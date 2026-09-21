@@ -634,9 +634,9 @@ export class Screens {
     if (!el) return;
     const n = (v: number): string => v.toLocaleString('ko-KR');
     el.innerHTML =
-      `<span class="site-stat ok">안전운전 성공 : <b>${n(s.success)}</b>회</span>` +
-      `<span class="site-stat bad">안전운전 실패 : <b>${n(s.fail)}</b>회</span>`;
-    el.setAttribute('aria-label', `이 사이트의 안전운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
+      `<span class="site-stat ok">전체 안전운전 성공 : <b>${n(s.success)}</b>회</span>` +
+      `<span class="site-stat bad">전체 안전운전 실패 : <b>${n(s.fail)}</b>회</span>`;
+    el.setAttribute('aria-label', `이 사이트 전체의 안전운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
     el.hidden = false;
   }
 
@@ -748,7 +748,7 @@ export class Screens {
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
-          (이어서 운행 · 시범 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
+          (이어서 안전운전 연습 · 시범 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
         -->
         <button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>
         <button class="icon ghost" id="btn-settings" title="설정" aria-label="설정">${icon(
@@ -905,7 +905,7 @@ export class Screens {
           */
           `<button class="btn primary" id="btn-generate">${icon('play')}마스터 운행</button>` +
           `<button class="btn" id="btn-ending">엔딩 다시 보기</button>`
-        : `<button class="btn primary" id="btn-generate">${icon('play')}${c.runs ? '이어서 운행' : '우회전 운행 시작'}</button>`;
+        : `<button class="btn primary" id="btn-generate">${icon('play')}${c.runs ? '이어서 안전운전 연습' : '우회전 안전운전 연습'}</button>`;
 
     const resetButton = this.resetCourseButton(save);
 
@@ -987,7 +987,7 @@ export class Screens {
         -->
         <div class="ai-course-actions">${button}<button class="btn" id="btn-ai-drive">${icon(
           'auto',
-        )}AI 자율 주행 시범</button>${resetButton}</div>
+        )}자율 주행</button>${resetButton}</div>
         ${ai.error ? `<p class="ai-note" style="color:var(--amber)">${esc(ai.error)}</p>` : ''}
 
       </div>

@@ -248,7 +248,7 @@ describe('수동 주행의 습관 기록 — recordHabits', () => {
     const before = freshCurriculum();
     const s = recordHabits(before, run(['PEDESTRIAN_BLOCKED']));
     expect(s.level).toBe(before.level);
-    expect(s.runs, "'이어서 운행' 은 AI 과정을 한 판이라도 했을 때의 말이다").toBe(before.runs);
+    expect(s.runs, "'이어서 안전운전 연습' 은 AI 과정을 한 판이라도 했을 때의 말이다").toBe(before.runs);
     expect(s.missStreak).toBe(before.missStreak);
     expect(s.bestLevel).toBe(before.bestLevel);
   });
