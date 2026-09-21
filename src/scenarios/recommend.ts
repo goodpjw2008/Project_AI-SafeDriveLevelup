@@ -308,8 +308,8 @@ export const PICKER_LABEL: Record<Picker, string> = {
   openrouter: 'OpenRouter',
   nvidia: 'NVIDIA',
   openai: 'OpenAI',
-  quota: 'AI 어우참',
-  rule: '어우참 규칙',
+  quota: 'AI 우회전',
+  rule: '우회전 규칙',
   random: '무작위 뽑기',
 };
 
@@ -771,7 +771,7 @@ export function masterPick(recentIds: readonly number[], random: () => number = 
   const fresh = pool.filter((e) => !recent.has(e.spec.id));
   const from = fresh.length ? fresh : pool;
   const entry = from[Math.min(from.length - 1, Math.floor(random() * from.length))];
-  const why = `어우참 마스터 — ${levelLabel(MAX_LEVEL)} 코스 ${pool.length.toLocaleString()}개 중에서 무작위로 골랐습니다.`;
+  const why = `우회전 마스터 — ${levelLabel(MAX_LEVEL)} 코스 ${pool.length.toLocaleString()}개 중에서 무작위로 골랐습니다.`;
   return {
     scenario: toScenario(entry, MAX_LEVEL, why, '처음부터 다시 시작하기 전까지 마스터 운행이 이어집니다', 'rule', 'random'),
     source: 'rule',

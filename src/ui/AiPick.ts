@@ -1,12 +1,12 @@
 /**
- * **AI 어우참이 코스를 고르는 장면** — 분석 연출과 추천 결과.
+ * **AI 우회전이 코스를 고르는 장면** — 분석 연출과 추천 결과.
  *
  * "이어서 운행" 을 누르면 AI 가 실제로 하는 일을 순서대로 보여 준다:
  *  ① 주행 기록 읽기 → ② 나쁜 운전 습관 분석 → ③ 6천여 시나리오에서 후보 추리기 → ④ AI 가 하나 고르기.
  * 단계의 숫자와 습관 이름은 **실제 값**이다 (recommend.ts 가 알려 준다). ④는 AI 의 답이 올 때까지 돈다 —
  * 연출이 AI 보다 먼저 끝나거나, 답이 왔는데 연출만 도는 일이 없게 한다.
  *
- * 연출이 끝나면 결과 카드로 바뀐다 — "AI 어우참이 운전자분에게 추천 시나리오 「…」 - 3700번을 선택해
+ * 연출이 끝나면 결과 카드로 바뀐다 — "AI 우회전이 운전자분에게 추천 시나리오 「…」 - 3700번을 선택해
  * 줬습니다" 와 추천 사유. 그 뒤에서 맵을 준비하고, 준비가 끝나면(그리고 읽을 틈이 지나면) 걷힌다.
  *
  * 화면(DOM)만 다룬다. 언제 무엇을 띄울지는 main.ts 가 정한다.
@@ -50,7 +50,7 @@ export class AiPickOverlay {
   private bar = $('ai-pick-bar');
   private img = $('ai-pick-img') as HTMLImageElement;
   /**
-   * **분석 화면의 원래 제목** ("AI 어우참이 운전 습관을 분석하고 있습니다") — 처음 한 번 읽어 둔다.
+   * **분석 화면의 원래 제목** ("AI 우회전이 운전 습관을 분석하고 있습니다") — 처음 한 번 읽어 둔다.
    *
    * 답이 오면 `setAnalyst` 가 제목을 "Gemini … 모델이 분석하고 있습니다" 로 **갈아 끼우는데**, 다음 판의 분석을
    * 시작할 때 이것을 되돌리지 않아 **지난 판에 답한 AI 이름**이 그대로 남아 있었다. 그래서 새 판의 답이 올
@@ -120,7 +120,7 @@ export class AiPickOverlay {
     for (let i = 0; i < items.length; i++) {
       if (run !== this.run) return;
       const text = steps[i];
-      // 'AI 어우참이 …' 의 이름은 신호등 딱지로 — 제목 · 말풍선과 같은 모양 (brandName.ts)
+      // 'AI 우회전이 …' 의 이름은 신호등 딱지로 — 제목 · 말풍선과 같은 모양 (brandName.ts)
       items[i].innerHTML = `<span class="mark"></span><span>${withBrandChips(
         esc(typeof text === 'function' ? text() : text),
       )}</span>`;
@@ -144,7 +144,7 @@ export class AiPickOverlay {
     await sleep(350);
   }
 
-  /** 결과 카드 — "Gemini 가 골라 줬습니다!" + "AI 어우참이 … 를 선택해 줬습니다" */
+  /** 결과 카드 — "Gemini 가 골라 줬습니다!" + "AI 우회전이 … 를 선택해 줬습니다" */
   showResult(r: PickResult): void {
     this.run++;
     this.img.src = robotCaution;

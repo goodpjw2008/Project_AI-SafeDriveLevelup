@@ -2,7 +2,7 @@
  * **플레이어 칸** — 내 레벨과 경험치를 보여 주는 **단 하나의 모양**.
  *
  * ```
- * ⬢6  어우참 L6                    150 / 500 XP
+ * ⬢6  우회전 Level6                150 / 500 XP
  *     ███████████░░░░░░░░░░░░░░░░░░░░░░░░░
  *     L7까지 350 XP · 새 맵 무위반 +100          (아랫줄은 있을 때만)
  * ```
@@ -32,7 +32,7 @@ export interface PlayerInfo {
   level: Difficulty;
   /** 지금 레벨에서 모은 경험치 */
   xp: number;
-  /** 다음 레벨(L10 은 어우참 마스터)까지 필요한 경험치 — 난이도가 곱해진 값 (curriculum.ts 의 xpToNext) */
+  /** 다음 레벨(L10 은 우회전 마스터)까지 필요한 경험치 — 난이도가 곱해진 값 (curriculum.ts 의 xpToNext) */
   need: number;
   mastered: boolean;
   /** 남은 나쁜 운전 습관 수 — 막대가 찼는데 오르지 못한 이유를 아랫줄이 말한다 */
@@ -46,7 +46,7 @@ export type PlayerSize = 'lg' | 'md' | 'hud';
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
-/** 호칭의 '어우참' 을 이름과 같은 신호등 딱지 셋으로 칠한다 (brandName.ts) */
+/** 호칭 맨 앞의 '우회전' 을 이름과 같은 신호등 딱지 셋으로 칠한다 (brandName.ts) */
 const branded = (text: string): string => withBrandChips(esc(text));
 
 /**
@@ -57,7 +57,7 @@ const branded = (text: string): string => withBrandChips(esc(text));
  */
 export function playerFoot(p: PlayerInfo): string {
   if (p.mastered) return `마스터 운행 — 처음부터 다시 시작하기 전까지 ${levelLabel(MAX_LEVEL)} 코스가 무작위로 이어집니다`;
-  const target = p.level >= MAX_LEVEL ? '어우참 마스터' : levelLabel((p.level + 1) as Difficulty);
+  const target = p.level >= MAX_LEVEL ? '우회전 마스터' : levelLabel((p.level + 1) as Difficulty);
   if (p.xp >= p.need) {
     return p.habitsLeft
       ? `경험치가 가득 찼습니다 — 나쁜 습관 ${p.habitsLeft}개를 고치면 ${target}`

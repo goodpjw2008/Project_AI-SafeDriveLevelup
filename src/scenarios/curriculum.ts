@@ -65,7 +65,7 @@ export const XP_REPLAY = 50;
 /** 나쁜 운전 습관 하나를 고친 판에 더 얹는 경험치 — 고친 것이 곧 보상이다 */
 export const XP_HABIT_FIXED = 50;
 /**
- * **다음 레벨까지 필요한 경험치** (난이도 3 '보통' 기준). L10 은 어우참 마스터까지다.
+ * **다음 레벨까지 필요한 경험치** (난이도 3 '보통' 기준). L10 은 우회전 마스터까지다.
  * 새 맵 무위반 한 판이 100 이라, 이 값 ÷ 100 이 그 레벨에 머무는 판 수다 — 3 · 3 · 4 · 4 · 5 · 5 · 6 · 7 · 8 · 10판(모두 55판).
  *
  * ## 어느 레벨도 한 판으로는 오르지 않는다
@@ -275,10 +275,10 @@ export const levelLabel = (level: Difficulty): string => `Level${level}`;
  * 닿은 것과 해낸 것을 같은 말로 부르면 목표가 사라진다.
  */
 export function courseTitle(state: Pick<CurriculumState, 'level' | 'mastered'>): string {
-  // 호칭은 작품 이름을 따른다 — 'AI 어우참 안전운전' 의 어우참 (brand.ts)
-  if (state.mastered) return '어우참 마스터';
-  if (state.level >= MAX_LEVEL) return `어우참 ${levelLabel(MAX_LEVEL)} 도전`;
-  return `어우참 ${levelLabel(state.level)}`;
+  // 호칭은 작품 이름을 따른다 — 'AI 우회전 참교육' 의 우회전 (brand.ts). 예전 이름은 '어우참' 이었다
+  if (state.mastered) return '우회전 마스터';
+  if (state.level >= MAX_LEVEL) return `우회전 ${levelLabel(MAX_LEVEL)} 도전`;
+  return `우회전 ${levelLabel(state.level)}`;
 }
 
 /**

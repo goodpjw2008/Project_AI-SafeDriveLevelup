@@ -59,7 +59,7 @@ import { nav } from './ui/nav';
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 // 시트 바깥을 누르면 한 칸 되돌아간다 — 어디로 돌아가는지는 히스토리가 안다
 const screens = new Screens({ onDismiss: () => nav.back() });
-/** AI 어우참이 코스를 고르는 장면 — 분석 연출 → 추천 결과 (ui/AiPick.ts) */
+/** AI 우회전이 코스를 고르는 장면 — 분석 연출 → 추천 결과 (ui/AiPick.ts) */
 const aiPick = new AiPickOverlay();
 const hud = new Hud();
 const audio = new GameAudio();
@@ -272,7 +272,7 @@ async function makeAiScenario(): Promise<void> {
         history.length ? `주행 기록 ${history.length}판을 읽는 중` : '첫 주행입니다 — 기본 판단부터 확인하는 중',
         `나쁜 운전 습관 분석 — ${habitsText}`,
         () => `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
-        () => `AI 어우참이 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+        () => `AI 우회전이 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
       ],
       picking,
     );
@@ -1438,7 +1438,7 @@ function finishRun(result: JudgeResult): void {
 }
 
 /**
- * **엔딩** — L10 을 마치고 어우참 마스터가 되면 AI 어우참이 축하한다. 그 뒤로는 **마스터 운행**이 이어진다.
+ * **엔딩** — L10 을 마치고 우회전 마스터가 되면 AI 우회전이 축하한다. 그 뒤로는 **마스터 운행**이 이어진다.
  *
  * 한때 엔딩에서 게임이 끝났다(첫 화면에 '엔딩 다시 보기' 만 남음). 그 뒤 사용자가 "마스터 단계가 되고, 처음부터 다시
  * 시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게 해 줘" 라고 해서, 첫 화면의 '마스터 운행' 으로 L10

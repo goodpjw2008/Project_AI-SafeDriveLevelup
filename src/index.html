@@ -380,7 +380,7 @@
       }
       /*
         ── About (Screens.ts 의 renderAbout) ─────────────────────────────
-        만든 사람이 직접 쓴 글이 주인공이다. 왼쪽에 AI 어우참, 오른쪽에 글 — 읽는 폭(약 60자)을 넘지 않게 창을 좁게 둔다.
+        만든 사람이 직접 쓴 글이 주인공이다. 왼쪽에 AI 우회전, 오른쪽에 글 — 읽는 폭(약 60자)을 넘지 않게 창을 좁게 둔다.
       */
       #screen-about .screen-inner {
         max-width: 860px;
@@ -715,7 +715,7 @@
       }
 
       /*
-        ── AI 어우참이 코스를 고르는 장면 (ui/AiPick.ts) ─────────────────
+        ── AI 우회전이 코스를 고르는 장면 (ui/AiPick.ts) ─────────────────
         분석 중에는 로봇 둘레를 스캔 고리가 돌고 단계가 하나씩 켜진다. 결과가 나오면 같은 카드가
         추천 결과로 바뀐다 (.result) — 화면이 한 번 갈아 끼워지지 않고 이어지는 것이 요점이다.
       */
@@ -1051,8 +1051,8 @@
 
       /*
         ── 엔딩 ─────────────────────────────────────────────────
-        L10 을 마치고 어우참 마스터가 된 판에 뜬다 (main.ts 의 showEnding). 결과 화면의 한 줄이나 작은 창으로는 **게임이
-        끝났다**는 것이 드러나지 않았다 — AI 어우참이 화면 한가운데에서 직접 축하한다. 그 뒤로는 마스터 운행(L10 코스 무작위)이 이어진다 — 사용자가 "처음부터 다시
+        L10 을 마치고 우회전 마스터가 된 판에 뜬다 (main.ts 의 showEnding). 결과 화면의 한 줄이나 작은 창으로는 **게임이
+        끝났다**는 것이 드러나지 않았다 — AI 우회전이 화면 한가운데에서 직접 축하한다. 그 뒤로는 마스터 운행(L10 코스 무작위)이 이어진다 — 사용자가 "처음부터 다시
         시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게" 해 달라고 했다.
       */
       .ending {
@@ -1554,8 +1554,9 @@
         word-break: keep-all;
       }
       /*
-        **'어우참' 세 글자는 신호등의 세 등이다** — 적색 · 황색 · 녹색 딱지 (brand.ts 의 APP_NAME_PARTS).
-        사용자가 이름을 바꾸며 "어우참 을 신호등의 색깔로" 라고 했다. 나란히 서면 이름 자체가 신호등으로 보인다.
+        **'우회전' 세 글자는 신호등의 세 등이다** — 적색 · 황색 · 녹색 딱지 (brand.ts 의 APP_NAME_PARTS).
+        예전 이름 '어우참' 에서 사용자가 "신호등의 색깔로" 라고 해 만든 딱지를, 이름을 바꾸며 '우회전' 에 그대로
+        옮겼다. 나란히 서면 이름 자체가 신호등으로 보인다.
 
         색은 지어내지 않고 화면에서 가져온다. 제목의 글자와 판에서 보는 것이 같은 색이면, 둘이 같은 것을 가리킨다는
         것이 말하지 않아도 보인다. 글자에만 색을 주는 것보다 딱지가 맞다 — 칠한 바탕이라야 켜진 등처럼 읽힌다.
@@ -1563,7 +1564,7 @@
         `em` 으로 재는 이유: 제목 크기가 화면 폭을 따라 26~38px 로 움직인다(clamp).
         px 로 두면 좁은 화면에서 딱지만 헐렁해진다.
 
-        **이름과 부제를 한 줄에** — `AI 어우참 안전운전 : 어린이보호구역 우회전 참교육`.
+        **이름과 부제를 한 줄에** — `AI 우회전 참교육 : 우회전과 어린이보호구역 안전운전 참교육`.
         글자 아랫선을 맞춰(baseline) 크기가 다른 두 줄이 한 문장처럼 읽히게 하고, 좁은 화면에서는
         부제가 다음 줄로 내려간다(wrap).
       */
@@ -1614,7 +1615,7 @@
       }
       /*
         **세 딱지 묶음** (ui/brandName.ts) — 제목 밖에서 이름이 나오는 자리(AI 분석 · 추천 결과 · 말풍선 · 엔딩)도
-        같은 딱지를 쓴다. 묶음째로 줄을 넘겨 '어우' 와 '참' 이 두 줄로 갈라지지 않게 하고, 둘레 글이 가늘어도
+        같은 딱지를 쓴다. 묶음째로 줄을 넘겨 '우회' 와 '전' 이 두 줄로 갈라지지 않게 하고, 둘레 글이 가늘어도
         딱지는 이름답게 굵게 둔다.
       */
       .brand-chips {
@@ -1705,27 +1706,6 @@
         .brand-ai {
           animation: none;
         }
-      }
-      /*
-        **부제에서는 딱지가 아니라 색 글자다** — 낱말의 첫 글자(어 · 우 · 참)만 이름과 같은 색으로 칠해, '어우참' 이
-        어디서 왔는지를 보인다 (brand.ts 의 APP_TAGLINE_PARTS). 어두운 바탕 위라 딱지 색보다 밝은 신호 값을 쓴다.
-      */
-      .brand-sub .brand-red,
-      .brand-sub .brand-yellow,
-      .brand-sub .brand-green {
-        background: none;
-        padding: 0;
-        margin: 0;
-        font-weight: 900;
-      }
-      .brand-sub .brand-red {
-        color: #ff6b60;
-      }
-      .brand-sub .brand-yellow {
-        color: #ffc21a;
-      }
-      .brand-sub .brand-green {
-        color: var(--green);
       }
       /* 출발 — 이 화면에서 가장 큰 것 */
       button.hero-cta {
@@ -3249,7 +3229,7 @@
 
         예전에는 제목 아래에 플레이 전 안내 문장(brief)이 두 줄로 붙어 있었다. 주행 중에
         그 문장을 다시 읽는 사람은 없고, 상자가 커질수록 하늘과 전방 신호등을 가렸다.
-        지금 무엇을 해야 하는지는 AI 어우참이 바로 아래에서 말해 준다.
+        지금 무엇을 해야 하는지는 AI 우회전이 바로 아래에서 말해 준다.
       */
       .hud-objective {
         padding: 10px 22px;
@@ -3527,7 +3507,7 @@
       }
 
       /*
-        **AI 어우참의 말풍선** — 진행 판단(서행 진행 · 일시정지 · 보행자 통행 확인)과
+        **AI 우회전의 말풍선** — 진행 판단(서행 진행 · 일시정지 · 보행자 통행 확인)과
         정지 거리를 로봇이 말한다.
 
         예전에는 두 줄의 알약(판단 · 거리)이 따로 떠 있었다. 이 게임의 AI 는 판을 만들고
@@ -3895,11 +3875,11 @@
       /*
         **색이 결과를 먼저 말한다** (사용자가 정했다).
 
-          잘 달린 판 → 초록 · 신호등을 든 어우참(turnlight.webp)
-          어긴 판   → 붉은색 · 손을 들어 세우는 어우참(stop.webp)
+          잘 달린 판 → 초록 · 신호등을 든 AI 우회전(turnlight.webp)
+          어긴 판   → 붉은색 · 손을 들어 세우는 AI 우회전(stop.webp)
 
         글을 읽기 전에 어느 쪽인지 알 수 있어야 한다. 아직 답을 기다리는 동안에는 호박색이다 —
-        이름 딱지의 '우'(#f2a900) 와 같은 계열이라 '어우참이 무언가 하고 있다' 로 읽힌다.
+        이름 딱지의 '회'(#f2a900) 와 같은 계열이라 'AI 우회전이 무언가 하고 있다' 로 읽힌다.
         (한때 전부 파랑→보라였는데 어두운 바탕에서 읽기 어려웠다)
       */
       .verdict {
@@ -4825,7 +4805,7 @@
           </div>
           <div class="signal-chip" id="signalchip"></div>
           <!--
-            **AI 어우참의 말풍선** — 진행 판단 · 정지 거리 · 보행자 움직임을 로봇이 말한다.
+            **AI 우회전의 말풍선** — 진행 판단 · 정지 거리 · 보행자 움직임을 로봇이 말한다.
             로봇 그림이 상태(평소 · 일시정지 · 우회전)에 따라 바뀐다 (ui/Hud.ts).
 
             **과제 상자 바로 아래(가운데 위)에 둔다.** 한때 왼쪽 아래로 옮겼다 — 이 높이가
@@ -4834,9 +4814,9 @@
             택해 되돌렸다. 가려질 수 있는 보행자는 머리 위 느낌표(Pedestrian.ts)가 짚어 준다.
           -->
           <div class="drive-coach" id="drive-coach">
-            <img class="drive-coach-robot" id="drive-coach-robot" alt="AI 어우참" />
+            <img class="drive-coach-robot" id="drive-coach-robot" alt="AI 우회전" />
             <div class="drive-coach-bubble">
-              <span class="drive-coach-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span></span>
+              <span class="drive-coach-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span></span>
               <div class="advice" id="advice"></div>
               <div class="stopdist" id="stopdist"></div>
               <div class="ped-cue" id="ped-cue"></div>
@@ -4968,17 +4948,17 @@
     </div>
 
     <!--
-      AI 어우참이 코스를 고르는 장면 (ui/AiPick.ts) — 분석 연출 → 추천 결과. 결과 카드 뒤에서 맵을 준비한다.
+      AI 우회전이 코스를 고르는 장면 (ui/AiPick.ts) — 분석 연출 → 추천 결과. 결과 카드 뒤에서 맵을 준비한다.
     -->
     <div class="ai-pick" id="ai-pick" role="dialog" aria-live="polite" aria-labelledby="ai-pick-title" hidden>
       <div class="ai-pick-card">
         <div class="ai-pick-robot">
           <div class="ai-pick-ring" aria-hidden="true"></div>
-          <img id="ai-pick-img" alt="AI 어우참" />
+          <img id="ai-pick-img" alt="AI 우회전" />
         </div>
         <div class="ai-pick-analyzing">
           <!-- 이름은 신호등 딱지 셋 — 첫 화면 제목 · 말풍선과 같은 마크업 (ui/brandName.ts 의 BRAND_CHIPS_HTML) -->
-          <h2 id="ai-pick-title"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span>이 운전 습관을 분석하고 있습니다</h2>
+          <h2 id="ai-pick-title"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span>이 운전 습관을 분석하고 있습니다</h2>
           <ol class="ai-pick-steps" id="ai-pick-steps"></ol>
           <div class="ai-pick-track"><i id="ai-pick-bar"></i></div>
         </div>
@@ -4989,7 +4969,7 @@
             코드가 고른 판에는 AI 이름을 쓰지 않는다 (ui/AiPick.ts 의 showResult).
           -->
           <p class="ai-pick-picked" id="ai-pick-picked"></p>
-          <p class="ai-pick-lead"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span>이 운전자분에게 추천 시나리오 <b id="ai-pick-name"></b><span id="ai-pick-josa">을</span> 선택해 줬습니다.</p>
+          <p class="ai-pick-lead"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span>이 운전자분에게 추천 시나리오 <b id="ai-pick-name"></b><span id="ai-pick-josa">을</span> 선택해 줬습니다.</p>
           <p class="ai-pick-why"><b>추천 사유</b> : <span id="ai-pick-why"></span></p>
           <p class="ai-pick-focus" id="ai-pick-focus"></p>
           <p class="ai-pick-status" id="ai-pick-statusbox">
@@ -5001,8 +4981,8 @@
     </div>
 
     <!--
-      **엔딩** — L10 의 경험치를 채우고 나쁜 습관을 모두 고쳐 어우참 마스터가 된 판에 뜬다 (main.ts 의 showEnding).
-      AI 어우참이 직접 축하하고, 그 뒤로는 마스터 운행이 이어진다. 첫 화면에서 "엔딩 다시 보기" 로 다시 볼 수 있다.
+      **엔딩** — L10 의 경험치를 채우고 나쁜 습관을 모두 고쳐 우회전 마스터가 된 판에 뜬다 (main.ts 의 showEnding).
+      AI 우회전이 직접 축하하고, 그 뒤로는 마스터 운행이 이어진다. 첫 화면에서 "엔딩 다시 보기" 로 다시 볼 수 있다.
     -->
     <div class="modal ending" id="ending" role="dialog" aria-modal="true" aria-labelledby="ending-title" hidden>
       <div class="ending-card">
@@ -5011,9 +4991,9 @@
         </div>
         <p class="ending-kicker">ENDING</p>
         <div class="ending-stage">
-          <img class="ending-robot" id="ending-robot" alt="AI 어우참" />
+          <img class="ending-robot" id="ending-robot" alt="AI 우회전" />
           <div class="ending-bubble">
-            <span class="ending-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span></span>
+            <span class="ending-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span></span>
             <h2 id="ending-title">축하합니다!</h2>
             <p class="ending-line">우회전과 어린이보호구역<br />안전운전 마스터가 되셨습니다!!!</p>
             <p class="ending-stats" id="ending-stats"></p>

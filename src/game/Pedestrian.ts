@@ -164,7 +164,7 @@ function alertTexture(kind: 'intending' | 'crossing'): THREE.CanvasTexture | nul
       tex.colorSpace = THREE.SRGBColorSpace;
       return tex;
     };
-    // 색은 AI 어우참 말풍선의 보행자 알림과 같다 (index.html 의 .ped-cue)
+    // 색은 AI 우회전 말풍선의 보행자 알림과 같다 (index.html 의 .ped-cue)
     alertTextures = { intending: make(ALERT_AMBER, '#1b1300'), crossing: make(ALERT_RED, '#ffffff') };
   }
   return alertTextures[kind];

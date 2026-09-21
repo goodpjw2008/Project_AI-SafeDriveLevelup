@@ -14,7 +14,7 @@ describe('플레이어 칸', () => {
       expect(html).toContain(`class="player ${size}`);
       expect(html).toContain('level-badge-wrap earned');
       expect(html).toContain(
-        '<span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span> Level6',
+        '<span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span> Level6',
       );
       expect(html).toContain('<b>150</b> / 400 XP');
       expect(html).toContain('width:37.5%');
@@ -44,7 +44,7 @@ describe('플레이어 칸', () => {
     const done = playerCard({ ...l10, mastered: true }, 'md');
     expect(done).toContain('level-badge-wrap earned');
     expect(done).toContain('>MAX<');
-    expect(done).toContain('참</span></span> 마스터');
+    expect(done).toContain('전</span></span> 마스터');
     // 마스터의 뱃지는 숫자 10 이 아니라 M — 첫 화면 레벨 길의 마지막 칸과 같은 그림이다
     expect(done).toContain('>M</text>');
     expect(done).not.toContain('>10</text>');

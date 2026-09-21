@@ -10,6 +10,7 @@ import {
   APP_CONTACT,
   APP_COPYRIGHT_YEAR,
   APP_NAME_PARTS,
+  APP_TAGLINE,
   APP_TAGLINE_PARTS,
   APP_USAGE,
 } from '../brand';
@@ -673,15 +674,14 @@ export class Screens {
           비튼 그림이라 이 게임이 무엇을 가르치는 물건인지와 상관이 없었다.
           이름이 길어진 지금은 그 자리를 이름이 쓴다.
 
-          **'어우참' 세 글자가 신호등의 세 등이다** — 어(어린이보호구역) 적색 · 우(우회전) 황색 · 참(참교육) 녹색 딱지.
-          부제에서는 같은 색이 낱말의 첫 글자에만 붙는다. 어느 글자에 무슨 색인지는 brand.ts 가 정하고, 그 색이 실제로
-          무엇인지는 index.html 이 정한다.
+          **'우회전' 세 글자가 신호등의 세 등이다** — 우 적색 · 회 황색 · 전 녹색 딱지. 부제는 색 없는 글자다.
+          어느 글자에 무슨 색인지는 brand.ts 가 정하고, 그 색이 실제로 무엇인지는 index.html 이 정한다.
         -->
         <div class="brand-wrap">
           <h1 class="brand">${APP_NAME_PARTS.map((p) =>
             p.tone ? `<span class="brand-${p.tone}">${esc(p.text)}</span>` : esc(p.text),
           ).join('')}</h1>
-          <!-- '어우참' 은 만든 말이라 무엇의 첫 글자인지 같은 줄에서 바로 풀어 준다 — "이름 : 부제" -->
+          <!-- 이름이 무엇을 다루는지 같은 줄에서 넓혀 말한다 — "이름 : 부제" -->
           <span class="brand-colon" aria-hidden="true">:</span>
           <p class="brand-sub">${APP_TAGLINE_PARTS.map((p) =>
             p.tone ? `<span class="brand-${p.tone}">${esc(p.text)}</span>` : esc(p.text),
@@ -699,8 +699,8 @@ export class Screens {
 
       <div class="menu-links">
         <!--
-          **어린이보호구역이 먼저다** — 이름 '어우참' 의 차례(어린이보호구역 · 우회전 · 참교육)와 같게 둔다.
-          사용자가 이 순서로 바꿔 달라고 했다. 부제를 읽은 눈이 그 차례대로 버튼을 만난다.
+          **어린이보호구역이 먼저다** — 사용자가 이 순서로 바꿔 달라고 했다. (예전 이름 '어우참' 의 차례 — 어린이보호구역 ·
+          우회전 · 참교육 — 를 따른 것이다. 지금 부제는 '우회전과 어린이보호구역' 차례지만 순서는 사용자가 정한 대로 둔다.)
         -->
         <button id="btn-zone-help">${icon('guide')}어린이보호구역 운전 방법</button>
         <button id="btn-help">${icon('guide')}우회전 방법</button>
@@ -1153,7 +1153,7 @@ export class Screens {
     const gate =
       level < MAX_LEVEL
         ? `모두 고치면 <b>${esc(levelLabel((level + 1) as Difficulty))}</b>로 올라갑니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.`
-        : '모두 고쳐야 <b>어우참 마스터</b>가 됩니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.';
+        : '모두 고쳐야 <b>우회전 마스터</b>가 됩니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.';
     return wrap(`<div class="ai-note">${gate}</div><ul class="habit-list">${rows}</ul>`);
   }
 
@@ -1588,8 +1588,8 @@ export class Screens {
           ? /*
               **판정에 따라 색과 로봇이 바뀐다** (사용자가 정했다).
 
-               - 깨끗하게 통과 → 초록 · `turnlight.webp` (신호등을 들고 웃는 어우참)
-               - 규정을 어겼거나 완주 못 함 → 붉은색 · `stop.webp` (손을 들어 세우는 어우참)
+               - 깨끗하게 통과 → 초록 · `turnlight.webp` (신호등을 들고 웃는 AI 우회전)
+               - 규정을 어겼거나 완주 못 함 → 붉은색 · `stop.webp` (손을 들어 세우는 AI 우회전)
 
               같은 칸에 같은 색으로 칭찬과 지적을 담으면, 읽기 전에는 어느 쪽인지 알 수 없다. 색과 그림이
               먼저 말하고 글이 잇는다 — 위쪽 등급 배지(PERFECT · FAIL)와도 같은 편을 든다.
@@ -2324,7 +2324,7 @@ export class Screens {
    *
    * 글은 만든 사람이 직접 쓴 것이다. 맞춤법 세 군데('헷갈리는' · '잘 지키고' · '있을 것')만 고치고 말투와 문장은 그대로
    * 둔다 — 공모전 심사자가 읽는 것은 다듬은 문장이 아니라 **왜 만들었는가**다. 마지막 한 줄은 이 작품의 바람이라 따로
-   * 세운다. 옆에는 주행 중 곁을 지키는 AI 어우참(normal.webp)이 선다 — 글이 말하는 'AI 의 도움' 이 누구인지 보이게.
+   * 세운다. 옆에는 주행 중 곁을 지키는 AI 우회전(normal.webp)이 선다 — 글이 말하는 'AI 의 도움' 이 누구인지 보이게.
    */
   /**
    * **맵 체험하기** — 시나리오 번호를 넣으면 그 판을 바로 달린다 (main.ts 의 mapTrial).
@@ -2369,10 +2369,11 @@ export class Screens {
         id: 'about',
         title: 'About',
         backLabel: '닫기',
-        sub: `${AI_BADGE_HTML} ${BRAND_CHIPS_HTML} 안전운전 — 어린이보호구역 우회전 참교육`,
+        // 이름(배지 + 딱지 + ' 참교육')과 부제 — 첫 화면 제목과 같은 말이다 (brand.ts)
+        sub: `${AI_BADGE_HTML} ${BRAND_CHIPS_HTML} 참교육 — ${esc(APP_TAGLINE)}`,
       })}
       <div class="about-body">
-        <img class="about-robot" src="${robotNormal}" alt="AI 어우참" />
+        <img class="about-robot" src="${robotNormal}" alt="AI 우회전" />
         <div class="about-text">
           <p>이 프로그램은 교통법규 중 지키기 힘든 부분을 <b>AI의 도움을 받아서 훈련</b>을 하는 프로그램입니다.</p>
           <p>아빠 차를 타며 헷갈리는 상황들을 많이 봤었습니다. 그리고 AI를 활용해서 훈련하는 곳을 만들면 많은 사람들이
