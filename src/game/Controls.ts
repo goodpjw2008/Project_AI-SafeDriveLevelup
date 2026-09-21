@@ -12,6 +12,8 @@ export interface ControlCallbacks {
   onPause(): void;
   onLook(dx: number, dy: number): void;
   onRecenter(): void;
+  /** 정지 · 출발 상태가 바뀌었다 — 터치 방향키의 ↑ · ↓ 불을 맞춘다 (키보드로 바꿔도 알린다) */
+  onStopChange?(stopped: boolean): void;
 }
 
 /**
@@ -159,6 +161,7 @@ export class Controls {
   /** 정지/진행 토글. 터치 버튼과 키보드가 함께 쓴다. */
   setStopped(on: boolean): void {
     this.stopped = on;
+    this.cb.onStopChange?.(on);
   }
 
   get isStopped(): boolean {
@@ -204,8 +207,8 @@ export class Controls {
         e.preventDefault();
         if (e.repeat) return;
         this.keys[k] = true;
-        if (k === 'stop') this.stopped = true;
-        if (k === 'go') this.stopped = false;
+        if (k === 'stop') this.setStopped(true);
+        if (k === 'go') this.setStopped(false);
         if (k === 'glanceLeft' || k === 'glanceRight') this.emitGlance();
       }
     };

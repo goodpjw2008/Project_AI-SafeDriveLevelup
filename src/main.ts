@@ -475,6 +475,7 @@ const controls = new Controls(canvas, {
   onLook: (dx, dy) => game?.look(dx, dy),
   onGlance: (dir) => game?.setGlance(dir),
   onRecenter: () => game?.recenterLook(),
+  onStopChange: () => syncGoStop(),
 });
 
 for (const [id, action] of [
@@ -485,15 +486,24 @@ for (const [id, action] of [
   if (el) controls.attachSteerButton(el, action);
 }
 
-// 정지/진행 토글 — 신호를 기다리는 동안 버튼을 계속 누르고 있지 않아도 된다
-const stopBtn = document.getElementById('t-stop');
-stopBtn?.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  void audio.resume();
-  controls.setStopped(!controls.isStopped);
-  stopBtn.classList.toggle('on', controls.isStopped);
-  stopBtn.textContent = controls.isStopped ? '출발' : '정지';
-});
+/*
+  **방향키 ↑ 출발 · ↓ 정지** — 키보드의 ↑ · ↓ 와 같다 (사용자 요청). 한 번 누르면 그 상태로 있으므로 신호를 기다리는
+  동안 손가락을 계속 대고 있지 않아도 된다. 지금 상태의 버튼에 불이 들어온다 (index.html 의 #t-up.on · #t-down.on).
+*/
+function syncGoStop(): void {
+  document.getElementById('t-up')?.classList.toggle('on', !controls.isStopped);
+  document.getElementById('t-down')?.classList.toggle('on', controls.isStopped);
+}
+for (const [id, stop] of [
+  ['t-up', false],
+  ['t-down', true],
+] as const) {
+  document.getElementById(id)?.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    void audio.resume();
+    controls.setStopped(stop);
+  });
+}
 document.getElementById('t-signal')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   void audio.resume();
@@ -1062,11 +1072,8 @@ async function startRun(id: number): Promise<void> {
   if (!aiDriving && !mapTrial) beginRun();
   // 깜빡이는 기본 점등 상태로 시작하므로 터치 버튼도 켜진 모습으로 맞춘다
   document.getElementById('t-signal')?.classList.toggle('on', controls.rightSignal);
-  const stopBtnEl = document.getElementById('t-stop');
-  if (stopBtnEl) {
-    stopBtnEl.classList.remove('on');
-    stopBtnEl.textContent = '정지';
-  }
+  // 판은 가는 상태로 시작한다 (controls.reset) — ↑ 에 불을 켠다
+  syncGoStop();
 
   screens.hideAll();
   /*

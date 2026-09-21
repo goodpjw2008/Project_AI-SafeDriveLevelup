@@ -3318,8 +3318,8 @@
         주행 중 나가는 길.
 
         **좌하단 맨 아래**에 둔다. 위쪽 좌·우 끝은 운전자 시점의 시야 창이 쓰고(보행자를
-        보는 창이라 절대 덮으면 안 된다), 우하단은 계기판, 그 위는 키 안내와 터치
-        조향 버튼 자리다. 세 시점 모두에서 비어 있는 곳은 여기뿐이다.
+        보는 창이라 절대 덮으면 안 된다), 우하단은 계기판, 그 위는 키 안내 자리다. 세 시점 모두에서 비어 있는
+        곳은 여기뿐이다. 계기판이 왼쪽 아래로 오는 작은 화면 · 터치 기기에서는 계기판 위로 올린다 (아래 규칙들).
 
         **눈에 띄지 않게 둔다.** 운전 중에 자꾸 보일 이유가 없는 버튼이라, 평소에는
         흐리게 두고 마우스를 올렸을 때만 또렷해진다.
@@ -3468,10 +3468,11 @@
         letter-spacing: 0;
       }
       @media (max-width: 760px) {
+        /* 왼쪽 아래는 계기판 · 홈으로 자리라 플레이어 칸 자리로 올린다 (자율 주행 중에는 플레이어 칸이 숨는다) */
         .hud-auto {
           font-size: 16px;
           padding: 10px 14px;
-          bottom: 16px;
+          bottom: 196px;
         }
         .hud-auto .sub {
           display: none;
@@ -3776,55 +3777,122 @@
       body.ai-drive #touch {
         display: none;
       }
-      .tbtn {
+      /*
+        **방향키 십자** — 키보드의 ↑ ← → ↓ 와 같은 자리 (사용자 요청). 오른쪽 아래에 둔다.
+
+        예전에는 ◀ ▶ 를 왼쪽에, 정지 · 깜빡이를 오른쪽에 떨어뜨려 놓아, 키보드로 익힌 사람도 처음 보는 사람도
+        무엇이 어디 있는지 새로 익혀야 했다. 한 덩어리로 모으니 화면 안내(← → 좌우 ↑ 출발 ↓ 정지)와 모양이 같다.
+
+        **↑ · ↓ 는 누르고 있을 필요가 없다** — 키보드와 같이 한 번 누르면 그 상태로 있는다(신호를 기다리는 동안
+        손가락을 떼도 서 있다). 지금 상태의 버튼에 불이 들어온다: 가는 중이면 ↑ 초록, 서 있으면 ↓ 빨강.
+        ← → 는 누르고 있는 동안만 돈다.
+      */
+      .dpad {
         position: absolute;
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        display: grid;
+        grid-template-columns: repeat(3, 60px);
+        grid-template-rows: repeat(3, 60px);
+        gap: 5px;
+        pointer-events: none;
+      }
+      .tbtn {
         pointer-events: auto;
-        width: 74px;
-        height: 74px;
-        border-radius: 50%;
-        background: rgba(28, 34, 48, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 14px;
+        background: rgba(28, 34, 48, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
         backdrop-filter: blur(8px);
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-size: 13px;
-        font-weight: 800;
+        gap: 1px;
         color: var(--text);
+        font-weight: 800;
         user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      .tbtn .ar {
+        font-size: 22px;
+        line-height: 1;
+      }
+      .tbtn .lb {
+        font-size: 11px;
+        line-height: 1;
       }
       .tbtn:active {
-        background: rgba(60, 74, 102, 0.9);
+        background: rgba(60, 74, 102, 0.95);
+        transform: translateY(2px);
+        box-shadow: none;
+      }
+      #t-up {
+        grid-area: 1 / 2;
+      }
+      #t-signal {
+        grid-area: 1 / 3;
+        font-size: 11px;
       }
       #t-left {
-        left: 20px;
-        bottom: 108px;
+        grid-area: 2 / 1;
       }
       #t-right {
-        left: 108px;
-        bottom: 108px;
+        grid-area: 2 / 3;
       }
-      #t-stop {
-        right: 20px;
-        bottom: 108px;
-        width: 88px;
-        height: 88px;
-        font-size: 15px;
+      #t-down {
+        grid-area: 3 / 2;
       }
-      #t-stop.on {
+      /* 지금 상태 — 가는 중 ↑ 초록 · 서 있음 ↓ 빨강 (main.ts 의 syncGoStop) */
+      #t-up.on {
         background: rgba(46, 224, 106, 0.85);
         color: #05210f;
       }
-      #t-signal {
-        right: 24px;
-        bottom: 210px;
-        width: 62px;
-        height: 62px;
-        font-size: 11px;
+      #t-down.on {
+        background: rgba(255, 69, 58, 0.88);
+        color: #fff;
       }
       #t-signal.on {
-        background: rgba(255, 176, 32, 0.85);
+        background: rgba(255, 176, 32, 0.88);
         color: #171100;
+      }
+
+      /*
+        **터치 기기의 왼쪽 아래 한 줄** — 아래부터 계기판 → 홈으로 → 플레이어 칸 (오른쪽 아래는 방향키가 쓴다).
+
+        예전에는 작은 화면에서 계기판을 왼쪽 아래로 옮기면서 **같은 자리의 '홈으로' 가 계기판을 덮었다**
+        (사용자가 짚었다). 홈으로는 계기판 바로 위에 작게 올린다. 화면 폭이 아니라 **터치 기기이면** 이 배치를 쓴다 —
+        넓은 태블릿에서도 오른쪽 아래는 방향키 자리라, 계기판이 오른쪽에 남으면 둘이 겹친다.
+
+        계기판은 폭 46vw(최대 240px) · 높이는 폭의 0.332배다. 좁은 폰(390px)에서 계기판 오른쪽 끝이 방향키 십자의
+        **비어 있는 왼쪽 아래 칸**까지 들어가는데, 높이가 60px 남짓이라 그 위의 ◀ 와는 닿지 않는다.
+      */
+      body.touch #cluster {
+        right: auto;
+        left: max(12px, env(safe-area-inset-left));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        width: min(46vw, 240px);
+      }
+      body.touch .hud-home {
+        left: max(12px, env(safe-area-inset-left));
+        bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(46vw, 240px) * 0.332 + 10px);
+        font-size: 14px;
+        padding: 8px 16px;
+      }
+      body.touch .keyhints {
+        display: none;
+      }
+      /* 방향키 십자(아래 12px + 높이 190px) 위 — 폭이 넓어도 방향키 위로 올라가 겹치지 않는다 */
+      body.touch .hud-player {
+        left: max(12px, env(safe-area-inset-left));
+        bottom: 218px;
+        width: min(62vw, 300px);
+      }
+      /* 자율 주행 표시도 같은 자리 — 그때는 플레이어 칸이 숨는다 */
+      body.touch .hud-auto {
+        left: max(12px, env(safe-area-inset-left));
+        bottom: 218px;
       }
 
       /* 주행 지도 — 어디서 걸렸는지 */
@@ -4738,9 +4806,8 @@
           margin-left: 12px;
         }
         /*
-          작은 화면에서는 계기판을 **좌하단**으로 옮긴다. 우하단은 터치 조작 버튼
-          (정지·깜빡이)이 쓰는 자리다. 폭도 키운다 — 30vw 로는 눈금이 뭉개진다.
-          높이(폭의 0.332배)가 86px 이라 아래에서 98px 까지만 차지해, 버튼(아래 108px)과 닿지 않는다.
+          작은 화면에서는 계기판을 **좌하단**으로 옮긴다 (터치 기기는 위의 body.touch 규칙이 다시 정한다 —
+          오른쪽 아래가 방향키 자리다). 폭도 키운다 — 30vw 로는 눈금이 뭉개진다.
         */
         #cluster {
           right: auto;
@@ -4749,9 +4816,15 @@
           width: min(52vw, 260px);
         }
         /*
-          플레이어 칸은 작게 줄여 **터치 방향 버튼(아래 108~182px) 위**에 둔다. 조작 안내가 사라진 자리라
-          더 내릴 수도 있지만, 그러면 터치 기기에서 ← → 버튼과 겹친다.
+          **홈으로는 계기판 바로 위**로 올리고 작게 줄인다. 계기판이 왼쪽 아래로 오면서 원래 자리(왼쪽 아래 18px)의
+          홈으로가 계기판을 덮었다 (사용자가 짚었다).
         */
+        .hud-home {
+          bottom: calc(12px + min(52vw, 260px) * 0.332 + 10px);
+          font-size: 14px;
+          padding: 8px 16px;
+        }
+        /* 플레이어 칸은 작게 줄여 홈으로 위에 둔다 */
         .hud-player {
           left: 12px;
           bottom: 196px;
@@ -4947,11 +5020,18 @@
       </div>
 
       <!-- ── 모바일 컨트롤 ─────────────────────────────────────── -->
+      <!--
+        **키보드 방향키와 같은 모양** — 위(출발) · 좌 · 우 · 아래(정지)를 십자로 (사용자 요청).
+        깜빡이는 십자의 빈 오른쪽 위 칸에 둔다 — 키보드에서 Q 로 켜고 끄는 것을 손가락 하나 거리에.
+      -->
       <div id="touch">
-        <div class="tbtn" id="t-left">◀</div>
-        <div class="tbtn" id="t-right">▶</div>
-        <div class="tbtn" id="t-stop">정지</div>
-        <div class="tbtn" id="t-signal">깜빡이</div>
+        <div class="dpad">
+          <div class="tbtn" id="t-up" aria-label="출발"><span class="ar">▲</span><span class="lb">출발</span></div>
+          <div class="tbtn" id="t-signal" aria-label="깜빡이">깜빡이</div>
+          <div class="tbtn" id="t-left" aria-label="왼쪽"><span class="ar">◀</span></div>
+          <div class="tbtn" id="t-right" aria-label="오른쪽"><span class="ar">▶</span></div>
+          <div class="tbtn" id="t-down" aria-label="정지"><span class="ar">▼</span><span class="lb">정지</span></div>
+        </div>
       </div>
 
       <!--
