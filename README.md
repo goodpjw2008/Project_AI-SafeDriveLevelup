@@ -1,4 +1,9 @@
-# AI 우회전 참교육 — 우회전과 어린이보호구역 안전운전 참교육
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/title-dark.png">
+    <img src="docs/title-light.png" alt="AI 우회전 참교육 — 우회전과 어린이보호구역 안전운전 참교육" width="880">
+  </picture>
+</h1>
 
 이 프로그램은 교통법규 중 지키기 힘든 부분을 AI의 도움을 받아서 훈련을 하는 프로그램입니다.
 
