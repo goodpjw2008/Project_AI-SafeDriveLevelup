@@ -1,6 +1,7 @@
 {
   "name": "turn-right",
   "private": true,
+  "license": "MIT",
   "version": "1.0.0",
   "type": "module",
   "description": "개정 도로교통법 우회전 규정 학습용 3D 운전 시뮬레이터",

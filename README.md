@@ -49,15 +49,14 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다.
 
 ![About](screenshot/09_about.png)
 
-※ 라이선스 — © 2026 goodpjw2008 · 비영리 목적으로만 사용할 수 있습니다.
+※ 라이선스 — © 2026 goodpjw2008
 
-함께 쓴 자료와 라이선스는 아래와 같습니다. 3D 자동차 모델 중 일부가 비영리(NC) 조건이라 이 프로그램 전체를 비영리로만 공개합니다. 모델마다의 이름 · 만든 사람 · 원본 링크는 프로그램의 '오픈소스 · 저작권' 화면에 있습니다.
+| 자산 | 라이선스 |
+|---|---|
+| 자체 작성 코드 | [**MIT License**](LICENSE) |
+| 로봇 캐릭터 '안전이' 그림(Google Gemini로 생성) · README 글과 그림 | [**CC BY 4.0**](LICENSE-ASSETS) |
+| 3D 자동차 모델 9종 · 전시관 차 사진 | 원작자 라이선스 — CC BY 4.0 · CC BY-NC 4.0 · CC BY-NC-SA 4.0 |
+| 효과음 · 환경광(HDRI) | CC0 1.0 |
+| 글꼴 Pretendard · 아이콘 Lucide · three.js | SIL OFL 1.1 · ISC · MIT |
 
-| 자료 | 출처 · 만든 사람 | 라이선스 |
-|---|---|---|
-| 3D 자동차 모델 9종 | Sketchfab — Armored Wave, Ddiaz Design, Nieve5677, VTX, twr422 | CC BY 4.0 · CC BY-NC 4.0 · CC BY-NC-SA 4.0 |
-| 효과음 | Freesound — andrewfordham, NachtmahrTV, boedie, The_Cri | CC0 1.0 |
-| 환경광(HDRI) | Poly Haven — Sergej Majboroda, Greg Zaal | CC0 1.0 |
-| 글꼴 | Pretendard | SIL OFL 1.1 |
-| 아이콘 | Lucide | ISC |
-| 3D 렌더링 | three.js | MIT |
+다만 3D 자동차 모델 중 4종(아반떼 N · M8 · M5 · SL63)이 비영리(NC) 조건이라, 이 모델이 들어 있는 배포 사이트는 비영리로만 운영합니다. 모델별 출처와 수정 사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 참고하시기 바랍니다.
