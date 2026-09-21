@@ -53,7 +53,7 @@ import type { HabitSummary } from '../coach/habits';
 const MAX_TRIES = 3;
 
 /** 한 번 요청의 상한 — 코치(12초)보다 길게 잡는다. 생성이 더 무겁다 */
-const TIMEOUT_MS = 20_000;
+export const TIMEOUT_MS = 20_000;
 
 /**
  * AI 가 만든 판. `ScenarioSpec` 에 **왜 이걸 만들었는지**가 붙는다.

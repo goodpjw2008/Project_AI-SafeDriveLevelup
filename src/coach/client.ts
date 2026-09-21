@@ -43,7 +43,7 @@ interface CoachRequest {
  * 디브리핑은 코치를 기다리는 화면이 아니다 — 지도와 위반 카드는 이미 떠 있고,
  * 코치는 그 위에 얹히는 것뿐이다. 오래 걸리면 그냥 없는 것으로 친다.
  */
-const TIMEOUT_MS = 12_000;
+export const TIMEOUT_MS = 12_000;
 
 export function toCoachRequest(
   stage: number,

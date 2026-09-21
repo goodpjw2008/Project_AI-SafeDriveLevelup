@@ -13,7 +13,21 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { BadInput, callModel, num, oneOf, order, providersFor, ratio, str } from '../server/llm.mjs';
+import {
+  ATTEMPT_TIMEOUT_MS,
+  BadInput,
+  TOTAL_BUDGET_MS,
+  callModel,
+  num,
+  oneOf,
+  order,
+  providersFor,
+  ratio,
+  str,
+} from '../server/llm.mjs';
+import { TIMEOUT_MS as COACH_TIMEOUT_MS } from '../src/coach/client';
+import { TIMEOUT_MS as SCENARIO_TIMEOUT_MS } from '../src/scenarios/generate';
+import { TIMEOUT_MS as RECOMMEND_TIMEOUT_MS } from '../src/scenarios/recommend';
 
 type Env = Record<string, string | undefined>;
 
@@ -299,5 +313,73 @@ describe('입력 좁히기', () => {
   it('oneOf — 정해 둔 값만 프롬프트에 실린다', () => {
     expect(oneOf('PASS', ['PASS', 'FAIL'], 'grade')).toBe('PASS');
     expect(() => oneOf('무엇', ['PASS', 'FAIL'], 'grade')).toThrow('grade: 알 수 없는 값');
+  });
+});
+
+/*
+  **멈춘 곳을 끝없이 기다리지 않는다.**
+
+  배포(Vercel)에서 한 제공자가 답을 쥔 채 멈추자, 다음 곳으로 넘어가지 못한 함수가 30초 뒤 통째로 잘렸다
+  (`FUNCTION_INVOCATION_TIMEOUT`). 브라우저는 그보다 먼저 포기해 규칙 추천으로 넘어갔다 — 다른 곳들이 멀쩡히
+  살아 있는데도 AI 추천이 빠졌다. 시계는 가짜로 돌린다 (진짜로 5초씩 기다리면 테스트가 느려진다).
+*/
+describe('멈춘 곳 끊기', () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** `hang(url)` 이 참인 곳은 답하지 않는다 — 끊겨야(abort) 비로소 실패한다 */
+  function stubHanging(hang: (url: string) => boolean): string[] {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', (url: string, init: { signal?: AbortSignal }) => {
+      urls.push(url);
+      if (hang(url)) {
+        return new Promise((_, reject) =>
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+        );
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ choices: [{ message: { content: '{"id":1}' } }] }),
+        text: () => Promise.resolve(''),
+      });
+    });
+    return urls;
+  }
+
+  it('한 곳이 멈추면 한 곳 몫의 시간 안에 끊고 다음 곳이 답한다', async () => {
+    vi.useFakeTimers();
+    stubHanging((url) => host(url) === 'googleapis');
+    const t0 = Date.now();
+    const pending = ask(ALL);
+    await vi.advanceTimersByTimeAsync(ATTEMPT_TIMEOUT_MS);
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(res.body.provider).not.toBe('gemini');
+    expect(Date.now() - t0).toBeLessThanOrEqual(ATTEMPT_TIMEOUT_MS);
+  });
+
+  it('모두 멈추면 예산 안에 포기하고, 한도 초과(429)로 읽히지 않는 실패를 돌려준다', async () => {
+    vi.useFakeTimers();
+    stubHanging(() => true);
+    const t0 = Date.now();
+    const pending = ask(ALL);
+    await vi.advanceTimersByTimeAsync(TOTAL_BUDGET_MS);
+    const res = await pending;
+    expect(Date.now() - t0).toBeLessThanOrEqual(TOTAL_BUDGET_MS);
+    expect(res.status).not.toBe(200);
+    expect(res.body.error).toBe('UPSTREAM_TIMEOUT');
+    // 추천 화면은 본문의 status 429 를 "일일 사용량 초과" 로 읽는다 — 멈춘 것은 그게 아니다
+    expect(res.body.status).not.toBe(429);
+  });
+
+  /*
+    서버가 브라우저보다 **먼저** 포기해야 브라우저가 끊긴 연결이 아니라 "실패" 라는 답을 받는다. 오가는 길(연결 ·
+    함수 기동)에 1초를 남긴다.
+  */
+  it('한 요청의 예산은 브라우저가 기다리는 시간보다 짧다', () => {
+    for (const client of [COACH_TIMEOUT_MS, RECOMMEND_TIMEOUT_MS, SCENARIO_TIMEOUT_MS]) {
+      expect(TOTAL_BUDGET_MS + 1_000).toBeLessThanOrEqual(client);
+    }
+    expect(ATTEMPT_TIMEOUT_MS).toBeLessThan(TOTAL_BUDGET_MS);
   });
 });

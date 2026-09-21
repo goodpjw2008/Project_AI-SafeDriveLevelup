@@ -251,7 +251,7 @@ export function freshAxesFor(courses: readonly LibraryEntry[], cover: Coverage):
 }
 
 /** 한 번 요청의 상한 — 넘기면 코드가 고른다 */
-const TIMEOUT_MS = 15_000;
+export const TIMEOUT_MS = 15_000;
 
 /** 지난 주행 한 판 — AI 가 "무엇을 탔고 어떻게 됐는지" 를 본다 */
 export interface RecentRun {

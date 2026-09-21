@@ -30,6 +30,10 @@ export declare function providersFor(env: Record<string, string | undefined>): P
 /** 이번 요청에서 시도할 차례 — `start` 부터 한 바퀴 */
 export declare function order<T>(available: T[], start: number): T[];
 /** 모델을 부르고 문장 하나를 돌려준다. 던지지 않고 값으로 돌려준다 */
+/** 한 곳을 기다리는 시간 · 한 요청 전체의 예산 (ms) */
+export declare const ATTEMPT_TIMEOUT_MS: number;
+export declare const TOTAL_BUDGET_MS: number;
+
 export declare function callModel(
   prompt: { system: string; user: string; maxTokens: number; json?: boolean },
   env: Record<string, string | undefined>,

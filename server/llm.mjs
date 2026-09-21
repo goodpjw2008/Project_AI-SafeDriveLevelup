@@ -236,6 +236,27 @@ export function providersFor(env) {
 }
 
 /**
+ * **한 곳을 이만큼만 기다린다** (ms) — 넘으면 끊고 다음 곳으로 간다.
+ *
+ * 처음에는 기다림에 끝이 없었다. 배포(Vercel)에서 한 제공자가 답을 쥔 채 멈추자, 다음 곳으로 넘어가지 못하고
+ * 함수가 통째로 30초 동안 붙잡혀 있다가 `FUNCTION_INVOCATION_TIMEOUT` 으로 잘렸다. 그 사이 브라우저는 15초에
+ * 먼저 포기해 규칙 추천으로 넘어갔다 — **다른 두 곳이 멀쩡히 살아 있는데도** AI 추천이 빠진 것이다.
+ *
+ * 정상이면 2~3초에 온다 (배포판에서 잰 값). 5초면 느린 모델도 대개 넘기고, 멈춘 곳 하나를 버리고도 다음 곳을
+ * 물어볼 시간이 남는다.
+ */
+export const ATTEMPT_TIMEOUT_MS = 5_000;
+
+/**
+ * **한 요청 전체의 예산** (ms) — 여러 곳을 돌아도 이 안에서 끝낸다.
+ *
+ * 브라우저가 가장 먼저 포기하는 곳(코치 · 리포트 12초 — coach/client.ts)보다 **짧아야** 한다. 그래야 모두 실패해도
+ * 서버가 먼저 "실패" 를 돌려주고, 브라우저는 끊긴 연결이 아니라 답을 받아 제 길(규칙 추천 · 코치 없음)로 간다.
+ * 남는 1초는 오가는 길(연결 · 함수 기동)에 쓴다.
+ */
+export const TOTAL_BUDGET_MS = 11_000;
+
+/**
  * 모델을 부르고 문장 하나를 돌려준다.
  *
  * 던지지 않고 **상태 코드와 본문을 값으로** 돌려준다 — 부르는 쪽(Vite 미들웨어 · Cloudflare Workers)의 응답 만드는
@@ -266,16 +287,40 @@ export async function callModel({ system, user, maxTokens, json = false }, env) 
     없는 모델 이름은 404 다. 둘 다 **그 제공자에서만** 나는 실패다. 보낸 것이 정말 틀렸으면 세 곳이 모두
     같은 이유로 실패하고, 마지막 이유가 그대로 올라간다 (입력 자체는 핸들러가 이미 걸렀다).
   */
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   for (const provider of queue) {
-    const res = await once(provider, { system, user, maxTokens, json }, env);
+    const left = deadline - Date.now();
+    // 남은 예산으로는 한 곳도 제대로 물어볼 수 없다 — 붙잡고 있지 말고 지금까지의 실패를 돌려준다
+    if (left < 1_000) break;
+    const res = await once(provider, { system, user, maxTokens, json }, env, Math.min(ATTEMPT_TIMEOUT_MS, left));
     if (res.status === 200) return res;
     last = res;
   }
   return last;
 }
 
-/** 한 곳에 한 번 물어본다 */
-async function once(provider, { system, user, maxTokens, json }, env) {
+/**
+ * 한 곳에 한 번 물어본다 — `waitMs` 가 지나면 끊는다. **본문을 받는 동안에도** 끊는다 (머리만 보내고 본문을 끄는 곳이 있다).
+ *
+ * 끊겨서 실패한 것은 `UPSTREAM_TIMEOUT` 으로 가려 적는다. 본문의 `status` 는 429 가 아니어야 한다 — 브라우저가
+ * 그 값을 "AI 의 일일 사용량 초과" 로 읽는다 (scenarios/recommend.ts 의 askAi).
+ */
+async function once(provider, prompt, env, waitMs) {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), waitMs);
+  try {
+    const res = await request(provider, prompt, env, abort.signal);
+    if (res.status !== 200 && abort.signal.aborted) {
+      return { status: 504, body: { error: 'UPSTREAM_TIMEOUT', provider: provider.id, model: provider.model.id, status: 0 } };
+    }
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 한 곳에 보내고 받은 것을 값으로 돌려준다 (끊는 것은 `once` 가 한다) */
+async function request(provider, { system, user, maxTokens, json }, env, signal) {
   // 모델 이름도 함께 돌려준다 — 화면이 "Gemini gemini-3.1-flash-lite 모델이 골라 줬어요!" 라고 적는다 (사용자 요청)
   const model = provider.model.id;
   // 생각을 먼저 뱉는 모델은 예산이 모자라면 빈 답이 온다 — 그런 모델만 바닥을 높인다 (위 minOutput)
@@ -285,6 +330,7 @@ async function once(provider, { system, user, maxTokens, json }, env) {
   let res;
   try {
     res = await fetch(provider.url(env), {
+      signal,
       method: 'POST',
       headers: { Authorization: `Bearer ${provider.key}`, 'content-type': 'application/json' },
       body: JSON.stringify({
