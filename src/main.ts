@@ -370,6 +370,8 @@ let autoNextLeft = 0;
 let autoNextHeld = false;
 /** 다 세면 시작할 판 */
 let autoNextTarget = 0;
+/** 시범 주행의 마지막 판 뒤 첫 화면으로 돌아가는 시계 — 화면을 떠나면 함께 끈다 (stopAutoNext) */
+let autoHomeTimer = 0;
 
 /**
  * 남은 초를 세다가 다음 Stage 를 시작한다.
@@ -379,6 +381,13 @@ let autoNextTarget = 0;
  */
 function startAutoNext(nextId: number): void {
   stopAutoNext();
+  /*
+    **결과 화면에 있을 때만 센다.** 세기 시작하는 때는 코치 문장이 도착한 뒤인데(onCoachReady), AI 가 답을 쓰는
+    사이 '홈으로' 를 누르면 그 알림이 **첫 화면에 온 뒤에** 온다. 결과 화면은 감춰졌을 뿐 문서에 남아 있어 코치
+    칸이 채워지고 알림도 그대로 온다 — 그때 세기 시작해 첫 화면에서 다음 판이 저절로 시작됐다 (사용자가 짚었다).
+    첫 화면이 stopAutoNext 로 시계를 끄는 것만으로는 막을 수 없다 — 그보다 **나중에** 켜지기 때문이다.
+  */
+  if (nav.current !== 'debrief') return;
   autoNextTarget = nextId;
   autoNextLeft = AUTO_NEXT_SECONDS;
   autoNextHeld = false;
@@ -390,6 +399,11 @@ function startAutoNext(nextId: number): void {
 function runAutoNextClock(): void {
   if (autoNextTimer) window.clearInterval(autoNextTimer);
   autoNextTimer = window.setInterval(() => {
+    // 결과 화면을 떠났는데 시계가 남아 있다 — 어느 길로 떠났든 넘기지 않는다 (위 startAutoNext 와 같은 까닭)
+    if (nav.current !== 'debrief') {
+      stopAutoNext();
+      return;
+    }
     autoNextLeft -= 1;
     if (autoNextLeft <= 0) {
       const next = autoNextTarget;
@@ -434,6 +448,8 @@ function toggleAutoNextHold(): void {
 function stopAutoNext(): void {
   if (autoNextTimer) window.clearInterval(autoNextTimer);
   autoNextTimer = 0;
+  if (autoHomeTimer) window.clearTimeout(autoHomeTimer);
+  autoHomeTimer = 0;
   autoNextLeft = 0;
   autoNextHeld = false;
   screens.setAutoNextCountdown(null);
@@ -1524,7 +1540,11 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
         onToggleAutoNextPause: () => toggleAutoNextHold(),
       }, null);
       if (nextId !== undefined) startAutoNext(nextId);
-      else window.setTimeout(() => goHome(), AUTO_NEXT_SECONDS * 1000);
+      // 마지막 시범 판 — 잠시 결과를 보여 준 뒤 첫 화면으로. 그 사이 떠났으면 끈다 (stopAutoNext · autoHomeTimer)
+      else autoHomeTimer = window.setTimeout(() => {
+        autoHomeTimer = 0;
+        if (nav.current === 'debrief') goHome();
+      }, AUTO_NEXT_SECONDS * 1000);
     },
   });
 }
