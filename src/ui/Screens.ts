@@ -674,7 +674,8 @@ export class Screens {
           비튼 그림이라 이 게임이 무엇을 가르치는 물건인지와 상관이 없었다.
           이름이 길어진 지금은 그 자리를 이름이 쓴다.
 
-          **'우회전' 세 글자가 신호등의 세 등이다** — 우 적색 · 회 황색 · 전 녹색 딱지. 부제는 색 없는 글자다.
+          **'우회전' 세 글자가 신호등의 세 등이다** — 우 적색 · 회 황색 · 전 녹색 딱지. 부제에서도 '우회전' 은 같은
+          딱지 셋이고, '어린이보호구역' 은 보호구역 노면과 같은 붉은 딱지다.
           어느 글자에 무슨 색인지는 brand.ts 가 정하고, 그 색이 실제로 무엇인지는 index.html 이 정한다.
         -->
         <div class="brand-wrap">
@@ -684,7 +685,11 @@ export class Screens {
           <!-- 이름이 무엇을 다루는지 같은 줄에서 넓혀 말한다 — "이름 : 부제" -->
           <span class="brand-colon" aria-hidden="true">:</span>
           <p class="brand-sub">${APP_TAGLINE_PARTS.map((p) =>
-            p.tone ? `<span class="brand-${p.tone}">${esc(p.text)}</span>` : esc(p.text),
+            p.tone
+              ? `<span class="brand-${p.tone}">${esc(p.text)}</span>`
+              : p.keep
+                ? `<span class="brand-keep">${esc(p.text)}</span>`
+                : esc(p.text),
           ).join('')}</p>
         </div>
         <!--

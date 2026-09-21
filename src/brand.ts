@@ -39,14 +39,22 @@
 /**
  * 이름 한 조각.
  *
- * `tone` 이 붙은 조각만 색을 입는다 (index.html 의 `.brand-red` · `.brand-yellow` · `.brand-green`).
+ * `tone` 이 붙은 조각만 색을 입는다 (index.html 의 `.brand-red` · `.brand-yellow` · `.brand-green` · `.brand-zone`).
  * 색을 여기서 정하지 않고 이름만 주는 이유는, 값은 화면의 것이고 **여기서 정하는 것은
  * "이 글자가 신호등의 어느 등인가"** 이기 때문이다.
  */
 export interface NamePart {
   text: string;
-  /** 신호등의 세 등 — 적색 · 황색 · 녹색. `ai` 는 'AI' 배지 (신호등과 다른 모양 · 다른 색) */
-  tone?: 'red' | 'yellow' | 'green' | 'ai';
+  /**
+   * 신호등의 세 등 — 적색 · 황색 · 녹색. `ai` 는 'AI' 배지 (신호등과 다른 모양 · 다른 색).
+   * `zone` 은 어린이보호구역 — 보호구역 노면과 같은 붉은 바탕 (부제의 '어린이보호구역')
+   */
+  tone?: 'red' | 'yellow' | 'green' | 'ai' | 'zone';
+  /**
+   * 줄이 접혀도 **한 덩어리로** 내려간다. 좁은 화면(390px)에서 부제가 두 줄이 될 때 '참교육' 만 홀로 아랫줄에
+   * 남았다 — 딱지의 여백만큼 윗줄이 길어져서다. '안전운전 참교육' 을 묶어 두면 '… 어린이보호구역' 에서 끊긴다.
+   */
+  keep?: boolean;
 }
 
 /**
@@ -103,11 +111,19 @@ export const APP_ICON_SVG = [
  *
  * 무엇을 다루는지(우회전과 어린이보호구역)를 이름보다 넓게 풀어 준다 — 탭 제목과 검색 결과에서 읽는 줄이다.
  *
- * **색을 칠하지 않는다.** 예전 이름 '어우참' 은 만든 말이라 부제의 첫 글자(어 · 우 · 참)를 같은 색으로 칠해 어디서
- * 왔는지 보였다. 지금 이름은 풀어 줄 것이 없고, 이름의 딱지 셋 옆에 색 글자가 또 있으면 무엇이 이름인지 흐려진다.
- * 조각으로 두는 것은 이름과 같은 모양으로 그리기 위해서다 (Screens.ts 의 첫 화면).
+ * **다루는 두 가지를 딱지로 칠한다** (사용자 요청) — '우회전' 은 제목과 같은 신호등 딱지 셋, '어린이보호구역' 은
+ * 보호구역 노면과 같은 붉은 바탕 하나. 부제를 읽기 전에 이 게임이 무엇을 다루는지 두 덩어리로 보인다. 나머지
+ * 낱말(과 · 안전운전 참교육)에는 칠하지 않는다 — 다 칠하면 무엇이 주제인지 흐려진다.
  */
-export const APP_TAGLINE_PARTS: readonly NamePart[] = [{ text: '우회전과 어린이보호구역 안전운전 참교육' }];
+export const APP_TAGLINE_PARTS: readonly NamePart[] = [
+  { text: '우', tone: 'red' },
+  { text: '회', tone: 'yellow' },
+  { text: '전', tone: 'green' },
+  { text: '과 ' },
+  { text: '어린이보호구역', tone: 'zone' },
+  { text: ' ' },
+  { text: '안전운전 참교육', keep: true },
+];
 
 export const APP_TAGLINE = APP_TAGLINE_PARTS.map((p) => p.text).join('');
 

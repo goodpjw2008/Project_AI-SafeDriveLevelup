@@ -1596,7 +1596,8 @@
       }
       .brand-red,
       .brand-yellow,
-      .brand-green {
+      .brand-green,
+      .brand-zone {
         color: #fff;
         padding: 0.04em 0.2em;
         border-radius: 0.12em;
@@ -1651,6 +1652,19 @@
       */
       .brand-green {
         background: #117332;
+      }
+      /*
+        **어린이보호구역** — 첫 화면 부제의 '어린이보호구역' 딱지 (brand.ts 의 APP_TAGLINE_PARTS · 사용자 요청).
+        이 게임이 그리는 보호구역 노면과 **같은 값**이다 (game/Intersection.ts 의 drawSchoolZonePavement) — 판에서 붉은
+        길을 보면 부제의 이 낱말이 떠오르게. 적색 딱지와 같은 값이지만 이름을 따로 두는 것은 가리키는 것이 달라서다
+        (신호등의 적색이 아니라 보호구역의 색). 흰 글자 6.65:1.
+      */
+      .brand-zone {
+        background: #a8322c;
+      }
+      /* 줄이 접혀도 한 덩어리로 내려가는 낱말 묶음 (brand.ts 의 NamePart.keep) */
+      .brand-keep {
+        white-space: nowrap;
       }
       /*
         **'AI' 배지** (brand.ts 의 APP_NAME_PARTS · ui/brandName.ts 의 AI_BADGE_HTML).

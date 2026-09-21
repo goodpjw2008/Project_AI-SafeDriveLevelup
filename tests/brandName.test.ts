@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AI_BADGE_HTML, BRAND_CHIPS_HTML, withAiBadge, withBrandChips } from '../src/ui/brandName';
-import { APP_ICON_SVG, APP_NAME, APP_NAME_PARTS, APP_TAGLINE } from '../src/brand';
+import { APP_ICON_SVG, APP_NAME, APP_NAME_PARTS, APP_TAGLINE, APP_TAGLINE_PARTS } from '../src/brand';
 
 /*
   **이름은 어디서나 같은 모양이다** (ui/brandName.ts) — 'AI' 는 배지, '우회전' 은 신호등 딱지 셋.
@@ -37,6 +37,19 @@ describe('이름 칠하기', () => {
       '전:green',
     ]);
     expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 안전운전 참교육');
+  });
+
+  /*
+    **부제는 다루는 두 가지를 칠한다** (사용자 요청) — '우회전' 은 제목과 같은 신호등 딱지 셋, '어린이보호구역' 은
+    보호구역 노면 색 딱지 하나. 나머지 낱말까지 칠하면 무엇이 주제인지 흐려진다.
+  */
+  it("부제의 '우회전' 은 신호등 딱지 셋, '어린이보호구역' 은 보호구역 딱지", () => {
+    expect(APP_TAGLINE_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
+      '우:red',
+      '회:yellow',
+      '전:green',
+      '어린이보호구역:zone',
+    ]);
   });
 });
 
