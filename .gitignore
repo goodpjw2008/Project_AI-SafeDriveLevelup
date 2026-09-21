@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.vite/
+
+# API 키. 저장소에 들어가면 되돌릴 수 없다 — 커밋 이력에 남는다.
+.env
+.env.*
+!.env.example
+
+# build:standalone 산출물 — 빌드할 때마다 새로 만든다 (src/index.html 이 원본이다).
+# 앞의 / 는 루트의 것만 뜻한다 — 빼면 원본 src/index.html 까지 무시된다.
+/index.html
+
+# manage.sh 가 남기는 것
+.dev-server.pid
+.dev-server.log
+
+# 3D 모델 원본(수십 MB)은 저장소에 두지 않는다.
+# 최적화 결과(public/models/*.glb, 수백 KB)는 배포에 필요하므로 커밋한다.
+assets/

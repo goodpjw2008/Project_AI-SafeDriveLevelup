@@ -1,0 +1,33 @@
+{
+  "name": "turn-right",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "개정 도로교통법 우회전 규정 학습용 3D 운전 시뮬레이터",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "assets": "node scripts/optimize-models.mjs",
+    "assets:lod": "node scripts/build-lod-models.mjs",
+    "fix:mirror": "node scripts/remove-room-mirror.mjs",
+    "fix:view": "node scripts/remove-view-blockers.mjs",
+    "fix:windshield": "node scripts/clear-windshield.mjs",
+    "sounds": "node scripts/build-sounds.mjs",
+    "airobot": "node scripts/build-airobot.mjs"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2",
+    "@types/three": "^0.169.0",
+    "meshoptimizer": "^1.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}

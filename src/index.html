@@ -1,0 +1,5032 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- 이름·부제·설명은 src/brand.ts 에서 정한다 (vite.config.ts 가 여기에 끼워 넣는다) -->
+    <title>{{APP_NAME}} — {{APP_TAGLINE}}</title>
+    <!--
+      탭 아이콘 — **주황 바탕에 '우' 한 글자** (brand.ts 의 APP_ICON_SVG · 이름 딱지의 가운데 글자).
+      vite.config.ts 가 SVG 를 data URI 로 끼워 넣는다. 그림 파일을 그대로 가리키면 단일 파일 빌드에서 깨진다.
+    -->
+    <link rel="icon" type="image/svg+xml" href="{{APP_ICON}}" />
+    <meta name="description" content="{{APP_DESCRIPTION}}" />
+
+    <!--
+      본문 글꼴 (Pretendard, SIL OFL 1.1).
+
+      **없어도 그대로 돌아간다.** 아래 --font 의 대체 목록이 그 자리를 받는다 —
+      단일 파일 빌드(file://)나 인터넷이 없는 곳에서는 링크가 조용히 실패하고
+      시스템 글꼴로 그려진다. HDRI 환경광과 같은 취급이다.
+
+      동적 서브셋을 쓴다: 글꼴이 유니코드 구간별로 쪼개져 있어 **화면에 실제로 나온 글자가
+      든 조각만** 받는다. 한글 전체(약 2MB)를 통째로 받으면 첫 화면이 그만큼 늦어진다.
+    -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <style>
+      :root {
+        --bg: #0b0d12;
+        --panel: #151922;
+        --panel-2: #1c2230;
+        --line: #2a3242;
+        --text: #e8ecf2;
+        --muted: #97a2b5;
+        --green: #2ee06a;
+        --red: #ff453a;
+        --amber: #ffb020;
+        --blue: #4c8dff;
+        --radius: 14px;
+        /*
+          Pretendard 를 **맨 앞에** 둔다. 예전에는 시스템 글꼴(-apple-system) 뒤에 있어서
+          어디서도 쓰이지 않았다 — 맥에서는 앞의 것이 먼저 잡히고, 윈도우에서는 애초에
+          내려받지 않아 맑은 고딕으로 떨어졌다. 한글 UI 는 글꼴 하나로 인상이 갈린다.
+        */
+        --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+          'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Segoe UI', sans-serif;
+
+        /* 그림자 단계 — 카드가 배경 위에 떠 보여야 3D 화면 위에서도 읽힌다 */
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.28);
+        --shadow-2: 0 8px 40px rgba(0, 0, 0, 0.5);
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /*
+        ── 글은 고를 수 있어야 한다 ────────────────────────────
+        화면 하나가 통째로 3D 위에 덮인 앱이라 브라우저 문서처럼 안 보이지만,
+        **여기 적힌 것은 대부분 읽으라고 쓴 글이다** — 규정 요약, 조문 원문, 습관 리포트,
+        저작권. 옮겨 적거나 검색해 보려는 사람이 있고, 그 사람이 드래그를 못 하면
+        화면이 글을 붙들고 있는 셈이 된다.
+
+        기본값(`auto`)이 이미 고를 수 있으므로 여기서 새로 켜는 것은 없다. 다만 아래
+        **누르는 것들만 골라서 끈다** — 버튼과 카드를 두 번 눌렀을 때 글자가 파랗게
+        잡히면 눌린 것인지 골라진 것인지 알 수 없다.
+      */
+      button,
+      .menu-tab,
+      .card.clickable,
+      .rank-step,
+      .level-step,
+      .level-change,
+      .grade,
+      .badge,
+      #hud,
+      .tbtn,
+      .keyhints {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        overscroll-behavior: none;
+      }
+
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+
+      #scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+
+      /* ── 화면 레이어 ─────────────────────────────────────────── */
+      /*
+        화면은 **3D 씬 위에 반투명으로 덮는다.**
+
+        예전에는 불투명한 그라데이션이라 뒤에서 돌아가는 교차로가 완전히 가려졌다.
+        그래서 첫 화면이 글자만 남은 문서처럼 보였다 — 3D 운전 게임을 켰는데 첫인상이
+        설정 페이지인 셈이다. 덮개를 걷으면 뒤의 차와 신호등이 그대로 배경이 된다.
+
+        **읽기는 양보하지 않는다.** blur 로 뒤를 뭉개고 아래로 갈수록 짙어지는 그라데이션을
+        얹어, 배경이 무엇이든 본문 대비가 유지되게 한다.
+      */
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: linear-gradient(
+          180deg,
+          rgba(12, 16, 24, 0.34) 0%,
+          rgba(11, 13, 18, 0.62) 42%,
+          rgba(11, 13, 18, 0.8) 100%
+        );
+        -webkit-backdrop-filter: blur(9px) saturate(120%);
+        backdrop-filter: blur(9px) saturate(120%);
+      }
+      /*
+        덮개를 얇게 걷은 대신 **글자에 그림자를 깐다.**
+
+        카드 안의 글자는 카드 배경(불투명)이 받쳐 주지만, 카드 밖에 있는 것들
+        (제목·소제목·머리말·점수)은 곧바로 3D 씬 위에 놓인다. 배경은 카메라가 도는
+        동안 밝은 쪽으로도 지나가므로, 그때 대비가 무너지지 않게 어두운 그림자를
+        바짝 붙여 둔다 — 어두운 배경 위에서는 보이지 않고 밝은 배경 위에서만 일한다.
+      */
+      .screen h1,
+      .screen h2,
+      .screen > .screen-inner > p,
+      .screen .screen-head .lede {
+        text-shadow: 0 1px 3px rgba(4, 6, 10, 0.85), 0 0 12px rgba(4, 6, 10, 0.55);
+      }
+      /* 시트는 자기 패널이 불투명하다 — 그 안에서는 그림자가 글자를 흐리게만 만든다 */
+      .screen.sheet h1,
+      .screen.sheet h2,
+      .screen.sheet .lede,
+      .screen.sheet p {
+        text-shadow: none;
+      }
+      .screen.active {
+        display: block;
+        animation: screen-in 0.22s ease-out;
+      }
+      @keyframes screen-in {
+        from {
+          opacity: 0;
+        }
+      }
+      /*
+        backdrop-filter 를 못 쓰는 브라우저에서는 뒤가 그대로 비쳐 글자가 안 읽힌다.
+        그럴 때만 예전처럼 불투명하게 깐다.
+      */
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .screen {
+          background: radial-gradient(ellipse at 50% -10%, #1b2436 0%, #0b0d12 62%);
+        }
+      }
+      .screen-inner {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 28px 24px 80px;
+      }
+
+      /*
+        ── 화면 머리 ────────────────────────────────────────────
+        **나가는 문은 모든 화면에서 같은 자리에 있다.**
+
+        예전에는 설정·도움말·저작권은 제목 아래, 전시관은 그 아래 폼 뒤, 디브리핑은 맨
+        아래 '홈으로' 였다. 화면마다 문을 새로 찾아야 했다. 지금은 언제나 왼쪽 위다.
+      */
+      .screen-head {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: start;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .screen-head h1 {
+        margin: 0;
+      }
+      /*
+        **결과 화면의 제목만 작게** (사용자 요청 — 두 단계). 이 화면에서 주인공은 판 이름이 아니라 바로 아래의
+        AI 주행결과 분석이다. 다른 화면(전시관 · 도움말)의 제목은 그대로 둔다.
+      */
+      #screen-debrief .screen-head h1 {
+        font-size: clamp(23px, 4vw, 36px);
+      }
+      .screen-head .lede {
+        margin: 8px 0 0;
+      }
+      .screen-head-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      /* 뒤로 버튼 — 제목의 첫 줄 높이에 맞춰 붙는다 */
+      button.back {
+        padding: 9px 14px 9px 11px;
+        gap: 4px;
+        margin-top: 3px;
+      }
+      @media (max-width: 620px) {
+        .screen-head {
+          grid-template-columns: auto 1fr;
+        }
+        .screen-head-right {
+          grid-column: 1 / -1;
+          justify-content: flex-start;
+        }
+      }
+
+      /*
+        ── 시트(모달) ───────────────────────────────────────────
+        설정과 저작권처럼 **잠깐 열었다 닫는 것**은 화면을 통째로 갈아 끼우지 않는다.
+        전체 화면 교체는 "다른 곳으로 왔다"는 신호라, 돌아갈 곳이 어디였는지를 기억하게
+        만든다. 시트는 뒤에 있던 화면이 그대로 보여서 그 기억이 필요 없다.
+      */
+      .screen.sheet {
+        background: rgba(6, 9, 14, 0.62);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        display: none;
+        /* 뒤에 있던 화면 위에 뜬다 — DOM 순서에 기대지 않는다 */
+        z-index: 15;
+      }
+      .screen.sheet.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .screen.sheet .screen-inner {
+        width: 100%;
+        max-width: 760px;
+        max-height: min(86vh, 900px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: linear-gradient(180deg, #161b26, #11151d);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: var(--shadow-2);
+        padding: 26px 26px 30px;
+        animation: sheet-in 0.2s ease-out;
+      }
+      @keyframes sheet-in {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+      }
+      /*
+        **설정은 넓게** — 두 칸(연습 · 화질)을 나란히 두어 스크롤 없이 한 화면에 들어오게 한다.
+        좁은 화면에서는 한 칸으로 접히고, 그때만 스크롤한다.
+      */
+      /*
+        **저작권도 넓게** — 설정 창과 같은 폭. 760px 에서는 카드가 두 장씩 서서 소프트웨어 · 차량 모델 · 소리를 보려면
+        한참 내려야 했다. 넓히고 카드를 작게 해 1280×900 화면에서 스크롤 없이 한 번에 들어온다 (ui/Screens.ts 의 renderCredits).
+      */
+      #screen-credits .screen-inner {
+        max-width: 1180px;
+        max-height: 94vh;
+        padding: 22px 26px 24px;
+      }
+      /* 머리말은 넓힌 폭을 그대로 쓴다 — 기본 폭(62ch)이면 한 줄짜리가 두 줄로 접힌다 */
+      #screen-credits .screen-head .lede {
+        max-width: none;
+      }
+      /* 머리말 아래 여백을 줄인다 — 이 창은 한 화면에 들어오는 것이 먼저다 */
+      #screen-credits .screen-head {
+        margin-bottom: 4px;
+      }
+      /* 소리 넉 장은 두 칸 아래 전체 폭에 한 줄로 */
+      .credit-wide .credit-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      }
+      /*
+        **2 : 3** — 오른쪽 차량 모델(9)이 한 줄에 석 장씩 세 줄, 왼쪽 소프트웨어(7)가 두 장씩 네 줄이 되어 두 칸의 높이가
+        비슷해진다. 반반이면 차량 모델만 다섯 줄로 길어져 창을 넘었다.
+      */
+      .credit-cols {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        gap: 0 22px;
+      }
+      @media (max-width: 900px) {
+        .credit-cols {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .credit-lede {
+        margin: 10px 0 0;
+        font-size: 14px;
+        line-height: 1.65;
+        color: var(--muted);
+      }
+      .credit-lede b {
+        color: var(--text);
+      }
+      .credit-sec {
+        margin-top: 14px;
+      }
+      /* 절 제목과 한 줄 설명을 나란히 — 설명이 따로 한 줄을 차지하지 않게 */
+      .credit-h {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 12px;
+        margin-bottom: 8px;
+      }
+      .credit-h h2 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 800;
+      }
+      .credit-h p {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      /* 한 줄에 다섯 장 남짓 — 좁은 화면에서는 저절로 줄어든다 */
+      .credit-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 8px;
+      }
+      .credit-card {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 9px 11px;
+        border-radius: 10px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .credit-name {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      /* 긴 모델 이름 · 주소가 카드 밖으로 넘치지 않게 아무 데서나 접는다 */
+      .credit-link {
+        overflow-wrap: anywhere;
+      }
+      /* 라이선스 이름은 통째로 — 'CC BY-NC-' / 'SA 4.0' 으로 갈리면 다른 라이선스처럼 읽힌다 */
+      .credit-lic {
+        white-space: nowrap;
+      }
+      /*
+        ── About (Screens.ts 의 renderAbout) ─────────────────────────────
+        만든 사람이 직접 쓴 글이 주인공이다. 왼쪽에 AI 어우참, 오른쪽에 글 — 읽는 폭(약 60자)을 넘지 않게 창을 좁게 둔다.
+      */
+      #screen-about .screen-inner {
+        max-width: 860px;
+      }
+      #screen-about .screen-head .lede {
+        max-width: none;
+        font-weight: 700;
+      }
+      .about-body {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 26px;
+        align-items: center;
+        margin-top: 6px;
+        padding: 22px 24px;
+        border-radius: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .about-robot {
+        width: 100%;
+        height: auto;
+        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
+      }
+      .about-text p {
+        margin: 0 0 12px;
+        font-size: 16.5px;
+        line-height: 1.8;
+        color: var(--text);
+        word-break: keep-all;
+      }
+      /* 마지막 한 줄은 이 작품의 바람 — 따로 세운다 */
+      .about-text .about-wish {
+        margin: 16px 0 0;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--green);
+      }
+      .about-maker {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 8px;
+        margin-top: 16px;
+        font-size: 13.5px;
+        color: var(--muted);
+      }
+      .about-maker b {
+        color: var(--text);
+      }
+      .about-maker a,
+      .site-footer a {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .about-maker .dot,
+      .site-footer .dot {
+        opacity: 0.6;
+      }
+      @media (max-width: 620px) {
+        .about-body {
+          grid-template-columns: minmax(0, 1fr);
+          justify-items: center;
+          gap: 12px;
+        }
+        .about-robot {
+          width: 150px;
+        }
+        /* 좁으면 한 줄씩 쌓는다 — 접힌 줄이 '·' 로 시작하면 어색하다 */
+        .about-maker,
+        .site-footer {
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+        }
+        .about-maker .dot,
+        .site-footer .dot {
+          display: none;
+        }
+      }
+      /*
+        ── 첫 화면 맨 아래의 저작권 줄 (Screens.ts 의 siteFooter) ───────────────
+        사이트에서 흔한 꼴 — 가운데 · 작은 글자 · 위에 가는 선. 3D 배경 위에 곧바로 놓이므로 다른 카드 밖 글자처럼
+        어두운 그림자를 깐다(밝은 장면이 지나가도 읽히게).
+      */
+      .site-footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 8px;
+        margin: 28px 0 6px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 12.5px;
+        color: var(--muted);
+        text-shadow: 0 1px 3px rgba(4, 6, 10, 0.85);
+      }
+      #screen-settings .screen-inner {
+        max-width: 1180px;
+        max-height: 94vh;
+        padding: 22px 26px 24px;
+      }
+      .settings-cols {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 26px;
+        margin-top: 6px;
+      }
+      @media (max-width: 900px) {
+        .settings-cols {
+          grid-template-columns: 1fr;
+        }
+      }
+      .settings-h {
+        margin: 12px 0 2px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .settings-col > .settings-h:first-child {
+        margin-top: 0;
+      }
+      .settings-h-note {
+        margin-left: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      #screen-settings .opt-row {
+        padding: 9px 14px;
+        margin-top: 6px;
+      }
+      #screen-settings button.opt {
+        padding: 6px 11px;
+      }
+      .screen.sheet h1 {
+        font-size: clamp(22px, 3.4vw, 30px);
+      }
+      @media (max-width: 620px) {
+        /* 좁은 화면에서는 아래에서 올라오는 시트가 손이 닿는 자리다 */
+        .screen.sheet.active {
+          align-items: flex-end;
+          padding: 0;
+        }
+        .screen.sheet .screen-inner {
+          max-width: none;
+          max-height: 88vh;
+          border-radius: 18px 18px 0 0;
+          border-bottom: 0;
+        }
+      }
+
+      /* ── 타이포 ───────────────────────────────────────────────── */
+      h1 {
+        font-size: clamp(28px, 5vw, 44px);
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+        font-weight: 800;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 32px 0 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      p {
+        line-height: 1.7;
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .lede {
+        font-size: 16px;
+        color: #c3ccdb;
+        max-width: 62ch;
+      }
+      /*
+        링크. 브라우저 기본값(순수 파랑 + 밑줄)은 이 화면의 어느 색과도 맞지 않아
+        저작권 화면에서 목록보다 링크가 먼저 읽혔다. 마우스를 올렸을 때만 밑줄을 켠다.
+      */
+      a {
+        color: var(--blue);
+        text-decoration: none;
+        overflow-wrap: anywhere;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+
+      /* ── 버튼 ─────────────────────────────────────────────────── */
+      button {
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 11px 18px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, transform 0.08s;
+        /* 아이콘과 글자를 나란히 — 아이콘이 없는 버튼에는 아무 영향이 없다 */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+      }
+      /*
+        인라인 아이콘의 크기.
+
+        **버튼만으로는 모자랐다.** icons.ts 의 SVG 는 `viewBox` 만 있고 width·height 가
+        없어서, 크기를 정해 주는 규칙이 없는 자리에 놓이면 부모를 가득 채운다 —
+        결과 화면의 'AI 코치' 제목(div)에서 아이콘 하나가 카드를 통째로 덮은 적이 있다.
+
+        그래서 **버튼 밖에 놓이는 자리**도 함께 적는다. 새 자리를 만들 때마다 여기 한 줄을
+        더하는 것이 아이콘이 폭발하는 화면을 한 번 더 만나는 것보다 낫다.
+      */
+      button svg,
+      /*
+        **아이콘의 기본 크기** (ui/icons.ts 의 icon). 글자 크기를 따라가므로 제목에 넣든 본문에 넣든 어울린다.
+        크기를 안 주면 SVG 가 칸을 통째로 채운다 — 결과 화면에서 두 번 겪고 나서 기본값을 여기 둔다.
+        자리마다 따로 정해 둔 규칙(아래 · 버튼)은 더 구체적이라 이것을 이긴다.
+      */
+      .ico {
+        width: 1.1em;
+        height: 1.1em;
+        flex: 0 0 auto;
+      }
+      /* 제목 줄의 아이콘 — 카드 제목은 글자보다 조금 크게 */
+      .coach-title svg,
+      .tip-title svg {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+      }
+      /* 키보드로 옮겨 다니는 사람에게 지금 어디에 있는지 보여 준다 */
+      button:focus-visible,
+      .card.clickable:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      button:hover:not(:disabled) {
+        background: #253046;
+        border-color: #3d4a63;
+      }
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: linear-gradient(180deg, #3d8bff, #2f6fe0);
+        border-color: #4c8dff;
+      }
+      button.primary:hover:not(:disabled) {
+        background: linear-gradient(180deg, #4f97ff, #3a7bef);
+      }
+      button.ghost {
+        background: transparent;
+      }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+
+      /*
+        ── 확인 창 ─────────────────────────────────────────────
+        되돌릴 수 없는 동작 앞에서 묻는다. 브라우저 `confirm()` 대신 쓴다 —
+        이유는 아래 마크업(#modal)의 주석 참조.
+
+        **뒤를 어둡게 덮는다.** 시트(.sheet)보다 진하게 덮는 이유는, 시트는 "읽는 곳" 이라
+        뒤 화면이 비쳐 어디서 열었는지가 보여야 하지만 확인 창은 "답할 것이 하나뿐인 곳"
+        이라 다른 데로 눈이 가면 안 되기 때문이다.
+      */
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(4, 6, 10, 0.72);
+        backdrop-filter: blur(3px);
+      }
+      /* `hidden` 은 display:flex 에 지는 속성이라 명시적으로 꺼 준다 */
+      .modal[hidden] {
+        display: none;
+      }
+      .modal-card {
+        width: min(440px, 100%);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 26px 26px 20px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        animation: sheet-in 0.16s ease-out;
+      }
+      .modal-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.015em;
+      }
+      /*
+        본문은 **한 줄에 한 문장**이다. 지워지는 것을 묻는 창이라 훑어 읽히면 안 되고,
+        줄을 나눠 두면 "무엇이" 와 "계속할까요" 가 서로 다른 무게로 읽힌다.
+      */
+      .modal-body {
+        margin-top: 12px;
+        font-size: 15.5px;
+        line-height: 1.75;
+        color: #c3ccdb;
+      }
+      /*
+        **취소가 왼쪽, 계속이 오른쪽.** 그리고 처음 놓이는 손가락(focus)은 취소 쪽이다 —
+        되돌릴 수 없는 쪽이 기본이 되면 Enter 한 번에 기록이 사라진다.
+      */
+      .modal-actions {
+        margin-top: 22px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .modal-actions button {
+        min-width: 92px;
+      }
+
+      /*
+        ── AI 어우참이 코스를 고르는 장면 (ui/AiPick.ts) ─────────────────
+        분석 중에는 로봇 둘레를 스캔 고리가 돌고 단계가 하나씩 켜진다. 결과가 나오면 같은 카드가
+        추천 결과로 바뀐다 (.result) — 화면이 한 번 갈아 끼워지지 않고 이어지는 것이 요점이다.
+      */
+      .ai-pick {
+        position: fixed;
+        inset: 0;
+        z-index: 65;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: radial-gradient(circle at 50% 40%, rgba(20, 40, 32, 0.96), rgba(6, 9, 14, 0.97) 70%);
+        backdrop-filter: blur(6px);
+      }
+      .ai-pick[hidden] {
+        display: none;
+      }
+      .ai-pick-card {
+        width: min(640px, 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+        text-align: center;
+      }
+      .ai-pick-robot {
+        position: relative;
+        width: 230px;
+        height: 230px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ai-pick-robot img {
+        position: relative;
+        width: 190px;
+        height: 150px;
+        object-fit: contain;
+        animation: ai-pick-bob 1.6s ease-in-out infinite;
+      }
+      /* 스캔 고리 — 녹색 호가 로봇 둘레를 돈다 */
+      .ai-pick-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, rgba(46, 224, 106, 0) 0deg, rgba(46, 224, 106, 0.55) 90deg, rgba(46, 224, 106, 0) 160deg);
+        -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%, #000 70%, transparent 71%);
+        mask: radial-gradient(circle, transparent 62%, #000 63%, #000 70%, transparent 71%);
+        animation: ai-pick-spin 1.4s linear infinite;
+      }
+      .ai-pick.result .ai-pick-ring {
+        animation: none;
+        background: rgba(46, 224, 106, 0.35);
+      }
+      @keyframes ai-pick-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes ai-pick-bob {
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      .ai-pick h2 {
+        margin: 0;
+        font-size: clamp(20px, 2.6vw, 26px);
+        font-weight: 800;
+      }
+      /*
+        제목이 "Gemini gemini-3.1-flash-lite 모델이 운전 습관을 분석하고 있습니다" 로 바뀌면 길어진다
+        (ui/AiPick.ts 의 setAnalyst). 카드가 640px 이라 원래 크기(26px)로는 두 줄이 되고, 둘째 줄에 '습니다'
+        한 마디만 남아 어색하다. **이름이 붙은 제목만** 한 단계 줄여 한 줄에 담는다.
+      */
+      .ai-pick h2.named {
+        font-size: clamp(15px, 1.85vw, 19.5px);
+      }
+      .ai-pick h2 .picker-model {
+        font-size: 0.86em;
+      }
+      .ai-pick h2 .picker-chip {
+        font-size: 0.92em;
+      }
+      .ai-pick-steps {
+        list-style: none;
+        margin: 16px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        text-align: left;
+        font-size: 16px;
+      }
+      .ai-pick-steps li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.3s, transform 0.3s, color 0.3s;
+        color: var(--muted);
+      }
+      .ai-pick-steps li.on,
+      .ai-pick-steps li.done {
+        opacity: 1;
+        transform: none;
+      }
+      .ai-pick-steps li.on {
+        color: var(--text);
+      }
+      .ai-pick-steps .mark {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(46, 224, 106, 0.35);
+        border-top-color: var(--green);
+        animation: ai-pick-spin 0.8s linear infinite;
+      }
+      .ai-pick-steps li.done .mark {
+        animation: none;
+        border-color: var(--green);
+        background: var(--green);
+        -webkit-mask: none;
+        box-shadow: inset 0 0 0 3px #0b1510;
+      }
+      .ai-pick-track {
+        margin-top: 18px;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+      .ai-pick-track i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, #117332, var(--green));
+        transition: width 0.5s ease;
+      }
+      .ai-pick-analyzing {
+        width: 100%;
+      }
+      .ai-pick-result {
+        display: none;
+        flex-direction: column;
+        gap: 14px;
+        animation: sheet-in 0.3s ease-out;
+      }
+      .ai-pick.result .ai-pick-analyzing {
+        display: none;
+      }
+      .ai-pick.result .ai-pick-result {
+        display: flex;
+      }
+      /*
+        **고른 쪽 줄** — "✦Gemini 가 골라 줬습니다!" 판마다 이름이 바뀌는 자리라, 이름만 알약으로 도드라지게 한다.
+        알약 색은 제공자마다 다르다 — 같은 모양에 이름만 바뀌면 바뀐 줄도 모르고 지나간다.
+      */
+      .ai-pick-picked {
+        margin: 0 0 6px;
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .ai-pick-picked:empty {
+        display: none;
+      }
+      .picker-chip {
+        display: inline-block;
+        margin-right: 4px;
+        padding: 0.06em 0.5em;
+        border-radius: 999px;
+        color: #fff;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        /* 기본은 회색 — 코드가 고른 판 (AI 이름을 쓰지 않는다) */
+        background: #4b5563;
+      }
+      .picker-chip.picker-gemini {
+        background: linear-gradient(115deg, #1a73e8, #8e5cf7);
+      }
+      .picker-chip.picker-groq {
+        background: linear-gradient(115deg, #f55036, #ff9a3c);
+      }
+      .picker-chip.picker-cerebras {
+        background: linear-gradient(115deg, #b0402f, #e8632f);
+      }
+      .picker-chip.picker-openrouter {
+        background: linear-gradient(115deg, #5b6470, #8e9aab);
+      }
+      .picker-chip.picker-nvidia {
+        background: linear-gradient(115deg, #4d7c0f, #76b900);
+      }
+      /* 한도 초과 — 잘못은 아니지만 평소와 다르다는 표시 (호박색) */
+      .picker-chip.picker-quota {
+        background: linear-gradient(115deg, #a16207, #d97706);
+      }
+      .picker-chip.picker-openai {
+        background: linear-gradient(115deg, #10a37f, #1abc9c);
+      }
+      /* 모델 이름 — 알약 옆에 작게. 이름이 길어도(openai/gpt-oss-20b) 줄을 밀지 않게 */
+      .picker-model {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.86em;
+        color: var(--text);
+        opacity: 0.85;
+      }
+      .ai-pick-lead {
+        margin: 0;
+        font-size: clamp(18px, 2.3vw, 22px);
+        line-height: 1.6;
+        word-break: keep-all;
+      }
+      .ai-pick-lead b {
+        color: var(--green);
+      }
+      .ai-pick-why {
+        margin: 0;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(46, 224, 106, 0.25);
+        font-size: 16.5px;
+        line-height: 1.7;
+        text-align: left;
+        word-break: keep-all;
+      }
+      .ai-pick-focus {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffd66b;
+      }
+      /*
+        **맵 준비 → 출발** — 이 카드에서 "곧 시작한다" 를 알리는 유일한 줄이다.
+
+        14px 회색 한 줄에 8px 점 하나였다. 카드에서 가장 작고 흐린 글자였는데 정작 화면이 넘어가는 때를
+        알려 주는 것이 이 줄이라, 사용자가 "폰트도 작고 표현도 잘 보이지 않아" 라고 짚었다.
+
+        키우면서 **알약(테두리 + 배경 + ▶)으로 만들었더니 이번에는 버튼으로 보였다** — 사용자가 다시
+        짚었다: "출발합니다 부분이 버튼처럼 보여서 사용자가 눌러야 할 것 같은 착각을 일으키게 돼."
+        여기는 누를 것이 없는 자리다(맵이 준비되면 저절로 넘어간다). 그래서 **상자도 ▶ 도 없애고**
+        큰 글자와 **움직이는 점**만 남겼다 — 점이 구르는 동안은 기다리는 중이라는 뜻이고, 누르는
+        물건으로는 보이지 않는다. 마우스도 잡지 않는다(`pointer-events: none`).
+      */
+      .ai-pick-status {
+        margin: 16px 0 0;
+        /* 부모가 세로 flex 라 그냥 두면 가로로 늘어난다 — 내용만큼만 잡아 가운데에 둔다 */
+        align-self: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 11px;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.2px;
+        color: #b9e7c9;
+        /* 누를 것이 아니다 — 손가락 커서도, 글자 선택도 생기지 않게 한다 */
+        pointer-events: none;
+        user-select: none;
+        transition: color 0.25s ease;
+      }
+      .ai-pick-status .dots {
+        display: inline-flex;
+        gap: 6px;
+      }
+      .ai-pick-status .dots i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--green);
+        animation: ai-pick-bob 1.1s ease-in-out infinite;
+      }
+      /* 차례로 튄다 — 하나만 깜빡이면 '멈춰 있다' 로 보인다 */
+      .ai-pick-status .dots i:nth-child(2) {
+        animation-delay: 0.18s;
+      }
+      .ai-pick-status .dots i:nth-child(3) {
+        animation-delay: 0.36s;
+      }
+      /*
+        **출발** — 기다림이 끝났다는 것은 색과 움직임으로만 말한다. 모양(상자 · 화살표)을 주면 다시
+        버튼이 된다.
+
+        **점은 멈추지 않는다.** 처음에는 점 셋이 한 번 미끄러져 나가고 사라지게 했는데, 그러면
+        '출발합니다' 가 떠 있는 몇 초 동안 화면이 **멈춘 것처럼** 보였다 — 사용자가 짚었다: "진행 중인
+        것 같은 게 초기 한 번만 나오는데, 계속 나와서 동작 중이구나 라는 것을 인지할 수 있게 해 줘."
+        실제로 그동안 맵을 올리고 있으니 움직임이 끊기면 안 된다.
+
+        준비 중(제자리에서 튐)과 **움직임의 결을 다르게** 둔다 — 여기서는 왼쪽에서 오른쪽으로 **흘러간다.**
+        '앞으로 나아간다' 는 뜻이 출발과 맞고, 두 단계가 글자를 읽지 않아도 갈린다.
+      */
+      .ai-pick-status.go {
+        color: #7df2a8;
+        animation: ai-pick-go 0.5s ease-out;
+      }
+      .ai-pick-status.go .dots i {
+        animation: ai-pick-flow 1s ease-in-out infinite;
+      }
+      .ai-pick-status.go .dots i:nth-child(2) {
+        animation-delay: 0.16s;
+      }
+      .ai-pick-status.go .dots i:nth-child(3) {
+        animation-delay: 0.32s;
+      }
+      @keyframes ai-pick-go {
+        0% {
+          opacity: 0.6;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+      /* 흘러간다 — 나타나서 오른쪽으로 가며 사라진다. 셋이 차례로 이어져 끊기지 않는다 */
+      @keyframes ai-pick-flow {
+        0% {
+          opacity: 0;
+          transform: translateX(-7px);
+        }
+        35% {
+          opacity: 1;
+        }
+        70% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(9px);
+        }
+      }
+
+      /*
+        ── 엔딩 ─────────────────────────────────────────────────
+        L10 을 마치고 어우참 마스터가 된 판에 뜬다 (main.ts 의 showEnding). 결과 화면의 한 줄이나 작은 창으로는 **게임이
+        끝났다**는 것이 드러나지 않았다 — AI 어우참이 화면 한가운데에서 직접 축하한다. 그 뒤로는 마스터 운행(L10 코스 무작위)이 이어진다 — 사용자가 "처음부터 다시
+        시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게" 해 달라고 했다.
+      */
+      .ending {
+        z-index: 80;
+        background: radial-gradient(circle at 50% 38%, rgba(46, 224, 106, 0.28), rgba(4, 6, 10, 0.92) 62%);
+        backdrop-filter: blur(6px);
+      }
+      .ending-card {
+        position: relative;
+        width: min(760px, 100%);
+        text-align: center;
+        padding: 30px 28px 26px;
+        background: rgba(15, 19, 27, 0.9);
+        border: 2px solid rgba(46, 224, 106, 0.6);
+        border-radius: 24px;
+        box-shadow: 0 0 0 1px rgba(46, 224, 106, 0.2), 0 30px 90px rgba(0, 0, 0, 0.7);
+        overflow: hidden;
+        animation: ending-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+      }
+      .ending-kicker {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 900;
+        letter-spacing: 6px;
+        color: #ffd60a;
+      }
+      .ending-stage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        margin-top: 10px;
+      }
+      .ending-robot {
+        width: 250px;
+        height: auto;
+        filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.55));
+        animation: ending-robot 2.4s ease-in-out infinite;
+      }
+      .ending-bubble {
+        position: relative;
+        flex: 1;
+        max-width: 380px;
+        text-align: left;
+        background: #0b0e14;
+        border: 3px solid var(--green);
+        border-radius: 20px;
+        padding: 18px 22px;
+      }
+      /* 말풍선 꼬리 — 로봇 쪽을 가리킨다 */
+      .ending-bubble::before {
+        content: '';
+        position: absolute;
+        left: -14px;
+        top: 44px;
+        border: 12px solid transparent;
+        border-right-color: var(--green);
+        border-left: 0;
+      }
+      /* 이름이 신호등 딱지라 말풍선 이름표처럼 한 단계 키웠다 (14px 에서는 딱지가 작았다) */
+      .ending-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .ending-bubble h2 {
+        margin: 4px 0 6px;
+        font-size: 34px;
+        font-weight: 900;
+        color: var(--green);
+      }
+      .ending-line {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.45;
+        color: #f3f6fa;
+      }
+      .ending-stats {
+        margin: 10px 0 0;
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .ending-end {
+        margin: 18px 0 4px;
+        font-size: 17px;
+        font-weight: 700;
+        color: #ffd60a;
+      }
+      .ending .modal-actions {
+        justify-content: center;
+      }
+      /* 꽃가루 — 위에서 흩날린다 */
+      .ending-confetti {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .ending-confetti i {
+        position: absolute;
+        top: -20px;
+        width: 10px;
+        height: 16px;
+        border-radius: 2px;
+        opacity: 0.9;
+        animation: ending-fall 3.6s linear infinite;
+      }
+      .ending-confetti i:nth-child(3n) {
+        background: var(--green);
+      }
+      .ending-confetti i:nth-child(3n + 1) {
+        background: #ffd60a;
+      }
+      .ending-confetti i:nth-child(3n + 2) {
+        background: #e2483d;
+      }
+      .ending-confetti i:nth-child(1) { left: 6%; animation-delay: 0s; }
+      .ending-confetti i:nth-child(2) { left: 14%; animation-delay: 1.1s; }
+      .ending-confetti i:nth-child(3) { left: 22%; animation-delay: 2.3s; }
+      .ending-confetti i:nth-child(4) { left: 31%; animation-delay: 0.6s; }
+      .ending-confetti i:nth-child(5) { left: 40%; animation-delay: 1.8s; }
+      .ending-confetti i:nth-child(6) { left: 49%; animation-delay: 2.9s; }
+      .ending-confetti i:nth-child(7) { left: 58%; animation-delay: 0.3s; }
+      .ending-confetti i:nth-child(8) { left: 67%; animation-delay: 1.5s; }
+      .ending-confetti i:nth-child(9) { left: 76%; animation-delay: 2.6s; }
+      .ending-confetti i:nth-child(10) { left: 84%; animation-delay: 0.9s; }
+      .ending-confetti i:nth-child(11) { left: 91%; animation-delay: 2.1s; }
+      .ending-confetti i:nth-child(12) { left: 97%; animation-delay: 3.2s; }
+      @keyframes ending-fall {
+        from {
+          transform: translateY(0) rotate(0deg);
+        }
+        to {
+          transform: translateY(620px) rotate(540deg);
+        }
+      }
+      @keyframes ending-robot {
+        0%,
+        100% {
+          transform: translateY(0) rotate(-2deg);
+        }
+        50% {
+          transform: translateY(-12px) rotate(2deg);
+        }
+      }
+      @keyframes ending-in {
+        from {
+          transform: scale(0.7);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      @media (max-width: 640px) {
+        .ending-stage {
+          flex-direction: column;
+        }
+        .ending-robot {
+          width: 170px;
+        }
+        .ending-bubble {
+          text-align: center;
+        }
+        .ending-bubble::before {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ending-robot,
+        .ending-confetti i,
+        .ending-card {
+          animation: none;
+        }
+      }
+
+      /*
+        ── 자동 넘김 ───────────────────────────────────────────
+        결과 화면에서 '다음 Stage' 버튼 **바로 아래**에 둔다. 켜면 저 버튼이 스스로
+        눌린다는 뜻이라, 설정 화면에 숨겨 두면 남은 초가 왜 세어지는지 알 수 없다.
+      */
+      .auto-next {
+        display: inline-flex;
+        align-items: center;
+        align-self: center;
+        gap: 9px;
+        margin-top: 0;
+        padding: 8px 14px 8px 11px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 13.5px;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+      .auto-next:hover {
+        border-color: #3d4a63;
+        color: var(--text);
+      }
+      .auto-next input {
+        /* 기본 네모를 그대로 쓰되 색만 이 화면에 맞춘다 — 직접 그리면 키보드 초점을 잃는다 */
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        accent-color: var(--blue);
+        cursor: pointer;
+      }
+      .auto-next:has(input:checked) {
+        border-color: rgba(76, 141, 255, 0.5);
+        color: var(--text);
+      }
+
+      /*
+        남은 초. 버튼 **안**에 둔다 — 어느 버튼이 스스로 눌릴 것인지가 숫자가 붙은
+        자리로 드러난다.
+
+        처음에는 13px 짜리 작은 칩이었는데 **읽히지 않았다.** 파란 버튼 위의 반투명
+        검정 위에 작은 글자라 대비가 모자랐고, 숫자만 있어서 그것이 남은 초인지
+        무엇인지도 분명하지 않았다. 지금은 이렇게 바꿨다.
+
+         · **크게, 흰색으로** — 버튼 글자보다 한 단계 크고 순백이라 눈이 먼저 잡는다
+         · **'초' 를 붙여** 무엇을 세는지 글로 말한다
+         · **1초마다 한 번 튄다** — 숫자가 바뀌는 순간이 눈에 걸려야 세고 있다는 것이
+           보인다. 정지 화면에서는 5 와 4 가 거의 같은 그림이라 바뀐 줄 모른다
+         · 폭을 고정해 5 → 4 로 줄 때 버튼이 들썩이지 않는다
+      */
+      button .count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        height: 26px;
+        margin-left: 4px;
+        padding: 0 6px;
+        border-radius: 8px;
+        background: rgba(3, 8, 18, 0.42);
+        color: #fff;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+      }
+      button .count[hidden] {
+        display: none;
+      }
+      /* '초' 는 숫자에 딸린 단위라 한 단계 작고 조금 옅게 */
+      button .count i {
+        font-style: normal;
+        font-size: 11.5px;
+        font-weight: 700;
+        opacity: 0.75;
+        margin-left: 1px;
+      }
+      /* 1초마다 다시 걸리는 튐 (Screens.setAutoNextCountdown 이 클래스를 다시 붙인다) */
+      button .count.tick {
+        animation: count-tick 0.42s ease-out;
+      }
+      @keyframes count-tick {
+        0% {
+          transform: scale(1.35);
+          background: rgba(255, 255, 255, 0.3);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        button .count.tick {
+          animation: none;
+        }
+      }
+      /* 붙잡아 둔 동안 — 숫자는 그대로 두되 색을 죽여 '지금은 안 센다'를 보여 준다 */
+      button .count.paused {
+        background: rgba(3, 8, 18, 0.24);
+        color: rgba(255, 255, 255, 0.62);
+      }
+      /*
+        카운트다운을 붙잡는 버튼. `다음 Stage` 바로 옆의 정사각 아이콘이다.
+        붙잡아 둔 동안은 눌린 상태로 보여야 다시 눌러 이어 셀 수 있다는 것이 드러난다.
+      */
+      #btn-auto-pause.on {
+        color: var(--amber);
+        border-color: rgba(255, 176, 32, 0.55);
+        background: rgba(255, 176, 32, 0.14);
+      }
+      #btn-auto-pause[hidden] {
+        display: none;
+      }
+      /*
+        톱니바퀴(설정) 버튼. 글자 없이 아이콘만 두므로 정사각으로 잡고,
+        무슨 버튼인지 알 수 있도록 title 과 aria-label 을 함께 단다.
+      */
+      button.icon {
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+      }
+      button.icon svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+      }
+      /*
+        ── 화질 설정 한 줄 ──────────────────────────────────────
+        이름 왼쪽, 선택지 오른쪽. 선택지는 **드롭다운이 아니라 버튼을 늘어놓는다** —
+        서넛뿐이라 펼치는 동작이 한 번 더 드는 것이 손해이고, 지금 무엇이 골라져
+        있는지가 펼치지 않아도 보인다.
+      */
+      .opt-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 13px 16px;
+        margin-top: 8px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      .opt-label {
+        font-size: 14.5px;
+        font-weight: 700;
+      }
+      /* 이 항목이 얼마나 듣는지 — 고르는 근거라 이름 바로 아래에 붙인다 */
+      .opt-hint {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .opt-choices {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      button.opt {
+        font-size: 13px;
+        font-weight: 700;
+        padding: 7px 13px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: var(--muted);
+      }
+      button.opt:hover:not(:disabled) {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.28);
+      }
+      /* 고른 것 — 색으로 갈라야 버튼 넷 중 무엇이 켜져 있는지 훑어서 안다 */
+      button.opt.on {
+        color: var(--blue);
+        background: rgba(76, 141, 255, 0.15);
+        border-color: rgba(76, 141, 255, 0.55);
+      }
+      .opt-note {
+        font-size: 12px;
+        color: var(--muted);
+        margin-left: 2px;
+      }
+
+      /* 설정 항목 — 고른 것이 한눈에 보여야 한다 */
+      .card.selected {
+        border-color: #4c8dff;
+        box-shadow: 0 0 0 1px #4c8dff inset;
+      }
+
+      /* ── 카드 ─────────────────────────────────────────────────── */
+      .grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 18px;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card.clickable {
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s, transform 0.1s;
+      }
+      .card.clickable:hover {
+        border-color: #46577a;
+        background: var(--panel-2);
+      }
+      .card-title {
+        font-weight: 700;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        /* 제목이 길면 두 줄이 되어도 배지는 첫 줄 옆에 붙어 있어야 한다 */
+        flex-wrap: wrap;
+      }
+      .card-sub {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        letter-spacing: 0.02em;
+        /*
+          **줄바꿈을 막는다.** flex 항목이라 제목이 길어지면 배지가 먼저 줄어드는데,
+          그러면 "완벽" 이 "완 / 벽" 으로 세로로 쪼개져 읽을 수 없게 된다
+          (시나리오 제목이 길어진 03·05·06·07 에서 그랬다).
+        */
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .badge.pass {
+        background: rgba(76, 141, 255, 0.16);
+        color: var(--blue);
+      }
+      .badge.violation {
+        background: rgba(255, 176, 32, 0.16);
+        color: var(--amber);
+      }
+      .badge.new {
+        background: rgba(255, 176, 32, 0.18);
+        color: var(--amber);
+      }
+      /*
+        저작권 화면의 '비상업' — 한때 `badge violation` 을 썼는데, 결과 화면의 위반 카드(.violation)와 이름이 같아
+        카드 여백과 왼쪽 굵은 선까지 따라와 딱지가 큰 상자가 됐다. 이름을 따로 둔다.
+      */
+      .badge.nc {
+        background: rgba(255, 69, 58, 0.16);
+        color: #ff8a80;
+      }
+
+
+      /*
+        ── 첫 화면 ──────────────────────────────────────────────
+        **누를 것이 하나라는 것이 크기로 보여야 한다.**
+
+        예전에는 '출발'·'우회전 하는 방법'·'오픈소스 · 저작권'이 같은 크기로 한 줄에
+        나란히 있었다. 세 개가 대등해 보이면 처음 온 사람은 무엇부터 눌러야 하는지
+        읽어서 판단해야 한다. 출발은 히어로로 키우고 나머지는 한 단계 낮춘다.
+      */
+      .hero {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 22px;
+        padding: 26px 28px;
+        margin-bottom: 30px;
+        border: 1px solid rgba(76, 141, 255, 0.28);
+        border-radius: 20px;
+        background: linear-gradient(
+          135deg,
+          rgba(46, 84, 160, 0.32),
+          rgba(21, 25, 34, 0.72) 58%
+        );
+        box-shadow: var(--shadow-1);
+      }
+      /* 로고와 이름은 한 덩어리로 움직인다 — 좁아지면 함께 줄바꿈된다 */
+      /*
+        게임 이름. 한때 왼쪽에 로고 그림(.brand-logo)이 붙어 있었는데, 유명한 게임 로고를
+        비튼 그림이라 이 게임이 무엇을 가르치는 물건인지와 상관이 없었다. 지금은 그
+        자리를 이름이 쓴다.
+
+        **이름이 길어져 글자를 조금 줄인다.** 공용 h1 은 clamp(28, 5vw, 44)인데,
+        `우회전과 어린이보호구역 레벨업` 은 그 크기로는 넓은 화면에서도 두 줄이 된다.
+        히어로는 이름과 출발 버튼뿐인 자리라 이름이 세 줄로 흐르면 버튼이 밀린다.
+      */
+      .brand {
+        margin: 0;
+        min-width: 0;
+        font-size: clamp(26px, 4vw, 38px);
+        /*
+          1.2 였는데 올렸다. 이름의 글자가 배경을 깐 딱지라(아래 .brand-red · .brand-yellow · .brand-green)
+          위아래로 조금 더 커지는데, 줄 간격이 좁으면 두 줄로 접혔을 때 윗줄 글자에
+          딱지가 닿는다.
+        */
+        line-height: 1.42;
+        /* 낱말 가운데서 끊지 않는다 — '어린이보호구'/'역' 으로 잘리면 읽히지 않는다 */
+        word-break: keep-all;
+      }
+      /*
+        **'어우참' 세 글자는 신호등의 세 등이다** — 적색 · 황색 · 녹색 딱지 (brand.ts 의 APP_NAME_PARTS).
+        사용자가 이름을 바꾸며 "어우참 을 신호등의 색깔로" 라고 했다. 나란히 서면 이름 자체가 신호등으로 보인다.
+
+        색은 지어내지 않고 화면에서 가져온다. 제목의 글자와 판에서 보는 것이 같은 색이면, 둘이 같은 것을 가리킨다는
+        것이 말하지 않아도 보인다. 글자에만 색을 주는 것보다 딱지가 맞다 — 칠한 바탕이라야 켜진 등처럼 읽힌다.
+
+        `em` 으로 재는 이유: 제목 크기가 화면 폭을 따라 26~38px 로 움직인다(clamp).
+        px 로 두면 좁은 화면에서 딱지만 헐렁해진다.
+
+        **이름과 부제를 한 줄에** — `AI 어우참 안전운전 : 어린이보호구역 우회전 참교육`.
+        글자 아랫선을 맞춰(baseline) 크기가 다른 두 줄이 한 문장처럼 읽히게 하고, 좁은 화면에서는
+        부제가 다음 줄로 내려간다(wrap).
+      */
+      .brand-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 14px;
+        min-width: 0;
+      }
+      .brand-colon {
+        font-size: clamp(22px, 2.8vw, 32px);
+        font-weight: 800;
+        color: var(--muted);
+      }
+      /* 좁은 화면에서는 부제가 다음 줄로 내려가므로 윗줄 끝에 남는 ':' 를 뺀다 */
+      @media (max-width: 720px) {
+        .brand-colon {
+          display: none;
+        }
+      }
+      .brand-sub {
+        margin: 0;
+        font-size: clamp(18px, 2.3vw, 26px);
+        font-weight: 700;
+        line-height: 1.5;
+        color: var(--text);
+        word-break: keep-all;
+      }
+      .brand-red,
+      .brand-yellow,
+      .brand-green {
+        color: #fff;
+        padding: 0.04em 0.2em;
+        border-radius: 0.12em;
+        /* 낱말 가운데서 끊기면 딱지가 두 조각 난다 — 통째로 다음 줄로 보낸다 */
+        white-space: nowrap;
+        /* 그래도 끊겼을 때 양쪽 모두 모서리와 여백을 갖게 한다 */
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+        /*
+          **딱지 안의 글자에는 그림자를 두지 않는다.** 첫 화면 제목(h1)은 3D 배경이 밝아질 때를 대비해 글자에 어두운
+          그림자를 깐다(위 '.screen h1'). 흰 글자에서는 보이지 않던 그 그림자가 **황색 딱지의 어두운 '우'** 둘레로
+          번져 글자가 뭉개져 보였다(사용자가 "어우참에서 우 글자가 이상해" 라고 짚었다). 딱지는 불투명한 바탕이
+          글자를 받쳐 주므로 그림자가 할 일이 없다 — 세 딱지 모두 끈다.
+        */
+        text-shadow: none;
+      }
+      /*
+        **세 딱지 묶음** (ui/brandName.ts) — 제목 밖에서 이름이 나오는 자리(AI 분석 · 추천 결과 · 말풍선 · 엔딩)도
+        같은 딱지를 쓴다. 묶음째로 줄을 넘겨 '어우' 와 '참' 이 두 줄로 갈라지지 않게 하고, 둘레 글이 가늘어도
+        딱지는 이름답게 굵게 둔다.
+      */
+      .brand-chips {
+        white-space: nowrap;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+      /*
+        세 딱지 사이를 조금 띄운다 — 붙어 있으면 한 덩어리 색띠로 보이고, 떨어져 있어야 등 셋으로 읽힌다.
+      */
+      .brand-red + .brand-yellow,
+      .brand-yellow + .brand-green {
+        margin-left: 0.08em;
+      }
+      /*
+        **적색** — 어린이보호구역 노면과 **같은 값**이다 (game/Intersection.ts 의 drawSchoolZonePavement).
+        글자에 쓰기엔 어두웠지만(대비 2.3:1) 바탕으로 쓰면 흰 글자가 6.65:1 로 앉는다.
+      */
+      .brand-red {
+        background: #a8322c;
+      }
+      /*
+        **황색** — 신호의 황색(--amber #ffb020)에서 조금 짙힌 값. 노랑 위의 흰 글자는 안 읽히므로(2.0:1) 이 딱지만
+        **어두운 글자**를 얹는다 — 실제 주의 표지판도 노랑 바탕에 검은 글자다 (대비 9.2:1).
+      */
+      .brand-yellow {
+        background: #f2a900;
+        color: #1a1300;
+      }
+      /*
+        **녹색** — 신호 값(--green #2ee06a)을 그대로 쓰면 흰 글자와 대비가 1.9:1 이라 안 읽힌다. 색상(140°)과
+        채도(74%)는 그대로 두고 **밝기만 53% → 26% 로 내린 값**이다 — 흰 글자와 5.96:1 로, 적색 딱지와 무게가 같다.
+      */
+      .brand-green {
+        background: #117332;
+      }
+      /*
+        **'AI' 배지** (brand.ts 의 APP_NAME_PARTS · ui/brandName.ts 의 AI_BADGE_HTML).
+
+        AI 활용 공모전에 내는 작품이라 이름의 'AI' 가 돋보여야 한다 — 한때 맨 흰 글자라, 사용자가 "AI 가 너무 돋보이지
+        않아" 라고 짚었다. 그렇다고 신호등 딱지처럼 칠하면 **넷째 등**으로 읽힌다. 그래서 셋 다 달리한다.
+         - **모양** — 둥근 알약(모서리 999px). 신호등 딱지는 모서리가 거의 각진 네모다
+         - **색** — 신호에 없는 파랑→보라 그라데이션. 요즘 'AI' 를 가리킬 때 흔히 쓰는 색이다. 흰 글자와의 대비는
+           양 끝에서 4.6:1 · 4.4:1 이라 11~13px 이름표에서도 읽힌다
+         - **표지** — 앞에 반짝이(✦). AI 기능을 가리키는 표지로 널리 쓰인다
+        은은한 빛(box-shadow)을 두르고, 그라데이션이 느리게 흘러 눈이 먼저 간다. 움직임을 줄이도록 한 사람에게는 멈춘다.
+      */
+      .brand-ai {
+        display: inline-block;
+        padding: 0.04em 0.36em 0.04em 0.28em;
+        border-radius: 999px;
+        color: #fff;
+        background: linear-gradient(115deg, #2f6bff 0%, #7b4dff 50%, #a445ff 75%, #2f6bff 100%);
+        background-size: 220% 100%;
+        box-shadow:
+          0 0 0.5em rgba(123, 77, 255, 0.55),
+          inset 0 0 0 0.04em rgba(255, 255, 255, 0.35);
+        text-shadow: none;
+        white-space: nowrap;
+        letter-spacing: 0.02em;
+        /* 둘레 글이 가늘어도(추천 결과 문장 · 분석 단계) 배지는 어디서나 같은 굵기 */
+        font-weight: 800;
+        animation: brand-ai-flow 6s ease-in-out infinite alternate;
+      }
+      /* 반짝이 — 글꼴에 기대지 않게 SVG 모양으로 오려 흰색을 칠한다 */
+      .brand-ai::before {
+        content: '';
+        display: inline-block;
+        width: 0.55em;
+        height: 0.55em;
+        margin-right: 0.14em;
+        vertical-align: 0.2em;
+        background: #fff;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1C13 7.5 16.5 11 23 12C16.5 13 13 16.5 12 23C11 16.5 7.5 13 1 12C7.5 11 11 7.5 12 1Z'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1C13 7.5 16.5 11 23 12C16.5 13 13 16.5 12 23C11 16.5 7.5 13 1 12C7.5 11 11 7.5 12 1Z'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+      }
+      @keyframes brand-ai-flow {
+        from {
+          background-position: 0% 50%;
+        }
+        to {
+          background-position: 100% 50%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .brand-ai {
+          animation: none;
+        }
+      }
+      /*
+        **부제에서는 딱지가 아니라 색 글자다** — 낱말의 첫 글자(어 · 우 · 참)만 이름과 같은 색으로 칠해, '어우참' 이
+        어디서 왔는지를 보인다 (brand.ts 의 APP_TAGLINE_PARTS). 어두운 바탕 위라 딱지 색보다 밝은 신호 값을 쓴다.
+      */
+      .brand-sub .brand-red,
+      .brand-sub .brand-yellow,
+      .brand-sub .brand-green {
+        background: none;
+        padding: 0;
+        margin: 0;
+        font-weight: 900;
+      }
+      .brand-sub .brand-red {
+        color: #ff6b60;
+      }
+      .brand-sub .brand-yellow {
+        color: #ffc21a;
+      }
+      .brand-sub .brand-green {
+        color: var(--green);
+      }
+      /* 출발 — 이 화면에서 가장 큰 것 */
+      button.hero-cta {
+        font-size: 19px;
+        font-weight: 800;
+        padding: 18px 34px;
+        border-radius: 14px;
+        letter-spacing: -0.01em;
+        box-shadow: 0 6px 22px rgba(47, 111, 224, 0.4);
+      }
+      button.hero-cta svg {
+        width: 20px;
+        height: 20px;
+      }
+      /*
+        AI 자율 주행 — 출발보다 **한 단계 낮게.** 이 게임에서 배우는 방법은 직접 모는
+        것이고, 자율 주행은 "어떻게 하는 건지 먼저 보고 싶다" 는 사람을 위한 곁길이다.
+        같은 크기·같은 파랑으로 두면 무엇부터 눌러야 할지가 다시 흐려진다.
+      */
+      button.ghost-cta {
+        font-size: 16px;
+        font-weight: 700;
+        padding: 16px 24px;
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.16);
+        box-shadow: none;
+      }
+      button.ghost-cta:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.28);
+      }
+      .hero-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      @media (max-width: 720px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+        .hero-actions {
+          flex-direction: column;
+        }
+        button.hero-cta {
+          width: 100%;
+        }
+      }
+
+      /* 보조 이동 — 히어로 아래 한 줄. 히어로보다 작고 조용하다. */
+      /*
+        **한 줄에 선다.** 판이 쌓여 '내 습관' 버튼이 생기고 '맵 체험' 이 더해지자 여덟 개가 1,134px 이 되어
+        1,032px 칸에서 두 줄로 접혔다 — 사용자가 "두 줄로 나오는 걸 한 줄로 줄여 줘" 라고 했다. 글자 둘을 줄이고
+        ('우회전 하는 방법' → '우회전 방법', '내 운전 습관' → '내 습관') 버튼 안팎 여백을 조금 좁혔다.
+        좁은 화면(폰)에서는 여전히 접힌다 — 가로로 넘치게 두는 것보다 낫다.
+      */
+      .menu-links {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 34px;
+      }
+      /* 12px — 1024px 화면(칸 976px)에서도 한 줄에 선다. 더 좁히면 글자가 테두리에 붙어 답답해진다 */
+      .menu-links button {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      /*
+        ── 시나리오 카드 ────────────────────────────────────────
+        **번호와 제목 · 조건표 · 그림** 순으로 쌓는다. 여덟 장이 번호와 제목만
+        달랐을 때는 목록이 글 여덟 줄이었고, 무엇이 다른 판인지 제목을 다 읽어야
+        알 수 있었다. 교차로를 위에서 내려다본 그림(ScenarioMap.ts)은 장식이 아니라
+        **고르는 근거**다 — 전방 신호색·보행자·어린이보호구역이 한눈에 갈린다.
+      */
+      /*
+        첫 화면의 두 갈래 — **탭으로 가른다.**
+
+        예전에는 버튼 두 개를 나란히 두었는데, 누른 뒤에도 무엇이 열려 있는지가 화면에
+        남지 않아 "지금 어느 쪽인가" 를 알 수 없었다. 탭은 **지금 어디에 있는지**가
+        늘 보인다.
+      */
+      .menu-tabs {
+        display: flex;
+        gap: 6px;
+        margin-top: 18px;
+        padding: 5px;
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        width: fit-content;
+        max-width: 100%;
+        flex-wrap: wrap;
+      }
+      .menu-tab {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .menu-tab:hover {
+        color: var(--text);
+      }
+      /*
+        열려 있는 쪽 — 색이 아니라 **면**으로 구분한다. 색만으로는 눈에 덜 띈다.
+
+        면의 색은 **출발 버튼과 같은 녹색**이다(#22c55e). 이 화면에서 녹색은 이제
+        레벨 뱃지·출발 버튼이 함께 쓰는 색이라, 탭만 파랑으로 남으면 지금 열려 있는
+        탭이 그 아래 내용과 다른 계통으로 읽힌다.
+
+        **글자는 어둡다.** 이 녹색 위의 흰 글자는 대비가 1.9:1 밖에 안 나온다
+        (파랑에서는 흰 글자가 맞았다). 출발 버튼과 같은 이유·같은 값이다.
+
+        그라데이션은 넣지 않는다 — 출발 버튼은 84px 이라 면이 넓지만 탭은 알약 하나라,
+        같은 그라데이션을 넣으면 그 좁은 면에서 얼룩으로 보인다.
+      */
+      .menu-tab.on {
+        background: #22c55e;
+        color: #052513;
+      }
+      .menu-tab svg {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+      }
+      /* 탭 안의 첫 줄 버튼들 */
+      .tab-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 18px 0 12px;
+      }
+      /*
+        AI 우회전 주행의 진행 상자.
+
+        **진행이 버튼보다 위에 있다.** 여기서 학습자가 알아야 할 것은 "내가 어디까지
+        왔는가"이고, 그것을 보고 나서 누를지를 정한다.
+      */
+      .ai-course {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        /*
+          위 여백은 **설명문이 있던 자리**를 대신한다. 그 문단이 12px 을 더 두고 있었는데,
+          없애고 나니 상자가 보조 이동 줄에 붙었다. 수동 탭의 첫 줄 버튼(.tab-actions)과
+          같은 18px 로 맞춰, 어느 탭을 열어도 같은 자리에서 시작하게 한다.
+        */
+        margin: 18px 0 4px;
+      }
+      /*
+        자동차전시관의 **레벨 뱃지** — 카드 그림 왼쪽 위에 얹는다.
+
+        계급이 넷일 때는 계급마다 머리(제목 + 뱃지)를 두고 그 아래 차 두세 대를 묶었다.
+        레벨이 열이 되면서 한 레벨에 한 대가 되어, 머리를 두면 차 아홉 대에 머리 아홉
+        개가 붙어 목록이 토막 난다. 카드에 얹으면 목록은 한 덩어리로 남으면서
+        **어느 카드가 몇 번째인지**가 그림으로 읽힌다.
+
+        그림 위에 뜨므로 뒤에 어두운 판을 깐다 — 밝은 차 사진 위에서도 숫자가 보여야 한다.
+      */
+      .car-level {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1;
+        /* 크기는 .level-badge-wrap.sm 이 정한다 — 여기서 또 정하면 둘이 다투게 된다 */
+        border-radius: 50%;
+        background: rgba(8, 11, 17, 0.72);
+        backdrop-filter: blur(2px);
+      }
+      /*
+        잠긴 차. **감추지 않는다** — 다음에 무엇이 오는지가 보여야 레벨이 목표로 읽힌다.
+        다만 눌리지는 않으므로, 눌러 볼 것이 없다는 것이 한눈에 보여야 한다.
+      */
+      .car-card.locked {
+        opacity: 0.5;
+      }
+      .car-card.locked .car-photo,
+      .car-card.locked .car-thumb {
+        filter: grayscale(1);
+      }
+      /* 차 한 줄 소개 — 가격표가 있던 자리 */
+      .car-tagline {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      /*
+        ── 지금 타는 차 ──────────────────────────────────────────
+        **레벨이 무엇을 내주는지가 그림으로 보이는 자리.**
+
+        레벨 뱃지와 숫자만으로는 "올라가면 뭐가 좋아지는가" 에 답하지 못한다.
+        차는 이 과정이 주는 유일한 보상이라, 전시관까지 들어가야 볼 수 있으면
+        훈련하는 동안 그 보상이 잊힌다.
+
+        **그림은 373px 다** — 140 → 280 → 373 으로 두 번 키웠다. 작은 그림은 차종이
+        구별되지 않아 "지금 타는 차" 라는 말만 남고 정작 무엇을 타는지가 안 보였다.
+        보상을 보여 주려고 넣은 그림이 보상으로 안 읽히면 없느니만 못하다.
+
+        그래도 상자의 주인공은 레벨과 진행이라, 그림은 **레벨 머리 아래**에 남는다 —
+        크기로 이겼어도 순서로는 지게 두는 것이 이 상자의 뜻에 맞는다.
+      */
+      /*
+        ── 두 칸 ───────────────────────────────────────────────
+        **지금 타는 차와 나쁜 운전 습관이 나란히 선다.**
+
+        위아래로 쌓았을 때는 카드가 세로로 길어져 훈련 버튼을 보려면 스크롤해야 했고,
+        그보다 나쁜 것은 둘의 관계가 안 보였다는 점이다 — 습관을 고치면 레벨이 오르고,
+        레벨이 오르면 차가 바뀐다. 나란히 놓이면 그 둘이 원인과 결과로 읽힌다.
+
+        왼쪽 칸은 그림 폭(373px)에 못 박고 오른쪽이 남는 폭을 다 쓴다. 습관 목록은 줄
+        길이가 제각각이라 늘어날 자리가 필요하고, 그림은 늘어나 봐야 커지기만 한다.
+
+        `align-items: start` — 두 칸의 키가 크게 다르다(그림 쪽이 훨씬 길다).
+        가운데로 맞추면 짧은 쪽이 허공에 뜬 것처럼 보인다.
+      */
+      .ai-split {
+        display: grid;
+        grid-template-columns: minmax(0, 373px) minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+      }
+      /* 그림을 굽지 못한 기기에서는 차 칸이 통째로 없다 — 남은 칸이 폭을 다 쓴다 */
+      .ai-split > :only-child {
+        grid-column: 1 / -1;
+      }
+      /* 좁아지면 위아래로 되돌린다 — 두 칸을 우겨 넣으면 습관 한 줄이 서너 줄로 접힌다 */
+      @media (max-width: 900px) {
+        .ai-split {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 20px;
+        }
+      }
+
+      /*
+        **글자 크기는 그림이 정한다.** 그림이 140 → 373px 로 커지는 동안 글은 그대로여서,
+        차 이름이 사진 옆에 붙은 캡션처럼 보였다. 이 줄에서 읽어야 할 것은 "무엇을 타고
+        있고 다음에 무엇이 오는가" 라 그림과 글이 함께 읽히는 크기여야 한다.
+
+        **그림이 글 위에 온다.** 옆에 세웠을 때는 나란히 놓였지만, 칸이 373px 로 좁아진
+        지금 옆에 두면 글에 100px 밖에 안 남는다. 그림을 줄이는 대신 아래로 내린다.
+      */
+      /*
+        `align-items: center` — **이름을 그림 한가운데에 세운다.**
+
+        그림이 칸보다 좁아질 때(좁은 화면에서 max-width 가 줄어든다) 왼쪽 맞춤이면
+        이름만 칸 왼쪽 끝에 남아 그림과 따로 놀았다. 가운데로 맞추면 그림이 어떤
+        폭이 되든 이름이 그 아래 한가운데를 지킨다.
+      */
+      .ai-car {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .ai-car-photo {
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: 373px;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        border-radius: 10px;
+        background: linear-gradient(160deg, #1a2130, #0d1119);
+        border: 1px solid var(--line);
+      }
+      /*
+        차 이름 — **이 칸에 남은 글은 이것뿐이다.**
+
+        한때 이름표('지금 타는 차')와 제원, 다음에 열릴 차까지 넉 줄이 붙어 있었다.
+        그러자 옆 칸(나쁜 운전 습관)과 무게가 같아져 훈련 화면이 차를 설명하는 화면처럼
+        읽혔다. 제원과 다음 차는 전시관이 이미 말한다.
+
+        **레벨 호칭(.player-name 26px)보다는 작게 둔다** — 둘이 같은 크기면 상자의 머리가
+        어느 쪽인지 알 수 없다. 이 상자가 답하는 것은 여전히 "내가 어디까지 왔는가" 이고,
+        차는 그 답에 딸린 보상이다.
+
+        `min-width: 0` — 이름이 길면(BMW M8 컴페티션 컨버터블) 좁은 칸에서 넘친다.
+        두 줄로 접힐 때를 생각해 가운데 맞춤을 글 안에도 건다(text-align).
+      */
+      .ai-car-name {
+        min-width: 0;
+        text-align: center;
+        font-size: 23px;
+        font-weight: 800;
+        letter-spacing: -0.015em;
+        line-height: 1.25;
+      }
+      /*
+        좁은 화면에서는 그림을 줄인다. 두 칸이 한 칸으로 접힌 뒤에도 그림이 폭을 다 쓰면
+        **스크롤해야 운행 버튼이 나온다** — 여기서 눌러야 할 것은 여전히 운행 시작이다.
+      */
+      @media (max-width: 720px) {
+        .ai-car-photo {
+          max-width: 267px;
+        }
+      }
+      @media (max-width: 520px) {
+        .ai-car-photo {
+          max-width: 200px;
+        }
+      }
+
+      /*
+        ── 레벨 뱃지 ───────────────────────────────────────────
+        **그림 파일이 아니라 그 자리에서 그린 SVG 다** (ui/badges.ts).
+
+        도형과 숫자가 모두 `currentColor` 라, 지나온 레벨·지금 레벨·아직 못 간 레벨을
+        여기 `color` 한 줄로 가른다. 계급 뱃지였을 때는 그림이 청동·금색으로 구워져
+        있어서 흑백 필터로 죽이는 수밖에 없었는데, 그러면 원래 채도가 0.34 뿐이라
+        "칼라가 아니다" 는 말이 나왔다. 그 문제가 통째로 사라졌다.
+
+        **색은 녹색이다.** 이 화면의 파랑(--blue)은 누르는 것과 지금 고른 것을 가리키는
+        색이라(버튼·탭·포커스 테두리), 뱃지까지 파랑이면 뱃지가 눌리는 것처럼 보인다.
+
+        무엇보다 여기는 교통을 가르치는 화면이고 녹색은 그 자리에서 **가도 좋다**는 뜻이다
+        (신호등 3D 와 HUD 신호 칩이 이미 같은 #2ee06a 를 쓴다). 잘 몰아서 얻은 자리를
+        가리키는 색으로 그보다 맞는 것이 없다.
+      */
+      .level-badge {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .level-badge-shape {
+        fill: currentColor;
+        fill-opacity: 0.16;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+      }
+      .level-badge-num {
+        fill: currentColor;
+        font-family: var(--font);
+        font-weight: 800;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }
+      /*
+        뱃지가 놓이는 자리. 크기는 여기가 정하고 뱃지는 그 칸을 채운다 —
+        SVG 라 어떤 크기로 놓아도 흐려지지 않는다.
+      */
+      .level-badge-wrap {
+        position: relative;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        width: 104px;
+        height: 104px;
+        color: var(--green);
+      }
+      /* 뒤에 깔리는 원 — 도형의 가장자리가 어두운 배경에 묻히지 않게 받쳐 준다 */
+      .level-badge-wrap::before {
+        content: '';
+        position: absolute;
+        inset: 6%;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(46, 224, 106, 0.18), transparent 68%);
+      }
+      /* 얻은 뱃지는 빛난다 — 얻었다는 것이 한눈에 읽혀야 한다 */
+      .level-badge-wrap.earned .level-badge {
+        filter: drop-shadow(0 0 10px rgba(46, 224, 106, 0.45));
+      }
+      /*
+        **아직 해내지 못한 자리는 점선을 두른다.** 지금은 L10 에 닿았지만 연속 무위반을
+        못 채운 경우 하나뿐이다 — 닿은 것과 해낸 것을 같은 그림으로 보여 주면
+        남은 세 판이 사라진 것처럼 읽힌다.
+      */
+      .level-badge-wrap.locked {
+        color: var(--muted);
+      }
+      .level-badge-wrap.locked::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 2px dashed rgba(255, 255, 255, 0.26);
+      }
+      .level-badge-wrap.sm {
+        width: 46px;
+        height: 46px;
+      }
+      .level-badge-wrap.sm::before {
+        display: none;
+      }
+      /* 작은 뱃지는 발광도 작게 — 같은 10px 이면 46px 짜리에서는 번져 보인다 */
+      .level-badge-wrap.sm.earned .level-badge {
+        filter: drop-shadow(0 0 6px rgba(46, 224, 106, 0.4));
+      }
+      @media (max-width: 560px) {
+        .level-badge-wrap {
+          width: 76px;
+          height: 76px;
+        }
+      }
+      /*
+        ── 레벨 길 ─────────────────────────────────────────────
+        이 과정이 어디서 시작해 어디로 가는지를 한 줄로 보여 준다.
+
+        한때는 계급 뱃지 넷이었고 칸마다 이름이 붙어 있었다. 열 칸이 되면서 이름을 뺐다 —
+        칸이 두 배 반이 되면 이름을 넣을 폭이 없고, 애초에 넣을 이름도 없다(레벨은 숫자다).
+
+        **지금 칸만 크다.** 지나온 자리와 남은 자리는 배경이고, 눈에 들어와야 하는 것은
+        "내가 어디 서 있는가" 하나다. 칸 사이 선이 그 사이를 이어 길로 만든다.
+      */
+      .level-track {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .level-step {
+        position: relative;
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        color: var(--muted);
+        opacity: 0.42;
+        transition: opacity 0.15s;
+      }
+      /* 칸 사이를 잇는 선 — 길이라는 것이 보여야 한다 */
+      .level-step + .level-step::before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 50%;
+        width: 8px;
+        height: 2px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+      /* 지나온 칸 — 얻은 것이라 색은 살리되 크기로는 나서지 않는다 */
+      .level-step.done {
+        color: var(--green);
+        opacity: 0.72;
+      }
+      /* 지금 칸 — 색과 크기, 그 둘로만 */
+      .level-step.now {
+        width: 44px;
+        height: 44px;
+        color: var(--green);
+        opacity: 1;
+      }
+      .level-step.now + .level-step::before,
+      .level-step.now::before {
+        top: 50%;
+      }
+      /*
+        **M(마스터) 칸은 금색이다** — 초록 레벨 칸들과 갈리고, 플레이어 칸의 'MAX' 와 같은 색이다. 아직 닿지 않았을 때는
+        다른 칸처럼 흐리게 둔다.
+      */
+      .level-step.master.now {
+        color: #ffd60a;
+        filter: drop-shadow(0 0 8px rgba(255, 214, 10, 0.45));
+      }
+      /* 마스터의 플레이어 칸 뱃지(M)도 같은 금색 */
+      .player.mastered .level-badge-wrap {
+        color: #ffd60a;
+      }
+      .player.mastered .level-badge-wrap.earned .level-badge {
+        filter: drop-shadow(0 0 8px rgba(255, 214, 10, 0.45));
+      }
+      @media (max-width: 700px) {
+        .level-track {
+          gap: 6px;
+        }
+        .level-step {
+          width: 24px;
+          height: 24px;
+        }
+        .level-step + .level-step::before {
+          left: -6px;
+          width: 6px;
+        }
+        .level-step.now {
+          width: 34px;
+          height: 34px;
+        }
+      }
+      .ai-note {
+        margin-top: 10px;
+        font-size: 16px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      /*
+        ── 플레이어 칸 (ui/playerCard.ts) ──────────────────────────
+        **내 레벨과 경험치의 단 하나의 모양** — 첫 화면(lg) · 결과 화면(md) · 운전 화면(hud)이 같은 칸을 크기만 바꿔 쓴다.
+        뱃지 · 호칭 · 숫자(오른쪽 위) · 막대 · 남은 양이 늘 같은 자리에 선다. 한때 셋이 제각각이라 사용자가
+        "헷갈리지 않게 일관된 ui 로" 라고 했다.
+
+        이번 판에 얻은 만큼은 밝은 초록(.player-new)으로 따로 칠해 "방금 이만큼 찼다" 가 보이게 한다.
+      */
+      .player {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .player-body {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      /* 좁으면 숫자가 다음 줄로 내려가되 **오른쪽에 붙어 있다** — 숫자는 어디서나 오른쪽이다 */
+      .player-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 2px 12px;
+      }
+      /* 호칭 — 이 칸에서 가장 크게 읽혀야 하는 한 마디 */
+      .player-name {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.015em;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      .player-xp {
+        margin-left: auto;
+        font-size: 15px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .player-xp b {
+        color: var(--text);
+        font-size: 20px;
+      }
+      .player.mastered .player-xp {
+        color: #ffd60a;
+        font-weight: 800;
+        font-size: 18px;
+      }
+      .player-track {
+        position: relative;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--line);
+        overflow: hidden;
+      }
+      .player-fill,
+      .player-new {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        border-radius: 999px;
+      }
+      .player-fill {
+        background: linear-gradient(90deg, #1f9c52, var(--green));
+      }
+      .player-new {
+        background: #b8ffcf;
+        box-shadow: 0 0 10px rgba(46, 224, 106, 0.8);
+        animation: xp-glow 1.2s ease-out 1;
+      }
+      @keyframes xp-glow {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      /* 가득 찼다 — 습관만 고치면 오른다 (또는 마스터) */
+      .player.full .player-fill {
+        background: linear-gradient(90deg, var(--green), #ffd60a);
+      }
+      /* 남은 양 · 첫 화면은 오른쪽에 레벨 길 */
+      .player-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 16px;
+        flex-wrap: wrap;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .player-foot .level-track {
+        margin-left: auto;
+      }
+      .player.full .player-foot-text {
+        color: #ffd60a;
+        font-weight: 700;
+      }
+      /* 결과 화면 — 첫 화면보다 한 단계 작다. 그 화면의 주인공은 이번 판의 위반과 기록이다 */
+      .player.md {
+        gap: 16px;
+        margin-top: 10px;
+      }
+      .player.md .level-badge-wrap {
+        width: 64px;
+        height: 64px;
+      }
+      .player.md .player-name {
+        font-size: 21px;
+      }
+      .player.md .player-xp b {
+        font-size: 18px;
+      }
+      /* 작은 뱃지는 발광도 작게 — 같은 10px 이면 번져 보인다 */
+      .player.md .level-badge-wrap.earned .level-badge,
+      .player.hud .level-badge-wrap.earned .level-badge {
+        filter: drop-shadow(0 0 6px rgba(46, 224, 106, 0.45));
+      }
+      @media (max-width: 560px) {
+        .player {
+          gap: 14px;
+        }
+        .player-name {
+          font-size: 21px;
+        }
+        .player.md .level-badge-wrap {
+          width: 52px;
+          height: 52px;
+        }
+        /* 레벨 길은 열 칸이라 폰 폭에서는 칸을 줄여야 한 줄에 든다 (지금 칸만 크다는 규칙은 그대로) */
+        .player-foot .level-track {
+          gap: 3px;
+        }
+        .player-foot .level-step {
+          width: 18px;
+          height: 18px;
+        }
+        .player-foot .level-step + .level-step::before {
+          left: -3px;
+          width: 3px;
+        }
+        .player-foot .level-step.now {
+          width: 26px;
+          height: 26px;
+        }
+      }      /* 결과 화면의 플레이어 상자 — 첫 화면의 .ai-course 와 같은 바탕 · 테두리 · 모서리 */
+      /*
+        **결과 화면 윗줄 — 경험치 칸과 버튼이 반반이다** (사용자 요청). 위아래로 쌓으면 화면만 길어지고,
+        지도 · 기록이 그만큼 밀려 내려간다. 좁은 화면(≤860px)에서는 한 칸으로 무너져 예전처럼 위아래가 된다.
+      */
+      /*
+        **결과 화면 윗줄 — [레벨 배너] [경험치] [버튼]이 한 줄에 선다.**
+
+        한때 격자로 반반(뒤에는 1 : 2.6)이었는데, 레벨이 오른 판에서는 왼쪽 칸에 배너 · 경험치 · 습관 칩이
+        세로로 쌓이고 오른쪽 넓은 칸에는 버튼 한 줄만 남아 **가운데가 텅 비었다** (사용자가 짚었다).
+        지금은 세 덩어리가 각자 필요한 만큼 차지하고 남는 폭을 나눠 가진다 — 배너가 없는 판(대부분)에서는
+        자연히 경험치와 버튼 둘이 한 줄이다. 좁은 화면에서는 한 덩어리씩 내려간다.
+      */
+      .debrief-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+      /* 한 줄 안에서는 칸끼리 여백을 따로 두지 않는다 — 줄의 gap 이 그 일을 한다 */
+      .debrief-top > .level-change {
+        flex: 0 1 auto;
+        margin: 0;
+      }
+      .debrief-top > .player-box {
+        /* 뱃지 · 이름 · 막대가 들어갈 만큼만 — 남는 폭은 버튼이 가져간다 */
+        flex: 1 1 300px;
+        margin: 0;
+      }
+      .debrief-top > .btn-row {
+        /* 네 개(다음 판 · 멈춤 · 다시 운행 · 자동 넘어가기)가 한 줄에 서려면 660px 남짓 */
+        flex: 1 1 660px;
+        margin: 0;
+      }
+      @media (max-width: 860px) {
+        .debrief-top > * {
+          flex-basis: 100%;
+        }
+      }
+      /*
+        **경험치 칸은 낮게.** 결과 화면에서 이 칸이 하는 말은 "지금 몇 레벨, 얼마나 모았나" 한 가지라 높이를
+        차지할 까닭이 없다 — 위의 AI 분석과 아래 버튼이 한 화면에 함께 보여야 한다 (사용자 요청).
+      */
+      .player-box {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 10px 18px 12px;
+        margin-top: 12px;
+      }
+      .player-box .player.md {
+        gap: 14px;
+        margin-top: 0;
+      }
+      .player-box .player.md .level-badge-wrap {
+        width: 52px;
+        height: 52px;
+      }
+      .player-box .player.md .player-foot {
+        margin-top: 4px;
+      }
+      /*
+        훈련 버튼과 **초기화 버튼이 나란히 선다.**
+
+        초기화를 설정 화면 깊숙이 넣지 않는 이유는 쓰임에 있다 — 마스터까지가 짧아
+        한 대를 여러 운전자가 번갈아 앉으므로, 다음 운전자가 찾지 못하면 앞 운전자의 나쁜
+        운전 습관 위에 앉는다. 다만 크기와 색으로는 훈련 쪽이 이긴다.
+      */
+      /*
+        **맵 체험하기** — 번호를 넣어 그 판을 바로 달린다 (Screens 의 bindMapTrial).
+
+        위의 큰 버튼 줄보다 **한 단 낮게** 둔다. 이 과정의 입구는 여전히 '이어서 운행' 이고, 이 칸은
+        고친 판을 골라 시험해 보는 **곁문**이라 같은 크기로 서면 어느 것을 먼저 눌러야 할지 흐려진다.
+        그래도 보이기는 해야 해서, 칸 이름을 앞에 두고 넣는 대로 **그 판의 이름**이 아래 줄에 뜬다.
+      */
+      .map-trial {
+        margin: 18px 0 0;
+        padding: 18px 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      /* 이 창에서 하는 일은 번호 넣기 하나라 칸을 크게 둔다 */
+      #screen-trial .screen-inner {
+        width: min(760px, 100%);
+      }
+      #screen-trial .map-trial input {
+        width: 180px;
+        height: 50px;
+        font-size: 22px;
+      }
+      #screen-trial .map-trial button {
+        height: 50px;
+        font-size: 17px;
+      }
+      #screen-trial .map-trial-note {
+        font-size: 16px;
+        min-height: 1.5em;
+      }
+      .map-trial-rules {
+        margin: 16px 0 0;
+        padding-left: 20px;
+        display: grid;
+        gap: 6px;
+        font-size: 14.5px;
+        color: var(--muted);
+        word-break: keep-all;
+      }
+      .map-trial-rules b {
+        color: var(--text);
+      }
+      .map-trial label {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .map-trial input {
+        width: 150px;
+        height: 42px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .map-trial input:focus {
+        outline: none;
+        border-color: var(--blue);
+      }
+      /* 숫자 칸의 위아래 화살표 — 9천 개 중 하나를 고르는 칸이라 한 칸씩 올리는 손잡이는 쓸 일이 없다 */
+      .map-trial input::-webkit-outer-spin-button,
+      .map-trial input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .map-trial input[type='number'] {
+        -moz-appearance: textfield;
+      }
+      .map-trial button {
+        height: 42px;
+      }
+      /* 그 판의 이름 — 넣는 대로 바뀐다. 있는 번호는 초록, 없는 번호는 황색으로 말한다 */
+      .map-trial-note {
+        flex-basis: 100%;
+        margin: 0;
+        font-size: 14.5px;
+        color: var(--muted);
+        word-break: keep-all;
+      }
+      .map-trial-note.ok {
+        color: #b9e7c9;
+      }
+      .map-trial-note.ok b {
+        color: var(--green);
+      }
+      .map-trial-note.bad {
+        color: #ffc400;
+      }
+      .ai-course-actions {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      /*
+        **이 두 버튼만 키가 두 배다** (42px → 84px).
+
+        이 상자에서 실제로 눌러야 하는 것은 둘뿐이다 — 훈련을 잇거나, 새 운전자로
+        시작하거나. 부스처럼 서서 쓰는 자리에서는 손가락으로 정확히 짚을 수 있는 크기가
+        곧 눌리는 크기라, 위에서 읽는 것(레벨·습관)과 아래에서 누르는 것을 키로 갈라 둔다.
+
+        **가로는 그대로다.** 폭까지 늘리면 글자 옆 여백만 벌어져 버튼이 텅 비어 보인다.
+        높이는 짚을 자리를 넓히지만 폭은 글자 길이가 정하게 두는 편이 낫다.
+
+        `padding` 이 아니라 `min-height` 로 잡는 이유: 버튼이 이미
+        `display:inline-flex; align-items:center` 라 글자와 아이콘이 저절로 가운데 선다.
+        패딩을 키우면 아이콘이 있는 버튼과 없는 버튼의 키가 어긋난다.
+      */
+      .ai-course-actions button {
+        min-height: 84px;
+        font-size: 20px;
+        padding-left: 26px;
+        padding-right: 26px;
+      }
+      /*
+        **출발 버튼만 녹색이다** (우회전 운행 시작 · 이어서 운행).
+
+        레벨 뱃지를 녹색으로 옮기고 나니 파란 버튼이 그 옆에서 따로 놀았다. 게다가 이
+        화면에서 녹색은 이미 **가도 좋다**는 뜻이다 — 신호등 3D 도, HUD 신호 칩도,
+        레벨 뱃지도 같은 #2ee06a 를 쓴다. 출발을 누르는 자리에 그보다 맞는 색이 없다.
+
+        **글자는 어둡다.** 이 녹색은 밝아서 흰 글자를 얹으면 대비가 1.9:1 밖에 안 나온다
+        (파랑에서는 흰 글자가 맞았다). 어두운 글자면 7:1 이 넘고, 무엇보다 밝은 녹색 판에
+        검은 글자는 신호등 자체의 생김새다.
+
+        `button.primary` 를 통째로 갈지 않는 이유: 그 색은 '수동 연습' 탭의 처음부터
+        순서대로 · 확인 창의 계속에도 걸려 있다. 파랑은 여전히 **누르는 것**의 색이고,
+        여기만 그 위에 '출발' 이라는 뜻을 하나 더 얹는다.
+      */
+      .ai-course-actions button.primary {
+        background: linear-gradient(180deg, #3ee87a, #22c55e);
+        border-color: #5cf094;
+        color: #052513;
+      }
+      .ai-course-actions button.primary:hover:not(:disabled) {
+        background: linear-gradient(180deg, #55f08c, #2dd46c);
+        border-color: #7bf5aa;
+      }
+      /* 아이콘도 글자를 따라 커진다 — 15px 글자에 맞춰 둔 17px 은 이 크기에서 점처럼 보인다 */
+      .ai-course-actions button svg {
+        width: 23px;
+        height: 23px;
+      }
+      /*
+        지우는 버튼 — **신호등의 황색이다** (#ffc400).
+
+        옆의 출발 버튼이 녹색이 되면서 이 자리도 짝이 생겼다. 신호등 3D 도(TrafficLight.ts
+        의 COLORS.yellow) HUD 신호 칩도(Hud.ts 의 DOT.yellow) 이미 같은 값을 쓰므로,
+        화면 안에서 **가도 좋다 · 잠깐 멈춰라**가 한 벌의 색으로 읽힌다.
+
+        `--amber`(#ffb020)가 아니라 신호 황색을 그대로 쓴다. 둘은 눈으로 거의 구별되지
+        않지만, 뜻이 신호에서 온 색이면 값도 신호에서 오는 편이 나중에 헷갈리지 않는다.
+
+        **칠하되 옅게 칠한다.** 출발 버튼처럼 진하게 칠하면 되돌릴 수 없는 동작이
+        가장 눈에 띄는 것이 되어 실수로 누르는 쪽이 더 무서워진다. 그렇다고 회색으로
+        두면 다른 버튼과 구별되지 않는다. 가리키면 그제야 진해지는 정도가 맞다.
+      */
+      button.caution {
+        color: #ffc400;
+        border-color: rgba(255, 196, 0, 0.5);
+        background: rgba(255, 196, 0, 0.09);
+      }
+      button.caution:hover:not(:disabled) {
+        background: rgba(255, 196, 0, 0.2);
+        border-color: #ffc400;
+      }
+      /*
+        나쁜 운전 습관 목록 — **AI 가 무엇을 근거로 판을 만드는지가 여기서 보인다.**
+        "AI 가 만들었습니다" 가 아니라 "당신은 이것을 세 번 저질렀고, 두 판만 더 지키면
+        사라집니다" 라고 말해 주는 자리다.
+      */
+      /* 위 경계선은 .ai-split 이 긋는다 — 칸 안에서 또 그으면 줄이 두 겹으로 보인다 */
+      .ai-habits {
+        min-width: 0;
+      }
+      /* 습관이 없을 때의 안내 — 제목 바로 아래 붙는다 */
+      .ai-habits .ai-note {
+        margin-top: 6px;
+      }
+      .ai-habits-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+        margin-bottom: 8px;
+      }
+      .habit-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .habit {
+        padding: 9px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border-left: 3px solid transparent;
+      }
+      /* 다음 판이 시험할 것 — 목록에서 가장 먼저 읽혀야 한다 */
+      .habit.target {
+        border-left-color: var(--amber);
+        background: rgba(255, 176, 32, 0.08);
+      }
+      .habit-name {
+        font-size: 17px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .habit-tag {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(255, 176, 32, 0.2);
+        color: var(--amber);
+      }
+      .habit-meta {
+        margin-top: 6px;
+        font-size: 15px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      /* 고치기까지 남은 판 — 채워질수록 사라짐에 가까워진다 */
+      .pips {
+        display: inline-flex;
+        gap: 3px;
+      }
+      .pip {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.14);
+      }
+      .pip.on {
+        background: var(--green);
+      }
+      /* 결과 화면 — 이번 판으로 습관이 생겼거나 사라졌다 */
+      .habit-change {
+        margin: 14px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .hc {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: var(--radius);
+        font-size: 13.5px;
+        border: 1px solid var(--line);
+      }
+      .hc svg {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+      }
+      .hc.cleared {
+        border-color: rgba(46, 224, 106, 0.4);
+        color: var(--green);
+      }
+      .hc.added {
+        border-color: rgba(255, 176, 32, 0.4);
+        color: var(--amber);
+      }
+      /*
+        결과 화면의 단계 이동 — **다음 버튼 바로 위.**
+        올라갔는지 · 그대로인지 · 내려갔는지가 색으로 먼저 읽히고, 글로 확인된다.
+      */
+      /*
+        ── Level up!! ──────────────────────────────────────────
+        레벨이 움직인 판에만 뜨는 **한 줄짜리** 배너.
+
+        예전에는 결과 화면의 한 줄짜리 칩에 `L5 → L6` 이라고만 적혀 있었다. 이 과정에서
+        가장 큰 사건인데 등급과 감점 사이에 묻혀서 올랐다는 것이 보이지 않았다.
+
+        그렇다고 넉 줄로 쌓았더니(제목·뱃지·글·안내문) 이번에는 **결과 화면을 통째로
+        차지했다** — 정작 읽어야 할 등급과 위반 목록이 스크롤 아래로 밀렸다.
+        축하는 자리를 많이 쓰는 것이 아니라 **눈에 먼저 들어오는 것**이다.
+
+        지금은 한 줄에 둘이다 — 무슨 일이 일어났는가(제목), 어디서 어디로(뱃지 둘).
+
+        오르면 녹색, 내리면 **붉은색**이다. 황색은 이 화면에서 이미 '잠깐 멈춰라'
+        (초기화 버튼)에 쓰고 있어 레벨이 내려간 것과 뜻이 겹쳤다.
+      */
+      .level-change {
+        margin: 14px 0 10px;
+        padding: 12px 18px;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        animation: level-change-in 0.42s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+      }
+      .level-change.up {
+        border-color: rgba(46, 224, 106, 0.45);
+        background: linear-gradient(90deg, rgba(46, 224, 106, 0.14), transparent 62%);
+      }
+      .level-change.down {
+        border-color: rgba(255, 69, 58, 0.45);
+        background: linear-gradient(90deg, rgba(255, 69, 58, 0.14), transparent 62%);
+      }
+      /*
+        영문 그대로 쓴다. "레벨 상승" 보다 **Level up!!** 이 이 순간의 말이다 —
+        게임에서 그렇게 부르는 것을 다들 알고 있고, 느낌표 둘이 그 뜻을 마저 채운다.
+      */
+      .level-change-title {
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+      }
+      .level-change.up .level-change-title {
+        color: var(--green);
+        text-shadow: 0 0 20px rgba(46, 224, 106, 0.4);
+      }
+      .level-change.down .level-change-title {
+        color: var(--red);
+        text-shadow: 0 0 20px rgba(255, 69, 58, 0.35);
+      }
+      /* 뱃지 셋은 붙어 다닌다 — 바깥 줄만 접힌다 */
+      .level-change-pair {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        flex: 0 0 auto;
+      }
+      /* 떠나온 레벨은 물러나 있는다 — 눈에 들어와야 하는 것은 닿은 자리다 */
+      .level-change .level-badge-wrap.from {
+        color: var(--muted);
+        opacity: 0.55;
+        width: 38px;
+        height: 38px;
+      }
+      /* 닿은 자리는 조금 크다 — 색만으로는 어느 쪽이 지금인지 덜 읽힌다 */
+      .level-change .level-badge-wrap.to {
+        width: 50px;
+        height: 50px;
+      }
+      .level-change.down .level-badge-wrap.to {
+        color: var(--red);
+      }
+      .level-change.down .level-badge-wrap.to .level-badge {
+        filter: drop-shadow(0 0 6px rgba(255, 69, 58, 0.45));
+      }
+      .level-change-arrow {
+        font-size: 20px;
+        color: var(--muted);
+      }
+      @keyframes level-change-in {
+        from {
+          opacity: 0;
+          transform: scale(0.94);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      /*
+        **움직임을 줄여 달라고 한 사람에게는 띄우기만 한다.** 이 배너는 축하지 안내가
+        아니라서 정보를 잃지 않고 애니메이션만 끌 수 있다.
+      */
+      @media (prefers-reduced-motion: reduce) {
+        .level-change {
+          animation: none;
+        }
+      }
+      /* 화면에는 안 보이고 낭독기만 읽는 글 — 뱃지가 aria-hidden 이라 그 뜻을 여기서 준다 */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /*
+        카드 전체가 버튼이다.
+
+        예전에는 `div` 에 click 만 달아 두었다. 마우스로는 똑같지만 **키보드로는 닿지
+        않는다** — Tab 으로 넘어오지도, Enter 로 눌리지도 않는다. `button` 으로 바꾸면
+        그 두 가지가 저절로 되고 화면 낭독기도 누를 것으로 읽는다.
+
+        `button` 의 기본 배치(가운데 정렬 inline-flex)는 카드에서 되돌린다.
+      */
+      .card.clickable {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        text-align: left;
+        font: inherit;
+        color: inherit;
+      }
+
+      /* ── 자동차전시관의 차 카드 ─────────────────────────────────────────────────── */
+      .car-card {
+        padding: 0;
+        overflow: hidden;
+        /* 레벨 뱃지(.car-level)가 이 상자를 기준으로 앉는다 */
+        position: relative;
+      }
+
+      /* 사진이 곧 좌석 맞추기 버튼 — 눌러야 하는 것을 알 수 있게 안내를 얹는다 */
+      .car-photo-btn {
+        display: block;
+        position: relative;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+      }
+      .car-photo-hint {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #eef2f8;
+        background: linear-gradient(0deg, rgba(6, 9, 14, 0.86), rgba(6, 9, 14, 0));
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      .car-photo-btn:hover .car-photo-hint,
+      .car-photo-btn:focus-visible .car-photo-hint {
+        opacity: 1;
+      }
+      .car-photo-btn:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: -2px;
+      }
+      /* 운행 버튼 + 톱니바퀴(좌석 맞추기) — 한 줄. 버튼이 남는 폭을 다 쓴다 */
+      .car-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .car-actions button:not(.icon) {
+        flex: 1;
+      }
+      .car-actions button.icon {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+      }
+      /*
+        지금 타고 있는 차. **누를 수 없지만 흐리지도 않다** — 비활성 기본값(opacity .4)을
+        그대로 두면 '이 차로 운행'과 회색끼리 겹쳐 보여, 아홉 장 중 어느 것이 내 차인지
+        한눈에 안 들어온다. 초록으로 두면 색만 보고도 찾는다.
+      */
+      .car-actions button.running:disabled {
+        opacity: 1;
+        color: var(--green);
+        background: rgba(46, 224, 106, 0.16);
+        border-color: rgba(46, 224, 106, 0.55);
+        cursor: default;
+      }
+
+      /* 사진 등록·되돌리기 — 카드 아래쪽에 작게 */
+      .car-photo-tools {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .car-photo-tools button {
+        flex: 1;
+        font-size: 12px;
+        padding: 6px 8px;
+      }
+
+      /*
+        준비 중 화면.
+
+        주행을 시작하기 전에 모델·환경맵·셰이더를 다 굽고 나서 출발한다. 그동안 무엇을
+        기다리는지 알 수 없으면 멈춘 것처럼 보이므로, 화면을 덮고 상태를 적는다.
+        (덮는 이유가 하나 더 있다 — 준비 중에는 아직 절차적 차체가 서 있어서,
+         모델로 바뀌는 순간이 그대로 보이면 "차가 바뀌었나" 로 읽힌다)
+      */
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 11, 17, 0.92);
+        backdrop-filter: blur(6px);
+        z-index: 20;
+      }
+      #loading.on {
+        display: flex;
+      }
+      .loading-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        text-align: center;
+        padding: 24px;
+      }
+      .loading-spin {
+        width: 34px;
+        height: 34px;
+        border: 3px solid rgba(255, 255, 255, 0.14);
+        border-top-color: var(--blue);
+        border-radius: 50%;
+        animation: loading-spin 0.8s linear infinite;
+      }
+      @keyframes loading-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .loading-text {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .loading-sub {
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 1.4em;
+        /* AI 추천 이유는 두 줄(이유 · 볼 것)이다 — 줄바꿈을 살린다 */
+        white-space: pre-line;
+        max-width: min(560px, 90vw);
+        line-height: 1.6;
+        text-align: center;
+      }
+      .loading-sub.reason {
+        font-size: 16px;
+        color: var(--text);
+        margin-top: 4px;
+      }
+
+      /* 좌석 맞추기 오버레이 — 운전석 화면 위 */
+      #seat-hud {
+        position: absolute;
+        inset: 0;
+        display: none;
+        pointer-events: none;
+      }
+      #seat-hud.on {
+        display: block;
+      }
+      .seat-hud-inner {
+        position: absolute;
+        left: 50%;
+        bottom: 28px;
+        transform: translateX(-50%);
+        pointer-events: auto;
+        text-align: center;
+        background: rgba(12, 16, 24, 0.88);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px 22px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      }
+      .seat-hud-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--blue);
+      }
+      .seat-hud-text {
+        margin-top: 4px;
+        font-size: 20px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .seat-hud-keys {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .seat-hud-keys kbd {
+        display: inline-block;
+        min-width: 17px;
+        text-align: center;
+        background: #232b3a;
+        border: 1px solid #364057;
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        padding: 0 4px;
+        font-family: inherit;
+        font-size: 11px;
+      }
+      .seat-hud-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 12px;
+      }
+      .car-photo {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        background: #0e131c;
+        display: block;
+      }
+      .car-photo-missing {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background: linear-gradient(135deg, #1a2130, #0e131c);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #566078;
+        font-size: 13px;
+        text-align: center;
+        padding: 12px;
+      }
+      /*
+        차 그림 — 사진을 등록하지 않았을 때 그 자리를 채운다.
+
+        예전에는 "사진 없음" 이라는 글자였다. 파는 물건이 아홉 개인데 아홉 칸이 모두
+        같은 회색 글자면 무엇을 고르는 화면인지 알 수 없다. 실제 차체 치수와 색으로
+        빚은 3D 를 굽어 넣으면(carThumb.ts) 아홉 대가 서로 다르게 보인다.
+      */
+      .car-thumb {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        background: linear-gradient(160deg, #1a2130, #0d1119);
+      }
+      .car-body {
+        padding: 14px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .car-credit {
+        font-size: 10px;
+        color: #5c667a;
+        line-height: 1.5;
+        margin-top: 4px;
+      }
+      .car-credit a {
+        color: #6b7a92;
+      }
+      .spec-row {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: var(--muted);
+        flex-wrap: wrap;
+      }
+      .meter {
+        height: 4px;
+        border-radius: 2px;
+        background: #232b3a;
+        overflow: hidden;
+        flex: 1;
+        min-width: 50px;
+      }
+      .meter > i {
+        display: block;
+        height: 100%;
+        background: var(--blue);
+      }
+      .meter.brake > i {
+        background: var(--green);
+      }
+
+      /* ── HUD ──────────────────────────────────────────────────── */
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        display: none;
+      }
+      #hud.active {
+        display: block;
+      }
+
+      .hud-top {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 14px 18px;
+        display: flex;
+        /* 지시문은 화면 **가운데 맨 위** — 좌우 끝은 시야 창이 쓰는 자리다 */
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        /*
+          그라데이션 **높이를 못 박는다.** 요소 높이에 맞춰 늘어나게 두면 판단 표시가
+          붙은 만큼 어두운 띠가 내려와 하늘과 전방 신호등까지 함께 어두워진다.
+        */
+        background: linear-gradient(180deg, rgba(6, 8, 13, 0.78), transparent) top center / 100% 150px
+          no-repeat;
+      }
+
+      .hud-objective {
+        background: rgba(12, 16, 24, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        padding: 14px 18px;
+        text-align: center;
+        /*
+          좌·우 시야 창(각각 화면 폭의 19%)이 양 끝에 붙어 있으므로 그 사이(62%)를 넘지 않는다.
+          넘기면 설명이 긴 시나리오에서 카드가 창 위로 올라탄다 — 카드는 DOM 이라 3D 창을 덮는다.
+        */
+        max-width: min(58vw, 1000px);
+      }
+      /*
+        **누가 골랐는지 — 판 이름 위 첫 줄.** 판 이름보다 작고 흐리게 둔다: 달리면서 늘 읽을 것은 아니고,
+        한 번 보고 "AI 가 골라 준 판이구나" 하면 되는 줄이다. 알약과 모델 이름은 추천 카드와 같은 모양이다.
+      */
+      .hud-objective .picked-by {
+        margin-bottom: 7px;
+        /*
+          **판 이름의 3분의 2쯤**으로 잡는다 (이름은 clamp(22,2.8vw,30)). 처음에는 clamp(11,1.05vw,14) 이었는데
+          달리면서 읽기에 너무 작다고 했다 — AI 가 한 일을 보여 주려고 둔 줄이 읽히지 않으면 둔 뜻이 없다.
+        */
+        font-size: clamp(15px, 1.75vw, 20px);
+        font-weight: 700;
+        /* 흐린 회색은 작을 때의 보완책이었다 — 커진 만큼 본문색에 가깝게 올린다 */
+        color: #c7d0dc;
+        line-height: 1.35;
+      }
+      .hud-objective .picked-by:empty {
+        display: none;
+      }
+      /* 알약과 모델 이름은 줄 크기를 따라간다 — 판 이름이 주인공인 것은 그대로다 */
+      .hud-objective .picked-by .picker-chip {
+        font-size: 0.95em;
+      }
+      .hud-objective .picked-by .picker-model {
+        font-size: 0.92em;
+      }
+      /* 지금 무슨 판을 하고 있는지 — 주행 중에도 한눈에 보이게 크게 */
+      .hud-objective .scenario {
+        /*
+          지금 무슨 판인지가 가장 먼저 읽혀야 한다 — 크게, 그리고 색으로.
+
+          **색은 판 이름(Stage01)에만 준다.** 예전에는 제목까지 통째로 파랑이었는데,
+          두 줄로 접히는 긴 제목이 다 색을 입으면 판 이름이 어디까지인지 알 수 없고
+          정작 읽어야 할 조건(정면신호 색·보행자)이 색에 묻힌다.
+        */
+        color: var(--text);
+        font-size: clamp(22px, 2.8vw, 30px);
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+      }
+      .hud-objective .scenario.long {
+        font-size: clamp(16px, 1.75vw, 21px);
+      }
+      .hud-objective .scenario.xlong {
+        font-size: clamp(14px, 1.45vw, 18px);
+      }
+      /*
+        판 이름 (`Stage01`) — 목록 카드의 이름표와 같은 파랑이다.
+
+        **주행 화면과 결과 화면이 한 규칙을 쓴다.** 두 화면이 같은 판을 말하는데 한쪽은
+        전체가 흰색, 다른 쪽은 앞부분만 파랑이면 같은 것으로 읽히지 않는다.
+        (선택자는 둘이지만 값은 한 곳에만 적는다 — 갈라 두면 한쪽만 바뀐다)
+      */
+      /* 제목의 둘째 줄 — 결과 화면의 판 조건. 윗줄보다 작고 흐리게 */
+      .hud-objective .scenario .stage,
+      .screen-head h1 .stage {
+        color: var(--blue);
+        margin-right: 10px;
+      }
+      /* 판 이름과 상황 사이의 쌍점 — 이름보다 한 톤 흐리게 */
+      .hud-objective .scenario .sep {
+        color: var(--muted);
+        margin-right: 10px;
+      }
+      /*
+        **주행 중 상단은 한 줄뿐이다** — 판 이름 : 상황.
+
+        예전에는 제목 아래에 플레이 전 안내 문장(brief)이 두 줄로 붙어 있었다. 주행 중에
+        그 문장을 다시 읽는 사람은 없고, 상자가 커질수록 하늘과 전방 신호등을 가렸다.
+        지금 무엇을 해야 하는지는 AI 어우참이 바로 아래에서 말해 준다.
+      */
+      .hud-objective {
+        padding: 10px 22px;
+      }
+
+      /*
+        계기판 — 우측 하단.
+
+        3D 대시보드 위에 얹던 것을 화면으로 옮겼다. Sketchfab 모델은 부품 이름이 제각각이라
+        계기판이 어디 있는지 자동으로 못 찾는데, 화면으로 올리면 모델과 무관해진다.
+        가로세로비(1024:340)는 캔버스와 같아야 눈금이 늘어나지 않는다.
+
+        자리는 미니맵이 있던 우측 하단이다. 실제 계기판이 시선 아래에 있으므로 화면에서도
+        아래가 자연스럽고, 위쪽은 시나리오 지시문·판단 표시가 쓰는 자리라 비워 두는 편이 낫다.
+      */
+      #cluster {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        width: min(30vw, 380px);
+        height: auto;
+        aspect-ratio: 1024 / 340;
+        border-radius: 12px;
+        opacity: 0;
+        transition: opacity 0.18s ease;
+        pointer-events: none;
+      }
+      #cluster.on {
+        opacity: 1;
+      }
+
+      /*
+        주행 중 나가는 길.
+
+        **좌하단 맨 아래**에 둔다. 위쪽 좌·우 끝은 운전자 시점의 시야 창이 쓰고(보행자를
+        보는 창이라 절대 덮으면 안 된다), 우하단은 계기판, 그 위는 키 안내와 터치
+        조향 버튼 자리다. 세 시점 모두에서 비어 있는 곳은 여기뿐이다.
+
+        **눈에 띄지 않게 둔다.** 운전 중에 자꾸 보일 이유가 없는 버튼이라, 평소에는
+        흐리게 두고 마우스를 올렸을 때만 또렷해진다.
+      */
+      .hud-home {
+        position: absolute;
+        left: 18px;
+        bottom: 18px;
+        pointer-events: auto;
+        font-family: inherit;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--muted);
+        background: rgba(12, 16, 24, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 999px;
+        padding: 16px 28px;
+        backdrop-filter: blur(8px);
+        cursor: pointer;
+        opacity: 0.72;
+        transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+      }
+      .hud-home:hover {
+        opacity: 1;
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.24);
+      }
+
+      /* 좌하단 키 안내 — 실제로 자주 쓰는 키만 */
+      .keyhints {
+        position: absolute;
+        left: 18px;
+        /* 아래 '홈으로' 버튼(약 60px)을 피해 띄운다 */
+        bottom: 112px;
+        font-size: 22px;
+        color: var(--muted);
+        line-height: 1.85;
+        background: rgba(12, 16, 24, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        padding: 14px 18px;
+        backdrop-filter: blur(8px);
+      }
+      /*
+        ── 내 레벨과 경험치 ──────────────────────────────────────
+        게임에서 흔한 플레이어 칸 — 레벨 배지 · 이름 · 경험치 바. 조작 안내(.keyhints) 바로 위, 같은 폭 · 같은 바탕이라
+        왼쪽 아래가 한 묶음으로 읽힌다. 운전 중에 읽는 것이라 글자를 키 안내와 비슷하게 크게 둔다.
+      */
+      .hud-player {
+        position: absolute;
+        left: 18px;
+        bottom: 236px;
+        width: 340px;
+        padding: 10px 16px 12px 10px;
+        background: rgba(12, 16, 24, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 12px;
+        backdrop-filter: blur(8px);
+      }
+      .hud-player[hidden] {
+        display: none;
+      }
+      /* 안의 칸은 첫 화면 · 결과 화면과 같은 .player 다 — 여기서는 운전 중에 맞는 크기만 정한다 */
+      .player.hud {
+        gap: 12px;
+      }
+      .player.hud .level-badge-wrap {
+        width: 50px;
+        height: 50px;
+      }
+      .player.hud .level-badge-wrap::before {
+        display: none;
+      }
+      .player.hud .player-body {
+        gap: 7px;
+      }
+      .player.hud .player-name {
+        font-size: 21px;
+      }
+      .player.hud .player-xp b {
+        font-size: 17px;
+      }
+      .player.hud .player-track {
+        height: 10px;
+      }
+      /* 시범 주행에서는 내 기록이 아니므로 감춘다 (main.ts 가 null 을 넘기지만, 자율 주행 표시와 겹치지 않게 한 번 더) */
+      body.ai-drive .hud-player {
+        display: none;
+      }
+
+      /*
+        ── AI 자율 주행 표시 ────────────────────────────────────
+        조작 안내와 **같은 자리**를 쓴다. 그 안내는 자율 주행 중에 거짓말이 되므로
+        같이 띄우지 않고 바꿔 단다 (body.ai-drive 가 둘을 맞바꾼다).
+
+        깜빡이는 점을 붙이는 이유: 정지 신호 앞에서 차가 서 있으면 화면이 완전히
+        멎어서 **멈춘 것인지 게임이 죽은 것인지** 알 수 없다. 점이 뛰고 있으면 안다.
+      */
+      .hud-auto {
+        position: absolute;
+        left: 18px;
+        bottom: 112px;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: var(--text);
+        background: rgba(12, 16, 24, 0.72);
+        border: 1px solid rgba(76, 141, 255, 0.45);
+        border-radius: 10px;
+        padding: 13px 20px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 6px 26px rgba(0, 0, 0, 0.42);
+      }
+      body.ai-drive .hud-auto {
+        display: flex;
+      }
+      body.ai-drive .keyhints {
+        display: none;
+      }
+      /* 터치 컨트롤을 감추는 규칙은 `body.touch #touch` 뒤에 있다 (아래 '모바일 터치 컨트롤') */
+      .hud-auto .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--blue);
+        box-shadow: 0 0 12px var(--blue);
+        animation: ai-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes ai-pulse {
+        50% {
+          opacity: 0.25;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hud-auto .dot {
+          animation: none;
+        }
+      }
+      .hud-auto .sub {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0;
+      }
+      @media (max-width: 760px) {
+        .hud-auto {
+          font-size: 16px;
+          padding: 10px 14px;
+          bottom: 16px;
+        }
+        .hud-auto .sub {
+          display: none;
+        }
+      }
+
+      /*
+        fps. **화면 오른쪽 위 구석**에 둔다 — 이 게임에서 유일하게 비어 있는 자리이고,
+        판단에 쓰는 표시(신호·판단·정지 거리)와 겹치지 않는다.
+      */
+      .fps {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: none;
+        padding: 5px 10px;
+        border-radius: 8px;
+        background: rgba(8, 11, 17, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 13px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--green);
+        backdrop-filter: blur(6px);
+      }
+      .fps.on {
+        display: block;
+      }
+      /* 30 아래로 떨어지면 색으로 알린다 — 숫자를 읽지 않아도 보인다 */
+      .fps.slow {
+        color: var(--amber);
+      }
+
+      .keyhints kbd {
+        display: inline-block;
+        min-width: 34px;
+        text-align: center;
+        background: #232b3a;
+        border: 1px solid #364057;
+        border-bottom-width: 2px;
+        border-radius: 6px;
+        padding: 0 8px;
+        font-family: inherit;
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text);
+        margin-right: 8px;
+      }
+
+      /*
+        신호 칩 — 상공·후방 시점에서 전방 신호(와 우회전신호등)를 글자로 알려 준다.
+        그 시점에서는 신호등 등화가 운전자 쪽을 향해 있어 화면에서 읽을 수 없다.
+      */
+      .signal-chip {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 16px;
+        border-radius: 999px;
+        background: rgba(9, 12, 18, 0.88);
+        border: 1px solid var(--line);
+        font-size: clamp(13px, 1.4vw, 17px);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        backdrop-filter: blur(10px);
+      }
+      .signal-chip.show {
+        display: inline-flex;
+      }
+      .signal-chip .sig-dot {
+        display: inline-block;
+        width: 0.72em;
+        height: 0.72em;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: -0.05em;
+        box-shadow: 0 0 8px currentColor;
+      }
+      .signal-chip .sig-sep {
+        display: inline-block;
+        width: 1px;
+        height: 1em;
+        background: var(--line);
+        margin: 0 2px;
+      }
+
+      /*
+        **AI 어우참의 말풍선** — 진행 판단(서행 진행 · 일시정지 · 보행자 통행 확인)과
+        정지 거리를 로봇이 말한다.
+
+        예전에는 두 줄의 알약(판단 · 거리)이 따로 떠 있었다. 이 게임의 AI 는 판을 만들고
+        습관을 진단하는데, 주행 중에 옆에서 말해 주는 존재는 화면에 없었다 — 같은 AI 가
+        운전석 옆에 앉아 있다는 것이 보이게 한다. 로봇의 얼굴 화면과 들고 있는 신호등이
+        상태를 함께 말하므로(웃음 · 느낌표 · 우회전 화살표) 글자를 읽기 전에 먼저 읽힌다.
+
+        **이름을 `drive-coach` 로 둔다.** 결과 화면의 AI 코치 카드가 이미 `.coach` 를 쓰고 있어,
+        처음에 같은 이름을 붙였더니 그 카드의 파란 테두리가 말풍선 묶음 둘레에 새어 나왔다.
+
+        밝은 노면 위에 옅게 얹으면 묻히므로 어두운 불투명 배경 + 굵은 테두리를 그대로 쓴다.
+        테두리 색이 판단을 말한다 — 빨강은 일시정지, 주황은 보행자 확인, 초록은 서행 진행.
+      */
+      .drive-coach {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        --coach-color: rgba(46, 224, 106, 0.85);
+        --coach-text: #5ef193;
+      }
+      .drive-coach.show {
+        opacity: 1;
+      }
+      /*
+        난이도 4 · 5 는 주행 중 도움을 걷는다 (challenge.ts 의 hints) — 4 는 할 일 한마디만,
+        5 는 로봇까지 감춰 신호와 보행자를 스스로 보고 판단하게 한다.
+      */
+      #hud.hints-less .drive-coach .stopdist,
+      #hud.hints-less .drive-coach .ped-cue {
+        display: none;
+      }
+      #hud.hints-none .drive-coach {
+        display: none;
+      }
+      .drive-coach.stop {
+        --coach-color: #ff453a;
+        --coach-text: #ff6b60;
+      }
+      .drive-coach.yield {
+        --coach-color: var(--amber);
+        --coach-text: #ffcb5c;
+      }
+      /* 가도 되지만 살피며 서행 — 로봇의 노랑 신호와 같은 색 */
+      .drive-coach.caution {
+        --coach-color: #ffd60a;
+        --coach-text: #ffe066;
+      }
+      /*
+        로봇은 **틀 없이** 세운다 — 배경을 지운 그림이라 도로 위에 그대로 서 있는 것처럼 보인다.
+        밝은 하늘·노면 위에서도 윤곽이 묻히지 않게 그림자만 드리운다. 상태의 색은 말풍선
+        테두리가 말한다.
+      */
+      .drive-coach-robot {
+        height: clamp(96px, 11.5vw, 150px);
+        width: auto;
+        flex: none;
+        filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.55));
+        /* 그림의 바닥(횡단보도 매트)까지 말풍선 아래선에 맞춘다 */
+        margin-bottom: -4px;
+      }
+      .drive-coach-bubble {
+        position: relative;
+        margin-left: 6px;
+        margin-bottom: 22px;
+        padding: 8px 24px 12px;
+        border-radius: 20px;
+        background: rgba(9, 12, 18, 0.9);
+        border: 2px solid var(--coach-color);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
+        transition: border-color 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
+      /* 말꼬리 — 로봇 쪽(왼쪽 아래)을 가리킨다. 테두리 삼각형 위에 배경 삼각형을 겹친다 */
+      .drive-coach-bubble::before,
+      .drive-coach-bubble::after {
+        content: '';
+        position: absolute;
+        bottom: 14px;
+        border-style: solid;
+        border-color: transparent;
+      }
+      .drive-coach-bubble::before {
+        left: -16px;
+        border-width: 9px 16px 9px 0;
+        border-right-color: var(--coach-color);
+      }
+      .drive-coach-bubble::after {
+        left: -12px;
+        border-width: 7px 13px 7px 0;
+        border-right-color: rgba(9, 12, 18, 0.96);
+      }
+      /* 이름이 신호등 딱지가 되면서 조금 키웠다 — 11~13px 에서는 딱지 셋이 점처럼 보였다 */
+      .drive-coach-name {
+        font-size: clamp(12px, 1.2vw, 15px);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--muted, #9aa3b2);
+      }
+      .advice {
+        font-size: clamp(22px, 2.6vw, 32px);
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        line-height: 1.15;
+        white-space: nowrap;
+        color: var(--coach-text);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+      }
+
+      /*
+        말풍선 마지막 줄 — **보행자가 건너려는 것 같다 / 건너는 중이다.**
+        연석으로 걸어 나오는 작은 움직임이 곧 규정의 "통행하려는 때" 다 (Game.pedCue).
+        주황은 "건너려 한다", 빨강은 "건너는 중" 이다.
+      */
+      .ped-cue {
+        display: none;
+        margin-top: 2px;
+        padding: 3px 10px;
+        border-radius: 10px;
+        font-size: clamp(14px, 1.5vw, 18px);
+        font-weight: 800;
+        white-space: nowrap;
+        color: #1b1300;
+        background: #ffcb5c;
+      }
+      .ped-cue.show {
+        display: block;
+      }
+      /*
+        **앞차가 서지 않았다** — 보행자 알림과 같은 자리·모양이고 색만 다르다 (보라).
+        주황·빨강은 보행자 몫이라, 같은 색이면 사람 이야기인지 앞차 이야기인지 섞인다.
+      */
+      .ped-cue.lead-cue {
+        color: #fff;
+        background: #8a5cf6;
+      }
+      .ped-cue.crossing {
+        color: #fff;
+        background: #ff453a;
+      }
+      /* 새로 뜬 순간에만 한 번 흔든다 — 계속 움직이면 눈이 거기 붙어 정작 사람을 안 본다 */
+      .ped-cue.pulse {
+        animation: ped-cue-pulse 0.6s ease-out;
+      }
+      @keyframes ped-cue-pulse {
+        0% { transform: scale(0.9); opacity: 0.3; }
+        50% { transform: scale(1.06); opacity: 1; }
+        100% { transform: scale(1); }
+      }
+
+      /* 말풍선 둘째 줄 — 어디서 멈춰야 하는지, 얼마나 남았는지. 없으면 줄째 접는다 */
+      .stopdist {
+        display: none;
+        font-size: clamp(15px, 1.7vw, 20px);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+        color: #ffcb5c;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+        white-space: nowrap;
+      }
+      .stopdist.show {
+        display: block;
+      }
+      .stopdist.done {
+        color: #5ef193;
+      }
+
+      .toast {
+        position: absolute;
+        left: 50%;
+        /* 계기판 위로 띄운다 */
+        bottom: max(220px, 38vh);
+        transform: translateX(-50%) translateY(8px);
+        background: rgba(18, 23, 33, 0.94);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.25s, transform 0.25s;
+        pointer-events: none;
+        max-width: 80vw;
+        text-align: center;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* ── 모바일 터치 컨트롤 ────────────────────────────────────── */
+      #touch {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        display: none;
+      }
+      body.touch #touch {
+        display: block;
+      }
+      /*
+        자율 주행 중에는 터치 조작을 감춘다 — 눌러도 아무 일이 없는 버튼을 띄워 두면
+        AI 가 도는 것을 사람이 방해할 수 있다고 오해한다.
+
+        **`body.touch` 규칙보다 뒤에 둔다.** 둘의 우선순위가 같아서(0,2,1) 순서로 갈리는데,
+        앞에 두면 터치 기기에서 이 규칙이 덮여 버린다 — 실제로 그랬다.
+      */
+      body.ai-drive #touch {
+        display: none;
+      }
+      .tbtn {
+        position: absolute;
+        pointer-events: auto;
+        width: 74px;
+        height: 74px;
+        border-radius: 50%;
+        background: rgba(28, 34, 48, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--text);
+        user-select: none;
+      }
+      .tbtn:active {
+        background: rgba(60, 74, 102, 0.9);
+      }
+      #t-left {
+        left: 20px;
+        bottom: 108px;
+      }
+      #t-right {
+        left: 108px;
+        bottom: 108px;
+      }
+      #t-stop {
+        right: 20px;
+        bottom: 108px;
+        width: 88px;
+        height: 88px;
+        font-size: 15px;
+      }
+      #t-stop.on {
+        background: rgba(46, 224, 106, 0.85);
+        color: #05210f;
+      }
+      #t-signal {
+        right: 24px;
+        bottom: 210px;
+        width: 62px;
+        height: 62px;
+        font-size: 11px;
+      }
+      #t-signal.on {
+        background: rgba(255, 176, 32, 0.85);
+        color: #171100;
+      }
+
+      /* 주행 지도 — 어디서 걸렸는지 */
+      .runmap-card {
+        margin-top: 16px;
+        background: #0e131c;
+        border: 1px solid #232b3a;
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .runmap-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #c9d6ea;
+        margin-bottom: 10px;
+      }
+      /*
+        **280px** — 지도는 '어디서 무슨 일이 있었나' 를 한눈에 보는 그림이지 들여다보는 도면이 아니다.
+        460 → 360 → 280 으로 줄여 왔고(사용자가 세 번 다 정했다), 이 크기에서도 정지선 · 궤적 · 보행자 경로 ·
+        위반 핀이 서로 가려지지 않는다. 지도가 작아진 만큼 옆의 주행 기록이 넓어진다.
+      */
+      #runmap {
+        display: block;
+        width: 100%;
+        max-width: 280px;
+        margin: 0 auto;
+        border-radius: 8px;
+        border: 1px solid #1c2431;
+      }
+      /* 지도 칸이 좁아져(2 : 3) 간격을 줄였다 — 14px 이면 '도착' 하나만 둘째 줄로 떨어졌다 */
+      .runmap-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        justify-content: center;
+        margin-top: 10px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .runmap-legend .sw {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+        vertical-align: -1px;
+      }
+      .runmap-legend .sw.path { background: #2ee06a; border-radius: 2px; }
+      .runmap-legend .sw.bad { background: #ff453a; }
+      .runmap-legend .sw.ped { background: #ffb020; border-radius: 2px; }
+      .runmap-legend .sw.start { background: #2ee06a; }
+      .runmap-legend .sw.end { background: #4c8dff; }
+
+      /*
+        위반 카드 — 번호 · 위치 · 교정 지시.
+
+        **바탕을 깐다.** 여태 이 블록에는 배경도 테두리도 없어서 글자만 화면에 떠
+        있었다 (Screens.ts 가 `border-left-color` 를 인라인으로 지정하는데, 받을
+        `border-left-width` 가 없어 아무 일도 하지 않았다). 화면 레이어가 거의
+        불투명하던 때는 티가 안 났지만, 뒤의 3D 가 비치기 시작하면 조문 원문이
+        도로 위에 얹힌 것처럼 보인다.
+
+        왼쪽 굵은 선은 **이것이 위반 하나**라는 표시다 — 카드가 여러 장 이어질 때
+        어디서 끊기는지가 그 선으로 갈린다. 색은 기본이 호박(위반)이고, 운행 실패만
+        인라인으로 빨강을 덮어쓴다.
+      */
+      /*
+        AI 코치 — 여러 판정을 가로질러 "그래서 뭐가 문제였나" 를 한 문단으로 답한다.
+
+        **위반 카드와 다르게 생겨야 한다.** 아래 카드들은 조문에 근거한 판정이고 이것은
+        조언이라, 같은 모양이면 학습자가 둘을 같은 무게로 읽는다. 그래서 왼쪽 굵은 선
+        대신 은은한 파랑 테두리를 두르고, 머리에 'AI 코치' 라벨을 붙여 출처를 밝힌다.
+
+        기다리는 동안에는 **뼈대만 깜빡인다.** 스피너를 두지 않는 이유는, 이 칸이
+        비어 있어도 아래 지도·기록·위반 카드는 이미 다 읽을 수 있기 때문이다 —
+        기다리라고 말할 일이 아니다. 못 받아 오면 칸 자체가 사라진다(client.ts 참고).
+      */
+      .coach {
+        margin-top: 16px;
+        padding: 15px 18px;
+        background: linear-gradient(180deg, rgba(76, 141, 255, 0.07), rgba(76, 141, 255, 0.02));
+        border: 1px solid rgba(76, 141, 255, 0.3);
+        border-radius: var(--radius);
+      }
+      .coach .coach-title {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--blue);
+        letter-spacing: 0.02em;
+        margin-bottom: 9px;
+      }
+      /*
+        **AI 주행결과 분석** — 결과 화면 맨 위, 경험치 칸 바로 앞 (ui/Screens.ts 의 renderDebrief).
+        로봇(normal.webp)을 옆에 두는 것은 사용자가 정했다 — "이미지 옆에 답을 써 주면 더 친근감이 있을 것
+        같아." 색은 이름표('AI' 배지)와 같은 파랑→보라라, 아래의 법규 설명(파랑)과 한눈에 갈린다.
+      */
+      /*
+        **색이 결과를 먼저 말한다** (사용자가 정했다).
+
+          잘 달린 판 → 초록 · 신호등을 든 어우참(turnlight.webp)
+          어긴 판   → 붉은색 · 손을 들어 세우는 어우참(stop.webp)
+
+        글을 읽기 전에 어느 쪽인지 알 수 있어야 한다. 아직 답을 기다리는 동안에는 호박색이다 —
+        이름 딱지의 '우'(#f2a900) 와 같은 계열이라 '어우참이 무언가 하고 있다' 로 읽힌다.
+        (한때 전부 파랑→보라였는데 어두운 바탕에서 읽기 어려웠다)
+      */
+      .verdict {
+        --verdict: #f2a900;
+        --verdict-text: #ffd88a;
+        margin-bottom: 14px;
+        padding: 14px 18px 16px;
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--verdict) 14%, transparent),
+          color-mix(in srgb, var(--verdict) 4%, transparent)
+        );
+        border: 1px solid color-mix(in srgb, var(--verdict) 42%, transparent);
+        border-left: 4px solid var(--verdict);
+        border-radius: var(--radius);
+      }
+      /* 무위반 — 통과 신호 */
+      .verdict.good {
+        --verdict: #2ee06a;
+        --verdict-text: #9df3bb;
+      }
+      /* 위반 · 미완주 — 멈춤 신호 */
+      .verdict.bad {
+        --verdict: #ff453a;
+        --verdict-text: #ffb1ab;
+      }
+      .verdict .verdict-head {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 7px 12px;
+        margin-bottom: 11px;
+        /* 결과 화면에서 가장 먼저 읽는 줄이라 크게 (사용자가 두 번에 걸쳐 키웠다) */
+        font-size: clamp(21px, 1.95vw, 25px);
+        font-weight: 800;
+        color: var(--verdict-text);
+        letter-spacing: 0.01em;
+      }
+      /* 누가 썼는지도 함께 키운다 — 제목 안에서 너무 작으면 읽히지 않는다 */
+      .verdict .verdict-head .coach-by {
+        font-size: 0.78em;
+      }
+      /* 제공자 알약(Groq 주황 · Gemini 파랑)이 호박색 바탕에 묻히지 않게 흰 테두리를 한 겹 두른다 */
+      .verdict .picker-chip {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+      }
+      .verdict .verdict-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      /* 로봇은 글을 밀어내지 않는다 — 크기를 못 박고 줄어들지도 않게 */
+      .verdict .verdict-robot {
+        width: 124px;
+        height: 124px;
+        flex: 0 0 auto;
+        object-fit: contain;
+        filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+      }
+      .verdict .coach-body {
+        /* 결과 화면에서 가장 먼저, 그리고 유일하게 읽는 글이라 본문보다 크게 (사용자가 두 번에 걸쳐 키웠다) */
+        font-size: clamp(19px, 1.65vw, 22px);
+        line-height: 1.75;
+        color: var(--text);
+        white-space: pre-wrap;
+      }
+      /* 받아 오는 중 — 글이 들어올 자리만큼 띠 두 줄 (아래 .coach.loading 과 같은 결) */
+      /*
+        **AI 의 평가는 목록이다** (ui/Screens.ts 의 coachLines · 코치가 개조식으로 답한다).
+        줄글이 눈에 들어오지 않는다는 말을 듣고 바꿨다 — 줄마다 점을 찍고 첫 글자를 맞춰 세운다.
+      */
+      .coach-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .coach-list li {
+        position: relative;
+        padding-left: 18px;
+      }
+      .coach-list li::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 0.62em;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        /* 카드 색을 따라간다 — 초록 판이면 초록 점, 어긴 판이면 붉은 점 (.verdict 의 --verdict) */
+        background: var(--verdict, #f2a900);
+      }
+      /* 습관 리포트의 카드는 파랑 계열이라 점도 그쪽 색으로 */
+      .coach .coach-list li::before {
+        background: var(--blue);
+      }
+      /*
+        **기다리는 동안** — 회색 띠 대신 "AI 답변 작성중…" 이라고 말한다. 띠만 있으면 화면이 멈춘 것처럼
+        보이는데, 실제로는 AI 가 1~4초 동안 쓰고 있는 중이다 (사용자 요청).
+      */
+      .verdict.loading .coach-wait-text {
+        display: inline-flex;
+        align-items: baseline;
+        color: var(--verdict-text);
+        font-weight: 700;
+        animation: coach-breathe 1.4s ease-in-out infinite;
+      }
+      /* 점 셋이 차례로 켜진다 — 도는 것이 있어야 '멈춘 화면' 이 아니라는 것이 보인다 */
+      .verdict.loading .dots {
+        font-style: normal;
+        display: inline-flex;
+      }
+      .verdict.loading .dots i {
+        font-style: normal;
+        animation: coach-dot 1.2s ease-in-out infinite;
+      }
+      .verdict.loading .dots i:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .verdict.loading .dots i:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes coach-breathe {
+        0%,
+        100% {
+          opacity: 0.65;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      @keyframes coach-dot {
+        0%,
+        70%,
+        100% {
+          opacity: 0.2;
+        }
+        35% {
+          opacity: 1;
+        }
+      }
+      .verdict.loading .verdict-head .coach-by {
+        display: none;
+      }
+      @media (max-width: 560px) {
+        /* 좁은 화면에서는 로봇을 줄인다 — 글이 두세 글자씩 끊기면 읽기 어렵다 */
+        .verdict .verdict-robot {
+          width: 76px;
+          height: 76px;
+        }
+        .verdict .coach-body {
+          font-size: 16px;
+        }
+      }
+      .coach .coach-body {
+        font-size: 14px;
+        line-height: 1.85;
+        color: var(--text);
+        white-space: pre-wrap;
+      }
+      /*
+        **누가 쓴 글인지 — 제목 옆이다** (ui/pickedBy.ts 의 advisedBy). 글 아래에 두었더니 거기까지 읽지 않아
+        "누가 써 준 건지 모르겠다" 는 말을 들었다. 제목 줄에 붙이면 글을 읽기 전에 먼저 보인다.
+        받아 오기 전에는 비어 있고, 비면 자리도 차지하지 않는다.
+      */
+      .coach .coach-by {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #c7d0dc;
+        letter-spacing: 0;
+      }
+      .coach .coach-by:empty {
+        display: none;
+      }
+      .coach .coach-by .picker-model {
+        font-size: 0.92em;
+      }
+      /* 받아 오는 중에는 이름 줄도 감춘다 — 글보다 먼저 뜨면 무엇에 붙는 줄인지 모른다 */
+      .coach.loading .coach-by {
+        display: none;
+      }
+      /* 받아 오는 중 — 글이 들어올 자리만큼 회색 띠 두 줄 */
+      .coach.loading .coach-body {
+        height: 52px;
+        border-radius: 6px;
+        background: linear-gradient(
+          90deg,
+          rgba(151, 162, 181, 0.09),
+          rgba(151, 162, 181, 0.17),
+          rgba(151, 162, 181, 0.09)
+        );
+        background-size: 200% 100%;
+        animation: coach-wait 1.4s ease-in-out infinite;
+      }
+      @keyframes coach-wait {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .coach.loading .coach-body {
+          animation: none;
+        }
+      }
+
+      /*
+        습관 리포트 — 지점별 준수율 막대.
+
+        **숫자를 먼저, AI 진단을 그 아래** 둔다. 막대는 AI 없이도 값어치가 있고(세면
+        나오는 값이라 늘 맞는다), 진단 문단은 그 위에 얹히는 해석이다. 순서가 반대면
+        서버가 안 붙은 배포에서 이 화면이 텅 빈 것처럼 보인다.
+
+        막대는 준수율에 따라 색이 갈린다 — 어디가 무너지는 자리인지가 글을 읽기 전에
+        눈에 들어와야 한다. 가장 낮은 지점 하나에는 테두리를 더 준다.
+      */
+      .habit-bars {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .habit-bar {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 4px 12px;
+        align-items: center;
+        padding: 11px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .habit-bar.worst {
+        border-color: rgba(255, 176, 32, 0.5);
+        background: rgba(255, 176, 32, 0.06);
+      }
+      .habit-bar .k {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .habit-bar .v {
+        font-size: 13.5px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .habit-bar .v small {
+        color: var(--muted);
+        font-weight: 500;
+        margin-left: 5px;
+      }
+      .habit-bar .track {
+        grid-column: 1 / -1;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(151, 162, 181, 0.16);
+        overflow: hidden;
+      }
+      .habit-bar .fill {
+        height: 100%;
+        border-radius: 3px;
+        background: var(--green);
+      }
+      .habit-bar.mid .fill,
+      .habit-bar.mid .v {
+        background: var(--amber);
+      }
+      .habit-bar.mid .v {
+        background: none;
+        color: var(--amber);
+      }
+      .habit-bar.low .fill {
+        background: var(--red);
+      }
+      .habit-bar.low .v {
+        color: var(--red);
+      }
+
+      /* 위쪽 요약 — 몇 판을 돌았고 그중 몇 판이 깨끗했나 */
+      .habit-top {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .habit-top .cell {
+        padding: 12px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .habit-top .cell .k {
+        font-size: 11.5px;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .habit-top .cell .v {
+        font-size: 21px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .habit-top .cell .v small {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
+        margin-left: 3px;
+      }
+
+      /* 반복된 위반 목록 */
+      .habit-codes {
+        margin-top: 14px;
+        display: grid;
+        gap: 6px;
+      }
+      .habit-codes .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .habit-codes .row b {
+        color: var(--amber);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* 판이 모자라 진단을 못 할 때 */
+      .habit-empty {
+        margin-top: 18px;
+        padding: 22px 18px;
+        text-align: center;
+        background: var(--panel);
+        border: 1px dashed var(--line);
+        border-radius: var(--radius);
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.8;
+      }
+
+      .violation {
+        margin-top: 14px;
+        padding: 16px 18px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--amber);
+        border-radius: var(--radius);
+      }
+      .violation h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+        letter-spacing: -0.01em;
+      }
+      .violation h3 .vnum {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ff453a;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 800;
+        margin-right: 8px;
+        vertical-align: 1px;
+      }
+      .violation .where {
+        font-size: 12.5px;
+        color: var(--amber);
+        margin: 2px 0 8px;
+        font-weight: 600;
+      }
+      .violation .fix {
+        background: rgba(46, 224, 106, 0.08);
+        border: 1px solid rgba(46, 224, 106, 0.28);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #c6e6d4;
+      }
+      .violation .fix b {
+        color: var(--green);
+      }
+
+      /* 주행 기록 — 판정이 언제 어떤 값으로 나왔는지 되짚는 타임라인 */
+      .runlog {
+        margin-top: 16px;
+        background: #0e131c;
+        border: 1px solid #232b3a;
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .runlog-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #c9d6ea;
+      }
+      .runlog-body {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .runlog-row {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font-size: 12.5px;
+        line-height: 1.6;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border-left: 3px solid transparent;
+      }
+      .runlog-row .t {
+        flex: 0 0 44px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #6b7a92;
+        font-size: 11.5px;
+      }
+      .runlog-row .msg {
+        color: #aeb9cb;
+      }
+      .runlog-row.ok {
+        border-left-color: rgba(46, 224, 106, 0.6);
+      }
+      .runlog-row.ok .msg {
+        color: #9fe0b8;
+      }
+      .runlog-row.warn {
+        border-left-color: rgba(255, 176, 32, 0.6);
+        background: rgba(255, 176, 32, 0.06);
+      }
+      .runlog-row.warn .msg {
+        color: #e8c98a;
+      }
+      .runlog-row.bad {
+        border-left-color: rgba(255, 69, 58, 0.7);
+        background: rgba(255, 69, 58, 0.08);
+      }
+      .runlog-row.bad .msg {
+        color: #ff9a92;
+        font-weight: 600;
+      }
+
+      .tip {
+        background: rgba(76, 141, 255, 0.08);
+        border: 1px solid rgba(76, 141, 255, 0.28);
+        border-radius: 10px;
+        padding: 14px 16px;
+        font-size: 13.5px;
+        line-height: 1.7;
+        color: #c9d6ea;
+      }
+      /*
+        **AI 글이 아니라는 표시.** 코스에 붙어 있는 도로교통법 설명인데(scenarios.ts 의 teaches), 제목이 없어
+        AI 의 의견으로 읽혔다. 옆에 한마디를 달아 둔다 — 바로 위의 AI 코치 카드와 갈라야 하는 자리다.
+      */
+      .tip .tip-title {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #9fc0ff;
+      }
+      .tip .tip-title .tip-note {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0;
+      }
+
+      /* ── 규정 요약 (도움말) ─────────────────────────────────────────
+         이 화면이 전하는 것은 **딱 두 가지**다. 그래서 카드도 두 장뿐이고,
+         번호 · 색 · 제목 세 가지로 "무엇을 기억해야 하는지"를 먼저 읽히게 한다.
+         왼쪽 굵은 선이 1번은 빨강(선다) · 2번은 초록(간다)이라, 글을 읽기 전에
+         색만으로도 두 규칙이 서로 반대 방향임을 알 수 있다. */
+      .rule {
+        display: flex;
+        gap: 18px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--line);
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        margin-top: 18px;
+      }
+      .rule.stop {
+        border-left-color: var(--red);
+      }
+      .rule.go {
+        border-left-color: var(--green);
+      }
+      /*
+        보행자 항목. 신호등 색에 딸린 규칙이 아니라 **두 경우에 공통으로 걸리는 것**이라
+        적색·녹색 어느 쪽 색도 쓰지 않는다. 호박색은 이 게임에서 보행자를 가리키는
+        색이다 — 주행 지도와 시나리오 그림의 사람이 같은 색이다.
+      */
+      .rule.care {
+        border-left-color: var(--amber);
+      }
+      /* 번호는 원 안에 크게 — 두 장뿐이라 눈이 번호부터 잡는다 */
+      .rule .n {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        font-size: 18px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .rule.stop .n {
+        background: rgba(255, 69, 58, 0.16);
+        color: var(--red);
+      }
+      .rule.go .n {
+        background: rgba(46, 224, 106, 0.16);
+        color: var(--green);
+      }
+      .rule.care .n {
+        background: rgba(255, 176, 32, 0.16);
+        color: var(--amber);
+      }
+      .rule-body {
+        min-width: 0; /* 긴 문장이 카드를 밀어 넓히지 않게 */
+      }
+      /*
+        **참고** — 규칙 카드가 아니라 곁들이는 정보다(판정에 쓰지 않는다). 번호도 색 띠도 없이
+        한 단계 낮게 둔다. 조사해 적은 것이라 출처 줄이 붙는다.
+      */
+      .rule-note {
+        margin-top: 18px;
+        padding: 18px 22px;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius);
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      .rule-note ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      .rule-note b {
+        color: var(--text);
+      }
+      .rule-src {
+        margin: 10px 0 0;
+        font-size: 12.5px;
+      }
+      .rule-src a {
+        color: var(--muted);
+      }
+      .rule-kicker {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .rule h3 {
+        font-size: clamp(18px, 2.4vw, 22px);
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin: 0 0 12px;
+      }
+      .rule ul {
+        margin: 0;
+        padding-left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .rule li {
+        font-size: 14.5px;
+        line-height: 1.65;
+        color: #c3ccdb;
+      }
+      .rule li::marker {
+        color: #56637c;
+      }
+      .rule li b {
+        color: var(--text);
+      }
+      @media (max-width: 560px) {
+        .rule {
+          gap: 12px;
+          padding: 18px 16px;
+        }
+        .rule .n {
+          width: 30px;
+          height: 30px;
+          font-size: 15px;
+        }
+      }
+
+      /* ── 결과 화면 머리 ─────────────────────────────────────────────
+         판정 등급은 이 화면에서 가장 먼저 읽혀야 하는 한 글자다.
+         등급마다 색을 달리해, 글을 읽기 전에 색으로 결과를 알 수 있게 한다. */
+      .result-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      .grade {
+        flex: none;
+        /*
+          등급 배지의 바탕색은 반투명이다(.grade.PERFECT … 참고). 결과 화면은 뒤에서
+          주행 종료 직후의 상공 화면이 비치므로, 밝은 노면 위에 놓이면 옅은 색이
+          씻겨 나간다. 불투명한 판을 한 겹 깔아 어디에 놓이든 같은 색으로 읽히게 한다.
+        */
+        background-color: var(--panel);
+        /* 등급 이름이 줄바꿈되지 않게 한 줄로 붙여 둔다 */
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 104px;
+        padding: 10px 18px;
+        border-radius: 12px;
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        border: 1px solid transparent;
+      }
+      /*
+        등급별 색은 **background-image 로 얹는다.**
+
+        `background` 로 쓰면 단축 속성이라 위에서 깔아 둔 `background-color`(불투명
+        패널)까지 함께 지워, 옅은 색만 남아 뒤의 3D 가 그대로 비친다. 색 한 겹을
+        그림처럼 덮으면 아래의 패널색이 살아남는다.
+      */
+      /*
+        **신호등 색을 그대로 쓴다** — 녹색 · 황색 · 적색.
+
+        이 게임이 하루 종일 읽게 하는 색이 그 셋이라, 결과도 같은 색으로 말하면
+        글을 읽기 전에 색만 보고 안다. 예전에는 PASS 가 파랑이었는데, 파랑은 이
+        화면에서 '지금 고른 것'·'링크' 를 뜻하는 색이라 결과의 좋고 나쁨과 섞였다.
+
+        FAIL 만 그 셋 밖이다. 돌기는 돌았는데 위반인 것(VIOLATION)과 애초에
+        끝내지 못한 것은 다른 일이라, **더 진한 적색**으로 갈라 둔다.
+      */
+      .grade.PERFECT {
+        background-image: linear-gradient(rgba(46, 224, 106, 0.14), rgba(46, 224, 106, 0.14));
+        border-color: rgba(46, 224, 106, 0.45);
+        color: var(--green);
+      }
+      .grade.PASS {
+        background-image: linear-gradient(rgba(255, 176, 32, 0.14), rgba(255, 176, 32, 0.14));
+        border-color: rgba(255, 176, 32, 0.45);
+        color: var(--amber);
+      }
+      .grade.VIOLATION {
+        background-image: linear-gradient(rgba(255, 69, 58, 0.14), rgba(255, 69, 58, 0.14));
+        border-color: rgba(255, 69, 58, 0.45);
+        color: var(--red);
+      }
+      /*
+        진한 적색. 글자색은 그대로 두되 **바탕을 채우고 테두리를 세워** 무게를 얹는다 —
+        같은 빨강이라도 이쪽이 더 무거운 결과라는 것이 색의 농도로 드러나야 한다.
+      */
+      .grade.FAIL {
+        background-image: linear-gradient(rgba(176, 26, 18, 0.85), rgba(140, 20, 14, 0.85));
+        border-color: rgba(255, 69, 58, 0.75);
+        color: #ffd9d5;
+      }
+
+      /*
+        결과 화면의 2분할 — 왼쪽 주행 지도, 오른쪽 주행 기록과 설명.
+
+        지도는 정사각(RunMap 이 폭에 맞춰 높이를 잡는다)이라 폭을 다 쓰면 세로로 길어져
+        아래 내용이 전부 밀려난다. 900px 아래에서는 한 줄로 무너뜨린다 — 좁은 폭에서 지도를
+        더 줄이면 정지선과 궤적을 구분할 수 없다.
+
+        **지도 2 : 기록 3 이다.** 한때 반반이었는데, 지도가 460px 정사각으로 화면의 절반을 차지해 사용자가
+        "지도 부분이 비중을 너무 많이 차지한다" 고 짚었다. 지도는 어디서 걸렸는지 **한눈에 짚는** 그림이라 작아도
+        읽히고, 읽을 글이 많은 쪽은 기록과 설명이다 — 기록 칸이 넓어지면 줄이 덜 접혀 두 칸의 높이도 비슷해진다.
+      */
+      .debrief-split {
+        display: grid;
+        /* 지도 : 기록 = 1 : 2 — 지도를 280px 로 줄이면서 남는 폭을 기록이 받는다 (한때 2 : 3) */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        gap: 16px;
+        align-items: start;
+        margin-top: 14px;
+      }
+      .split-col {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      /* 칸 안에서는 위쪽 여백을 각자 갖지 않는다 — 간격은 split-col 의 gap 이 정한다 */
+      .split-col > .runmap-card,
+      .split-col > .runlog,
+      .split-col > .tip {
+        margin-top: 0;
+      }
+      @media (max-width: 900px) {
+        .debrief-split {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      /* 위반 카드 안의 범칙금·이유 */
+      .violation .cost {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--amber);
+      }
+      .violation .why {
+        font-size: 13.5px;
+        line-height: 1.7;
+        color: #c3ccdb;
+        margin: 8px 0;
+      }
+
+      /* 법령 인용 — 본문과 구분되게 들여쓰고 색을 낮춘다 */
+      .citation {
+        border-left: 2px solid var(--line);
+        padding: 8px 0 8px 12px;
+        margin-top: 10px;
+      }
+      .citation .src {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--blue);
+        margin-bottom: 4px;
+      }
+      .citation .body {
+        font-size: 12.5px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 26px;
+        flex-wrap: wrap;
+      }
+      /* 포인트와 톱니바퀴를 한 줄에 — 좁은 화면에서는 포인트가 먼저 줄바꿈된다 */
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .warn {
+        color: var(--amber);
+      }
+      .danger {
+        color: var(--red);
+      }
+
+      @media (max-width: 760px) {
+        .keyhints {
+          display: none;
+        }
+        /* 작은 화면에서는 목표 패널이 도로를 다 가리지 않도록 줄인다 */
+        .hud-objective {
+          max-width: 92vw;
+          padding: 10px 12px;
+        }
+        .hud-objective .picked-by {
+          font-size: 13.5px;
+        }
+        .hud-objective .scenario {
+          font-size: 18px;
+        }
+        .hud-objective .scenario.long {
+          font-size: 14px;
+        }
+        .hud-objective .scenario.xlong {
+          font-size: 12.5px;
+        }
+        .drive-coach-robot {
+          height: 80px;
+        }
+        .drive-coach-bubble {
+          padding: 6px 16px 9px;
+          margin-left: 12px;
+        }
+        /*
+          작은 화면에서는 계기판을 **좌하단**으로 옮긴다. 우하단은 터치 조작 버튼
+          (정지·깜빡이)이 쓰는 자리다. 폭도 키운다 — 30vw 로는 눈금이 뭉개진다.
+          높이(폭의 0.332배)가 86px 이라 아래에서 98px 까지만 차지해, 버튼(아래 108px)과 닿지 않는다.
+        */
+        #cluster {
+          right: auto;
+          left: 12px;
+          bottom: 12px;
+          width: min(52vw, 260px);
+        }
+        /*
+          플레이어 칸은 작게 줄여 **터치 방향 버튼(아래 108~182px) 위**에 둔다. 조작 안내가 사라진 자리라
+          더 내릴 수도 있지만, 그러면 터치 기기에서 ← → 버튼과 겹친다.
+        */
+        .hud-player {
+          left: 12px;
+          bottom: 196px;
+          width: min(64vw, 250px);
+          padding: 7px 12px 9px 7px;
+        }
+        .player.hud {
+          gap: 9px;
+        }
+        .player.hud .level-badge-wrap {
+          width: 36px;
+          height: 36px;
+        }
+        .player.hud .player-body {
+          gap: 5px;
+        }
+        .player.hud .player-name {
+          font-size: 15px;
+        }
+        .player.hud .player-xp {
+          font-size: 11.5px;
+        }
+        .player.hud .player-xp b {
+          font-size: 13px;
+        }
+        .player.hud .player-track {
+          height: 7px;
+        }
+        .screen-inner {
+          padding: 28px 16px 60px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      /*
+       * 이 파일은 빌드 원본(Vite 템플릿)이다. 아래의 module 스크립트는 TypeScript를 가리키므로
+       * Vite가 변환해 내려줘야 동작한다. 이 파일이나 dist/index.html 을 더블클릭해서(file://) 열면
+       * 브라우저가 외부 module 스크립트를 CORS로 차단해 빈 화면이 된다.
+       * 그 경우 원인과 해결법을 화면에 띄운다. (module 스크립트는 defer라 이보다 늦게 실행된다)
+       *
+       * 실행 가능한 파일은 프로젝트 루트의 index.html 이다 — 스크립트·이미지가 전부 인라인되어 있다.
+       */
+      if (location.protocol === 'file:') {
+        window.addEventListener('DOMContentLoaded', function () {
+          // 단일 파일 빌드도 file:// 로 열리지만 거기서는 앱이 정상 부팅된다.
+          // 부팅 플래그를 확인해, 진짜로 스크립트를 못 불러온 경우에만 안내로 대체한다.
+          setTimeout(function () {
+            if (window.__TURN_RIGHT_BOOTED__) return;
+            showHelp();
+          }, 800);
+        });
+      }
+
+      function showHelp() {
+        document.body.innerHTML = [
+            '<div style="max-width:640px;margin:12vh auto;padding:0 24px;',
+            'font-family:-apple-system,BlinkMacSystemFont,\'Apple SD Gothic Neo\',\'Malgun Gothic\',sans-serif;',
+            'color:#e8ecf2;line-height:1.7">',
+            '<h1 style="font-size:26px;margin:0 0 12px">이 파일은 직접 열 수 없습니다</h1>',
+            '<p style="color:#97a2b5;margin:0 0 28px">',
+            '<code style="color:#ffb020">index.html</code>은 개발 서버용 소스라서 TypeScript를 참조합니다. ',
+            '브라우저가 직접 열면 동작하지 않습니다. 아래 둘 중 하나를 쓰세요.',
+            '</p>',
+            '<div style="background:#151922;border:1px solid #2a3242;border-radius:12px;padding:18px 20px;margin-bottom:14px">',
+            '<b>1. 더블클릭으로 열고 싶다면</b>',
+            '<pre style="background:#0b0d12;border-radius:8px;padding:12px 14px;overflow-x:auto;',
+            'color:#9ad82e;font-size:13px">npm install\nnpm run build:standalone</pre>',
+            '<span style="color:#97a2b5;font-size:14px">→ 생성된 ',
+            '<code style="color:#4c8dff">프로젝트 루트의 index.html</code> 을 더블클릭하세요.</span>',
+            '</div>',
+            '<div style="background:#151922;border:1px solid #2a3242;border-radius:12px;padding:18px 20px">',
+            '<b>2. 개발 서버로 실행 (권장)</b>',
+            '<pre style="background:#0b0d12;border-radius:8px;padding:12px 14px;overflow-x:auto;',
+            'color:#9ad82e;font-size:13px">npm install\nnpm run dev</pre>',
+            '<span style="color:#97a2b5;font-size:14px">→ 브라우저에서 ',
+            '<code style="color:#4c8dff">http://localhost:5173</code> 접속</span>',
+            '</div></div>',
+        ].join('');
+      }
+    </script>
+
+    <div id="app">
+      <canvas id="scene"></canvas>
+
+      <!-- ── 주행 HUD ─────────────────────────────────────────── -->
+      <div id="hud">
+        <!--
+          목표 상자 · 진행 판단 · 정지 거리는 **한 묶음으로 위에서부터 쌓는다.**
+          예전에는 판단 표시가 화면 위에서 232px 로 못 박혀 있었는데, 시나리오 설명이
+          두 줄이 되면 그 자리가 목표 상자 아래가 아니라 **전방 신호등 높이**여서
+          정작 봐야 할 신호를 가렸다. 쌓아 두면 상자가 몇 줄이든 항상 그 바로 아래다.
+        -->
+        <div class="hud-top">
+          <div class="hud-objective">
+            <!--
+              **첫 줄은 누가 이 맵을 골랐는지다** — "Gemini gemini-3.1-flash-lite 모델이 운전자의 운전 습관을
+              분석해서 추천해 준 맵이에요." AI 활용 공모전 작품이라 AI 가 한 일은 달리는 동안에도 보여야 한다
+              (사용자 요청). 코드가 고른 판에는 AI 이름을 쓰지 않는다 (ui/AiPick.ts 의 pickedLine 과 같은 규칙).
+            -->
+            <div class="picked-by" id="hud-picked"></div>
+            <div class="scenario" id="hud-scenario"></div>
+          </div>
+          <div class="signal-chip" id="signalchip"></div>
+          <!--
+            **AI 어우참의 말풍선** — 진행 판단 · 정지 거리 · 보행자 움직임을 로봇이 말한다.
+            로봇 그림이 상태(평소 · 일시정지 · 우회전)에 따라 바뀐다 (ui/Hud.ts).
+
+            **과제 상자 바로 아래(가운데 위)에 둔다.** 한때 왼쪽 아래로 옮겼다 — 이 높이가
+            교차로 지평선이라 후방 시점에서 우회전 후 횡단보도를 가릴 때가 있어서였다. 그런데
+            운전 중 시선이 가는 곳은 앞쪽 가운데라 **아래로 내리면 읽히지 않았다.** 가독성을
+            택해 되돌렸다. 가려질 수 있는 보행자는 머리 위 느낌표(Pedestrian.ts)가 짚어 준다.
+          -->
+          <div class="drive-coach" id="drive-coach">
+            <img class="drive-coach-robot" id="drive-coach-robot" alt="AI 어우참" />
+            <div class="drive-coach-bubble">
+              <span class="drive-coach-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span></span>
+              <div class="advice" id="advice"></div>
+              <div class="stopdist" id="stopdist"></div>
+              <div class="ped-cue" id="ped-cue"></div>
+              <div class="ped-cue lead-cue" id="lead-cue"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 아직 사지 않은 차로 달리는 중이라는 표시. 산 차에서는 감춘다 -->
+
+        <!--
+          AI 자율 주행 중이라는 표시.
+
+          **조작 안내(keyhints)가 있던 자리에 대신 뜬다.** 그 안내는 "←→ 좌우 ↑출발" 인데
+          자율 주행 중에는 눌러도 아무 일이 없다 — 거짓말이 되는 안내를 띄워 둘 수는 없다.
+        -->
+        <div class="hud-auto" id="hud-auto">
+          <i class="dot"></i>AI 자율 주행 중
+          <span class="sub">규정대로 도는 모습을 보여 줍니다</span>
+        </div>
+
+        <!-- 계기판 — 3D 대시보드가 아니라 화면 우측 하단에 둔다.
+             모델마다 계기판 자리가 달라 자동으로 찾을 수 없기 때문이다. -->
+        <canvas id="cluster"></canvas>
+
+        <!--
+          안내는 실제로 자주 쓰는 키만 적는다. Z/X(좌우 확인)·E(정면 복귀)·R(재시작)·
+          Q(깜빡이)와 마우스 드래그·좌우 시야 창 설명은 기능은 그대로 살아 있지만
+          안내에서는 뺐다 — 줄이 길어질수록 아무도 읽지 않는다.
+        -->
+        <div class="keyhints">
+          <div><kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>출발 <kbd>↓</kbd>정지</div>
+          <div><kbd>C</kbd>시점 전환</div>
+        </div>
+
+        <!-- 내 레벨과 경험치 — 조작 안내 바로 위 (ui/Hud.ts 의 setPlayer). AI 과정의 판에서만 뜬다 -->
+        <div class="hud-player" id="hud-player" role="status" hidden></div>
+
+        <!-- 주행을 그만두고 첫 화면으로. HUD 는 pointer-events:none 이라 버튼만 auto 로 켠다 -->
+        <button class="hud-home" id="btn-hud-home">홈으로</button>
+
+        <!--
+          fps 표시. 설정에서 켰을 때만 뜬다 — 화질 손잡이를 내렸을 때 숫자가 실제로
+          올라가는 것을 보고 정하라는 장치다.
+        -->
+        <div class="fps" id="fps"></div>
+
+        <div class="toast" id="toast"></div>
+      </div>
+
+      <!-- ── 준비 중 오버레이 ───────────────────────────────────
+           도로를 다 만들고 나서 출발한다. 준비가 끝날 때까지 화면을 덮는다. -->
+      <div id="loading">
+        <div class="loading-box">
+          <div class="loading-spin"></div>
+          <div class="loading-text" id="loading-text">도로 상황을 준비하는 중…</div>
+          <div class="loading-sub" id="loading-sub"></div>
+        </div>
+      </div>
+
+      <!-- ── 좌석 맞추기 오버레이 ────────────────────────────────
+           차고에서 사진을 누르면 뜬다. 운전석 화면 위에 얹혀 값과 조작만 안내한다. -->
+      <div id="seat-hud">
+        <div class="seat-hud-inner">
+          <div class="seat-hud-title" id="seat-hud-title">좌석 맞추기</div>
+          <div class="seat-hud-text" id="seat-hud-text">기본 자리</div>
+          <div class="seat-hud-keys">
+            <kbd>↑</kbd><kbd>↓</kbd> 또는 마우스 휠로 앞뒤 조절 · <kbd>R</kbd> 기본값
+          </div>
+          <div class="seat-hud-btns">
+            <button class="primary" id="seat-save">저장</button>
+            <button id="seat-cancel">취소</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 모바일 컨트롤 ─────────────────────────────────────── -->
+      <div id="touch">
+        <div class="tbtn" id="t-left">◀</div>
+        <div class="tbtn" id="t-right">▶</div>
+        <div class="tbtn" id="t-stop">정지</div>
+        <div class="tbtn" id="t-signal">깜빡이</div>
+      </div>
+
+      <!--
+        ── 화면들 ──────────────────────────────────────────────
+        `sheet` 는 전체 화면을 갈아 끼우지 않고 뒤에 있던 화면 위에 뜬다.
+        **잠깐 열었다 닫는 것**(설정·저작권)만 시트다 — 전시관과 도움말은 머무르며 읽는
+        곳이라 화면 하나를 온전히 쓰고, 결과 화면은 판을 마친 뒤의 본문이라 더욱 그렇다.
+      -->
+      <div class="screen active" id="screen-menu"><div class="screen-inner" id="menu-body"></div></div>
+      <div class="screen" id="screen-debrief"><div class="screen-inner" id="debrief-body"></div></div>
+      <div class="screen" id="screen-help"><div class="screen-inner" id="help-body"></div></div>
+      <div class="screen sheet" id="screen-credits"><div class="screen-inner" id="credits-body"></div></div>
+      <div class="screen sheet" id="screen-about"><div class="screen-inner" id="about-body"></div></div>
+      <!-- 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 시트다 (Screens 의 renderTrial) -->
+      <div class="screen sheet" id="screen-trial"><div class="screen-inner" id="trial-body"></div></div>
+      <div class="screen sheet" id="screen-settings"><div class="screen-inner" id="settings-body"></div></div>
+      <div class="screen" id="screen-shop"><div class="screen-inner" id="shop-body"></div></div>
+      <!--
+        습관 리포트는 **머무르며 읽는 곳**이라 시트가 아니라 화면 하나를 온전히 쓴다
+        (설정·저작권처럼 잠깐 열었다 닫는 것이 아니다).
+      -->
+      <div class="screen" id="screen-report"><div class="screen-inner" id="report-body"></div></div>
+    </div>
+
+    <!--
+      ── 확인 창 ──────────────────────────────────────────────
+      **되돌릴 수 없는 동작 앞에서 묻는 자리.**
+
+      브라우저의 `confirm()` 을 쓰지 않는다. 저것은 운영체제가 그리는 창이라 이 화면의
+      어느 색·글꼴과도 맞지 않고, 제목에 주소(localhost:5173)가 뜨며, 줄바꿈과 굵기를
+      쓸 수 없어 "무엇이 지워지는가" 를 읽기 좋게 적을 수가 없다. 부스에 세워 둔
+      기기에서는 그 창 하나가 게임이 아니라 웹페이지라는 것을 드러내기도 한다.
+
+      **화면(.screen)이 아니라 그 위에 뜬다.** 히스토리 한 칸이 아니므로 nav 를 거치지
+      않는다 — 확인 창에서 뒤로가기를 누르면 창만 닫히는 것이 아니라 뒤 화면까지
+      떠나게 되기 때문이다. Esc 와 바깥 클릭으로 닫는다.
+    -->
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+      <div class="modal-card">
+        <h2 class="modal-title" id="modal-title"></h2>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-actions">
+          <button class="ghost" id="modal-cancel">취소</button>
+          <button class="primary" id="modal-ok">계속</button>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      AI 어우참이 코스를 고르는 장면 (ui/AiPick.ts) — 분석 연출 → 추천 결과. 결과 카드 뒤에서 맵을 준비한다.
+    -->
+    <div class="ai-pick" id="ai-pick" role="dialog" aria-live="polite" aria-labelledby="ai-pick-title" hidden>
+      <div class="ai-pick-card">
+        <div class="ai-pick-robot">
+          <div class="ai-pick-ring" aria-hidden="true"></div>
+          <img id="ai-pick-img" alt="AI 어우참" />
+        </div>
+        <div class="ai-pick-analyzing">
+          <!-- 이름은 신호등 딱지 셋 — 첫 화면 제목 · 말풍선과 같은 마크업 (ui/brandName.ts 의 BRAND_CHIPS_HTML) -->
+          <h2 id="ai-pick-title"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span>이 운전 습관을 분석하고 있습니다</h2>
+          <ol class="ai-pick-steps" id="ai-pick-steps"></ol>
+          <div class="ai-pick-track"><i id="ai-pick-bar"></i></div>
+        </div>
+        <div class="ai-pick-result">
+          <!--
+            **누가 골랐는지 먼저 말한다** — 무료 AI 여러 곳을 돌아가며 쓰므로(server/llm.mjs) 판마다 다르다.
+            사용자가 정했다: "Gemini가 골라줬습니다!!! Groq가 골라줬습니다!!! 이런 식으로 나오면 더 재미있을 것 같아."
+            코드가 고른 판에는 AI 이름을 쓰지 않는다 (ui/AiPick.ts 의 showResult).
+          -->
+          <p class="ai-pick-picked" id="ai-pick-picked"></p>
+          <p class="ai-pick-lead"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span>이 운전자분에게 추천 시나리오 <b id="ai-pick-name"></b><span id="ai-pick-josa">을</span> 선택해 줬습니다.</p>
+          <p class="ai-pick-why"><b>추천 사유</b> : <span id="ai-pick-why"></span></p>
+          <p class="ai-pick-focus" id="ai-pick-focus"></p>
+          <p class="ai-pick-status" id="ai-pick-statusbox">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span
+            ><span id="ai-pick-status"></span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      **엔딩** — L10 의 경험치를 채우고 나쁜 습관을 모두 고쳐 어우참 마스터가 된 판에 뜬다 (main.ts 의 showEnding).
+      AI 어우참이 직접 축하하고, 그 뒤로는 마스터 운행이 이어진다. 첫 화면에서 "엔딩 다시 보기" 로 다시 볼 수 있다.
+    -->
+    <div class="modal ending" id="ending" role="dialog" aria-modal="true" aria-labelledby="ending-title" hidden>
+      <div class="ending-card">
+        <div class="ending-confetti" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <p class="ending-kicker">ENDING</p>
+        <div class="ending-stage">
+          <img class="ending-robot" id="ending-robot" alt="AI 어우참" />
+          <div class="ending-bubble">
+            <span class="ending-name"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">어</span><span class="brand-yellow">우</span><span class="brand-green">참</span></span></span>
+            <h2 id="ending-title">축하합니다!</h2>
+            <p class="ending-line">우회전과 어린이보호구역<br />안전운전 마스터가 되셨습니다!!!</p>
+            <p class="ending-stats" id="ending-stats"></p>
+          </div>
+        </div>
+        <!-- 게임이 끝나지 않는다 — 마스터 운행(L10 코스 무작위)이 이어진다. 끝내고 새로 하려면 '처음부터 다시 시작' -->
+        <p class="ending-end">— 이제부터 마스터 운행 · Level10 코스가 무작위로 이어집니다 —</p>
+        <div class="modal-actions">
+          <button class="primary" id="ending-ok">처음 화면으로</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
