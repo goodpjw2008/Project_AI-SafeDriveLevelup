@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleStatsRead, handleStatsWrite } from '../server/statsHandler.mjs';
-import { FINISH_SCRIPT, MIN_RUN_MS, RUN_TTL_SEC, resetMemoryStore } from '../server/statsStore.mjs';
+import { FINISH_SCRIPT, MIN_RUN_MS, RUN_TTL_SEC, resetMemoryStore, upstashEnv } from '../server/statsStore.mjs';
 import { resetRateLimit, type VercelLikeRequest } from '../server/vercelHandler.mjs';
 import { outcomeOf } from '../src/siteStats';
 
@@ -180,6 +180,21 @@ describe('Upstash 저장소', () => {
     expect((await handleStatsRead(UP)).status).toBe(502);
     vi.stubGlobal('fetch', () => Promise.reject(new Error('network')));
     expect((await handleStatsWrite({ action: 'start' }, UP, T0)).status).toBe(502);
+  });
+
+  /*
+    **연결할 때 앞머리를 붙이면 이름이 달라진다** (`STORAGE_KV_REST_API_URL`). 그걸 못 찾으면 저장소를 연결하고도
+    "저장소 없음" 이라 숫자가 뜨지 않는다 — 배포한 사이트에서만 숫자가 안 보이는 까닭을 찾기 어렵다.
+  */
+  it('앞머리가 붙은 환경변수 이름도 찾는다 — 읽기 전용 열쇠는 쓰지 않는다', () => {
+    expect(upstashEnv({ STORAGE_KV_REST_API_URL: 'https://a.upstash.io', STORAGE_KV_REST_API_TOKEN: 'w' })).toEqual({
+      url: 'https://a.upstash.io',
+      token: 'w',
+    });
+    expect(upstashEnv({ X_KV_REST_API_URL: 'https://a.upstash.io', X_KV_REST_API_READ_ONLY_TOKEN: 'r' })).toBeNull();
+    expect(upstashEnv({ KV_REST_API_URL: 'https://a', KV_REST_API_TOKEN: 't', Z_KV_REST_API_URL: 'https://z', Z_KV_REST_API_TOKEN: 'z' }))
+      .toEqual({ url: 'https://a', token: 't' });
+    expect(upstashEnv({ VERCEL: '1' })).toBeNull();
   });
 
   it('Upstash 가 주는 다른 이름의 환경변수도 받는다', async () => {

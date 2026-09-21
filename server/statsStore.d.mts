@@ -17,6 +17,7 @@ export interface StatsStore {
 export declare const RUN_TTL_SEC: number;
 export declare const MIN_RUN_MS: number;
 export declare const FINISH_SCRIPT: string;
+export declare function upstashEnv(env: Env): { url: string; token: string } | null;
 export declare function storeFor(env: Env): StatsStore | null;
 export declare function namespaceOf(env: Env): string;
 export declare function totalsKey(ns: string): string;

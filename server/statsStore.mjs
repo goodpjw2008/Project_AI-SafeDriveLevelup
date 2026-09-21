@@ -59,18 +59,42 @@ const toCount = (v) => {
 };
 
 /**
- * 어느 저장소를 쓰는가.
+ * Upstash 의 주소와 열쇠를 환경변수에서 찾는다.
  *
  * Vercel 대시보드에서 Upstash Redis 를 붙이면 `KV_REST_API_URL` · `KV_REST_API_TOKEN` 이 들어온다 (연결 방식에 따라
- * `UPSTASH_REDIS_REST_URL` · `UPSTASH_REDIS_REST_TOKEN` 일 수도 있어 둘 다 본다). **배포에서 저장소가 없으면 `null`**
- * — 메모리로 세면 함수마다 다른 숫자가 되므로, 차라리 숫자를 띄우지 않는다.
+ * `UPSTASH_REDIS_REST_URL` · `UPSTASH_REDIS_REST_TOKEN` 일 수도 있다). **연결할 때 앞머리를 붙일 수 있어**
+ * (`STORAGE_KV_REST_API_URL` 처럼) 그런 이름도 받는다 — 앞머리가 붙었다고 "저장소 없음" 이 되면, 연결하고도 숫자가
+ * 뜨지 않는 까닭을 찾기 어렵다. 읽기 전용 열쇠(`…_READ_ONLY_TOKEN`)는 쓰지 않는다 — 숫자를 올려야 한다.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {{ url: string, token: string } | null}
+ */
+export function upstashEnv(env) {
+  const pairs = [
+    ['KV_REST_API_URL', 'KV_REST_API_TOKEN'],
+    ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'],
+  ];
+  // 앞머리 없는 이름이 먼저다
+  for (const [u, t] of pairs) if (env[u] && env[t]) return { url: env[u], token: env[t] };
+  for (const key of Object.keys(env).sort()) {
+    for (const [u, t] of pairs) {
+      if (!key.endsWith(`_${u}`) || !env[key]) continue;
+      const token = env[key.slice(0, -u.length) + t];
+      if (token) return { url: env[key], token };
+    }
+  }
+  return null;
+}
+
+/**
+ * 어느 저장소를 쓰는가. **배포에서 저장소가 없으면 `null`** — 메모리로 세면 함수마다 다른 숫자가 되므로, 차라리
+ * 숫자를 띄우지 않는다.
  *
  * @param {Record<string, string | undefined>} env
  */
 export function storeFor(env) {
-  const url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
-  const token = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN;
-  if (url && token) return upstashStore(url, token);
+  const up = upstashEnv(env);
+  if (up) return upstashStore(up.url, up.token);
   if (env.VERCEL) return null;
   return memoryStore;
 }
