@@ -3,7 +3,8 @@
 export const RATE_WINDOW_MS: number;
 export const RATE_PER_WINDOW: number;
 
-export function overLimit(key: string, now?: number): boolean;
+export function overLimit(key: string, now?: number, perWindow?: number): boolean;
+export function clientIp(req: VercelLikeRequest): string;
 export function resetRateLimit(): void;
 
 /** Vercel 이 넘겨주는 요청 · 응답 중 여기서 쓰는 것만 */

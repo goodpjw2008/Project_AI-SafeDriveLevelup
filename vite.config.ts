@@ -7,6 +7,7 @@ import { handleCoach } from './server/coachHandler.mjs';
 import { handleRecommend } from './server/recommendHandler.mjs';
 import { handleReport } from './server/reportHandler.mjs';
 import { handleScenario } from './server/scenarioHandler.mjs';
+import { handleStatsRead, handleStatsWrite } from './server/statsHandler.mjs';
 import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_TAGLINE } from './src/brand';
 import { CARS } from './src/economy/cars';
 
@@ -94,6 +95,8 @@ function devApi(mode: string): Plugin {
     '/api/report': handleReport,
     '/api/scenario': handleScenario,
     '/api/recommend': handleRecommend,
+    // 안전운전 성공 · 실패 횟수 — 판 표 받기 · 내기 (읽기는 아래 GET 이 따로 받는다)
+    '/api/stats': (body) => handleStatsWrite(body, env),
     // 배포 쪽 껍데기가 없다 — 사진을 파일로 쓰는 일이라 디스크가 있는 이 서버에서만 된다
     '/api/car-photo': (body) => handleCarPhoto(body, { dir: CAR_PHOTO_DIR, ids: carIds }),
   };
@@ -101,6 +104,15 @@ function devApi(mode: string): Plugin {
   return {
     name: 'turn-right-dev-api',
     configureServer(server) {
+      // 안전운전 횟수 읽기 — 이 하나만 GET 이다 (배포에서는 가장자리에 잠깐 담아 둔다 — api/stats.js)
+      server.middlewares.use('/api/stats', (req, res, next) => {
+        if (req.method !== 'GET') return next();
+        void handleStatsRead(env).then(({ status, body }) => {
+          res.statusCode = status;
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify(body));
+        });
+      });
       for (const [path, handler] of Object.entries(routes)) {
         server.middlewares.use(path, (req, res, next) => {
           if (req.method !== 'POST') return next();

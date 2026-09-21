@@ -51,6 +51,7 @@ import { Screens, type AiTrainingState, type CourseStep } from './ui/Screens';
 import { AiPickOverlay } from './ui/AiPick';
 import { habitTitle } from './coach/badHabits';
 import { nav } from './ui/nav';
+import { beginRun, cachedSiteStats, endRun, loadSiteStats, outcomeOf } from './siteStats';
 
 // index.html 의 file:// 안내 가드가 "스크립트가 실제로 실행됐는지"를 이 플래그로 판단한다.
 // 단일 파일 빌드는 file:// 로 열려도 정상 동작하므로 안내가 뜨면 안 된다.
@@ -573,6 +574,21 @@ function renderMenu(): void {
     // 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 창이다 (renderTrial)
     onTrial: () => nav.go({ name: 'trial', enter: renderTrial }),
   }, aiTraining);
+  showSiteStatsOnMenu();
+}
+
+/**
+ * 첫 화면 오른쪽 위의 **사이트 전체 안전운전 성공 · 실패 횟수** (siteStats.ts).
+ *
+ * 가지고 있던 숫자를 먼저 띄우고, 서버에서 새로 읽어 바꾼다 — 판을 마치고 돌아왔을 때 방금 센 숫자가 바로 보이고,
+ * 읽는 동안 칸이 비었다 채워지며 깜빡이지 않는다. 읽는 사이 다른 화면으로 갔으면 그리지 않는다.
+ */
+function showSiteStatsOnMenu(): void {
+  const cached = cachedSiteStats();
+  if (cached) screens.showSiteStats(cached);
+  void loadSiteStats().then((s) => {
+    if (s && nav.current === 'menu') screens.showSiteStats(s);
+  });
 }
 
 /**
@@ -1023,6 +1039,11 @@ async function startRun(id: number): Promise<void> {
   document.body.classList.toggle('ai-drive', aiDriving);
   // 결과 화면의 제목이 이것을 본다 — 체험한 판을 'AI 추천' 이라 부르지 않게 (Screens 의 debriefTitle)
   document.body.classList.toggle('map-trial', mapTrial);
+  /*
+    **사이트 전체 안전운전 횟수의 판 표** (siteStats.ts) — 사람이 모는 판만 받는다. AI 자율 주행 시범은 AI 가 몬
+    판이고, 맵 체험은 시험용이라 세지 않는다 (둘 다 finishRun 에서 기록을 남기지 않는 것과 같은 선).
+  */
+  if (!aiDriving && !mapTrial) beginRun();
   // 깜빡이는 기본 점등 상태로 시작하므로 터치 버튼도 켜진 모습으로 맞춘다
   document.getElementById('t-signal')?.classList.toggle('on', controls.rightSignal);
   const stopBtnEl = document.getElementById('t-stop');
@@ -1255,6 +1276,9 @@ function finishRun(result: JudgeResult): void {
     finishTrialRun(sc, result);
     return;
   }
+
+  // 사이트 전체 안전운전 횟수 — 이 판의 표를 내고 센다 (siteStats.ts). 기다리지 않는다 — 결과 화면은 바로 뜬다
+  void endRun(outcomeOf(result.grade));
 
   // 운전 점수(save.money)는 더 모으지 않는다 — 화면에서 없앴다 (Screens.ts). 벌점 · 연속 기록은 통계로 남긴다
   saveData.penaltyPoints += payout.penaltyPoints;

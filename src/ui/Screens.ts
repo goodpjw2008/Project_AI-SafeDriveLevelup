@@ -65,6 +65,7 @@ import {
 import { levelBadge, masterBadge } from './badges';
 import { playerCard } from './playerCard';
 import { AI_BADGE_HTML, BRAND_CHIPS_HTML, withAiBadge } from './brandName';
+import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
 import {
@@ -624,6 +625,21 @@ export class Screens {
 
   // ── 메인 메뉴 ────────────────────────────────────────────────────────────
 
+  /**
+   * 첫 화면 오른쪽 위의 **안전운전 성공 · 실패 횟수** — 성공은 녹색, 실패는 붉은색 (사용자가 정했다).
+   * 첫 화면이 떠 있지 않으면(판이 끝나 숫자가 온 사이 다른 화면으로 갔으면) 아무 일도 하지 않는다.
+   */
+  showSiteStats(s: SiteStats): void {
+    const el = document.getElementById('site-stats');
+    if (!el) return;
+    const n = (v: number): string => v.toLocaleString('ko-KR');
+    el.innerHTML =
+      `<span class="site-stat ok">안전운전 성공 : <b>${n(s.success)}</b>회</span>` +
+      `<span class="site-stat bad">안전운전 실패 : <b>${n(s.fail)}</b>회</span>`;
+    el.setAttribute('aria-label', `이 사이트의 안전운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
+    el.hidden = false;
+  }
+
   renderMenu(
     save: SaveData,
     handlers: {
@@ -660,6 +676,11 @@ export class Screens {
       낮은 줄에 모여 있다.
     */
     $('menu-body').innerHTML = `
+      <!--
+        **이 사이트 전체의 안전운전 성공 · 실패 횟수** — 오른쪽 위 (사용자 요청 · siteStats.ts).
+        숫자가 오기 전에는 감춰 둔다 — 서버가 없는 배포에서는 끝내 뜨지 않는다 (showSiteStats).
+      -->
+      <div class="site-stats" id="site-stats" hidden></div>
       <!--
         히어로에는 **이름과 출발뿐이다.**
 

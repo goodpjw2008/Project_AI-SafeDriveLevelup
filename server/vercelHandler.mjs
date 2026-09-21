@@ -30,16 +30,20 @@ const LEDGER_PRUNE_AT = 5000;
 const ledger = new Map();
 
 /** 부른 사람의 IP — Vercel 은 앞단 프록시가 `x-forwarded-for` 첫 칸에 적어 준다 */
-function clientIp(req) {
+export function clientIp(req) {
   const fwd = req.headers?.['x-forwarded-for'];
   const first = (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim();
   return first || req.headers?.['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
 }
 
-/** 이번 호출이 한도를 넘는가. 넘지 않으면 장부에 적는다 */
-export function overLimit(key, now = Date.now()) {
+/**
+ * 이번 호출이 한도를 넘는가. 넘지 않으면 장부에 적는다.
+ *
+ * @param perWindow 한 창에 부를 수 있는 횟수 — 엔드포인트마다 다를 수 있다 (안전운전 횟수는 한 판에 두 번 부른다)
+ */
+export function overLimit(key, now = Date.now(), perWindow = RATE_PER_WINDOW) {
   const recent = (ledger.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  const over = recent.length >= RATE_PER_WINDOW;
+  const over = recent.length >= perWindow;
   if (!over) recent.push(now);
   ledger.set(key, recent);
   if (ledger.size > LEDGER_PRUNE_AT) {

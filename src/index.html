@@ -1514,6 +1514,45 @@
         나란히 있었다. 세 개가 대등해 보이면 처음 온 사람은 무엇부터 눌러야 하는지
         읽어서 판단해야 한다. 출발은 히어로로 키우고 나머지는 한 단계 낮춘다.
       */
+      /*
+        **사이트 전체의 안전운전 성공 · 실패 횟수** — 오른쪽 위 (사용자 요청 · src/siteStats.ts).
+        성공은 녹색, 실패는 붉은색 — 결과 화면의 통과 · 위반 색과 같은 계열이다. 히어로 위에 한 줄로 오른쪽에 붙여,
+        이름과 출발보다 앞서 눈에 띄지 않게 작게 둔다. 좁은 화면에서는 둘이 두 줄로 나뉘어도 오른쪽에 붙는다.
+      */
+      .site-stats {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        margin: -6px 0 10px;
+      }
+      .site-stats[hidden] {
+        display: none;
+      }
+      .site-stat {
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+        background: rgba(12, 15, 21, 0.72);
+        border: 1px solid currentColor;
+      }
+      .site-stat b {
+        font-weight: 900;
+      }
+      .site-stat.ok {
+        color: #2ee06a;
+      }
+      .site-stat.bad {
+        color: #ff6b60;
+      }
+      @media (max-width: 420px) {
+        .site-stat {
+          font-size: 12px;
+          padding: 4px 10px;
+        }
+      }
       .hero {
         display: grid;
         grid-template-columns: 1fr auto;
