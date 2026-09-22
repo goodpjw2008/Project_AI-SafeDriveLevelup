@@ -7,7 +7,7 @@
  *
  * **없으면 없는 대로 굴러가야 한다.** 이 게임은 서버 없이 정적 호스팅으로도, 파일
  * 하나(`build:standalone`)로도 배포된다. 그 두 경우에는 `/api/coach` 자체가 없으므로
- * 여기서 나는 실패는 전부 `null` 로 접어 화면이 코치 칸을 조용히 감춘다.
+ * 여기서 나는 실패는 전부 `null` 로 접고, 화면은 AI 글이 아니라고 밝힌 뒤 판정 기록으로 정리한 코칭을 보여 준다.
  * 화질 설정(game/quality.ts)이 안 되는 기능을 손잡이에서 빼는 것과 같은 사고다.
  */
 
@@ -80,14 +80,26 @@ export function toCoachRequest(
   };
 }
 
+/** 첫 요청이 이 안에 실패했을 때만 다시 묻는다 (ms) — 늦게 실패한 것까지 다시 물으면 20초 넘게 기다린다 */
+const RETRY_IF_FAILED_WITHIN_MS = 6_000;
+
 /**
  * 코칭 문장을 받아 온다. **어떤 이유로든 안 되면 `null`** 이다.
  *
- * 실패를 구분해서 돌려주지 않는 이유: 화면이 할 수 있는 일이 하나뿐이다 — 칸을 감추는 것.
- * "AI 코치를 불러오지 못했습니다" 같은 안내는 학습자에게 아무 쓸모가 없고, 서버가 없는
- * 배포에서는 매번 뜬다. (원인이 궁금할 때는 개발자 도구 콘솔에 남는다)
+ * 실패를 구분해서 돌려주지 않는 이유: 화면이 할 수 있는 일이 하나뿐이다 — AI 글이 아니라고 밝히고 판정 기록으로
+ * 정리한 코칭을 보여 주는 것 (ui/Screens.ts 의 fallbackCoach). 까닭(한도 · 끊김 · 서버 없음)은 학습자에게 쓸모가
+ * 없다. (원인이 궁금할 때는 개발자 도구 콘솔에 남는다)
  */
 export async function fetchCoaching(req: CoachRequest): Promise<Advice | null> {
+  const started = Date.now();
+  const first = await postForText('/api/coach', req);
+  if (first) return first;
+  /*
+    **빨리 실패했으면 한 번 더 묻는다.** 사용자가 "AI 답변이 나오지 않고 카운트다운이 나왔어" 라고 짚었다. 무료 AI 는
+    한도(429) · 혼잡으로 가끔 두 곳이 다 거절하는데, 서버는 요청마다 **다른 곳부터** 부르므로(server/llm.mjs 의
+    order) 다시 물으면 대개 받는다. 늦게 실패한 것(끊김)은 다시 묻지 않는다 — 결과 화면이 그만큼 더 기다리게 된다.
+  */
+  if (Date.now() - started > RETRY_IF_FAILED_WITHIN_MS) return null;
   return postForText('/api/coach', req);
 }
 

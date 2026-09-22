@@ -191,6 +191,27 @@ export function coachLines(text: string): string {
   return `<ul class="coach-list">${items.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
 }
 
+/**
+ * **AI 코치의 답을 못 받았을 때 판정 기록으로 쓰는 코칭** — `- ` 로 시작하는 2~3줄 (coachLines 가 그대로 그린다).
+ *
+ * 예전에는 답을 못 받으면 칸을 통째로 지웠다. 그랬더니 사용자가 "AI 답변이 나오지 않고 카운트다운이 나왔어" 라고
+ * 짚었다 — 늘 있던 칸이 말없이 사라지면 고장처럼 보인다. 그래서 칸을 남기고 **AI 글이 아니라고 밝힌 뒤**(loadCoaching)
+ * 판정이 이미 아는 것으로 짧게 정리한다: 완주 못 한 까닭, 위반마다 고치는 법(violations.ts 의 `fix`), 잘한 것.
+ */
+export function fallbackCoach(result: JudgeResult): string {
+  const lines: string[] = [];
+  if (result.failReason) lines.push(`${FAIL_REASON[result.failReason] ?? '완주하지 못했습니다.'} 이번 판은 끝까지 가지 못했습니다.`);
+  // 같은 위반이 여러 번이어도 고치는 법은 한 번만 — 세 가지까지
+  const codes = [...new Set(result.violations.map((v) => v.code))].slice(0, 3);
+  for (const code of codes) lines.push(`${VIOLATIONS[code].title} — ${VIOLATIONS[code].fix}`);
+  if (!lines.length) {
+    lines.push('오늘 주행 — 규정을 모두 지켰습니다.');
+    if (result.stats.cleanStopBeforeA) lines.push('정지선 앞에서 완전히 멈췄다가 출발했습니다.');
+    if (result.stats.signalAt30m) lines.push('교차로 30m 전에 우측 방향지시등을 켰습니다.');
+  }
+  return lines.map((l) => `- ${l}`).join('\n');
+}
+
 const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'settings', 'report', 'trial'] as const;
 
 /** 뒤에 있던 화면 위에 뜨는 화면 — 바깥을 누르면 닫힌다 (index.html 의 `.sheet`) */
@@ -1607,8 +1628,8 @@ export class Screens {
           가장 먼저 읽는 자리**에 로봇과 함께 둔다 — "완벽했으면 완벽했다고 칭찬을 받는 것도 기분이 좋다" 는
           사용자의 말이 이 자리의 이유다.
 
-          글이 오기 전에는 회색 띠만 있다가 도착하면 채워진다 (loadCoaching). 못 받으면 카드를 통째로 지운다 —
-          빈 상자를 남기지 않는다.
+          글이 오기 전에는 회색 띠만 있다가 도착하면 채워진다 (loadCoaching). 못 받으면 AI 글이 아니라고 밝히고 판정
+          기록으로 정리한 코칭을 넣는다 (fallbackCoach) — 늘 있던 칸이 말없이 사라지면 고장처럼 보인다.
         */
         needsCoach
           ? /*
@@ -1621,7 +1642,7 @@ export class Screens {
               먼저 말하고 글이 잇는다 — 위쪽 등급 배지(PERFECT · FAIL)와도 같은 편을 든다.
             */
             `<div class="verdict loading ${clean ? 'good' : 'bad'}" id="coach-card">
-              <div class="verdict-head">${icon('guide')}AI 주행결과 분석<span class="coach-by" id="coach-by"></span></div>
+              <div class="verdict-head">${icon('guide')}<span id="coach-head">AI 주행결과 분석</span><span class="coach-by" id="coach-by"></span></div>
               <div class="verdict-row">
                 <img class="verdict-robot" src="${clean ? robotTurn : robotStop}" alt="" aria-hidden="true" />
                 <!--
@@ -1806,7 +1827,7 @@ export class Screens {
   }
 
   /**
-   * AI 코치 문장을 받아 채워 넣는다. 못 받아 오면 칸을 지운다.
+   * AI 코치 문장을 받아 채워 넣는다. 못 받아 오면 판정 기록으로 정리한 코칭을 넣고 AI 글이 아니라고 밝힌다.
    *
    * **이번 화면의 것이 맞는지 확인하고 그린다.** 자동 넘김이 켜져 있으면 응답이 오기
    * 전에 다음 판으로 넘어가는 일이 흔한데, 그때 늦게 도착한 문장을 그냥 그리면 새 판의
@@ -1829,7 +1850,16 @@ export class Screens {
         카운트다운이 아예 시작되지 않아, 자동 넘김을 켜 둔 사람이 결과 화면에 갇힌다.
       */
       if (!advice) {
-        card.remove();
+        /*
+          **칸을 지우지 않고, AI 글이 아니라고 밝힌 뒤 판정 기록으로 채운다** (위 fallbackCoach). 제목에서 'AI' 를 빼고,
+          누가 썼는지 적는 자리에 까닭을 적는다 — AI 가 쓰지 않은 글을 AI 이름으로 내보내면 거짓말이 된다.
+        */
+        card.classList.remove('loading');
+        const head = document.getElementById('coach-head');
+        if (head) head.textContent = '주행결과 정리';
+        const by = document.getElementById('coach-by');
+        if (by) by.textContent = 'AI 답변을 받지 못해 판정 기록으로 정리했어요';
+        body.innerHTML = coachLines(fallbackCoach(result));
         onReady?.();
         return;
       }
