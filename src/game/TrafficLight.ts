@@ -1,7 +1,8 @@
 /**
  * 신호등 4종.
  *
- *  - 차량신호등: 한국 표준 4색등(적 / 황 / 좌회전 녹색화살표 / 녹색) 가로형
+ *  - 차량신호등: 한국 표준 4색등(적 / 황 / 좌회전 녹색화살표 / 녹색) 가로형 — 교차로가 아닌 횡단보도(진입로
+ *    어린이보호구역)는 좌회전할 길이 없어 3색등(적 / 황 / 녹색)
  *  - 보행신호등: 적(서 있는 사람) / 녹(걷는 사람) 세로형
  *  - 우회전신호등: 적 원형 / 황 원형 / **녹색 우회전 화살표** 세로형
  *
@@ -280,14 +281,14 @@ function housingMaterial(): THREE.MeshStandardMaterial {
 }
 
 /**
- * 차량신호등 (4색등).
- * 왼쪽부터 적 · 황 · 좌회전화살표 · 녹.
+ * 차량신호등 (4색등 · 3색등).
+ * 왼쪽부터 적 · 황 · 좌회전화살표 · 녹 — 3색등은 좌회전화살표가 없다.
  */
 export class VehicleSignal {
   readonly group = new THREE.Group();
   private red: Lens;
   private yellow: Lens;
-  private leftArrow: ArrowLens;
+  private leftArrow: ArrowLens | null;
   private green: Lens;
   private housingMat = housingMaterial();
   private backboardMat = new THREE.MeshStandardMaterial({ color: 0x0d0e12, roughness: 0.9 });
@@ -299,9 +300,13 @@ export class VehicleSignal {
   /**
    * @param S 확대 배율. 교차로는 `SIGNAL_SCALE`(3.0), 진입부 보호구역은
    *          `ZONE_SIGNAL_SCALE`(2.2) — 등화까지의 거리가 다섯 배 넘게 차이난다.
+   * @param withLeftArrow 좌회전화살표를 다는가. **교차로가 아닌 횡단보도의 신호등은 3색등이다** — 진입로 어린이보호구역
+   *          횡단보도는 길 중간이라 좌회전할 곳이 없는데 4색등을 달았더니, 사용자가 "이 상황은 절대로 좌회전 표시가
+   *          나오지 않는 곳" 이라고 짚었다. 등화 한 칸만큼 몸통도 좁힌다.
    */
-  constructor(S: number = SIGNAL_SCALE) {
-    const W = 1.6 * S;
+  constructor(S: number = SIGNAL_SCALE, withLeftArrow = true) {
+    const lamps = withLeftArrow ? 4 : 3;
+    const W = 0.4 * lamps * S;
     const H = 0.46 * S;
     const margin = backboardMargin(S);
 
@@ -327,13 +332,13 @@ export class VehicleSignal {
     // 헤일로는 렌즈 지름의 3배. 49m 밖에서도 색이 또렷하게 읽힌다.
     this.red = new Lens(COLORS.red, radius, 3);
     this.yellow = new Lens(COLORS.yellow, radius, 3);
-    this.leftArrow = new ArrowLens(COLORS.green, Math.PI); // 왼쪽을 가리키도록 회전
+    this.leftArrow = withLeftArrow ? new ArrowLens(COLORS.green, Math.PI) : null; // 왼쪽을 가리키도록 회전
     this.green = new Lens(COLORS.green, radius, 3);
 
-    const xs = [-0.6 * S, -0.2 * S, 0.2 * S, 0.6 * S];
-    const lenses = [this.red.mesh, this.yellow.mesh, this.leftArrow.mesh, this.green.mesh];
+    // 등화 간격은 0.4·S — 가운데를 0 으로 두고 양쪽으로 벌린다 (4색등 ±0.2·±0.6, 3색등 0·±0.4)
+    const lenses = [this.red.mesh, this.yellow.mesh, ...(this.leftArrow ? [this.leftArrow.mesh] : []), this.green.mesh];
     lenses.forEach((m, i) => {
-      m.position.set(xs[i], 0, 0.11);
+      m.position.set((i - (lenses.length - 1) / 2) * 0.4 * S, 0, 0.11);
       this.group.add(m);
     });
   }
@@ -345,13 +350,13 @@ export class VehicleSignal {
     this.red.set(state === 'red' || (state === 'redFlash' && blinkOn));
     this.yellow.set(state === 'yellow');
     this.green.set(state === 'green');
-    this.leftArrow.set(false);
+    this.leftArrow?.set(false);
   }
 
   dispose(): void {
     this.red.dispose();
     this.yellow.dispose();
-    this.leftArrow.dispose();
+    this.leftArrow?.dispose();
     this.green.dispose();
     this.housingGeo.dispose();
     this.backboardGeo.dispose();

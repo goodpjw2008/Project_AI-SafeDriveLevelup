@@ -638,7 +638,8 @@ export class Game {
         오른쪽 변이 보도까지 뻗어 **지주를 세울 자리가 없었다.**
       */
       const zoneSignalX = PLAYER_APPROACH_X;
-      this.zoneSignal = new VehicleSignal(ZONE_SIGNAL_SCALE);
+      // 길 중간의 횡단보도라 좌회전할 곳이 없다 — 좌회전화살표 없는 3색등 (TrafficLight.ts)
+      this.zoneSignal = new VehicleSignal(ZONE_SIGNAL_SCALE, false);
       this.zoneSignal.group.position.set(
         zoneSignalX,
         ZONE_SIGNAL_ARM_Y - 0.09 - ZONE_SIGNAL_HALF_HEIGHT,
