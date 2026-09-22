@@ -44,7 +44,7 @@ import {
   scenarioLibrary,
 } from './scenarios/library';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
-import { masterPick, recommendScenario, type Picker, type RecentRun } from './scenarios/recommend';
+import { masterPick, priorityHabits, recommendScenario, type Picker, type RecentRun } from './scenarios/recommend';
 import { advance, currentTarget, levelLabel, MAX_LEVEL, recordHabits, xpToNext } from './scenarios/curriculum';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
@@ -266,6 +266,8 @@ async function makeAiScenario(): Promise<void> {
       시작할 때는 어느 자리가 받을지 알 수 없어서(server/llm.mjs 가 자리를 돌려 쓴다) 이렇게 뒤늦게 갈아 끼운다.
     */
     void picking.then((r) => aiPick.setAnalyst(r.picker, r.model)).catch(() => undefined);
+    // 습관이 둘 이상이면 **먼저 고칠 습관을 AI 가 정한다** (recommend.ts 의 coursesByHabit) — 단계 글도 그렇게 말한다
+    const many = priorityHabits(plan).length >= 2;
     const habitsText = c.badHabits.length
       ? c.badHabits.slice(0, 2).map((h) => habitTitle(h.code)).join(' · ') + (c.badHabits.length > 2 ? ' 외' : '')
       : '기록된 나쁜 습관 없음 — 다음 레벨 준비';
@@ -273,8 +275,14 @@ async function makeAiScenario(): Promise<void> {
       [
         history.length ? `주행 기록 ${history.length}판을 읽는 중` : '첫 주행입니다 — 기본 판단부터 확인하는 중',
         `나쁜 운전 습관 분석 — ${habitsText}`,
-        () => `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
-        () => `AI 우회전이 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+        () =>
+          many
+            ? `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개 추리기`
+            : `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
+        () =>
+          many
+            ? `AI 우회전이 먼저 고칠 습관을 정하고 후보 ${counts.courses}개 중 코스를 고르는 중`
+            : `AI 우회전이 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
       ],
       picking,
     );
@@ -288,6 +296,8 @@ async function makeAiScenario(): Promise<void> {
       // 어느 AI 의 어느 모델이 골랐는지 카드가 그대로 말한다 (ui/AiPick.ts · 무료 여러 곳을 돌아가며 쓴다)
       picker: rec.picker,
       model: rec.model,
+      habit: rec.habit ? habitTitle(rec.habit) : undefined,
+      habitByAi: rec.habitBy === 'ai',
     });
     outcome = { scenario: rec.scenario, tries: 1, rejected: [], reason: 'ok' };
   } catch (e) {

@@ -952,6 +952,25 @@
         color: #ffd66b;
       }
       /*
+        **먼저 고칠 습관** — 습관이 여럿일 때 AI 가 정한 것이면 "(AI 판단)" 을 붙인다 (ui/AiPick.ts).
+        추천 사유 위에 둔다 — "무엇을 고치려고" 가 "왜 이 맵인가" 보다 먼저 읽혀야 사유가 이어진다.
+      */
+      .ai-pick-habit {
+        margin: 0;
+        font-size: 16.5px;
+        line-height: 1.6;
+        word-break: keep-all;
+      }
+      .ai-pick-habit b {
+        color: #ff8a80;
+      }
+      .ai-pick-habit .by {
+        margin-left: 6px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #c9c2ff;
+      }
+      /*
         **맵 준비 → 출발** — 이 카드에서 "곧 시작한다" 를 알리는 유일한 줄이다.
 
         14px 회색 한 줄에 8px 점 하나였다. 카드에서 가장 작고 흐린 글자였는데 정작 화면이 넘어가는 때를
@@ -5160,6 +5179,7 @@
           -->
           <p class="ai-pick-picked" id="ai-pick-picked"></p>
           <p class="ai-pick-lead"><span class="brand-ai">AI</span> <span class="brand-chips"><span class="brand-red">우</span><span class="brand-yellow">회</span><span class="brand-green">전</span></span>이 운전자분에게 추천 시나리오 <b id="ai-pick-name"></b><span id="ai-pick-josa">을</span> 선택해 줬습니다.</p>
+          <p class="ai-pick-habit" id="ai-pick-habit" hidden></p>
           <p class="ai-pick-why"><b>추천 사유</b> : <span id="ai-pick-why"></span></p>
           <p class="ai-pick-focus" id="ai-pick-focus"></p>
           <p class="ai-pick-status" id="ai-pick-statusbox">

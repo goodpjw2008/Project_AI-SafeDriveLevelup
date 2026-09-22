@@ -8,6 +8,10 @@
  *    약점을 시험하는 것, 쉬운 것과 어려운 것, 신호·보행자·보호구역이 서로 다른 것이 섞이게.
  *  - **AI**(server/recommendPrompt.mjs): 습관 기록과 최근 주행을 읽고 **후보 중 하나를 고른다**.
  *    그리고 학습자에게 보여 줄 **추천 이유**와 **이번 판에서 볼 것**을 쓴다.
+ *    나쁜 습관이 **여럿이면 먼저 고칠 습관도 AI 가 정한다** — 코드는 습관마다 후보를 따로 추려 두기만 한다
+ *    (`coursesByHabit`). 예전에는 가장 많이 한 습관을 코드가 먼저로 정했는데, 사용자가 "분석 단계도 AI 가
+ *    하게" 해 달라고 했다. 많이 한 순서만이 답이 아니다 — 최근에 이어 나오는지, 보행자 · 어린이가 걸린
+ *    위험한 습관인지를 읽고 순서를 정하는 것은 판단이라 AI 에게 맞는다.
  *  - **코드**: 고른 번호가 후보에 있는지 확인한다. 학습자에게 나가는 것은 늘 검증을 통과한 판이다.
  *
  * 처음에는 AI 에게 **축마다 값을 고르게** 했다(신호 · 보행자 · 보호구역 …). 실제 모델로 돌려 보니
@@ -43,6 +47,13 @@ import { challengeRule } from './challenge';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
+/**
+ * **먼저 고칠 습관을 AI 가 고르는 습관 수** — 많이 한 순서로 셋까지.
+ * 습관마다 후보를 추리므로 셋이면 후보가 15개로, 서버가 한 번에 받는 양(recommendHandler.mjs 의 16) 안에 든다.
+ */
+const PRIORITY_HABITS = 3;
+/** 습관이 여럿일 때 습관 하나에 담는 후보 수 — 둘이면 7개씩, 셋이면 5개씩 */
+const perHabit = (n: number): number => (n <= 1 ? SHORTLIST_SIZE : n === 2 ? 7 : 5);
 /** 후보 코스 중 한 축의 한 값(예: 우회전 후 무단횡단)이 차지할 수 있는 수 */
 const PER_VALUE_MAX = 3;
 /** 최근 이만큼 탄 판은 다시 고르지 않는다 */
@@ -280,6 +291,15 @@ export interface RecommendOutcome {
    * 코드가 고른 판에는 없다.
    */
   model?: string;
+  /**
+   * **이번 판에서 고칠 습관** — 습관이 없으면 `null`.
+   *
+   * 습관이 둘 이상이면 AI 가 정한 것이고(`habitBy: 'ai'`), 하나뿐이거나 AI 가 답하지 않았으면 가장 많이 한
+   * 습관이다(`'rule'`). 결과 카드가 "먼저 고칠 습관 (AI 판단)" 이라고 적는 근거라, 코드가 정한 것을 AI 가
+   * 정했다고 말하지 않게 둘을 나눠 둔다.
+   */
+  habit: ViolationCode | null;
+  habitBy: 'ai' | 'rule';
 }
 
 /**
@@ -452,6 +472,8 @@ export function shortlist(
   random: () => number = Math.random,
   seen: SeenShapes = NO_SHAPES,
   cover: Coverage = NO_COVER,
+  /** 담을 수 — 습관이 여럿일 때는 습관마다 조금씩 담는다 (`coursesByHabit`) */
+  size: number = SHORTLIST_SIZE,
 ): LibraryEntry[] {
   const scored = candidates
     .map((e) => ({ e, s: scoreOf(plan, e, seen, cover) + random() * 1.5 }))
@@ -475,7 +497,7 @@ export function shortlist(
   */
   const taken = new Set<number>();
   const take = (e: LibraryEntry, force = false) => {
-    if (out.length >= SHORTLIST_SIZE || taken.has(e.spec.id)) return;
+    if (out.length >= size || taken.has(e.spec.id)) return;
     if (!force && (shapes.has(shapeOf(e)) || crowded(e))) return;
     taken.add(e.spec.id);
     shapes.add(shapeOf(e));
@@ -485,13 +507,70 @@ export function shortlist(
     out.push(e);
   };
   const target = plan.target as ViolationCode | null;
-  if (target) for (const { e } of scored) if (e.targets.includes(target) && out.length < SHORTLIST_SIZE / 2) take(e);
+  if (target) for (const { e } of scored) if (e.targets.includes(target) && out.length < size / 2) take(e);
   const easiest = [...candidates].sort((x, y) => x.level - y.level || x.cost - y.cost)[0];
   if (easiest) take(easiest, true);
   for (const { e } of scored) take(e);
   // 후보가 적은 판(앞차 차례 등)에서는 독차지 제한 때문에 모자랄 수 있다 — 그때는 풀어서 채운다
   for (const { e } of scored) take(e, true);
   return out;
+}
+
+/** 습관 하나를 고치는 후보 묶음 — `habit` 이 `null` 이면 고칠 습관이 없는 판 */
+export interface HabitCourses {
+  habit: ViolationCode | null;
+  courses: LibraryEntry[];
+}
+
+/** AI 가 먼저 고칠 것을 고르는 습관들 — 많이 한 순서로 `PRIORITY_HABITS` 개까지, 같은 코드는 한 번 */
+export function priorityHabits(plan: Plan): ViolationCode[] {
+  const out: ViolationCode[] = [];
+  for (const h of plan.badHabits) if (!out.includes(h.code)) out.push(h.code);
+  return out.slice(0, PRIORITY_HABITS);
+}
+
+/** 이 코스가 그 습관을 시험하는가 — 늘 시험되는 위반(방향지시등 · 서행 · 대회전)은 어느 코스에서나 참 */
+export const coursesTest = (e: LibraryEntry, habit: ViolationCode): boolean =>
+  ALWAYS_TESTED.includes(habit) || e.targets.includes(habit);
+
+/**
+ * **습관마다 후보를 따로 추린다** — 먼저 고칠 습관은 AI 가 정한다.
+ *
+ * 습관이 하나 이하면 예전과 같다 — 가장 많이 한 습관(`plan.target`)의 후보 하나 묶음. 둘 이상이면 습관마다
+ * `candidatesFor` · `shortlist` 를 따로 돌려 묶음을 만든다. 어느 묶음이든 그 습관을 시험하는 판뿐이라,
+ * AI 가 어느 습관을 먼저로 정해도 "습관이 있으면 그 습관을 고치는 코스만" 이라는 약속이 지켜진다.
+ * 두 습관을 함께 시험하는 판은 앞 묶음에만 담는다 — 같은 번호가 두 번 나가면 AI 가 헷갈린다.
+ *
+ * @returns 묶음들과, 분석 화면에 적을 **추린 판의 수**(묶음들의 후보를 합친 것)
+ */
+export function coursesByHabit(
+  plan: Plan,
+  recentIds: readonly number[],
+  random: () => number = Math.random,
+  seen: SeenShapes = NO_SHAPES,
+  cover: Coverage = NO_COVER,
+): { groups: HabitCourses[]; candidates: number } {
+  const habits = priorityHabits(plan);
+  if (habits.length < 2) {
+    const candidates = candidatesFor(plan, recentIds);
+    return {
+      groups: [{ habit: (plan.target as ViolationCode | null) ?? null, courses: shortlist(plan, candidates, random, seen, cover) }],
+      candidates: candidates.length,
+    };
+  }
+  const size = perHabit(habits.length);
+  const pooled = new Set<number>();
+  const taken = new Set<number>();
+  const groups: HabitCourses[] = [];
+  for (const habit of habits) {
+    const p = { ...plan, target: habit };
+    const candidates = candidatesFor(p, recentIds);
+    for (const e of candidates) pooled.add(e.spec.id);
+    const courses = shortlist(p, candidates, random, seen, cover, size).filter((e) => !taken.has(e.spec.id));
+    for (const e of courses) taken.add(e.spec.id);
+    if (courses.length) groups.push({ habit, courses });
+  }
+  return { groups, candidates: pooled.size };
 }
 
 // ── 3. 코드가 고르기 (AI 가 없을 때) ─────────────────────────────────────────
@@ -586,6 +665,8 @@ interface AiReply {
   id: number;
   why: string;
   focus: string;
+  /** AI 가 정한 **먼저 고칠 습관** — 습관이 여럿일 때만 온다. 받는 쪽이 한 번 더 확인한다 */
+  habit?: string;
   /** 어느 제공자가 골랐는가 (server/recommendHandler.mjs) */
   picker: Picker;
   /** 그 제공자의 어느 모델인가 */
@@ -623,6 +704,7 @@ async function askAi(payload: unknown): Promise<AiReply | 'no-server' | 'quota' 
       id?: unknown;
       why?: unknown;
       focus?: unknown;
+      habit?: unknown;
       picker?: unknown;
       model?: unknown;
     };
@@ -631,6 +713,7 @@ async function askAi(payload: unknown): Promise<AiReply | 'no-server' | 'quota' 
       id: body.id,
       why: typeof body.why === 'string' ? body.why.trim() : '',
       focus: typeof body.focus === 'string' ? body.focus.trim() : '',
+      habit: typeof body.habit === 'string' ? body.habit : undefined,
       picker: asPicker(body.picker),
       // 화면에 그대로 적히는 값이라 길이를 자른다 — 서버가 준 것이지만 화면을 밀어내게 두지는 않는다
       model: typeof body.model === 'string' ? body.model.trim().slice(0, MODEL_NAME_MAX) : undefined,
@@ -651,8 +734,11 @@ export function recommendPayload(
   courses: readonly LibraryEntry[],
   /** 이 레벨에서 겪은 것 — 후보마다 '아직 안 겪은 축' 을 적는 데 쓴다 (위 coverageOf) */
   cover: Coverage = NO_COVER,
+  /** 후보가 어느 습관의 묶음인가 (위 coursesByHabit) — 둘 이상이면 먼저 고칠 습관을 AI 가 정한다 */
+  habitOf: ReadonlyMap<number, ViolationCode> = new Map(),
 ) {
   const fresh = freshAxesFor(courses, cover);
+  const priority = new Set(habitOf.values()).size >= 2;
   return {
     level: plan.level,
     tier: levelTier(plan.level),
@@ -677,6 +763,8 @@ export function recommendPayload(
       violations: r.violations.slice(0, 6),
     })),
     turn: { schoolZone: plan.schoolZone, lead: plan.lead },
+    // **먼저 고칠 습관을 AI 가 정하는 판인가** — 습관마다 후보를 따로 추렸을 때만
+    priority,
     /*
       **후보마다 구조화된 메타를 함께 보낸다.** 예전에는 제목 · 시험 · 레벨 셋뿐이라, 모델이 코스에 대해
       아는 모든 것이 한국어 제목 문자열 안에 압축돼 있었다 — 그래서 시스템 프롬프트가 40줄 중 17줄을
@@ -696,6 +784,7 @@ export function recommendPayload(
       sideA: sideOf(e.spec, 'A'),
       sideC: sideOf(e.spec, 'C'),
       fresh: fresh[i].slice(0, 3),
+      ...(priority && habitOf.has(e.spec.id) ? { habit: habitOf.get(e.spec.id) } : {}),
     })),
   };
 }
@@ -720,19 +809,32 @@ export async function recommendScenario(
    */
   playedIds: readonly number[] = recentIds,
 ): Promise<RecommendOutcome> {
-  const candidates = candidatesFor(plan, recentIds);
   // 최근에 나온 모양을 깎아 **번호만 다른 같은 장면**이 이어지지 않게 한다 (위 REPEAT_PENALTY)
   const seen = seenShapes(recentIds);
   // 이 레벨에서 **실제로 탄** 판만 세어, 아직 안 겪은 상황을 좋게 친다 (위 coverageOf)
   const cover = coverageOf(playedIds, plan.level);
-  const courses = shortlist(plan, candidates, Math.random, seen, cover);
-  onCandidates?.({ candidates: candidates.length, courses: courses.length });
-  const reply = await askAi(recommendPayload(plan, habits, recent, courses, cover));
+  // 습관이 여럿이면 습관마다 후보를 따로 추린다 — 먼저 고칠 습관은 AI 가 정한다 (위 coursesByHabit)
+  const byHabit = coursesByHabit(plan, recentIds, Math.random, seen, cover);
+  const courses = byHabit.groups.flatMap((g) => g.courses);
+  const habitOf = new Map<number, ViolationCode>();
+  for (const g of byHabit.groups) if (g.habit) for (const e of g.courses) habitOf.set(e.spec.id, g.habit);
+  const priority = byHabit.groups.length >= 2;
+  onCandidates?.({ candidates: byHabit.candidates, courses: courses.length });
+  const reply = await askAi(recommendPayload(plan, habits, recent, courses, cover, priority ? habitOf : undefined));
 
   // **고른 번호가 후보에 있을 때만** 받는다 — 모델이 지어낸 번호는 버리고 코드가 고른다
   const answer = reply && reply !== 'no-server' && reply !== 'quota' ? reply : null;
   const chosen = answer ? courses.find((e) => e.spec.id === answer.id) : undefined;
   if (chosen && answer) {
+    /*
+      **AI 가 정한 습관은 두 가지를 확인한 뒤에만 받는다** — 학습자에게 실제로 있는 습관인가, 고른 코스가 그
+      습관을 시험하는가. 어긋나면 고른 코스가 들어 있던 묶음의 습관으로 본다 (그 코스는 그 습관을 고치려고
+      추린 것이다). 습관이 하나 이하인 판은 AI 가 정한 것이 아니므로 그렇게 말하지 않는다.
+    */
+    const told = answer.habit as ViolationCode | undefined;
+    const aiHabit =
+      priority && told && priorityHabits(plan).includes(told) && coursesTest(chosen, told) ? told : undefined;
+    const habit = aiHabit ?? habitOf.get(chosen.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
     return {
       scenario: toScenario(
         chosen,
@@ -746,15 +848,20 @@ export async function recommendScenario(
       source: 'ai',
       picker: answer.picker,
       model: answer.model,
+      habit,
+      habitBy: aiHabit ? 'ai' : 'rule',
     };
   }
-  const entry = rulePick(plan, courses.length ? courses : candidates, Math.random, seen, cover);
+  const entry = rulePick(plan, courses.length ? courses : candidatesFor(plan, recentIds), Math.random, seen, cover);
   // 한도를 다 써서 코드가 고른 판은 그렇게 말한다 (위 Picker 주석)
   const why: Picker = reply === 'quota' ? 'quota' : 'rule';
   return {
     scenario: toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why),
     source: 'rule',
     picker: why,
+    // AI 가 답하지 않았다 — 코드가 고른 코스의 묶음 습관 (rulePick 은 가장 많이 한 습관의 코스를 좋게 친다)
+    habit: habitOf.get(entry.spec.id) ?? (plan.target as ViolationCode | null) ?? null,
+    habitBy: 'rule',
   };
 }
 
@@ -776,6 +883,8 @@ export function masterPick(recentIds: readonly number[], random: () => number = 
     scenario: toScenario(entry, MAX_LEVEL, why, '처음부터 다시 시작하기 전까지 마스터 운행이 이어집니다', 'rule', 'random'),
     source: 'rule',
     picker: 'random',
+    habit: null,
+    habitBy: 'rule',
   };
 }
 

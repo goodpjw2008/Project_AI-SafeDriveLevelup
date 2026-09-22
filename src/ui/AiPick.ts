@@ -42,6 +42,10 @@ export interface PickResult {
   picker?: Picker;
   /** 그 제공자의 모델 이름 — 'gemini-3.1-flash-lite' (AI 가 고른 판만) */
   model?: string;
+  /** 이번 판에서 고칠 습관의 이름 — 없으면 그 줄을 감춘다 */
+  habit?: string;
+  /** 그 습관을 **AI 가 정했는가** — 습관이 여럿일 때만 AI 가 정한다 (scenarios/recommend.ts 의 habitBy) */
+  habitByAi?: boolean;
 }
 
 export class AiPickOverlay {
@@ -154,6 +158,15 @@ export class AiPickOverlay {
       `「${esc(r.title)}」${r.number !== undefined ? ` - ${r.number}번` : ''}`;
     // "… 3131번을" — 번호가 없으면 제목이 」 로 끝나 받침을 알 수 없다
     $('ai-pick-josa').textContent = r.number !== undefined ? '을' : '을(를)';
+    /*
+      **먼저 고칠 습관** — AI 가 정한 것만 "AI 판단" 이라고 적는다. 습관이 하나뿐이면 고를 것이 없었으므로
+      그냥 "고칠 습관" 이다. 코드가 정한 것을 AI 가 정했다고 말하면 거짓말이다.
+    */
+    const habit = $('ai-pick-habit');
+    habit.innerHTML = r.habit
+      ? `${r.habitByAi ? '먼저 고칠 습관' : '고칠 습관'} : <b>${esc(r.habit)}</b>${r.habitByAi ? '<span class="by">AI 판단</span>' : ''}`
+      : '';
+    habit.hidden = !r.habit;
     $('ai-pick-why').textContent = r.why;
     const focus = $('ai-pick-focus');
     focus.textContent = r.focus ? `👉 ${r.focus}` : '';

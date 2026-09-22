@@ -22,7 +22,9 @@ import { libraryEntry } from '../src/scenarios/library';
 import { isCombinedLevel, levelGuide } from '../src/scenarios/library';
 import {
   candidatesFor,
+  coursesByHabit,
   coverageOf,
+  priorityHabits,
   recommendPayload,
   masterPick,
   PICKER_LABEL,
@@ -577,5 +579,127 @@ describe('습관이 풀리는 판 수 — 화면과 프롬프트가 같은 수�
     );
     expect(text).toContain(`${HABIT_CLEARED_AFTER}번 지켜야 풀립니다`);
     expect(text).toContain(`지킨 판 1/${HABIT_CLEARED_AFTER}`);
+  });
+});
+
+/*
+  **먼저 고칠 습관은 AI 가 정한다** (recommend.ts 의 coursesByHabit · server/recommendPrompt.mjs).
+
+  사용자가 "분석 단계(③)도 AI 가 하게" 해 달라고 했다. 습관이 둘 이상이면 코드는 습관마다 후보를 따로 추리기만 하고,
+  어느 습관부터 고칠지는 모델이 정한다. 다만 **울타리는 그대로다** — 어느 묶음이든 그 습관을 시험하는 판뿐이고,
+  모델이 댄 습관은 학습자에게 있고 고른 코스가 그 습관을 시험할 때만 받는다.
+*/
+describe('먼저 고칠 습관 — AI 가 정한다', () => {
+  const two = (over: Partial<Plan> = {}) =>
+    plan({
+      level: 5,
+      target: 'RED_NO_STOP',
+      badHabits: [
+        { code: 'RED_NO_STOP', count: 4, cleanRuns: 0, lastRun: 8 },
+        { code: 'PEDESTRIAN_BLOCKED', count: 2, cleanRuns: 0, lastRun: 9 },
+      ],
+      ...over,
+    });
+
+  it('습관이 하나면 예전처럼 한 묶음 — AI 가 습관을 고르지 않는다', () => {
+    const { groups } = coursesByHabit(plan(), [], () => 0.5);
+    expect(groups.length).toBe(1);
+    expect(groups[0].habit).toBe('RED_NO_STOP');
+  });
+
+  it('습관이 둘이면 습관마다 묶음이 있고, 묶음의 판은 모두 그 습관을 시험한다', () => {
+    const { groups, candidates } = coursesByHabit(two(), [], () => 0.5);
+    expect(groups.map((g) => g.habit)).toEqual(['RED_NO_STOP', 'PEDESTRIAN_BLOCKED']);
+    const ids = groups.flatMap((g) => g.courses.map((e) => e.spec.id));
+    expect(new Set(ids).size, '같은 번호가 두 묶음에 나가지 않는다').toBe(ids.length);
+    expect(ids.length, '서버가 한 번에 받는 16개 안').toBeLessThanOrEqual(16);
+    for (const g of groups) for (const e of g.courses) expect(e.targets, String(g.habit)).toContain(g.habit);
+    expect(candidates).toBeGreaterThanOrEqual(ids.length);
+  });
+
+  it('습관은 셋까지만 — 넷이어도 묶음은 셋이다', () => {
+    const p = plan({
+      level: 8,
+      badHabits: [
+        { code: 'RED_NO_STOP', count: 5, cleanRuns: 0, lastRun: 8 },
+        { code: 'PEDESTRIAN_BLOCKED', count: 4, cleanRuns: 0, lastRun: 8 },
+        { code: 'RIGHT_ARROW_RED', count: 3, cleanRuns: 0, lastRun: 8 },
+        { code: 'OVER_STOP_LINE', count: 2, cleanRuns: 0, lastRun: 8 },
+      ],
+    });
+    expect(priorityHabits(p)).toEqual(['RED_NO_STOP', 'PEDESTRIAN_BLOCKED', 'RIGHT_ARROW_RED']);
+    expect(coursesByHabit(p, [], () => 0.5).groups.length).toBeLessThanOrEqual(3);
+  });
+
+  it('프롬프트가 먼저 고칠 습관을 정하라고 하고, 후보 줄마다 어느 습관의 묶음인지 적는다', () => {
+    const p = two();
+    const { groups } = coursesByHabit(p, [], () => 0.5);
+    const habitOf = new Map(groups.flatMap((g) => g.courses.map((e) => [e.spec.id, g.habit!] as const)));
+    const courses = groups.flatMap((g) => g.courses);
+    const req = sanitize(JSON.parse(JSON.stringify(recommendPayload(p, habits, [], courses, undefined, habitOf)))) as {
+      priority: boolean;
+    };
+    expect(req.priority).toBe(true);
+    const text = buildUserPrompt(req);
+    expect(text).toContain('먼저 고칠 습관을 정하십시오');
+    expect(text).toContain('[PEDESTRIAN_BLOCKED]');
+    expect(text).toContain('[RED_NO_STOP]');
+  });
+
+  it('습관이 하나면 프롬프트는 정하라고 하지 않고 묶음 표시도 없다', () => {
+    const p = plan();
+    const text = buildUserPrompt(
+      sanitize(JSON.parse(JSON.stringify(recommendPayload(p, habits, [], shortlist(p, candidatesFor(p, []), () => 0.5))))),
+    );
+    expect(text).not.toContain('먼저 고칠 습관을 정하십시오');
+    expect(text).not.toContain('[RED_NO_STOP]');
+  });
+
+  it('서버는 학습자에게 있고 고른 코스가 시험하는 습관만 넘긴다', () => {
+    const ok = (id: number, habit: string) => id === 7 && habit === 'PEDESTRIAN_BLOCKED';
+    expect(parseReply('{"habit":"PEDESTRIAN_BLOCKED","id":7,"why":"이유"}', [7], ok)?.habit).toBe('PEDESTRIAN_BLOCKED');
+    expect(parseReply('{"habit":"RED_NO_STOP","id":7,"why":"이유"}', [7], ok)?.habit, '그 코스가 시험하지 않는 습관').toBeUndefined();
+    expect(parseReply('{"habit":"지어낸 코드","id":7}', [7], () => true)?.habit, '모르는 코드').toBeUndefined();
+    // 습관을 댔는지와 무관하게 번호가 맞으면 판은 받는다
+    expect(parseReply('{"habit":"RED_NO_STOP","id":7}', [7], ok)?.id).toBe(7);
+  });
+
+  it('AI 가 둘째 습관을 먼저로 정하면 그 습관 · 그 코스로 간다 — 카드가 "AI 판단" 이라고 적는다', async () => {
+    let sent: { habit?: string; id: number }[] = [];
+    vi.stubGlobal('fetch', (_u: string, init: { body: string }) => {
+      const body = JSON.parse(init.body);
+      sent = body.courses;
+      const pick = sent.find((c) => c.habit === 'PEDESTRIAN_BLOCKED')!;
+      const reply = { habit: 'PEDESTRIAN_BLOCKED', id: pick.id, why: '최근 두 판 연속 보행자 앞에서 서지 않았습니다.', focus: '' };
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(reply) } as unknown as Response);
+    });
+    const out = await recommendScenario(two(), habits, [], []);
+    expect(out.source).toBe('ai');
+    expect(out.habit).toBe('PEDESTRIAN_BLOCKED');
+    expect(out.habitBy).toBe('ai');
+    expect(libraryEntry(out.scenario.id)!.targets).toContain('PEDESTRIAN_BLOCKED');
+  });
+
+  it('AI 가 댄 습관이 고른 코스와 맞지 않으면 그 코스의 묶음 습관으로 보고, AI 판단이라고 하지 않는다', async () => {
+    vi.stubGlobal('fetch', (_u: string, init: { body: string }) => {
+      const courses = JSON.parse(init.body).courses as { habit?: string; id: number }[];
+      // 보행자 묶음의 코스를 골라 놓고 습관은 엉뚱한 것(학습자에게 없는 것)을 댄다
+      const pick = courses.find((c) => c.habit === 'PEDESTRIAN_BLOCKED')!;
+      const reply = { habit: 'SCHOOL_ZONE_RED', id: pick.id, why: '이유', focus: '' };
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(reply) } as unknown as Response);
+    });
+    const out = await recommendScenario(two(), habits, [], []);
+    expect(out.habit).toBe('PEDESTRIAN_BLOCKED');
+    expect(out.habitBy).toBe('rule');
+  });
+
+  it('AI 가 없으면 코드가 고르고, 가장 많이 한 습관의 코스를 먼저 본다', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('{}') } as unknown as Response),
+    );
+    const out = await recommendScenario(two(), habits, [], []);
+    expect(out.source).toBe('rule');
+    expect(out.habitBy).toBe('rule');
+    expect(libraryEntry(out.scenario.id)!.targets).toContain(out.habit);
   });
 });
