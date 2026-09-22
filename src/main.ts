@@ -6,6 +6,7 @@ import { GameAudio } from './game/Audio';
 import robotNormal from './assets/airobot/normal.webp';
 import { Controls, leaveToBrowser } from './game/Controls';
 import { Game, type GameSnapshot } from './game/Game';
+import type { ViewMode } from './game/CameraRig';
 import { setPedestrianAlerts } from './game/Pedestrian';
 import { setStopBands } from './game/StopMarkers';
 import { setClusterStopCue } from './game/ClusterPanel';
@@ -595,6 +596,14 @@ function renderMenu(): void {
 }
 
 /**
+ * **지금 시점을 문서에 적는다** (`body.view-driver` · `view-chase` · `view-top`). 휴대폰 가로 화면의 상단 과제 상자는
+ * 운전석 시점에서만 좁힌다 — 그 시점에서만 위쪽 양 끝에 좌 · 우 시야 창이 선다 (index.html).
+ */
+function markView(v: ViewMode): void {
+  for (const m of ['driver', 'chase', 'top'] as const) document.body.classList.toggle(`view-${m}`, m === v);
+}
+
+/**
  * 첫 화면 오른쪽 위의 **사이트 전체 안전운전 성공 · 실패 횟수** (siteStats.ts).
  *
  * 가지고 있던 숫자를 먼저 띄우고, 서버에서 새로 읽어 바꾼다 — 판을 마치고 돌아왔을 때 방금 센 숫자가 바로 보이고,
@@ -1147,6 +1156,9 @@ async function startRun(id: number): Promise<void> {
   setStopBands(hints !== 'none');
   setClusterStopCue(hints !== 'none');
 
+  // 시작 시점 — 자율 주행 중에는 후방 시점으로 고정한다 (아래 startView 주석)
+  const startViewOfRun: ViewMode = aiDriving ? 'chase' : saveData.settings.startView;
+  markView(startViewOfRun);
   game = new Game(canvas, currentScenario, carSpec, controls, audio, {
     onSnapshot: (s: GameSnapshot) => {
       hud.update(s);
@@ -1157,8 +1169,10 @@ async function startRun(id: number): Promise<void> {
     },
     onFinish: (result) => finishRun(result),
     onToast: (msg) => hud.toast(msg),
-    onViewChange: (v) =>
-      hud.toast(v === 'driver' ? '운전자 시점' : v === 'chase' ? '후방 시점' : '탑다운 시점'),
+    onViewChange: (v) => {
+      markView(v);
+      hud.toast(v === 'driver' ? '운전자 시점' : v === 'chase' ? '후방 시점' : '탑다운 시점');
+    },
   },
   {
     // 차고에서 맞춰 둔 좌석 자리를 그대로 들고 들어간다
@@ -1170,7 +1184,7 @@ async function startRun(id: number): Promise<void> {
       보여 주는 것이라 차와 차로가 함께 보이는 화면이라야 한다. 주행 중 C 로 바꾸는
       것은 그대로 되므로, 운전석에서 보고 싶으면 그때 돌리면 된다.
     */
-    startView: aiDriving ? 'chase' : saveData.settings.startView,
+    startView: startViewOfRun,
     autoDrive: aiDriving,
     graphics: saveData.settings.graphics,
     // 난이도가 오르면 더 빨리 다가가고 브레이크가 무르며, 정지선에 더 붙여 서야 한다 (challenge.ts)
