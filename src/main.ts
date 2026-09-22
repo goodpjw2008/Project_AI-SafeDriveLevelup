@@ -10,7 +10,7 @@ import type { ViewMode } from './game/CameraRig';
 import { setPedestrianAlerts } from './game/Pedestrian';
 import { setStopBands } from './game/StopMarkers';
 import { setClusterStopCue } from './game/ClusterPanel';
-import { challengeRule } from './scenarios/challenge';
+import { AUTO_DRIVE_RULE, challengeRule } from './scenarios/challenge';
 import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
 import { loadCarModel } from './game/carModel';
@@ -1195,7 +1195,8 @@ async function startRun(id: number): Promise<void> {
     **난이도가 주행을 바꾼다** (challenge.ts) — 도움의 양(hints), 다가가는 속도와 제동(pace), 정지 구역(stopZone).
     시범 주행은 보여 주는 판이라 쉬움으로 달린다 — 도움이 다 켜져 있고, AI 운전이 맞춰 둔 속도와 제동이다.
   */
-  const challenge = challengeRule(aiDriving ? 1 : saveData.settings.difficulty);
+  // 자율 주행은 난이도 설정과 상관없이 가장 친절한 시범 값으로 몬다 (challenge.ts 의 AUTO_DRIVE_RULE)
+  const challenge = aiDriving ? AUTO_DRIVE_RULE : challengeRule(saveData.settings.difficulty);
   const hints = challenge.hints;
   hud.setHints(hints);
   setPedestrianAlerts(hints !== 'none');

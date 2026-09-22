@@ -15,7 +15,7 @@
  * 무위반 한 판이면 한 레벨이 올라 열 판 남짓이면 마스터였다(진급 — 지금은 경험치 곡선이다). 그래서 넷을 함께 조인다.
  *
  * **판정 규칙은 난이도와 상관없이 같다** — 무엇이 위반인지는 법이 정한다. 난이도는 판단할 시간과 도움의 양,
- * 그리고 증명해야 할 판 수만 바꾼다. 가장 느슨한 값(1)이 예전 동작 그대로다.
+ * 그리고 증명해야 할 판 수만 바꾼다. 가장 느슨한 값(예전 쉬움)은 자율 주행이 쓴다 (AUTO_DRIVE_RULE).
  *
  * 값은 설정 화면에서 고르고 저장본(settings.difficulty)에 남는다. 기본은 3.
  */
@@ -94,40 +94,41 @@ export interface ChallengeRule {
   missPenalty: number;
 }
 
+/*
+  ## 난이도를 한 칸씩 올렸다 (2026-09-22)
+
+  사용자가 보통(3)으로 달려 보고 말했다 — "너무 쉬워. 현재 3. 보통을 쉬움으로 하고 난이도를 다시 기획해서 전체적으로
+  올려 줘." 그래서 **예전 보통이 지금의 쉬움(1)** 이고, 그 위를 한 칸씩 조였다. 예전 쉬움 · 조금 쉬움(도움 전부, 가장 느린
+  차)은 목록에서 빠지고 **자율 주행만** 그 값을 쓴다 (아래 AUTO_DRIVE_RULE).
+
+  | | 1 쉬움 | 2 조금 쉬움 | 3 보통 | 4 조금 어려움 | 5 어려움 |
+  |---|---|---|---|---|---|
+  | 코스 복잡함 (상한) | 0.45 (12) | 0.6 (14) | 0.75 (16) | 1.2 (20) | 1.5 (24) |
+  | 위 레벨 섞기 | 0 | 0 | 1 | 2 | 3 |
+  | 도움 | 할 일만 | 할 일만 | 할 일만 | 없음 | 없음 |
+  | 서행 · 접근 · 제동 | 14 · 28 · 4.2 | 14.5 · 29 · 4.0 | 15 · 30 · 3.8 | 15.5 · 31 · 3.6 | 16 · 32 · 3.4 |
+  | 정지 구역 | 12m | 10m | 9m | 8.5m | 8m |
+  | 경험치 배율 · 위반 감점 | ×1 · −20 | ×1 · −30 | ×1 · −40 | ×1.25 · −60 | ×1.5 · −80 |
+
+  **도움은 보통까지 남긴다.** 말풍선 · 보행자 느낌표 · 정지 구역 띠는 이 작품이 보여 주는 AI 기능이고(포트폴리오 ⑤⑥),
+  사용자가 바로 전에 "신호 없는 횡단보도에도 일시정지 부분이 녹색으로 표시되게" 해 달라고 했다 — 기본 난이도에서 그것이
+  사라지면 안 된다. 보통은 코스 · 속도 · 정지 구역 · 감점으로 어려워진다.
+
+  **경험치 곡선은 쉬움 ~ 보통이 같다(×1).** 레벨마다 몇 판인지(2 · 2 · 3 … 4판)는 사용자가 보통에서 정한 값이라
+  (curriculum.ts 의 XP_TO_NEXT) 보통을 올렸다고 판 수가 늘면 그 약속이 깨진다. 어려움 쪽만 더 든다.
+
+  **4 · 5 는 복잡함을 1 넘게 친다.** 같은 레벨의 판에는 +3 을 얹으므로(recommend.ts 의 scoreOf) 1 이하로는 위 레벨의 더
+  복잡한 판이 그 +3 을 넘지 못해, "두 · 세 레벨 위까지 섞는다" 가 말뿐이었다 — L7 에서 보통 · 조금 어려움 · 어려움이
+  모두 같은 판(조건 점수 16)을 골랐다. 1.2 · 1.5 면 위 레벨의 복잡한 판이 실제로 뽑힌다.
+
+  **5 는 예전 어려움의 속도에 멈춘다** — 더 빠르게 했더니 1초 늦은 운전자가 설 수 없는 판이 늘었다(아래 5 의 주석).
+  위를 조이는 대신 사이를 채웠다: 4 는 보통과 어려움의 가운데 속도다. 5 는 코스(세 레벨 위 · 가장 복잡)와 경험치로 더한다.
+*/
 export const CHALLENGES: readonly ChallengeRule[] = [
   {
     id: 1,
     name: '쉬움',
-    desc: '중간 정도로 복잡한 코스 · 도움 전부 · 경험치 절반만 모으면 레벨업',
-    complexity: 0,
-    cap: 20,
-    target: 5,
-    skipEmpty: true,
-    reach: 0,
-    hints: 'full',
-    pace: { slowKmh: 12, approachKmh: 25, brakeDecel: 4.8 },
-    stopZone: 12,
-    xpScale: 0.5,
-    missPenalty: 0,
-  },
-  {
-    id: 2,
-    name: '조금 쉬움',
-    desc: '판단할 것이 많은 코스 · 조금 빠르게 · 경험치 ×0.75',
-    complexity: 0.25,
-    cap: 8,
-    skipEmpty: true,
-    reach: 0,
-    hints: 'full',
-    pace: { slowKmh: 13, approachKmh: 26, brakeDecel: 4.5 },
-    stopZone: 12,
-    xpScale: 0.75,
-    missPenalty: 0,
-  },
-  {
-    id: 3,
-    name: '보통',
-    desc: '조건이 겹친 코스 · AI 우회전은 할 일만 · 위반하면 경험치 −20',
+    desc: '조건이 겹친 코스 · AI 우회전은 할 일만 · 정지선 12m 안 · 위반하면 경험치 −20',
     complexity: 0.45,
     cap: 12,
     skipEmpty: true,
@@ -139,28 +140,62 @@ export const CHALLENGES: readonly ChallengeRule[] = [
     missPenalty: 20,
   },
   {
-    id: 4,
-    name: '조금 어려움',
-    desc: '복잡한 코스 + 한 레벨 위 · 도움 없음 · 정지선 9m 안 · 경험치 ×1.25 · 위반 −40',
-    complexity: 0.7,
-    cap: 20,
+    id: 2,
+    name: '조금 쉬움',
+    desc: '더 복잡한 코스 · 조금 빠르게 · 정지선 10m 안 · 위반 −30',
+    complexity: 0.6,
+    cap: 14,
+    skipEmpty: true,
+    reach: 0,
+    hints: 'less',
+    pace: { slowKmh: 14.5, approachKmh: 29, brakeDecel: 4.0 },
+    stopZone: 10,
+    xpScale: 1,
+    missPenalty: 30,
+  },
+  {
+    id: 3,
+    name: '보통',
+    desc: '복잡한 코스 + 한 레벨 위 · 빠르게 · 정지선 9m 안 · 위반 −40',
+    complexity: 0.75,
+    cap: 16,
     skipEmpty: true,
     reach: 1,
-    hints: 'none',
+    hints: 'less',
     pace: { slowKmh: 15, approachKmh: 30, brakeDecel: 3.8 },
     stopZone: 9,
-    xpScale: 1.25,
+    xpScale: 1,
     missPenalty: 40,
   },
   {
-    id: 5,
-    name: '어려움',
-    desc: '가장 복잡한 코스 + 두 레벨 위 · 도움 없음 · 정지선 8m 안 · 경험치 ×1.5 · 위반 −60',
-    complexity: 0.9,
+    id: 4,
+    name: '조금 어려움',
+    desc: '더 복잡한 코스 + 두 레벨 위 · 도움 없음 · 정지선 8.5m 안 · 경험치 ×1.25 · 위반 −60',
+    complexity: 1.2,
     cap: 20,
     skipEmpty: true,
     reach: 2,
     hints: 'none',
+    pace: { slowKmh: 15.5, approachKmh: 31, brakeDecel: 3.6 },
+    stopZone: 8.5,
+    xpScale: 1.25,
+    missPenalty: 60,
+  },
+  {
+    id: 5,
+    name: '어려움',
+    desc: '가장 복잡한 코스 + 세 레벨 위 · 도움 없음 · 가장 빠르게 · 정지선 8m 안 · 경험치 ×1.5 · 위반 −80',
+    complexity: 1.5,
+    cap: 24,
+    skipEmpty: true,
+    reach: 3,
+    hints: 'none',
+    /*
+      **예전 어려움과 같은 속도다 — 더 올리지 않는다.** 16.5 · 33 · 3.3 으로 올려 전 판을 1초 늦은 운전자로 달려 보니
+      설 수 없는 판이 360 → 522 로 늘었다 (시나리오 플레이테스트). 늘어난 162 판은 모두 **앞차가 지나간 바로 뒤에
+      무단횡단자가 나서는** 장면이라, 빨라진 만큼 어려워진 것이 아니라 불가능해졌다. 그래서 속도는 예전 5 에 두고,
+      어려움은 코스(세 레벨 위 · 가장 복잡)와 경험치로 더한다.
+    */
     pace: { slowKmh: 16, approachKmh: 32, brakeDecel: 3.4 },
     /*
       **8m 가 바닥이다.** 16km/h 에서 반응 1초(4.4m) + 제동(2.9m) 이 7.3m 라, 7m 로 두면 보고 눌러서는
@@ -168,9 +203,32 @@ export const CHALLENGES: readonly ChallengeRule[] = [
     */
     stopZone: 8,
     xpScale: 1.5,
-    missPenalty: 60,
+    missPenalty: 80,
   },
 ];
+
+/**
+ * **자율 주행의 규칙** — 예전 쉬움(1) 그대로다: 도움 전부 · 가장 느린 차 · 정지 구역 12m · 기록을 남기지 않는다.
+ *
+ * 자율 주행은 AI 가 규정대로 모는 **시범**이라 난이도 설정과 상관없이 가장 친절하게 보여 준다 — 말풍선이 거리와
+ * 보행자까지 알려 주고, 차가 천천히 다가가 무엇을 보고 서는지 따라 읽을 수 있다. 난이도를 한 칸씩 올리며
+ * (위 표) 이 값이 목록에서 빠졌으므로 따로 둔다.
+ */
+export const AUTO_DRIVE_RULE: ChallengeRule = {
+  id: 1,
+  name: '자율 주행',
+  desc: 'AI 가 규정대로 모는 시범',
+  complexity: 0,
+  cap: 20,
+  target: 5,
+  skipEmpty: true,
+  reach: 0,
+  hints: 'full',
+  pace: { slowKmh: 12, approachKmh: 25, brakeDecel: 4.8 },
+  stopZone: 12,
+  xpScale: 0.5,
+  missPenalty: 0,
+};
 
 export const challengeRule = (c: number | undefined): ChallengeRule =>
   CHALLENGES.find((r) => r.id === c) ?? CHALLENGES[DEFAULT_CHALLENGE - 1];

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { challengeRule } from '../src/scenarios/challenge';
+import { AUTO_DRIVE_RULE, challengeRule } from '../src/scenarios/challenge';
 import { libraryNumber, scenarioLibrary } from '../src/scenarios/library';
 import { playScenario } from '../src/scenarios/playSim';
 import { describeIssues, validateScenario } from '../src/scenarios/validate';
@@ -46,7 +46,8 @@ export function validateShard(shard: number): void {
     it(
       '실제 차로 달려 보면 — 규정대로 통과하고, 사람도 설 수 있고, 보행자는 역할이 있다',
       () => {
-        const easy = challengeRule(1);
+        // 규정대로 모는 사람 = 게임의 자율 주행 — 그 값으로 몬다 (challenge.ts 의 AUTO_DRIVE_RULE)
+        const easy = AUTO_DRIVE_RULE;
         const normal = challengeRule(3);
         const bad: string[] = [];
         scenarioLibrary().forEach((e, i) => {

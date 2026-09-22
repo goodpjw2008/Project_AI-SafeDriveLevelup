@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CHALLENGES, challengeRule } from '../src/scenarios/challenge';
+import { AUTO_DRIVE_RULE, CHALLENGES, challengeRule } from '../src/scenarios/challenge';
 import { advance, freshCurriculum, MAX_LEVEL, type CurriculumState } from '../src/scenarios/curriculum';
 import { DEFAULT_PACE, Vehicle, zoneTargetKmh } from '../src/game/Vehicle';
 import { SLOW_DOWN_LIMIT_KMH, STOP_ZONE_DEPTH, type JudgeResult } from '../src/rules/lawRules';
@@ -27,8 +27,10 @@ describe('다섯 단계가 모든 축에서 한 방향으로 어려워진다', (
   it('도움 — 전부 → 할 일만 → 없음 순으로 줄어든다', () => {
     const order = { full: 0, less: 1, none: 2 } as const;
     expect(nonDecreasing(CHALLENGES.map((c) => order[c.hints]))).toBe(true);
-    expect(challengeRule(1).hints).toBe('full');
+    expect(challengeRule(1).hints).toBe('less');
     expect(challengeRule(5).hints).toBe('none');
+    // 보통까지는 말풍선 · 느낌표 · 정지 구역 띠를 남긴다 — 이 작품이 보여 주는 AI 기능이다
+    expect(challengeRule(3).hints).toBe('less');
   });
 
   it('주행 — 더 빨리 다가가고, 브레이크가 무르고, 정지선에 더 붙여 서야 한다', () => {
@@ -48,11 +50,22 @@ describe('다섯 단계가 모든 축에서 한 방향으로 어려워진다', (
     expect(challengeRule(3).xpScale, '보통이 경험치 곡선의 기준이다').toBe(1);
   });
 
-  it('1(쉬움)은 예전 주행 그대로다 — 속도 · 제동 · 정지 구역 · 틀려도 경험치를 잃지 않음', () => {
+  /*
+    **한 칸씩 올렸다** — 사용자: "현재 3. 보통을 쉬움으로 하고 난이도를 다시 기획해서 전체적으로 올려 줘."
+    예전 보통(서행 14 · 접근 28 · 제동 4.2 · 정지 구역 12m · 위반 −20)이 지금의 쉬움이다.
+  */
+  it('1(쉬움)은 예전의 보통 그대로다', () => {
     const easy = challengeRule(1);
-    expect(easy.pace).toEqual(DEFAULT_PACE);
-    expect(easy.stopZone).toBe(STOP_ZONE_DEPTH);
-    expect(easy.missPenalty).toBe(0);
+    expect(easy.pace).toEqual({ slowKmh: 14, approachKmh: 28, brakeDecel: 4.2 });
+    expect(easy.stopZone).toBe(12);
+    expect(easy.hints).toBe('less');
+    expect(easy.missPenalty).toBe(20);
+  });
+
+  it('자율 주행은 예전 쉬움 그대로다 — 도움 전부 · 가장 느린 차 · 정지 구역 12m', () => {
+    expect(AUTO_DRIVE_RULE.pace).toEqual(DEFAULT_PACE);
+    expect(AUTO_DRIVE_RULE.stopZone).toBe(STOP_ZONE_DEPTH);
+    expect(AUTO_DRIVE_RULE.hints).toBe('full');
   });
 });
 
@@ -83,7 +96,7 @@ describe('어느 난이도든 법을 지키는 주행이다', () => {
 describe('주행 — 차가 난이도대로 달린다', () => {
   it('어려울수록 정지선 앞에서 더 빨리 다가간다', () => {
     const at = (c: 1 | 5) => zoneTargetKmh(PLAYER_APPROACH_X, STOP_LINE + 10, false, false, challengeRule(c).pace);
-    expect(at(1)).toBe(12);
+    expect(at(1)).toBe(14);
     expect(at(5)).toBeGreaterThan(at(1));
   });
 
@@ -136,15 +149,15 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
     return n;
   };
 
-  it('어려울수록 한 레벨에 더 오래 머문다', () => {
-    expect(runsToLevelUp(6, 1)).toBeLessThan(runsToLevelUp(6, 3));
+  it('어려울수록 한 레벨에 더 오래 머문다 — 쉬움 ~ 보통은 사용자가 정한 판 수 그대로', () => {
+    expect(runsToLevelUp(6, 1)).toBe(runsToLevelUp(6, 3));
     expect(runsToLevelUp(6, 3)).toBeLessThan(runsToLevelUp(6, 5));
   });
 
-  it('어려움(5)은 위반한 판에서 60 을 잃고, 쉬움(1)은 잃지 않는다', () => {
+  it('어려움(5)은 위반한 판에서 80 을, 쉬움(1)은 20 을 잃는다', () => {
     const s = { ...at(6), xp: 100 };
-    expect(advance(s, miss, undefined, challengeRule(5)).next.xp).toBe(40);
-    expect(advance(s, miss, undefined, challengeRule(1)).next.xp).toBe(100);
+    expect(advance(s, miss, undefined, challengeRule(5)).next.xp).toBe(20);
+    expect(advance(s, miss, undefined, challengeRule(1)).next.xp).toBe(80);
   });
 
   it('경험치가 차도 레벨을 올리기 전에는 그 레벨의 차가 열리지 않는다', () => {
@@ -163,8 +176,8 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
       }
       return n;
     };
-    // 보통이 네 판(curriculum.ts 의 XP_TO_NEXT) — 쉬움은 절반, 어려움은 한 배 반
-    expect(until(1)).toBe(2);
+    // 보통 · 쉬움이 네 판(curriculum.ts 의 XP_TO_NEXT) — 어려움은 한 배 반
+    expect(until(1)).toBe(4);
     expect(until(5)).toBe(6);
   });
 });

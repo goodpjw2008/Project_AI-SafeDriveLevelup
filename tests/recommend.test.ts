@@ -160,7 +160,8 @@ describe('후보 추리기', () => {
       const cands = candidatesFor(p, []);
       expect(cands.length).toBeGreaterThan(0);
       for (const e of cands) {
-        expect(e.level).toBeLessThanOrEqual(p.level);
+        // 난이도가 허용한 만큼만 위 레벨 개념을 섞는다 (보통은 한 레벨 — challenge.ts 의 reach)
+        expect(e.level).toBeLessThanOrEqual(p.level + challengeRule(p.challenge).reach);
         expect(e.tags.zone === 'yes' || e.tags.approach !== 'none').toBe(p.schoolZone);
         expect(e.tags.lead).toBe(p.lead ?? 'none');
       }
@@ -371,18 +372,17 @@ describe('난이도 설정', () => {
     expect(normal).toBeLessThan(hard);
   });
 
-  it('4 는 한 레벨, 5 는 두 레벨 위의 개념까지 후보에 넣는다', () => {
+  it('보통은 한 레벨, 4 는 두 레벨, 5 는 세 레벨 위의 개념까지 후보에 넣는다', () => {
     const lv = (challenge: 1 | 3 | 4 | 5) =>
       Math.max(...candidatesFor(plan({ level: 4, target: null, badHabits: [], challenge }), []).map((e) => e.level));
     expect(lv(1)).toBe(4);
-    expect(lv(3)).toBe(4);
-    expect(lv(4)).toBe(5);
-    expect(lv(5)).toBe(6);
+    expect(lv(3)).toBe(5);
+    expect(lv(4)).toBe(6);
+    expect(lv(5)).toBe(7);
   });
 
-  it('3 부터 주행 중 도움을 걷는다', () => {
-    expect([1, 2].map((c) => challengeRule(c).hints)).toEqual(['full', 'full']);
-    expect(challengeRule(3).hints).toBe('less');
+  it('4 부터 주행 중 도움을 걷는다 — 보통까지는 할 일 한마디 · 느낌표 · 정지 구역 띠를 남긴다', () => {
+    expect([1, 2, 3].map((c) => challengeRule(c).hints)).toEqual(['less', 'less', 'less']);
     expect(challengeRule(4).hints).toBe('none');
     expect(challengeRule(5).hints).toBe('none');
   });
@@ -560,7 +560,11 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
       expect(r, shown).toBeGreaterThanOrEqual(0.5);
       expect(r, shown).toBeLessThanOrEqual(0.8);
     }
-    expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.2);
+    /*
+      표본이 레벨마다 160판이라 ±7%p 쯤 흔들린다. 보통을 한 칸 올린 뒤(한 레벨 위까지 섞음) 레벨마다 1,000판으로 재면
+      L2 ~ L10 이 58 ~ 71% 로 고르다 — 이 표본에서 벌어지는 폭은 그보다 크게 나올 수 있어 여유를 둔다.
+    */
+    expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.25);
   });
 
   /*
