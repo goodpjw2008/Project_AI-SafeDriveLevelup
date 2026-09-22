@@ -12,71 +12,9 @@
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.\
 https://safeturn.vercel.app
 
-포트폴리오를 슬라이드로 한 장씩 넘겨 보기 → [AI_safeturn_portfolio.html](https://safeturn.vercel.app/AI_safeturn_portfolio.html)
+<a href="https://safeturn.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 우회전 참교육 포트폴리오 — 장표 22장이 저절로 넘어갑니다. 누르면 한 장씩 넘겨 보는 페이지가 열립니다" width="880"></a>
 
----
-
-## 1. 개요
-
-### ① AI 우회전 참교육의 필요성
-
-![법 개정 뒤에도 줄지 않은 우회전 사고](docs/slides/05-accidents.png)
-
-![보도로 본 우회전 사고와 헷갈리는 규칙](docs/slides/06-news.png)
-
-![어린이보호구역 신호 없는 횡단보도의 일시정지](docs/slides/07-school-zone.png)
-
-### ② 우회전 · 어린이보호구역에 AI가 필요한 이유
-
-![이론 · 영상 교육의 한계](docs/slides/08-ai-vs-lecture.png)
-
-![습관이 고쳐질 때까지 이끄는 AI](docs/slides/09-ai-loop.png)
-
----
-
-## 2. AI 우회전 참교육 내용
-
-### ① 주요 기능 8가지
-
-![① PC와 모바일 모두 지원](docs/slides/11-pc-mobile.png)
-
-![② 안전운전 연습과 AI 분석 시작](docs/slides/12-start.png)
-
-![③ 운전 습관 분석과 코스 범위](docs/slides/13-habit-analysis.png)
-
-![④ 운전자에게 맞는 맵 추천](docs/slides/14-ai-recommend.png)
-
-![⑤ 말풍선으로 주는 안전 안내](docs/slides/15-guide-bubble.png)
-
-![⑥ 보행자 느낌표와 바닥 색 표시](docs/slides/16-pedestrian-mark.png)
-
-![⑦ AI 결과 분석 - 규정을 지킨 PERFECT 결과 화면](docs/slides/17-result-perfect.png)
-
-![⑧ AI 결과 분석 - 규정을 어긴 VIOLATION 결과 화면](docs/slides/18-result-violation.png)
-
-### ② 우회전 방법 · 어린이보호구역 운전 방법
-
-![우회전 방법](docs/slides/19-right-turn.png)
-
-![어린이보호구역 운전 방법](docs/slides/20-school-zone-guide.png)
-
----
-
-## 3. AI 우회전 참교육 활용
-
-### ① 온라인 - 전국민 생활형 안전운전 연습
-
-![온라인 - 전국민 생활형 안전운전 연습](docs/slides/22-online.png)
-
-### ② 오프라인 - 실습하며 배우는 안전운전 교육
-
-![오프라인 - 실습하며 배우는 안전운전 교육](docs/slides/23-offline.png)
-
----
-
-## 4. 기대효과
-
-![기대효과](docs/slides/24-effect.png)
+장표가 저절로 넘어갑니다. **그림을 누르면** 방향키나 손가락으로 한 장씩 넘겨 볼 수 있습니다.
 
 ---
 
