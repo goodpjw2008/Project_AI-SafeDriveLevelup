@@ -2578,6 +2578,21 @@
         align-items: center;
       }
       /*
+        **휴대폰에서는 가운데로 한 줄씩** (사용자 요청). 좁은 화면에서는 세 버튼이 저마다 다른 폭으로 한 줄씩 떨어져
+        왼쪽에 붙어 들쭉날쭉했다. 가운데 한 줄로 세우고, 폭은 **가장 긴 버튼에 맞춰 셋을 같게** 한다 — 화면보다
+        넓어지지는 않는다(`fit-content(100%)`). PC 에서는 한 줄에 셋이 나란히 서므로 그대로 둔다.
+      */
+      @media (max-width: 640px) {
+        .ai-course-actions {
+          display: grid;
+          grid-template-columns: fit-content(100%);
+          justify-content: center;
+        }
+        .ai-course-actions button {
+          justify-content: center;
+        }
+      }
+      /*
         **이 두 버튼만 키가 두 배다** (42px → 84px).
 
         이 상자에서 실제로 눌러야 하는 것은 둘뿐이다 — 훈련을 잇거나, 새 운전자로
