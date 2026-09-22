@@ -17,6 +17,7 @@ import {
   PLAYER_EXIT_Z,
   ROAD_HALF_WIDTH,
   STOP_LINE,
+  STOP_LINE_S,
 } from '../layout';
 
 /** 정지선 폭 (m). 도로교통법 시행규칙 [별표 6] 정지선은 30~60cm — 상한을 쓴다. */
@@ -45,10 +46,16 @@ export function setStopBands(on: boolean): void {
 
 const AMBER = 0xffb020;
 const GREEN = 0x2ee06a;
+/** S 띠(덮어 칠함)의 불투명도 배율 — 초록이 0.26 → 0.55 */
+const ZONE_BOOST = 2.1;
 
 /**
- * 지금 겨누는 정지 지점. `zone` 은 진입부 어린이보호구역 횡단보도(S)의 정지선이다 —
- * 그 자리에는 노면에 따로 그린 정지선이 있어 여기서 띠를 얹지 않는다 (HUD 글자만 안내한다).
+ * 지금 겨누는 정지 지점. `zone` 은 진입부 어린이보호구역 횡단보도(S)의 정지선이다.
+ *
+ * 한때 `zone` 에는 띠를 얹지 않았다 — 노면에 정지선이 따로 그려져 있어 HUD 글자로만 안내했다. 그랬더니 사용자가
+ * 짚었다: "신호없는 횡단보도에 일시정지 부분이 녹색으로 표시가 되지 않아. 사거리에서처럼 일시정지 부분에 표시가 되게
+ * 해 줘." 이 게임의 핵심(제27조 제7항 — 사람이 없어도 선다)이 일어나는 자리인데, 사거리에서는 보이던 "여기서 서라 ·
+ * 섰다" 가 정작 그 자리에서만 없었다. 지금은 교차로 정지선과 **같은 띠**를 S 정지선 앞에 깐다.
  */
 export type StopTarget = 'line' | 'crosswalk' | 'zone';
 
@@ -66,8 +73,10 @@ export class StopMarkers {
   private lineMat: THREE.MeshBasicMaterial;
   private bandMatA: THREE.MeshBasicMaterial;
   private bandMatC: THREE.MeshBasicMaterial;
+  private bandMatS: THREE.MeshBasicMaterial;
   private bandA: THREE.Mesh;
   private bandC: THREE.Mesh;
+  private bandS: THREE.Mesh;
   private disposables: Array<{ dispose(): void }> = [];
   private pulse = 0;
 
@@ -132,34 +141,61 @@ export class StopMarkers {
       PLAYER_EXIT_Z + 0.4,
     );
     this.group.add(this.bandC);
+
+    /*
+      진입부 어린이보호구역 횡단보도(S) — 교차로 정지선(A)과 **같은 모양 · 같은 간격**이다. 같은 자리 잡기라야 "보호구역
+      정지선도 교차로 정지선처럼 선다" 가 그림으로 읽힌다. 보호구역이 없는 판에서는 늘 꺼져 있다 (target 이 'zone' 이 아니다).
+    */
+    /*
+      **S 띠는 더하지 않고 덮어 칠한다** (NormalBlending). 보호구역은 붉은 노면이라, 교차로처럼 빛을 더하면 초록 + 빨강이
+      **탁한 황토색**이 되어 "섰다(초록)" 가 읽히지 않았다 (실제 화면으로 확인했다). 덮어 칠하면 붉은 노면 위에서도 초록이
+      초록으로 보인다. 그만큼 진하게 칠해야 해서 불투명도를 높인다 (update 의 ZONE_BOOST).
+    */
+    this.bandMatS = track(
+      new THREE.MeshBasicMaterial({
+        color: AMBER,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+        toneMapped: false,
+      }),
+    );
+    this.bandS = new THREE.Mesh(bandGeoA, this.bandMatS);
+    this.bandS.rotation.x = -Math.PI / 2;
+    this.bandS.position.set(
+      LANE_SPAN / 2 + 0.25,
+      0.012,
+      STOP_LINE_S + LINE_WIDTH + BAND_GAP + BAND_DEPTH / 2,
+    );
+    this.group.add(this.bandS);
   }
 
   update(state: StopMarkerState, dt: number): void {
     this.pulse = (this.pulse + dt) % 1.0;
 
-    if (state.target === 'zone' || !bandsEnabled) {
-      this.bandMatA.opacity = 0;
-      this.bandMatC.opacity = 0;
-      return;
-    }
+    const mats = { line: this.bandMatA, crosswalk: this.bandMatC, zone: this.bandMatS } as const;
+    // 겨누는 자리의 띠 하나만 켠다 — 나머지는 끈다
+    for (const m of Object.values(mats)) m.opacity = 0;
+    if (!bandsEnabled) return;
     const active = state.required || state.satisfied;
-    const mat = state.target === 'line' ? this.bandMatA : this.bandMatC;
-    const other = state.target === 'line' ? this.bandMatC : this.bandMatA;
-    other.opacity = 0;
+    const mat = mats[state.target];
 
     if (!active) {
       mat.opacity = 0;
       return;
     }
 
+    // 덮어 칠하는 S 띠는 더하는 띠보다 진해야 같은 세기로 보인다 (위 bandMatS)
+    const boost = state.target === 'zone' ? ZONE_BOOST : 1;
     if (state.satisfied) {
       mat.color.setHex(GREEN);
-      mat.opacity = 0.26;
+      mat.opacity = 0.26 * boost;
     } else {
       // 점멸시켜 "여기서 멈춰라"를 놓치지 않게 한다
       const wave = 0.5 + 0.5 * Math.sin(this.pulse * Math.PI * 2);
       mat.color.setHex(AMBER);
-      mat.opacity = 0.18 + wave * 0.24;
+      mat.opacity = (0.18 + wave * 0.24) * boost;
     }
   }
 
