@@ -372,6 +372,26 @@ function noSignalZoneLevel(): Difficulty {
   return noSignalLevel;
 }
 
+/**
+ * **신호기 없는 보호구역을 이만큼 연달아 못 만났으면 이번 판은 반드시 그 판이다.**
+ *
+ * 사용자가 "10판 넘게 했는데 어린이보호구역 신호없는 횡단보도가 한번도 나오지 않았어" 라고 짚었다. 보호구역 차례는
+ * 네 판에 한 판(확률)이라 여러 판 동안 안 나올 수 있는데, 더 큰 까닭은 **고칠 습관**이었다 — 습관이 남아 있으면 그
+ * 습관을 시험하는 판만 후보에 오르고 레벨도 오르지 않는다. L1 의 무신호 판 셋은 모두 정면 녹색이라 "정면 적색에서
+ * 안 섬" 같은 습관이 있는 사람에게는 **한 번도** 나오지 않았다(모의 주행 12판 × 40명, 0%). 이 게임의 핵심이
+ * 제27조 제7항 — 신호기 없는 보호구역 횡단보도는 사람이 없어도 선다 — 이라, 확률에만 맡기지 않고 바닥을 둔다.
+ */
+export const NO_SIGNAL_ZONE_GAP = 3;
+
+/** 실제로 탄 판 번호들 → 이번 판이 무신호 보호구역 차례인가 (최근 `NO_SIGNAL_ZONE_GAP` 판에 하나도 없었는가) */
+export function noSignalZoneDue(playedIds: readonly number[]): boolean {
+  if (playedIds.length < NO_SIGNAL_ZONE_GAP) return false;
+  return !playedIds.slice(-NO_SIGNAL_ZONE_GAP).some((id) => {
+    const e = libraryEntry(id);
+    return !!e && isNoSignalZone(e.tags);
+  });
+}
+
 // ── 1. 후보 추리기 ────────────────────────────────────────────────────────────
 
 /**
@@ -443,6 +463,26 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
   const target = plan.target as ViolationCode | null;
   const tests = (e: LibraryEntry) =>
     !target || ALWAYS_TESTED.includes(target) || e.targets.includes(target);
+
+  /*
+    **무신호 보호구역 차례면 그 판만 고른다** (위 `noSignalZoneDue`). 습관을 함께 시험하는 판이 먼저이고, 이 레벨에
+    없으면 무신호 보호구역이 열리는 레벨(L2)까지 올라가 찾는다 — L1 의 무신호 판은 모두 정면 녹색이라, 정면 적색
+    습관이 있는 L1 학습자에게는 L2 의 적색 무신호 판(습관과 보호구역을 한 판에서 함께 시험)이 맞다. 그래도 습관을
+    시험하는 무신호 판이 없으면 습관과 무관한 무신호 판이라도 준다 — 몇 판에 한 번뿐이고, 사용자가 이 판을 원했다.
+  */
+  if (plan.noSignalZoneDue) {
+    const upTo = Math.max(plan.level + reach, noSignalZoneLevel());
+    const core = (e: LibraryEntry) => isNoSignalZone(e.tags) && e.level <= upTo;
+    for (const ok of [
+      (e: LibraryEntry) => core(e) && tests(e) && fresh(e),
+      (e: LibraryEntry) => core(e) && tests(e),
+      (e: LibraryEntry) => core(e) && fresh(e),
+      core,
+    ]) {
+      const out = lib.filter(ok);
+      if (out.length) return out;
+    }
+  }
 
   const tiers: ((e: LibraryEntry) => boolean)[] = [
     (e) => fits(e) && tests(e) && zoneOk(e) && zoneSigOk(e) && leadOk(e) && fresh(e),

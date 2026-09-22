@@ -44,7 +44,14 @@ import {
   scenarioLibrary,
 } from './scenarios/library';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
-import { masterPick, priorityHabits, recommendScenario, type Picker, type RecentRun } from './scenarios/recommend';
+import {
+  masterPick,
+  noSignalZoneDue,
+  priorityHabits,
+  recommendScenario,
+  type Picker,
+  type RecentRun,
+} from './scenarios/recommend';
 import { advance, currentTarget, levelLabel, MAX_LEVEL, recordHabits, xpToNext } from './scenarios/curriculum';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
@@ -183,6 +190,11 @@ async function makeAiScenario(): Promise<void> {
   */
   renderMenu();
   const zoneTurn = rollSchoolZoneTurn();
+  /*
+    **신호기 없는 보호구역이 몇 판째 없었으면 이번 판은 반드시 그 판이다** (recommend.ts 의 `noSignalZoneDue`).
+    사용자가 "10판 넘게 했는데 한번도 나오지 않았어" 라고 짚었다 — 차례 확률과 고칠 습관 때문에 연달아 빠질 수 있었다.
+  */
+  const noSignalDue = noSignalZoneDue(saveData.history.map((r) => r.st));
   const plan = {
     level: c.level,
     target: currentTarget(c),
@@ -193,7 +205,7 @@ async function makeAiScenario(): Promise<void> {
       AI 에게 고르기를 맡기기 **전에** 굴린다 — 비율은 여러 판에 걸쳐 나타나는 성질이라
       판 하나를 고르는 모델이 맞출 수 있는 것이 아니다.
     */
-    schoolZone: zoneTurn,
+    schoolZone: zoneTurn || noSignalDue,
     /*
       **보호구역이 나올 차례면 신호기 유무도 여기서 굴린다** (scenarios.ts 의 `ZONE_NO_SIGNAL_CHANCE`).
 
@@ -203,7 +215,8 @@ async function makeAiScenario(): Promise<void> {
       **차례가 아닐 때도 굴린다.** 새 개념을 여는 레벨과 종합 레벨에서는 보호구역 차례가 아니어도
       보호구역 판이 섞여 들어오기 때문이다 (recommend.ts 의 `zoneOk` 예외).
     */
-    zoneNoSignal: rollZoneNoSignalTurn(),
+    zoneNoSignal: noSignalDue || rollZoneNoSignalTurn(),
+    noSignalZoneDue: noSignalDue,
     /* **앞차 차례도 여기서 굴린다** (scenarios.ts 의 `rollLeadTurn`) — 보호구역과 같은 이유다 */
     lead: rollLeadTurn(),
     /* 설정의 난이도 1~5 — 같은 레벨 안에서 얼마나 복잡한 코스를 고를지 (scenarios/challenge.ts) */

@@ -476,6 +476,12 @@ export interface Plan {
    * 보호구역 차례가 아니거나 그 개념이 아직 안 열린 레벨이면 `undefined` — 그때는 걸지 않는다.
    */
   zoneNoSignal?: boolean;
+  /**
+   * **이번 판은 반드시 신호기 없는 보호구역 판이다** — 최근 몇 판 동안 한 번도 없었을 때 (recommend.ts 의 `noSignalZoneDue`).
+   * 보호구역 차례(`schoolZone`)는 확률이라 여러 판 동안 안 나올 수 있고, 고칠 습관이 있으면 그 습관을 시험하지 못하는
+   * 무신호 판은 후보에서 아예 빠졌다.
+   */
+  noSignalZoneDue?: boolean;
   /** 난이도 설정 1~5 (challenge.ts) — 같은 레벨 안에서 얼마나 어려운 코스를 고르는가. 없으면 3 */
   challenge?: 1 | 2 | 3 | 4 | 5;
   /** 지금 레벨에서 모은 경험치와 다음 레벨까지 필요한 양 (curriculum.ts) — AI 가 "얼마 남았는지" 를 말할 때 쓴다 */

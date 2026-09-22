@@ -28,13 +28,15 @@ import {
   priorityHabits,
   recommendPayload,
   masterPick,
+  noSignalZoneDue,
+  NO_SIGNAL_ZONE_GAP,
   PICKER_LABEL,
   recommendScenario,
   rulePick,
   seenShapes,
   shortlist,
 } from '../src/scenarios/recommend';
-import { scenarioLibrary, zoneKindOf, type LibraryEntry } from '../src/scenarios/library';
+import { isNoSignalZone, scenarioLibrary, zoneKindOf, type LibraryEntry } from '../src/scenarios/library';
 
 /*
   **마스터 운행** — L10 을 마치면 '처음부터 다시 시작' 전까지 L10 코스가 무작위로 이어진다 (masterPick).
@@ -721,5 +723,71 @@ describe('먼저 고칠 습관 — AI 가 정한다', () => {
     expect(out.source).toBe('rule');
     expect(out.habitBy).toBe('rule');
     expect(libraryEntry(out.scenario.id)!.targets).toContain(out.habit);
+  });
+});
+
+/*
+  **신호기 없는 보호구역의 바닥** — 사용자가 "10판 넘게 했는데 어린이보호구역 신호없는 횡단보도가 한번도 나오지 않았어"
+  라고 짚었다. 고칠 습관이 남은 사람은 그 습관을 시험하는 판만 받는데, L1 의 무신호 판은 모두 정면 녹색이라 "정면 적색
+  미정지" 습관이 있으면 L1 에서 한 번도 나오지 않았다 (0%). 최근 NO_SIGNAL_ZONE_GAP 판에 없었으면 이번 판은 반드시 그 판이다.
+*/
+describe('신호기 없는 보호구역 — 몇 판째 없으면 반드시 나온다', () => {
+  const lib = scenarioLibrary();
+  const noSig = lib.find((e) => isNoSignalZone(e.tags))!;
+  const plain = lib.filter((e) => zoneKindOf(e.tags) === 'none').slice(0, 5).map((e) => e.spec.id);
+
+  it('최근 판에 없었을 때만 차례가 된다', () => {
+    expect(noSignalZoneDue([]), '기록이 짧으면 확률에 맡긴다').toBe(false);
+    expect(noSignalZoneDue(plain.slice(0, NO_SIGNAL_ZONE_GAP - 1))).toBe(false);
+    expect(noSignalZoneDue(plain.slice(0, NO_SIGNAL_ZONE_GAP))).toBe(true);
+    expect(noSignalZoneDue([...plain.slice(0, 2), noSig.spec.id, ...plain.slice(2, NO_SIGNAL_ZONE_GAP)].slice(-NO_SIGNAL_ZONE_GAP))).toBe(false);
+  });
+
+  it('차례면 후보가 모두 무신호 보호구역이고, 고칠 습관도 함께 시험한다 — L1 의 정면 적색 습관이어도', () => {
+    const p = plan({ level: 1, target: 'RED_NO_STOP', noSignalZoneDue: true, schoolZone: true, zoneNoSignal: true });
+    const cands = candidatesFor(p, []);
+    expect(cands.length).toBeGreaterThan(0);
+    expect(cands.every((e) => isNoSignalZone(e.tags))).toBe(true);
+    expect(cands.every((e) => e.targets.includes('RED_NO_STOP'))).toBe(true);
+    expect(cands.every((e) => e.tags.env !== 'night'), 'L1 에는 야간을 주지 않는다').toBe(true);
+    // 습관이 둘이어도 습관마다 추린 후보가 모두 무신호 보호구역이다
+    const two = plan({
+      level: 3,
+      target: 'RED_NO_STOP',
+      badHabits: [
+        { code: 'RED_NO_STOP', count: 3, cleanRuns: 0, lastRun: 8 },
+        { code: 'PEDESTRIAN_BLOCKED', count: 2, cleanRuns: 0, lastRun: 7 },
+      ],
+      noSignalZoneDue: true,
+    });
+    const { groups } = coursesByHabit(two, [], () => 0.5);
+    expect(groups.flatMap((g) => g.courses).every((e) => isNoSignalZone(e.tags))).toBe(true);
+  });
+
+  it('습관이 남아 L1 에 머물러도 네 판에 한 번은 만난다', () => {
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const played: number[] = [];
+    let gap = 0;
+    let longest = 0;
+    let hits = 0;
+    for (let i = 0; i < 16; i++) {
+      const due = noSignalZoneDue(played);
+      const p = plan({
+        level: 1,
+        target: 'RED_NO_STOP',
+        schoolZone: rnd() < SCHOOL_ZONE_CHANCE || due,
+        zoneNoSignal: rnd() < ZONE_NO_SIGNAL_CHANCE || due,
+        noSignalZoneDue: due,
+      });
+      const e = rulePick(p, candidatesFor(p, played), rnd);
+      played.push(e.spec.id);
+      if (isNoSignalZone(e.tags)) {
+        hits++;
+        gap = 0;
+      } else longest = Math.max(longest, ++gap);
+    }
+    expect(longest, '연달아 빠진 판').toBeLessThanOrEqual(NO_SIGNAL_ZONE_GAP);
+    expect(hits, '16판 중').toBeGreaterThanOrEqual(4);
   });
 });
