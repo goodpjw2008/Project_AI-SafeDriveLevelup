@@ -64,6 +64,8 @@ import {
 } from '../scenarios/curriculum';
 import { levelBadge, masterBadge } from './badges';
 import { playerCard } from './playerCard';
+import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
+import type { BadgeEvent } from '../economy/badges';
 import { AI_BADGE_HTML, BRAND_CHIPS_HTML, withAiBadge } from './brandName';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
@@ -88,6 +90,7 @@ export type ScreenId =
   | 'settings'
   | 'report'
   | 'trial'
+  | 'badges'
   | 'none';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -212,7 +215,7 @@ export function fallbackCoach(result: JudgeResult): string {
   return lines.map((l) => `- ${l}`).join('\n');
 }
 
-const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'settings', 'report', 'trial'] as const;
+const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'settings', 'report', 'trial', 'badges'] as const;
 
 /** 뒤에 있던 화면 위에 뜨는 화면 — 바깥을 누르면 닫힌다 (index.html 의 `.sheet`) */
 const SHEET_IDS: ReadonlySet<ScreenId> = new Set<ScreenId>(['settings', 'credits', 'about']);
@@ -684,6 +687,8 @@ export class Screens {
       onShowEnding(): void;
       /** 맵 체험하기 창을 연다 — 시나리오 번호로 그 판을 바로 달리는 **시험용** 메뉴 (renderTrial) */
       onTrial(): void;
+      /** 뱃지 모음 화면을 연다 (renderBadges) */
+      onBadges(): void;
     },
     /** AI 맞춤 훈련의 지금 상태 — main.ts 가 들고 있다 */
     ai: AiTrainingState,
@@ -808,6 +813,7 @@ export class Screens {
     on('btn-reset-course', handlers.onResetCourse);
     on('btn-ending', handlers.onShowEnding);
     on('btn-trial', handlers.onTrial);
+    on('btn-badges', handlers.onBadges);
 
     /*
       '지금 타는 차' 그림을 구웠다면 **여기서 렌더러를 버린다** (전시관과 같은 규칙).
@@ -984,6 +990,9 @@ export class Screens {
             aside: `<div class="level-track" aria-label="${esc(courseTitle(c))} · ${c.level} / ${MAX_LEVEL}레벨">${track}</div>`,
           },
         )}
+
+        <!-- 뱃지 요약 — 레벨 칸 바로 아래. 누르면 모음 화면이 열린다 (ui/badgeArt.ts) -->
+        ${badgeSummary(save.badges)}
 
         <!--
           **지금 타는 차와 나쁜 운전 습관이 나란히 선다.**
@@ -1452,6 +1461,8 @@ export class Screens {
      * 수동 주행이면 `null` 이다.
      */
     course: CourseStep | null = null,
+    /** 이번 판에 얻거나 잃은 뱃지 (economy/badges.ts) — 없으면 뱃지 줄을 그리지 않는다 */
+    badgeEvents: readonly BadgeEvent[] = [],
   ): void {
     // 등급 이름은 판정 엔진이 정한다 — 주행 기록도 같은 표를 쓴다 (lawRules.ts 의 GRADE_TEXT)
     const gradeLabel = GRADE_TEXT[result.grade] ?? result.grade;
@@ -1657,6 +1668,13 @@ export class Screens {
             </div>`
           : ''
       }
+
+      <!--
+        **뱃지 줄 — AI 평가 바로 아래** (ui/badgeArt.ts). 이 판에서 얻은 뱃지와 잃은 뱃지를 까닭과 함께 보여 준다. 사용자가
+        캐글처럼 "중간중간 뭔가를 달성할 때마다 뱃지를 주고, 교통법규를 위반하면 뱃지를 뺏기게" 해 달라고 했다 — 판을
+        마치자마자 읽는 자리라야 잘한 것과 어긴 것이 곧바로 뱃지와 이어진다. 움직인 뱃지가 없으면 그리지 않는다.
+      -->
+      ${badgeStrip(badgeEvents)}
 
       <!--
         **경험치 칸과 버튼을 한 줄에 반반씩 둔다** (사용자 요청 — 공간 활용). 둘 다 "이 판이 어땠고 다음에
@@ -1881,6 +1899,23 @@ export class Screens {
    * (coach/habits.ts) 서버가 없어도 늘 맞고, 진단 문단은 그 위에 얹히는 해석이다.
    * 순서를 반대로 두면 정적 배포에서 이 화면이 텅 빈 것처럼 보인다.
    */
+  /**
+   * **뱃지 모음** — 가진 뱃지와 아직 없는 뱃지를 모두 늘어놓는다. 없는 뱃지는 회색이고 얻는 법과 남은 양을 적는다
+   * (캐글의 뱃지 화면처럼). 습관 리포트와 같은 모양이다 — 머무르며 읽는 화면이고, 뒤로가기는 첫 화면으로 간다.
+   */
+  renderBadges(save: SaveData, onBack: () => void): void {
+    $('badges-body').innerHTML = `
+      ${this.head({
+        id: 'badges',
+        title: '내 뱃지',
+        backLabel: '홈으로',
+        sub: '안전운전 습관을 지킬 때마다 받고, 교통법규를 어기면 그 법규의 뱃지를 잃습니다.',
+      })}
+      ${badgeCollection(save.badges)}
+    `;
+    this.bindBack('badges', onBack);
+  }
+
   renderReport(save: SaveData, onBack: () => void): void {
     const s = summarize(save.history);
 

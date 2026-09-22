@@ -4080,6 +4080,96 @@
         이름 딱지의 '회'(#f2a900) 와 같은 계열이라 'AI 우회전이 무언가 하고 있다' 로 읽힌다.
         (한때 전부 파랑→보라였는데 어두운 바탕에서 읽기 어려웠다)
       */
+      /*
+        ── 뱃지 (ui/badgeArt.ts · economy/badges.ts) ──
+        결과 화면의 뱃지 줄 · 첫 화면의 요약 · 모음 화면. 메달 그림은 SVG 가 색까지 갖고 오므로 여기서는 자리만 잡는다.
+        얻은 것은 초록, 잃은 것은 빨강 — 결과 화면의 등급 배지 · AI 평가 칸과 같은 편을 든다.
+      */
+      .badge-medal { flex: none; display: block; }
+      .badge-tier {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 0 7px;
+        border-radius: 999px;
+        font-size: 0.78em;
+        font-weight: 800;
+        vertical-align: 1px;
+      }
+      .badge-tier.t1 { background: rgba(201, 138, 75, 0.22); color: #e7b384; }
+      .badge-tier.t2 { background: rgba(195, 204, 214, 0.2); color: #e2e8ef; }
+      .badge-tier.t3 { background: rgba(242, 176, 30, 0.22); color: #ffd46b; }
+
+      .badge-strip {
+        margin-bottom: 14px;
+        padding: 10px 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+      .badge-strip ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+      .badge-ev { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .badge-ev-text { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+      .badge-ev-text b { margin-right: 6px; }
+      .badge-ev.gain b,
+      .badge-ev.up b { color: var(--green); }
+      .badge-ev.down b,
+      .badge-ev.lost b { color: var(--red); }
+      .badge-ev small { color: var(--muted); font-size: 13px; }
+
+      .badge-summary {
+        width: 100%;
+        margin: 10px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 8px 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .badge-summary:hover { border-color: rgba(255, 176, 32, 0.55); }
+      .badge-summary-count { white-space: nowrap; font-size: 15px; color: var(--muted); }
+      .badge-summary-count b { color: var(--text); font-size: 18px; }
+      .badge-summary-medals { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; overflow: hidden; }
+      .badge-summary-empty { font-size: 13px; color: var(--muted); }
+      .badge-summary-more { white-space: nowrap; font-size: 14px; color: var(--blue); }
+
+      .badge-group { margin: 18px 0 26px; }
+      .badge-group h2 { margin: 0 0 4px; font-size: 20px; }
+      .badge-best { margin-left: 8px; font-size: 14px; font-weight: 600; color: #ffb38f; }
+      .badge-group-note { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      .badge-grid {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 12px;
+      }
+      .badge-card {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+      /* 아직 없는 뱃지는 한 발 물러서 보인다 — 그래도 읽을 수는 있어야 한다(얻는 법이 적혀 있다) */
+      .badge-card:not(.held) { opacity: 0.72; }
+      .badge-card-text { min-width: 0; }
+      .badge-card h3 { margin: 2px 0 4px; font-size: 16px; }
+      .badge-how { margin: 0 0 6px; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+      .badge-progress { margin: 0; font-size: 13.5px; color: var(--text); }
+      @media (max-width: 640px) {
+        .badge-grid { grid-template-columns: 1fr; }
+        .badge-summary-more { display: none; }
+      }
+
       .verdict {
         --verdict: #f2a900;
         --verdict-text: #ffd88a;
@@ -5130,6 +5220,7 @@
         (설정·저작권처럼 잠깐 열었다 닫는 것이 아니다).
       -->
       <div class="screen" id="screen-report"><div class="screen-inner" id="report-body"></div></div>
+      <div class="screen" id="screen-badges"><div class="screen-inner" id="badges-body"></div></div>
     </div>
 
     <!--

@@ -23,6 +23,7 @@ import { carForLevel, getCar } from './economy/cars';
 import { ensureCarPhotos, hasCarPhoto, loadCarPhotos, uploadCarPhoto } from './economy/carPhotos';
 import { settle } from './economy/reward';
 import { load, save as persist, pushHistory, reset as resetSave, type SaveData } from './economy/save';
+import { updateBadges } from './economy/badges';
 import type { JudgeResult } from './rules/lawRules';
 import {
   GENERATED_ID_BASE,
@@ -615,6 +616,7 @@ function renderMenu(): void {
     onResetCourse: () => void handleResetCourse(),
     // 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 창이다 (renderTrial)
     onTrial: () => nav.go({ name: 'trial', enter: renderTrial }),
+    onBadges: () => nav.go({ name: 'badges', enter: renderBadges }),
   }, aiTraining);
   showSiteStatsOnMenu();
 }
@@ -709,6 +711,15 @@ function renderReport(): void {
   ensureMenuScene();
   screens.show('report');
   screens.renderReport(saveData, goHome);
+}
+
+/** 뱃지 모음 — 습관 리포트와 같은 모양이다 (Screens.renderBadges) */
+function renderBadges(): void {
+  stopAutoNext();
+  disposeSeatPreview();
+  ensureMenuScene();
+  screens.show('badges');
+  screens.renderBadges(saveData, goHome);
 }
 
 function renderHelp(): void {
@@ -1383,6 +1394,8 @@ function finishRun(result: JudgeResult): void {
     처음 들어온 사람의 프롬프트가 "습관 기록 없음" 과 "위반 7회" 를 동시에 말하게 된다.
   */
   let courseStep: CourseStep | null = null;
+  // 이 판 전에 남아 있던 나쁜 습관 — 판을 마친 뒤와 견줘 고친 수를 센다 (아래 뱃지의 습관 교정가)
+  const habitsBefore = saveData.curriculum.badHabits.map((h) => h.code);
   if (aiCourse) {
     const before = saveData.curriculum;
     // 이 판이 무엇을 시험했는가 — 습관은 시험한 판에서만 '고쳤다' 고 센다 (library.ts)
@@ -1434,6 +1447,21 @@ function finishRun(result: JudgeResult): void {
     saveData.curriculum = recordHabits(saveData.curriculum, result, habitsTestedBy(sc));
     aiTraining.curriculum = saveData.curriculum;
   }
+
+  /*
+    **뱃지** (economy/badges.ts) — 이 판에서 지킨 법규는 오르고, 어긴 법규는 한 단계 내려간다. 자율 주행 · 맵 체험은 위에서
+    이미 걸러 냈다 — 직접 운전한 판만 센다. 얻고 잃은 것은 결과 화면이 곧바로 보여 준다 (renderDebrief).
+  */
+  const habitsAfter = new Set(saveData.curriculum.badHabits.map((h) => h.code));
+  const badgeStep = updateBadges(saveData.badges, {
+    result,
+    spec: sc,
+    tested: habitsTestedBy(sc),
+    habitsFixed: habitsBefore.filter((code) => !habitsAfter.has(code)).length,
+    mastered: saveData.curriculum.mastered,
+  });
+  saveData.badges = badgeStep.next;
+  const badgeEvents = badgeStep.events;
 
   // 실패가 아니면 다음 시나리오를 연다 — 위반해도 배웠으니 진행은 시킨다
   let unlockedNew = false;
@@ -1491,7 +1519,7 @@ function finishRun(result: JudgeResult): void {
           else stopAutoNext();
         },
         onToggleAutoNextPause: () => toggleAutoNextHold(),
-      }, courseStep);
+      }, courseStep, badgeEvents);
       /*
         **마스터를 해낸 그 판이면 엔딩으로 간다** (showEnding). 한 번만 띄운다 — 뒤로 갔다 돌아와도 다시 뜨지 않는다.
         첫 화면의 "엔딩 다시 보기" 로 다시 볼 수 있다.

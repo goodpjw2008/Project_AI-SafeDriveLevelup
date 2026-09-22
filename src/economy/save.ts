@@ -10,6 +10,8 @@ import { defaultGraphics, graphicsFromSaved, type GraphicsSettings } from '../ga
 import { DEFAULT_SOUNDS } from '../game/soundAssets';
 import { freshCurriculum, unlockedLevel, type CurriculumState } from '../scenarios/curriculum';
 import { DEFAULT_CHALLENGE, type Challenge } from '../scenarios/challenge';
+import { habitsTestedBy, libraryEntry } from '../scenarios/library';
+import { badgesFromHistory, freshBadges, normalizeBadges, type BadgeState } from './badges';
 
 const KEY = 'turn-right:save:v1';
 
@@ -50,10 +52,14 @@ const KEY = 'turn-right:save:v1';
  *      **한 번만 한다.** 채워진 '자동' 과 사용자가 고른 '자동' 은 저장본에서 구별되지 않으므로, 버전으로
  *      한 번 되살린 뒤에는 고른 값을 그대로 둔다.
  *
+ * v12 — **뱃지**(`badges`)가 생겼다 (economy/badges.ts). 없던 항목이라, 예전 저장본은 **남아 있는 주행 기록(최근 60판)
+ *      으로 채운다** — 이미 7레벨까지 온 사람이 뱃지 0개에서 시작하면 그동안 지켜 온 것이 없던 일이 된다 (사용자가 정했다).
+ *      기록에 없는 것(고친 습관 · 앞차가 실제로 섰는지)은 세지 않는다.
+ *
  * **버전이 올랐다고 전부 버리지는 않는다.** 항목마다 언제부터 뜻이 달라졌는지가 다르므로
  * 저장본의 버전을 보고 해당 항목만 되돌린다 — 상점 때문에 최고 등급 기록까지 날릴 이유가 없다.
  */
-const VERSION = 11;
+const VERSION = 12;
 
 /**
  * 주행 한 판의 기록 — **습관 진단에 쓰는 것만** 남긴다.
@@ -202,6 +208,8 @@ export interface SaveData {
    * 진행 상황이라 **초기화 버튼으로 지워진다** (설정과 달리).
    */
   curriculum: CurriculumState;
+  /** 뱃지 — 법규 지킴 · 무위반 연속 · 성장 (economy/badges.ts). 처음부터 다시 시작하면 함께 지운다 */
+  badges: BadgeState;
 }
 
 export function defaultSave(): SaveData {
@@ -223,6 +231,7 @@ export function defaultSave(): SaveData {
     stats: { attempts: 0, perfects: 0, violations: 0, fails: 0, streak: 0, bestStreak: 0 },
     history: [],
     curriculum: freshCurriculum(),
+    badges: freshBadges(),
   };
 }
 
@@ -322,6 +331,20 @@ export function load(): SaveData {
       버전과 무관하게 **읽을 때마다 본다.** 저장본을 손으로 고쳤을 수도 있고, 차의
       레벨을 옮기면(cars.ts 의 한 줄) 예전 저장본이 그 자리에서 어긋나기 때문이다.
     */
+    /*
+      **뱃지** — v12 에서 생겼다. 그 전 저장본은 남은 주행 기록으로 채우고(위 v12), 그 뒤로는 항목별로 합친다 (뱃지가
+      늘어도 예전 저장본이 깨지지 않게 — badges.ts 의 normalizeBadges).
+    */
+    merged.badges =
+      from < 12
+        ? badgesFromHistory(
+            merged.history,
+            (id) => libraryEntry(id)?.spec ?? SCENARIOS.find((s) => s.id === id),
+            habitsTestedBy,
+            merged.curriculum.mastered,
+          )
+        : normalizeBadges(parsed.badges);
+
     const active = CARS.find((c) => c.id === merged.activeCarId);
     if (!active || !isCarUnlocked(active, unlockedLevel(merged.curriculum))) {
       merged.activeCarId = STARTER_CAR_ID;
