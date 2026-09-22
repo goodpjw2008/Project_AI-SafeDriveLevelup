@@ -1677,7 +1677,7 @@ export class Screens {
                   글이 도착하면 이 칸을 통째로 갈아 끼운다 (loadCoaching).
                 -->
                 <div class="coach-body" id="coach-body">
-                  <span class="coach-wait-text">AI 답변 작성중<i class="dots"><i>.</i><i>.</i><i>.</i></i></span>
+                  <span class="coach-wait-text">AI 결과 분석 중<i class="dots"><i>.</i><i>.</i><i>.</i></i></span>
                 </div>
               </div>
             </div>`
