@@ -1256,23 +1256,30 @@ export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
 // ── AI 자율 주행 시범 ──────────────────────────────────────────────────────
 
 /**
- * **AI 자율 주행 시범**에서 돌 대표 코스 — 이 게임이 가르치는 판단을 한 바퀴에 모두 보여 준다.
+ * **AI 자율 주행 시범**에서 돌 대표 코스 — 열 판.
  *
- * 한때 시범은 손으로 쓴 11판을 차례로 돌았다. 그 판들이 있던 '수동 우회전 연습' 을 없애면서
- * (AI 가 라이브러리에서 고르는 과정 하나로 합쳤다) 시범도 라이브러리의 코스로 옮겼다.
- * 순서는 쉬운 것에서 어려운 것으로 — 신호만 → 보행자 → 우회전 신호등 → 보호구역 → 앞차 → 꼬리물기.
+ * 사용자가 정했다 — "10판 정도로 구성해서 아래의 핵심 내용이 들어가는 시나리오들로 난이도가 낮은 것부터 높은 것으로.
+ * 우회전 시 발생할 수 있는 경우의 수 중 대표적인 것, 어린이보호구역에서 신호 없는 횡단보도 상황." 그래서
+ *
+ *  - **우회전의 대표 경우 일곱** — 녹색 기본 · 적색 일시정지 · 우회전 후 보행자 · 우회전 신호 적색(녹색 화살표까지) ·
+ *    녹색 화살표인데 무단횡단자(화살표여도 사람이 있으면 선다) · 적색에 무단횡단 노인 · 일시정지를 무시하는 앞차
+ *  - **신호 없는 보호구역 셋** — 교차로 첫 횡단보도(사람이 없어도 선다) · 교차로 앞 진입로 횡단보도(어린이) ·
+ *    우회전 후 횡단보도(아이가 나올 수도)
+ *
+ * 한때는 꼬리물기 · 직진 대기 앞차도 있었는데, 꼬리물기는 앞이 막혔는지가 애매하다고 사용자가 뱃지에서 뺀 장면이라
+ * 시범에서도 뺐다. **차례는 여기 적힌 순서가 아니다** — demoCourses 가 판의 레벨 · 난이도 점수로 쉬운 것부터 줄 세운다.
  */
 const DEMO: readonly Partial<LibraryTags>[] = [
-  { signal: 'green', a: 'none', c: 'none' },
-  { signal: 'red', a: 'none', c: 'none' },
-  { signal: 'green', c: 'crossing', a: 'none' },
-  { signal: 'red', c: 'jaywalk', a: 'none', kind: 'elder' },
-  { signal: 'arrowRed', c: 'crossing', a: 'none' },
-  { signal: 'green', zone: 'yes', sigC: 'no', c: 'maybe', a: 'none', kind: 'child' },
-  { signal: 'green', approach: 'noSignal', a: 'none', c: 'none' },
-  { signal: 'red', lead: 'rolling', a: 'none', c: 'none' },
-  { signal: 'red', lead: 'straight', a: 'none', c: 'none' },
-  { signal: 'green', jam: 'jam', lead: 'none' },
+  { signal: 'green' },
+  { signal: 'red' },
+  { signal: 'green', c: 'crossing' },
+  { signal: 'arrowRed', c: 'crossing' },
+  { signal: 'arrowGreen', c: 'jaywalk' },
+  { signal: 'red', c: 'jaywalk', kind: 'elder' },
+  { signal: 'red', lead: 'rolling' },
+  { signal: 'green', zone: 'yes', sigA: 'no' },
+  { signal: 'green', approach: 'noSignal' },
+  { signal: 'green', zone: 'yes', sigC: 'no', c: 'maybe', kind: 'child' },
 ];
 
 /** 시범 코스 — 맑은 낮 · 재촉 없음 · 나머지는 가장 단순한 값으로 채운 판 */
@@ -1281,10 +1288,12 @@ export function demoCourses(): LibraryEntry[] {
     zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
     approach: 'none', lead: 'none', pressure: 'calm', env: 'day', jam: 'none',
   };
-  return DEMO.map((want) => {
+  const found = DEMO.map((want) => {
     const t = { ...plain, ...want };
     const hit = scenarioLibrary().find((e) => AXIS_KEYS.every((k) => t[k] === undefined || e.tags[k] === t[k]));
     if (!hit) throw new Error(`시범 코스가 라이브러리에 없습니다: ${JSON.stringify(want)}`);
     return hit;
   });
+  // **쉬운 것부터** — 판의 레벨, 같으면 난이도 점수(costOf). 같은 값이면 위에 적힌 차례를 지킨다 (sort 는 안정적이다)
+  return found.sort((p, q) => p.level - q.level || p.cost - q.cost);
 }

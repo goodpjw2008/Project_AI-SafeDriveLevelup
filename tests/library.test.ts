@@ -169,16 +169,39 @@ describe('이 판이 무엇을 시험했는가 — habitsTestedBy', () => {
   });
 });
 
+/*
+  **자율 주행 시범은 열 판** — 사용자가 정했다: "10판 정도로 … 우회전 시 발생할 수 있는 경우의 수 중 대표적인 것,
+  어린이보호구역에서 신호 없는 횡단보도 상황 … 난이도가 낮은 것부터 높은 것으로."
+*/
 describe('AI 자율 주행 시범 코스', () => {
-  it('대표 코스가 모두 라이브러리에 있고, 가르치는 판단을 두루 담는다', () => {
+  it('열 판이 모두 라이브러리에 있고, 우회전의 대표 판단을 두루 담는다', () => {
     const demo = demoCourses();
-    expect(demo.length).toBeGreaterThanOrEqual(8);
+    expect(demo).toHaveLength(10);
     expect(new Set(demo.map((e) => e.spec.id)).size).toBe(demo.length);
     const all = new Set(demo.flatMap((e) => e.targets));
-    for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP', 'BLOCKING_INTERSECTION'] as const) {
+    for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP'] as const) {
       expect(all.has(code), code).toBe(true);
     }
+    expect(demo.some((e) => e.tags.lead === 'rolling'), '일시정지를 무시하는 앞차').toBe(true);
+    // 꼬리물기는 앞이 막혔는지가 애매하다고 사용자가 뺀 장면이다
+    expect(demo.some((e) => e.tags.jam === 'jam')).toBe(false);
     expect(demo.every((e) => e.tags.env === 'day' && e.tags.pressure === 'calm')).toBe(true);
+  });
+
+  it('신호 없는 보호구역 횡단보도가 셋 — 교차로 첫 횡단보도 · 진입로 · 우회전 후', () => {
+    const zone = demoCourses().filter((e) => zoneKindOf(e.tags) === 'noSignal');
+    expect(zone).toHaveLength(3);
+    expect(zone.some((e) => e.tags.sigA === 'no')).toBe(true);
+    expect(zone.some((e) => e.tags.approach === 'noSignal')).toBe(true);
+    expect(zone.some((e) => e.tags.sigC === 'no')).toBe(true);
+  });
+
+  it('쉬운 것부터 어려운 것으로 — 레벨, 같으면 난이도 점수', () => {
+    const demo = demoCourses();
+    for (let i = 1; i < demo.length; i++) {
+      const [p, q] = [demo[i - 1], demo[i]];
+      expect(p.level < q.level || (p.level === q.level && p.cost <= q.cost), `${p.spec.title} → ${q.spec.title}`).toBe(true);
+    }
   });
 });
 

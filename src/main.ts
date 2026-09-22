@@ -1125,10 +1125,15 @@ async function startRun(id: number): Promise<void> {
     라이브러리 판은 **결과 화면과 같은 이름**으로 부른다 — `AI 추천 시나리오 3700 - 제목`
     (library.ts 의 libraryNumber). 달리는 동안과 끝난 뒤의 이름이 같아야 "그 판" 이 이어진다.
   */
-  const libNo = aiDriving ? undefined : libraryNumber(currentScenario.id);
+  const libNo = libraryNumber(currentScenario.id);
   hud.show(
+    /*
+      **자율 주행도 번호를 적는다** — `자율주행 - 시나리오 1363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
+      시나리오 내용 이렇게 나왔잖아. 자율주행도 자율주행 - 시나리오 ??? 시나리오 상황 이렇게 나오게 해 줘" 라고 했다.
+      번호가 있으면 맵 체험으로 같은 판을 직접 달려 볼 수 있다.
+    */
     aiDriving
-      ? 'AI 자율 주행 시범'
+      ? `자율주행 - 시나리오 ${libNo ?? ''}`.trim()
       : mapTrial && libNo !== undefined
       ? `맵 체험 ${libNo}`
       : libNo !== undefined

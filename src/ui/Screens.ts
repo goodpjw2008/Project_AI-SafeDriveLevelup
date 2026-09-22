@@ -385,8 +385,11 @@ function debriefTitle(sc: ScenarioSpec): { stage: string; title: string } {
   // 첫 화면에서 번호로 고른 판 — AI 가 고른 것이 아니므로 'AI 추천' 이라 부르지 않는다 (main.ts 의 mapTrial)
   const trial = document.body.classList.contains('map-trial');
   const n = libraryNumber(sc.id);
+  // 자율 주행도 주행 화면과 같은 이름 — `자율주행 - 시나리오 1363` (main.ts 의 hud.show)
   const stage = demo
-    ? 'AI 시범'
+    ? n !== undefined
+      ? `자율주행 - 시나리오 ${n}`
+      : '자율주행'
     : n !== undefined
       ? trial
         ? `맵 체험 ${n}`
