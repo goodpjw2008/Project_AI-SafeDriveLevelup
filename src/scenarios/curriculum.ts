@@ -259,8 +259,7 @@ export const ruleFor = (level: Difficulty): LevelRule => LEVELS[level - 1];
 
 /** 화면에 찍는 레벨 이름 — `L1` … `L10` */
 /**
- * 화면에 적는 레벨 이름 — **`Level7` 이다** (사용자가 정했다: "어우참L1, 어우참L2 … 를 어우참 Level1,
- * 어우참 Level2 … 로 변경해 줘").
+ * 화면에 적는 레벨 이름 — **`Level7` 이다** (사용자가 정했다: "L1, L2 … 를 Level1, Level2 … 로 변경해 줘").
  *
  * 한때 `L7` 이었다. 자리를 아끼는 표기였는데, 이 과정을 처음 여는 사람에게 'L' 한 글자는 레벨인지 차로인지
  * 등급인지 알 수 없다 — 운전면허 1종 · 2종처럼 읽는 사람도 있다. 뱃지 안에는 숫자만 들어가므로(ui/badges.ts)
@@ -275,7 +274,7 @@ export const levelLabel = (level: Difficulty): string => `Level${level}`;
  * 닿은 것과 해낸 것을 같은 말로 부르면 목표가 사라진다.
  */
 export function courseTitle(state: Pick<CurriculumState, 'level' | 'mastered'>): string {
-  // 호칭은 작품 이름을 따른다 — 'AI 우회전 참교육' 의 우회전 (brand.ts). 예전 이름은 '어우참' 이었다
+  // 호칭은 작품 이름을 따른다 — 'AI 우회전 참교육' 의 우회전 (brand.ts)
   if (state.mastered) return '우회전 마스터';
   if (state.level >= MAX_LEVEL) return `우회전 ${levelLabel(MAX_LEVEL)} 도전`;
   return `우회전 ${levelLabel(state.level)}`;

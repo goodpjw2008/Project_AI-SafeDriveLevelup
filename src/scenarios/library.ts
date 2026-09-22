@@ -236,7 +236,7 @@ export function combinationAllowed(t: LibraryTags): boolean {
 
 /**
  * **플레이테스트로 뺀 조합** — 법규 · 신호 구조로는 성립하지만, 실제 차로 달려 보니 운전자에게 가르칠 것이 없거나
- * 공정하지 않은 판 (.claude/skills/scenario-playtest).
+ * 공정하지 않은 판 (시나리오 플레이테스트).
  *
  * `combinationAllowed` 와 따로 두는 까닭은 **번호**다. 판 번호(libraryNumber)는 라이브러리 순서라, 판을 빼면 그 뒤의
  * 번호가 모두 밀려 사용자가 부르던 "4927번" 이 다른 판이 된다. 여기서 뺀 판은 번호 자리만 비워 두고 싣지 않는다.
