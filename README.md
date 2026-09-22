@@ -12,6 +12,8 @@
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.\
 https://safeturn.vercel.app
 
+포트폴리오를 슬라이드로 한 장씩 넘겨 보기 → [AI_safeturn_portfolio.html](https://safeturn.vercel.app/AI_safeturn_portfolio.html)
+
 ---
 
 ## 1. 개요

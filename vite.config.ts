@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig, loadEnv, type Plugin } from 'vite';
@@ -58,6 +59,66 @@ function brandHtml(): Plugin {
         /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_ICON)\}\}/g,
         (_, key: string) => escapeHtml(values[key]),
       );
+    },
+  };
+}
+
+/** 저장소 맨 위의 포트폴리오 넘겨 보기 페이지 — README 를 장표 그림으로 한 장씩 넘겨 본다 */
+const PORTFOLIO_PAGE = 'AI_safeturn_portfolio.html';
+
+/** 그 페이지가 부르는 그림의 형식 */
+const IMAGE_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+};
+
+/**
+ * 포트폴리오 넘겨 보기 페이지를 배포 사이트에도 같은 경로로 싣는다.
+ *
+ * 페이지는 **저장소 맨 위**에 둔다 — GitHub 에서 README 옆에 바로 보이고, 저장소를 내려받아 두 번 누르면
+ * 그림(docs/slides/…)을 상대 경로로 찾아 그대로 열린다. 그런데 GitHub 는 HTML 을 그려 주지 않고 소스만
+ * 보여 주므로, 누르면 바로 넘겨 볼 수 있게 safeturn.vercel.app/AI_safeturn_portfolio.html 에도 올린다.
+ *
+ * public/ 으로 옮기지 않는 이유: 저장소 맨 위에서 사라지고, 그림도 public/ 에 한 벌 더 두어야 한다.
+ * 그래서 빌드 때 **페이지가 부르는 그림만** 골라 같은 경로로 dist 에 내보낸다 — 그림 목록은 페이지 한 곳에만 있어,
+ * 장표를 더하거나 빼도 여기는 손대지 않는다. 개발 서버도 같은 목록으로 같은 주소를 연다.
+ */
+function portfolioPage(): Plugin {
+  const fromRepo = (path: string) => fileURLToPath(new URL(`./${path}`, import.meta.url));
+  const readPage = () => readFileSync(fromRepo(PORTFOLIO_PAGE), 'utf8');
+  /** 페이지가 상대 경로로 부르는 저장소 파일 (docs/… · screenshot/…) */
+  const imagesOf = (html: string) => [
+    ...new Set([...html.matchAll(/\bsrc="((?:docs|screenshot)\/[^"?#]+)"/g)].map((m) => m[1])),
+  ];
+
+  return {
+    name: 'turn-right-portfolio-page',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = decodeURIComponent((req.url ?? '').split(/[?#]/)[0]).replace(/^\//, '');
+        if (path !== PORTFOLIO_PAGE && !/^(docs|screenshot)\//.test(path)) return next();
+        // 페이지는 요청마다 읽는다 — 서버를 띄워 둔 채 고쳐도 새로 고침만 하면 보이게
+        const html = readPage();
+        if (path === PORTFOLIO_PAGE) {
+          res.setHeader('content-type', 'text/html; charset=utf-8');
+          res.end(html);
+          return;
+        }
+        // 페이지가 부르는 그림만 내준다 — 저장소의 다른 파일이 개발 서버로 새어 나가지 않게
+        const type = IMAGE_TYPES[path.split('.').pop()!.toLowerCase()];
+        if (!type || !imagesOf(html).includes(path)) return next();
+        res.setHeader('content-type', type);
+        res.end(readFileSync(fromRepo(path)));
+      });
+    },
+    generateBundle() {
+      const html = readPage();
+      this.emitFile({ type: 'asset', fileName: PORTFOLIO_PAGE, source: html });
+      for (const path of imagesOf(html)) {
+        this.emitFile({ type: 'asset', fileName: path, source: readFileSync(fromRepo(path)) });
+      }
     },
   };
 }
@@ -150,7 +211,7 @@ function devApi(mode: string): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [brandHtml(), devApi(mode)],
+  plugins: [brandHtml(), devApi(mode), portfolioPage()],
   // 빌드 원본(HTML 템플릿)은 src/index.html 이다.
   // 프로젝트 루트의 index.html 은 build:standalone 이 만들어 내는 '실행 가능한 게임 파일'이라,
   // 원본을 루트에 두면 서로 덮어쓰게 된다.
