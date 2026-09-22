@@ -1463,6 +1463,8 @@ export class Screens {
     course: CourseStep | null = null,
     /** 이번 판에 얻거나 잃은 뱃지 (economy/badges.ts) — 없으면 뱃지 줄을 그리지 않는다 */
     badgeEvents: readonly BadgeEvent[] = [],
+    /** `coach: false` 면 AI 주행결과 분석 칸을 그리지도 부르지도 않는다 — 자율 주행 (main.ts 의 finishDemoRun) */
+    options: { coach?: boolean } = {},
   ): void {
     // 등급 이름은 판정 엔진이 정한다 — 주행 기록도 같은 표를 쓴다 (lawRules.ts 의 GRADE_TEXT)
     const gradeLabel = GRADE_TEXT[result.grade] ?? result.grade;
@@ -1521,8 +1523,11 @@ export class Screens {
       알 수가 없어." 그 판이 PERFECT 라 코치 카드가 아예 없었고, 남은 파란 상자는 **AI 가 아니라 법규 설명**
       이었다. AI 활용 공모전 작품에서 잘 달린 판일수록 AI 가 사라지는 셈이라, 무위반 판에도 부른다 —
       프롬프트에 '위반이 없는 경우' 절이 이미 있어 잘한 판단을 짚어 준다 (server/coachPrompt.mjs).
+
+      **자율 주행만은 부르지 않는다** (options.coach === false). AI 가 규정대로 몬 판이라 코치가 짚을 것이 없고 —
+      사용자가 "자율주행일 때는 AI 분석결과가 필요없어" 라고 했다 — 부르면 무료 AI 한도만 쓴다.
     */
-    const needsCoach = true;
+    const needsCoach = options.coach !== false;
     // 위반도 실패도 없었는가 — AI 평가 칸의 색과 로봇이 이걸 따른다 (아래 verdict)
     const clean = result.violations.length === 0 && result.failReason === null;
 

@@ -1600,7 +1600,8 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
         onMenu: goHome,
         onToggleAutoNext: () => undefined,
         onToggleAutoNextPause: () => toggleAutoNextHold(),
-      }, null);
+        // 자율 주행은 AI 가 규정대로 몬 판 — AI 주행결과 분석은 띄우지 않는다 (사용자 요청)
+      }, null, [], { coach: false });
       if (nextId !== undefined) startAutoNext(nextId);
       // 마지막 시범 판 — 잠시 결과를 보여 준 뒤 첫 화면으로. 그 사이 떠났으면 끈다 (stopAutoNext · autoHomeTimer)
       else autoHomeTimer = window.setTimeout(() => {
