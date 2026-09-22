@@ -3891,16 +3891,58 @@
         display: none;
       }
       /*
-        **플레이어 칸은 출발(↑) 버튼과 같은 줄**에 둔다 (사용자 요청). 아래 끝을 ↑ 의 아래 끝(12 + 60 + 5 + 60 + 5 =
-        142px)에 맞추고, 폭은 ↑ 왼쪽까지만 쓴다 — ↑ 의 왼쪽 끝이 화면 오른쪽에서 12 + 60 + 5 + 60 = 137px 이라
-        그보다 13px 더 비워 둔다. 예전에는 방향키 위(218px)에 넓게 떠 있어 차 뒤를 가렸다.
+        **휴대폰에서는 주행 중 레벨 칸을 감춘다** (사용자 요청) — 가로 · 세로 모두. 작은 화면에서는 도로를 가려
+        시야를 방해했다. 레벨과 경험치는 첫 화면과 결과 화면에서 같은 모양(playerCard)으로 본다.
       */
-      body.touch .hud-player {
-        left: max(12px, env(safe-area-inset-left));
-        bottom: calc(max(12px, env(safe-area-inset-bottom)) + 130px);
-        width: min(calc(100vw - 162px), 300px);
+      body.touch #hud-player {
+        display: none;
       }
-      /* 자율 주행 표시도 같은 자리 — 그때는 플레이어 칸이 숨는다 */
+      /*
+        **휴대폰 가로 화면에서는 AI 우회전(로봇 + 말풍선)을 상단 과제 상자 옆에** 둔다 (사용자 요청).
+
+        가로로 들면 화면 높이가 390px 남짓이다. 과제 상자 **아래**에 로봇을 세우면 바로 그 높이가 교차로 지평선이라
+        도로 한가운데 — 신호등 · 횡단보도 · 앞차 — 를 가렸다. 한 줄로 나란히 세우고 둘 다 조금 줄인다. 높이로
+        가르는 것은 태블릿 가로(높이 700px 이상)는 자리가 넉넉해 그대로 두기 위해서다.
+
+        **폭은 좌 · 우 시야 창 사이에 들어가게** 잡는다 (운전석 시점에서 두 창이 위쪽 양 끝을 쓴다 — 각각 화면 폭의
+        17% 남짓). 844px 폭에서 두 창 사이가 514px 인데, 과제 상자 36vw(304px) + 로봇 · 말풍선 190px 남짓이면 들어간다.
+      */
+      @media (orientation: landscape) and (max-height: 540px) {
+        body.touch .hud-top {
+          flex-direction: row;
+          justify-content: center;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 8px 10px;
+        }
+        body.touch .hud-objective {
+          max-width: 36vw;
+          padding: 6px 12px;
+        }
+        body.touch .hud-objective .picked-by {
+          font-size: 11.5px;
+          margin-bottom: 3px;
+        }
+        body.touch .hud-objective .scenario,
+        body.touch .hud-objective .scenario.long,
+        body.touch .hud-objective .scenario.xlong {
+          font-size: 14px;
+        }
+        body.touch .drive-coach-robot {
+          height: 52px;
+        }
+        body.touch .drive-coach-bubble {
+          margin-bottom: 6px;
+          padding: 4px 12px 7px;
+        }
+        body.touch .drive-coach-name {
+          font-size: 11px;
+        }
+        body.touch .drive-coach .advice {
+          font-size: 18px;
+        }
+      }
+      /* 자율 주행 표시 — 출발(↑) 버튼과 같은 줄 */
       body.touch .hud-auto {
         left: max(12px, env(safe-area-inset-left));
         bottom: calc(max(12px, env(safe-area-inset-bottom)) + 130px);

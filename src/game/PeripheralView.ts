@@ -316,8 +316,10 @@ export class PeripheralView {
     */
     const clusterRect = document.getElementById('cluster')?.getBoundingClientRect();
     /*
-      **터치 기기는 방향키 바로 위**에 선다. 휴대폰에서는 계기판이 왼쪽 아래로 가고 그 오른쪽이 방향키 십자 자리라,
-      계기판 옆에 붙이면 창이 ◀ · ▼ 밑에 깔렸다. 방향키가 떠 있지 않으면(PC · 자율 주행 중) 계기판 옆 그대로다.
+      **계기판 옆 자리가 방향키와 겹치면 방향키 바로 위**에 선다. 휴대폰 세로에서는 계기판이 왼쪽 아래로 가고 그
+      오른쪽이 방향키 십자 자리라, 계기판 옆에 붙이면 창이 ◀ · ▼ 밑에 깔렸다. 휴대폰 가로에서는 계기판 옆이
+      비어 있는데, 거기서도 방향키 위로 올리면 오른쪽 위의 우측 시야 창과 겹쳤다 — 그래서 **겹칠 때만** 옮긴다.
+      방향키가 떠 있지 않으면(PC · 자율 주행 중) 늘 계기판 옆이다.
     */
     const padRect = document.querySelector('#touch .dpad')?.getBoundingClientRect();
     const rowGap = margin * 0.6;
@@ -328,7 +330,9 @@ export class PeripheralView {
       let cy: number;
       let labelBelow = false;
 
-      if (u.side === 0 && padRect && padRect.width > 0) {
+      const besideCluster =
+        u.side === 0 && clusterRect && clusterRect.width > 0 ? rearBesideCluster(clusterRect, w, pw, box, rowGap) : null;
+      if (u.side === 0 && padRect && padRect.width > 0 && (!besideCluster || overlaps(besideCluster, padRect))) {
         cx = padRect.right - (pw * box.outerW) / 2;
         cy = padRect.top - rowGap - (pw * box.outerH) / 2;
       } else if (u.side === 0 && clusterRect && clusterRect.width > 0) {
@@ -513,4 +517,22 @@ export class PeripheralView {
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
+}
+
+/** 계기판 옆에 밑변을 맞춰 붙였을 때 후방 창이 차지하는 자리 (CSS px) — resize 의 계산과 같다 */
+function rearBesideCluster(
+  cluster: DOMRect,
+  w: number,
+  pw: number,
+  box: { outerW: number; outerH: number },
+  gap: number,
+): { left: number; right: number; top: number; bottom: number } {
+  const outerW = pw * box.outerW;
+  const onLeft = cluster.left + cluster.width / 2 < w / 2;
+  const left = onLeft ? cluster.right + gap : cluster.left - gap - outerW;
+  return { left, right: left + outerW, top: cluster.bottom - pw * box.outerH, bottom: cluster.bottom };
+}
+
+function overlaps(a: { left: number; right: number; top: number; bottom: number }, b: DOMRect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
