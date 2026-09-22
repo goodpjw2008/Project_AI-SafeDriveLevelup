@@ -68,4 +68,16 @@ describe('아랫줄 끄기', () => {
     const stuck = { ...base, xp: 500, habitsLeft: 2 };
     expect(playerCard(stuck, 'md', { foot: true })).toContain('나쁜 습관 2개를 고치면');
   });
+
+  /*
+    **필요한 양이 나중에 줄어도 넘쳐 보이지 않는다** — 경험치 곡선을 줄였을 때(L6 500 → 300) 저장된 400 이 "400 / 300 XP" 로
+    보일 뻔했다. 난이도를 쉽게 바꿔도 같다.
+  */
+  it('모은 경험치가 필요한 양을 넘으면 필요한 양까지만 보인다', () => {
+    const over = { ...base, xp: 400, need: 300 };
+    const html = playerCard(over, 'md');
+    expect(html).toContain('<b>300</b> / 300 XP');
+    expect(html).not.toContain('<b>400</b>');
+    expect(playerFoot(over)).toContain('준비 완료');
+  });
 });

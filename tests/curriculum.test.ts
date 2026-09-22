@@ -60,15 +60,13 @@ describe('진급', () => {
 
   /*
     **어느 레벨도 한 판으로는 오르지 않는다** — 사용자가 "1판만 했는데 레벨 2로 올라갔어 … 저랩에서 너무 쉽게" 라고 했다.
-    한 판은 운일 수 있다. 서로 다른 맵 셋에서 지켜 내야 그 레벨을 익힌 것이다.
+    한 판은 운일 수 있다. 그 뒤 "레벨이 너무 늦게 오른다" 는 말에 가장 낮은 레벨을 세 판에서 **두 판**으로 줄였다 — 한 판은 아니다.
   */
-  it('무위반 한 판으로는 오르지 않는다 — 가장 낮은 레벨도 세 판이다', () => {
+  it('무위반 한 판으로는 오르지 않는다 — 가장 낮은 레벨도 두 판이다', () => {
     let s = step(freshCurriculum(), clean());
     expect(s.level).toBe(START_LEVEL);
     expect(s.runs).toBe(1);
     expect(s.xp).toBe(XP_PER_CLEAN_RUN);
-    s = step(s, clean());
-    expect(s.level).toBe(START_LEVEL);
     s = step(s, clean());
     expect(s.level).toBe(START_LEVEL + 1);
     expect(s.xp, '새 레벨은 빈 막대에서').toBe(0);
@@ -110,9 +108,14 @@ describe('진급', () => {
 
   /*
     **경험치 곡선** — 사용자가 "게임처럼 고렙일수록 경험치가 많아야" 라고 했고, 그 뒤 "저랩에서 너무 쉽게 올라간다" 고 했다.
-    그래서 가장 낮은 레벨도 세 판, 위로 갈수록 오래 머문다.
+    그래서 가장 낮은 레벨도 여러 판, 위로 갈수록 오래 머문다.
   */
-  it('낮은 레벨도 세 판이 들고, 높은 레벨일수록 여러 판이 든다', () => {
+  /*
+    **사용자가 정한 판 수** — "1~3까지는 2판만 깨면 되고 3~7까지는 3판만 깨면 되고 7에서 10은 4판만 깨면 레벨이
+    올라가도록" (L1→L2 · L2→L3 은 2판, L3→L4 … L6→L7 은 3판, L7→L8 … L9→L10 · L10→마스터는 4판). 그 전에는 3 · 3 · 4 ·
+    4 · 5 · 5 · 6 · 7 · 8 · 10판이라 "레벨이 너무 늦게 오르니까 흥미가 떨어진다" 고 했다.
+  */
+  it('낮은 레벨도 두 판이 들고, 높은 레벨일수록 여러 판이 든다', () => {
     const runsToLevelUp = (level: CurriculumState['level']): number => {
       let s = at(level);
       let n = 0;
@@ -122,20 +125,24 @@ describe('진급', () => {
       }
       return n;
     };
-    expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([3, 3, 4, 4, 5, 5, 6, 7, 8]);
+    expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([2, 2, 3, 3, 3, 3, 4, 4, 4]);
+    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 우회전 마스터').toBe(4);
     for (let l = 1; l <= MAX_LEVEL; l++) {
-      expect(XP_TO_NEXT[l as 1] / XP_PER_CLEAN_RUN, `L${l} 은 한 판으로 오르지 않는다`).toBeGreaterThanOrEqual(3);
+      expect(XP_TO_NEXT[l as 1] / XP_PER_CLEAN_RUN, `L${l} 은 한 판으로 오르지 않는다`).toBeGreaterThanOrEqual(2);
     }
     for (let l = 2; l <= MAX_LEVEL; l++) {
       expect(XP_TO_NEXT[l as 1], `L${l}`).toBeGreaterThanOrEqual(XP_TO_NEXT[(l - 1) as 1]);
     }
-    expect(Object.values(XP_TO_NEXT).reduce((n, x) => n + x, 0) / XP_PER_CLEAN_RUN, '보통으로 마스터까지 새 맵 무위반 55판').toBe(55);
+    expect(Object.values(XP_TO_NEXT).reduce((n, x) => n + x, 0) / XP_PER_CLEAN_RUN, '보통으로 마스터까지 새 맵 무위반 32판').toBe(32);
   });
 
   it('난이도가 필요한 경험치를 늘리고 줄인다', () => {
-    expect(xpToNext(5, { xpScale: 0.5, missPenalty: 0 })).toBe(250);
-    expect(xpToNext(5, { xpScale: 1.5, missPenalty: 60 })).toBe(750);
-    expect(xpToNext(1, { xpScale: 0.5, missPenalty: 0 }), '아무리 쉬워도 한 판은 든다').toBeGreaterThan(0);
+    expect(xpToNext(5, { xpScale: 0.75, missPenalty: 0 })).toBe(250);
+    expect(xpToNext(5, { xpScale: 1.5, missPenalty: 60 })).toBe(450);
+    // 쉬움(×0.5)이어도 두 판 아래로는 내려가지 않는다 — 한 판은 운일 수 있다
+    for (let l = 1; l <= MAX_LEVEL; l++) {
+      expect(xpToNext(l as 1, { xpScale: 0.5, missPenalty: 0 }), `쉬움 L${l}`).toBeGreaterThan(XP_PER_CLEAN_RUN);
+    }
   });
 
   it('1레벨에서는 더 내려가지 않는다', () => {

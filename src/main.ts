@@ -221,7 +221,8 @@ async function makeAiScenario(): Promise<void> {
     lead: rollLeadTurn(),
     /* 설정의 난이도 1~5 — 같은 레벨 안에서 얼마나 복잡한 코스를 고를지 (scenarios/challenge.ts) */
     challenge: saveData.settings.difficulty,
-    xp: c.xp ?? 0,
+    // 필요한 양이 나중에 줄면(곡선 · 난이도를 바꿨을 때) 저장된 값이 넘친다 — AI 에게도 잘라서 준다 (ui/playerCard.ts)
+    xp: Math.min(c.xp ?? 0, xpToNext(c.level, challengeRule(saveData.settings.difficulty))),
     xpNeed: xpToNext(c.level, challengeRule(saveData.settings.difficulty)),
     cleanStreak: c.cleanStreak,
     missStreak: c.missStreak,

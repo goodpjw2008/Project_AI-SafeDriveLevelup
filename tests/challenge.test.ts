@@ -142,9 +142,9 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
   });
 
   it('어려움(5)은 위반한 판에서 60 을 잃고, 쉬움(1)은 잃지 않는다', () => {
-    const s = { ...at(6), xp: 200 };
-    expect(advance(s, miss, undefined, challengeRule(5)).next.xp).toBe(140);
-    expect(advance(s, miss, undefined, challengeRule(1)).next.xp).toBe(200);
+    const s = { ...at(6), xp: 100 };
+    expect(advance(s, miss, undefined, challengeRule(5)).next.xp).toBe(40);
+    expect(advance(s, miss, undefined, challengeRule(1)).next.xp).toBe(100);
   });
 
   it('경험치가 차도 레벨을 올리기 전에는 그 레벨의 차가 열리지 않는다', () => {
@@ -163,7 +163,8 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
       }
       return n;
     };
-    expect(until(1)).toBe(5);
-    expect(until(5)).toBe(15);
+    // 보통이 네 판(curriculum.ts 의 XP_TO_NEXT) — 쉬움은 절반, 어려움은 한 배 반
+    expect(until(1)).toBe(2);
+    expect(until(5)).toBe(6);
   });
 });

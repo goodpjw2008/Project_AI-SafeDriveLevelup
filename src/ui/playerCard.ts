@@ -43,6 +43,13 @@ export interface PlayerInfo {
 
 export type PlayerSize = 'lg' | 'md' | 'hud';
 
+/**
+ * **모은 경험치는 필요한 양을 넘겨 보이지 않는다.** 판을 마칠 때 막대는 필요한 양에서 멈추지만(curriculum.ts 의 advance),
+ * 필요한 양이 **나중에** 줄면 저장된 값이 넘친다 — 경험치 곡선을 줄였을 때(L6 500 → 300) "400 / 300 XP" 가 떴고,
+ * 난이도를 쉽게 바꿔도 같다. 넘친 몫은 다음 판에서 어차피 잘리므로(advance 의 `before`) 보여 줄 때도 자른다.
+ */
+const withinNeed = (p: PlayerInfo): PlayerInfo => (p.xp > p.need ? { ...p, xp: p.need } : p);
+
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
@@ -55,7 +62,8 @@ const branded = (text: string): string => withBrandChips(esc(text));
  * 막대가 찼는데 나쁜 습관이 남았으면 "습관을 고치면 오른다" 고 말한다 — 학습 루프(습관을 다 고쳐야 다음 레벨)가
  * 막대 바로 옆에 보여야, 잘했는데 왜 안 오르는지를 알 수 있다.
  */
-export function playerFoot(p: PlayerInfo): string {
+export function playerFoot(given: PlayerInfo): string {
+  const p = withinNeed(given);
   if (p.mastered) return `마스터 운행 — 처음부터 다시 시작하기 전까지 ${levelLabel(MAX_LEVEL)} 코스가 무작위로 이어집니다`;
   const target = p.level >= MAX_LEVEL ? '우회전 마스터' : levelLabel((p.level + 1) as Difficulty);
   if (p.xp >= p.need) {
@@ -71,10 +79,11 @@ export function playerFoot(p: PlayerInfo): string {
  * @param opts.aside 아랫줄 오른쪽에 붙일 것 (첫 화면의 레벨 길)
  */
 export function playerCard(
-  p: PlayerInfo,
+  given: PlayerInfo,
   size: PlayerSize,
   opts: { foot?: boolean; aside?: string } = {},
 ): string {
+  const p = withinNeed(given);
   const showFoot = opts.foot ?? size !== 'hud';
   const full = p.mastered || p.xp >= p.need;
   const pct = (v: number): number => (p.mastered ? 100 : Math.max(0, Math.min(100, (v / p.need) * 100)));
