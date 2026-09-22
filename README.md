@@ -12,7 +12,11 @@
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.\
 https://safeturn.vercel.app
 
-<a id="slide-01"></a><img src="docs/slides/01-cover.png" alt="AI 우회전 참교육 포트폴리오 — 표지" width="880">
+<a id="slide-01"></a>
+
+<br>
+
+<img src="docs/slides/01-cover.png" alt="AI 우회전 참교육 포트폴리오 — 표지" width="880">
 
 <p align="center">
   <img src="docs/nav/prev-off.svg" alt="" height="48" align="middle">
@@ -20,9 +24,11 @@ https://safeturn.vercel.app
   <a href="#slide-02"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-02"></a>
+
 <br>
 
-<a id="slide-02"></a><img src="docs/slides/02-intro.png" alt="들어가며 · AI 우회전 참교육을 만든 이유" width="880">
+<img src="docs/slides/02-intro.png" alt="들어가며 · AI 우회전 참교육을 만든 이유" width="880">
 
 <p align="center">
   <a href="#slide-01"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -30,9 +36,11 @@ https://safeturn.vercel.app
   <a href="#slide-03"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-03"></a>
+
 <br>
 
-<a id="slide-03"></a><img src="docs/slides/05-accidents.png" alt="① 필요성 · 법 개정 뒤에도 줄지 않은 우회전 사고" width="880">
+<img src="docs/slides/05-accidents.png" alt="① 필요성 · 법 개정 뒤에도 줄지 않은 우회전 사고" width="880">
 
 <p align="center">
   <a href="#slide-02"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -40,9 +48,11 @@ https://safeturn.vercel.app
   <a href="#slide-04"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-04"></a>
+
 <br>
 
-<a id="slide-04"></a><img src="docs/slides/06-news.png" alt="① 필요성 · 보도로 본 우회전 사고와 헷갈리는 규칙" width="880">
+<img src="docs/slides/06-news.png" alt="① 필요성 · 보도로 본 우회전 사고와 헷갈리는 규칙" width="880">
 
 <p align="center">
   <a href="#slide-03"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -50,9 +60,11 @@ https://safeturn.vercel.app
   <a href="#slide-05"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-05"></a>
+
 <br>
 
-<a id="slide-05"></a><img src="docs/slides/07-school-zone.png" alt="① 필요성 · 어린이보호구역 신호 없는 횡단보도의 일시정지" width="880">
+<img src="docs/slides/07-school-zone.png" alt="① 필요성 · 어린이보호구역 신호 없는 횡단보도의 일시정지" width="880">
 
 <p align="center">
   <a href="#slide-04"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -60,9 +72,11 @@ https://safeturn.vercel.app
   <a href="#slide-06"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-06"></a>
+
 <br>
 
-<a id="slide-06"></a><img src="docs/slides/08-ai-vs-lecture.png" alt="② AI가 필요한 이유 · 이론 · 영상 교육의 한계" width="880">
+<img src="docs/slides/08-ai-vs-lecture.png" alt="② AI가 필요한 이유 · 이론 · 영상 교육의 한계" width="880">
 
 <p align="center">
   <a href="#slide-05"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -70,9 +84,11 @@ https://safeturn.vercel.app
   <a href="#slide-07"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-07"></a>
+
 <br>
 
-<a id="slide-07"></a><img src="docs/slides/09-ai-loop.png" alt="② AI가 필요한 이유 · 습관이 고쳐질 때까지 이끄는 AI" width="880">
+<img src="docs/slides/09-ai-loop.png" alt="② AI가 필요한 이유 · 습관이 고쳐질 때까지 이끄는 AI" width="880">
 
 <p align="center">
   <a href="#slide-06"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -80,9 +96,11 @@ https://safeturn.vercel.app
   <a href="#slide-08"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-08"></a>
+
 <br>
 
-<a id="slide-08"></a><img src="docs/slides/11-pc-mobile.png" alt="① PC와 모바일 모두 지원" width="880">
+<img src="docs/slides/11-pc-mobile.png" alt="① PC와 모바일 모두 지원" width="880">
 
 <p align="center">
   <a href="#slide-07"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -90,9 +108,11 @@ https://safeturn.vercel.app
   <a href="#slide-09"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-09"></a>
+
 <br>
 
-<a id="slide-09"></a><img src="docs/slides/12-start.png" alt="② 안전운전 연습과 AI 분석 시작" width="880">
+<img src="docs/slides/12-start.png" alt="② 안전운전 연습과 AI 분석 시작" width="880">
 
 <p align="center">
   <a href="#slide-08"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -100,9 +120,11 @@ https://safeturn.vercel.app
   <a href="#slide-10"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-10"></a>
+
 <br>
 
-<a id="slide-10"></a><img src="docs/slides/13-habit-analysis.png" alt="③ 운전 습관 분석과 코스 범위" width="880">
+<img src="docs/slides/13-habit-analysis.png" alt="③ 운전 습관 분석과 코스 범위" width="880">
 
 <p align="center">
   <a href="#slide-09"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -110,9 +132,11 @@ https://safeturn.vercel.app
   <a href="#slide-11"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-11"></a>
+
 <br>
 
-<a id="slide-11"></a><img src="docs/slides/14-ai-recommend.png" alt="④ 운전자에게 맞는 맵 추천" width="880">
+<img src="docs/slides/14-ai-recommend.png" alt="④ 운전자에게 맞는 맵 추천" width="880">
 
 <p align="center">
   <a href="#slide-10"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -120,9 +144,11 @@ https://safeturn.vercel.app
   <a href="#slide-12"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-12"></a>
+
 <br>
 
-<a id="slide-12"></a><img src="docs/slides/15-guide-bubble.png" alt="⑤ 말풍선으로 주는 안전 안내" width="880">
+<img src="docs/slides/15-guide-bubble.png" alt="⑤ 말풍선으로 주는 안전 안내" width="880">
 
 <p align="center">
   <a href="#slide-11"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -130,9 +156,11 @@ https://safeturn.vercel.app
   <a href="#slide-13"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-13"></a>
+
 <br>
 
-<a id="slide-13"></a><img src="docs/slides/16-pedestrian-mark.png" alt="⑥ 보행자 느낌표와 바닥 색 표시" width="880">
+<img src="docs/slides/16-pedestrian-mark.png" alt="⑥ 보행자 느낌표와 바닥 색 표시" width="880">
 
 <p align="center">
   <a href="#slide-12"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -140,9 +168,11 @@ https://safeturn.vercel.app
   <a href="#slide-14"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-14"></a>
+
 <br>
 
-<a id="slide-14"></a><img src="docs/slides/17-result-perfect.png" alt="⑦ AI 결과 분석 - 규정을 지킨 PERFECT 결과 화면" width="880">
+<img src="docs/slides/17-result-perfect.png" alt="⑦ AI 결과 분석 - 규정을 지킨 PERFECT 결과 화면" width="880">
 
 <p align="center">
   <a href="#slide-13"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -150,9 +180,11 @@ https://safeturn.vercel.app
   <a href="#slide-15"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-15"></a>
+
 <br>
 
-<a id="slide-15"></a><img src="docs/slides/18-result-violation.png" alt="⑧ AI 결과 분석 - 규정을 어긴 VIOLATION 결과 화면" width="880">
+<img src="docs/slides/18-result-violation.png" alt="⑧ AI 결과 분석 - 규정을 어긴 VIOLATION 결과 화면" width="880">
 
 <p align="center">
   <a href="#slide-14"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -160,9 +192,11 @@ https://safeturn.vercel.app
   <a href="#slide-16"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-16"></a>
+
 <br>
 
-<a id="slide-16"></a><img src="docs/slides/19-right-turn.png" alt="우회전 방법" width="880">
+<img src="docs/slides/19-right-turn.png" alt="우회전 방법" width="880">
 
 <p align="center">
   <a href="#slide-15"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -170,9 +204,11 @@ https://safeturn.vercel.app
   <a href="#slide-17"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-17"></a>
+
 <br>
 
-<a id="slide-17"></a><img src="docs/slides/20-school-zone-guide.png" alt="어린이보호구역 운전 방법" width="880">
+<img src="docs/slides/20-school-zone-guide.png" alt="어린이보호구역 운전 방법" width="880">
 
 <p align="center">
   <a href="#slide-16"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -180,9 +216,11 @@ https://safeturn.vercel.app
   <a href="#slide-18"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-18"></a>
+
 <br>
 
-<a id="slide-18"></a><img src="docs/slides/22-online.png" alt="① 온라인 - 전국민 생활형 안전운전 연습" width="880">
+<img src="docs/slides/22-online.png" alt="① 온라인 - 전국민 생활형 안전운전 연습" width="880">
 
 <p align="center">
   <a href="#slide-17"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -190,9 +228,11 @@ https://safeturn.vercel.app
   <a href="#slide-19"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-19"></a>
+
 <br>
 
-<a id="slide-19"></a><img src="docs/slides/23-offline.png" alt="② 오프라인 - 실습하며 배우는 안전운전 교육" width="880">
+<img src="docs/slides/23-offline.png" alt="② 오프라인 - 실습하며 배우는 안전운전 교육" width="880">
 
 <p align="center">
   <a href="#slide-18"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -200,9 +240,11 @@ https://safeturn.vercel.app
   <a href="#slide-20"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-20"></a>
+
 <br>
 
-<a id="slide-20"></a><img src="docs/slides/24-effect.png" alt="기대효과" width="880">
+<img src="docs/slides/24-effect.png" alt="기대효과" width="880">
 
 <p align="center">
   <a href="#slide-19"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -210,9 +252,11 @@ https://safeturn.vercel.app
   <a href="#slide-21"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-21"></a>
+
 <br>
 
-<a id="slide-21"></a><img src="docs/slides/21-about.png" alt="About · 라이선스" width="880">
+<img src="docs/slides/21-about.png" alt="About · 라이선스" width="880">
 
 <p align="center">
   <a href="#slide-20"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
@@ -220,9 +264,11 @@ https://safeturn.vercel.app
   <a href="#slide-22"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
 </p>
 
+<a id="slide-22"></a>
+
 <br>
 
-<a id="slide-22"></a><img src="docs/slides/25-closing.png" alt="감사합니다" width="880">
+<img src="docs/slides/25-closing.png" alt="감사합니다" width="880">
 
 <p align="center">
   <a href="#slide-21"><img src="docs/nav/prev.svg" alt="이전 장" height="48" align="middle"></a>
