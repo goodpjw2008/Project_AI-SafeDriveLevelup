@@ -12,9 +12,13 @@
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.\
 https://safeturn.vercel.app
 
-<a href="https://safeturn.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 우회전 참교육 포트폴리오 — 장표 22장이 저절로 넘어갑니다. 누르면 한 장씩 넘겨 보는 페이지가 열립니다" width="880"></a>
+<img src="docs/slides/01-cover.png" alt="AI 우회전 참교육 포트폴리오 — 표지" width="880">
 
-장표가 저절로 넘어갑니다. **그림을 누르면** 방향키나 손가락으로 한 장씩 넘겨 볼 수 있습니다.
+<p align="center">
+  <img src="docs/nav/prev-off.svg" alt="" height="48" align="middle">
+  &nbsp;&nbsp;<b>01 / 22</b>&nbsp;&nbsp;
+  <a href="portfolio/02.md"><img src="docs/nav/next.svg" alt="다음 장" height="48" align="middle"></a>
+</p>
 
 ---
 
