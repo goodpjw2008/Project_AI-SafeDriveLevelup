@@ -396,8 +396,11 @@ let autoNextLeft = 0;
 let autoNextHeld = false;
 /** 다 세면 시작할 판 */
 let autoNextTarget = 0;
-/** 시범 주행의 마지막 판 뒤 첫 화면으로 돌아가는 시계 — 화면을 떠나면 함께 끈다 (stopAutoNext) */
-let autoHomeTimer = 0;
+/**
+ * 다 세면 판을 시작하는 대신 할 일 — 시범 주행의 마지막 판은 **첫 화면으로** 돌아간다 (finishDemoRun).
+ * 따로 시계를 두면 화면에 남은 초가 안 보여, 같은 카운트다운으로 센다.
+ */
+let autoNextThen: (() => void) | null = null;
 
 /**
  * 남은 초를 세다가 다음 Stage 를 시작한다.
@@ -405,7 +408,7 @@ let autoHomeTimer = 0;
  * `setInterval` 한 벌만 쓴다 — 화면에 그리는 것과 실제로 넘기는 것이 같은 시계를 봐야
  * "1" 을 보여 놓고 2초 뒤에 넘어가는 일이 없다.
  */
-function startAutoNext(nextId: number): void {
+function startAutoNext(nextId: number, then?: () => void): void {
   stopAutoNext();
   /*
     **결과 화면에 있을 때만 센다.** 세기 시작하는 때는 코치 문장이 도착한 뒤인데(onCoachReady), AI 가 답을 쓰는
@@ -415,6 +418,7 @@ function startAutoNext(nextId: number): void {
   */
   if (nav.current !== 'debrief') return;
   autoNextTarget = nextId;
+  autoNextThen = then ?? null;
   autoNextLeft = AUTO_NEXT_SECONDS;
   autoNextHeld = false;
   screens.setAutoNextCountdown(autoNextLeft);
@@ -433,7 +437,12 @@ function runAutoNextClock(): void {
     autoNextLeft -= 1;
     if (autoNextLeft <= 0) {
       const next = autoNextTarget;
+      const then = autoNextThen;
       stopAutoNext();
+      if (then) {
+        then();
+        return;
+      }
       /*
         AI 과정에서는 '다음' 이 **다음 번호의 판이 아니라 다음에 만들어질 판**이다.
         번호를 하나 올려 봐야 그런 판은 없다.
@@ -474,8 +483,7 @@ function toggleAutoNextHold(): void {
 function stopAutoNext(): void {
   if (autoNextTimer) window.clearInterval(autoNextTimer);
   autoNextTimer = 0;
-  if (autoHomeTimer) window.clearTimeout(autoHomeTimer);
-  autoHomeTimer = 0;
+  autoNextThen = null;
   autoNextLeft = 0;
   autoNextHeld = false;
   screens.setAutoNextCountdown(null);
@@ -1594,20 +1602,28 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
     name: 'debrief',
     enter: () => {
       screens.show('debrief');
-      screens.renderDebrief(sc, result, false, saveData, {
-        onRetry: () => goRun(sc.id, true),
-        onNext: () => (nextId !== undefined ? goRun(nextId, true) : goHome()),
-        onMenu: goHome,
-        onToggleAutoNext: () => undefined,
-        onToggleAutoNextPause: () => toggleAutoNextHold(),
-        // 자율 주행은 AI 가 규정대로 몬 판 — AI 주행결과 분석은 띄우지 않는다 (사용자 요청)
-      }, null, [], { coach: false });
-      if (nextId !== undefined) startAutoNext(nextId);
-      // 마지막 시범 판 — 잠시 결과를 보여 준 뒤 첫 화면으로. 그 사이 떠났으면 끈다 (stopAutoNext · autoHomeTimer)
-      else autoHomeTimer = window.setTimeout(() => {
-        autoHomeTimer = 0;
-        if (nav.current === 'debrief') goHome();
-      }, AUTO_NEXT_SECONDS * 1000);
+      screens.renderDebrief(
+        sc,
+        result,
+        false,
+        saveData,
+        {
+          onRetry: () => goRun(sc.id, true),
+          onNext: () => (nextId !== undefined ? goRun(nextId, true) : goHome()),
+          onMenu: goHome,
+          onToggleAutoNext: () => undefined,
+          onToggleAutoNextPause: () => toggleAutoNextHold(),
+        },
+        null,
+        [],
+        /*
+          **자율 주행** — AI 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적는다, 다음 시범 코스(마지막이면 첫 화면)로 가는
+          버튼과 카운트다운은 일반 판과 같은 자리에 둔다 (사용자 요청 — Screens.renderDebrief 의 options.demo).
+        */
+        { demo: { nextLabel: nextId !== undefined ? '다음 시범 코스' : '첫 화면으로' } },
+      );
+      // 마지막 시범 판은 다 세면 첫 화면으로 — 같은 카운트다운이 남은 초를 보여 준다
+      startAutoNext(nextId ?? sc.id, nextId === undefined ? goHome : undefined);
     },
   });
 }

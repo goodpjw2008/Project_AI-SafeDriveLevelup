@@ -1463,13 +1463,17 @@ export class Screens {
     course: CourseStep | null = null,
     /** 이번 판에 얻거나 잃은 뱃지 (economy/badges.ts) — 없으면 뱃지 줄을 그리지 않는다 */
     badgeEvents: readonly BadgeEvent[] = [],
-    /** `coach: false` 면 AI 주행결과 분석 칸을 그리지도 부르지도 않는다 — 자율 주행 (main.ts 의 finishDemoRun) */
-    options: { coach?: boolean } = {},
+    /**
+     * **자율 주행의 결과 화면** (main.ts 의 finishDemoRun). AI 주행결과 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적고,
+     * 다음 시범 코스(마지막이면 첫 화면)로 가는 버튼과 카운트다운을 일반 판과 같은 자리에 둔다.
+     */
+    options: { demo?: { nextLabel: string } } = {},
   ): void {
     // 등급 이름은 판정 엔진이 정한다 — 주행 기록도 같은 표를 쓴다 (lawRules.ts 의 GRADE_TEXT)
     const gradeLabel = GRADE_TEXT[result.grade] ?? result.grade;
     // AI 과정은 늘 다음 판이 있다 — 마스터가 된 뒤에도 마스터 운행(L10 무작위)이 이어진다
-    const hasNext = course ? true : sc.id < SCENARIOS.length;
+    // 자율 주행은 다음 시범 코스(마지막이면 첫 화면)로 늘 넘어간다 — 번호가 라이브러리 번호라 스테이지 수와 견줄 수 없다
+    const hasNext = options.demo ? true : course ? true : sc.id < SCENARIOS.length;
     /*
       자동 넘김은 **이어 달릴 수 있을 때만** 뜬다 — 다음 판이 있고, 실패하지 않았을 때.
       실패한 판을 자동으로 넘기면 방금 틀린 것을 다시 해 보지 않고 지나가게 된다.
@@ -1487,7 +1491,9 @@ export class Screens {
       "더 어려운 난이도" 라고 적으면 학습자가 자기 성적을 잘못 읽는다 — 버튼 하나가
       방금 무슨 일이 있었는지를 말해 주는 자리다.
     */
-    const nextLabel = !course
+    const nextLabel = options.demo
+      ? options.demo.nextLabel
+      : !course
       ? '다음 Stage'
       : course.mastered
         ? '다음 판 · 마스터 운행'
@@ -1524,10 +1530,11 @@ export class Screens {
       이었다. AI 활용 공모전 작품에서 잘 달린 판일수록 AI 가 사라지는 셈이라, 무위반 판에도 부른다 —
       프롬프트에 '위반이 없는 경우' 절이 이미 있어 잘한 판단을 짚어 준다 (server/coachPrompt.mjs).
 
-      **자율 주행만은 부르지 않는다** (options.coach === false). AI 가 규정대로 몬 판이라 코치가 짚을 것이 없고 —
-      사용자가 "자율주행일 때는 AI 분석결과가 필요없어" 라고 했다 — 부르면 무료 AI 한도만 쓴다.
+      **자율 주행만은 AI 에게 묻지 않는다** (options.demo). AI 가 규정대로 몬 판이라 짚을 것이 없고, 부르면 무료 AI
+      한도만 쓴다. 다만 **칸은 둔다** — 사용자가 정했다: "AI 분석결과 화면은 나오고 … 자율주행은 교통법규를 준수하는
+      주행으로 AI가 분석을 하지 않습니다 라고 적어 줘." 늘 있던 자리가 비면 고장처럼 보인다.
     */
-    const needsCoach = options.coach !== false;
+    const needsCoach = !options.demo;
     // 위반도 실패도 없었는가 — AI 평가 칸의 색과 로봇이 이걸 따른다 (아래 verdict)
     const clean = result.violations.length === 0 && result.failReason === null;
 
@@ -1671,7 +1678,15 @@ export class Screens {
                 </div>
               </div>
             </div>`
-          : ''
+          : options.demo
+            ? `<div class="verdict good" id="coach-card">
+              <div class="verdict-head">${icon('guide')}<span id="coach-head">AI 주행결과 분석</span></div>
+              <div class="verdict-row">
+                <img class="verdict-robot" src="${robotTurn}" alt="" aria-hidden="true" />
+                <div class="coach-body" id="coach-body">자율주행은 교통법규를 준수하는 주행으로 AI가 분석을 하지 않습니다.</div>
+              </div>
+            </div>`
+            : ''
       }
 
       <!--
@@ -1747,7 +1762,8 @@ export class Screens {
             있어야 남은 초가 왜 세어지는지 알 수 있다. 한때 버튼 아래 줄에 따로 있었는데, 결과 화면
             윗부분이 두 줄을 차지해 정산 · 지도가 그만큼 밀려 내려갔다.
           */
-          canAdvance
+          // 자율 주행은 늘 다음 시범 코스로 넘어간다 — 끄고 켤 것이 없다 (멈춤 버튼은 그대로 둔다)
+          canAdvance && !options.demo
             ? `<label class="auto-next">
                  <input type="checkbox" id="chk-auto-next" ${
                    save.settings.autoNextStage ? 'checked' : ''
@@ -1843,8 +1859,9 @@ export class Screens {
 
     if (canAdvance) {
       $('btn-next').addEventListener('click', handlers.onNext);
-      const chk = $('chk-auto-next') as HTMLInputElement;
-      chk.addEventListener('change', () => handlers.onToggleAutoNext(chk.checked));
+      // 자율 주행에는 체크가 없다 (위) — 있을 때만 묶는다
+      const chk = document.getElementById('chk-auto-next') as HTMLInputElement | null;
+      chk?.addEventListener('change', () => handlers.onToggleAutoNext(chk.checked));
       $('btn-auto-pause').addEventListener('click', handlers.onToggleAutoNextPause);
     }
   }
