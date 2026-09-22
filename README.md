@@ -9,10 +9,10 @@
 
 아빠 차를 타며 헷갈리는 상황들을 많이 봤었습니다. 그리고 AI를 활용해서 훈련하는 곳을 만들면 많은 사람들이 교통법규도 잘 지키고 안전하게 운전을 할 수 있을 것 같아서 만들게 되었습니다.
 
-AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.\
-https://safeturn.vercel.app
+AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.
 
-**포트폴리오** — https://safeturn.vercel.app/AI_safeturn_portfolio.html
+* 서비스 주소 : https://safeturn.vercel.app
+* 포트폴리오 : https://safeturn.vercel.app/AI_safeturn_portfolio.html
 
 <a href="https://safeturn.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 우회전 참교육 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
 
