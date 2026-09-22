@@ -122,6 +122,22 @@ const REPEAT_WINDOW = 10;
 const NONE_EXTRA = (axis: string, e: LibraryEntry): number =>
   axis === 'c' && e.tags.c === 'none' ? 2 : 1;
 
+/**
+ * **신호기 없는 보호구역은 되풀이 감점을 절반만 받는다.**
+ *
+ * 신호 있음 · 없음의 비율은 이미 보호구역 차례가 정한다(scenarios.ts 의 `ZONE_NO_SIGNAL_CHANCE`). 여기서 또
+ * 온전히 깎으면 두 번 거르는 셈인데, 보호구역 종류 셋 중 무신호가 가장 자주 나오니 늘 무신호만 깎였다. 보호구역
+ * 판이 차례와 상관없이 섞이는 레벨(보호구역을 여는 L2 · 종합 L8~L10)에서 무신호 차례가 오면 보호구역이 아닌
+ * 판에 밀려(L10: 신호 차례에 보호구역 93% · 무신호 차례에 57%), 무신호 비율이 51~56% 로 다른 레벨(58~68%)보다
+ * 낮았다 — 사용자가 "각 레벨별로 어린이보호구역에 신호없는 횡단보도가 고르게 나오게" 해 달라고 했다.
+ *
+ * **0 이 아니라 절반이다.** 아예 빼 보니 반대로 L2 · L8~L10 이 71~76% 로 치솟고 종합 레벨의 보호구역 판이
+ * 80~90% 가 되었다. 절반이면 레벨마다 58~67% 로 가장 고르다 (레벨마다 1,000판 모의 주행). 신호 있는 두 종류끼리의
+ * 되풀이는 그대로 깎는다.
+ */
+const CORE_REPEAT = (axis: string, e: LibraryEntry): number =>
+  axis === 'zoneKind' && zoneKindOf(e.tags) === 'noSignal' ? 0.5 : 1;
+
 /** 최근에 나온 축 값의 수 — `axis=value` → 몇 번 (아래 `scoreOf` 가 깎는 근거) */
 export type SeenShapes = ReadonlyMap<string, number>;
 
@@ -400,8 +416,8 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
     보호구역만 해도 신호 1,632 · 무신호 1,632 로 반반이라, 차례가 와도 절반은 핵심이 아닌 판이었다
     (사용자가 짚었다). 이 게임의 핵심은 제27조 제7항, **신호기 없는 보호구역 횡단보도**다.
 
-    **개념이 열린 뒤부터만 건다.** 무신호 판은 낮은 레벨에 거의 없어(L2·L3), 열리기 전에 걸면
-    1·2 티어가 늘 비어 차례가 아무 뜻이 없어진다.
+    **개념이 열린 뒤부터만 건다.** 무신호 보호구역은 보호구역과 함께 L2 에서 열리므로(library.ts 의
+    conceptStage) L1 에는 걸지 않는다 — L1 에는 보호구역 판이 몇 개뿐이라 걸면 1·2 티어가 늘 빈다.
   */
   const opensNoSignalZone = combined || plan.level >= noSignalZoneLevel();
   /*
@@ -591,7 +607,7 @@ function scoreOf(
   let s = 0;
   // 최근에 나온 모양은 깎는다 (위 REPEAT_PENALTY) — 번호만 다른 같은 장면을 막는다
   for (const axis of Object.keys(REPEAT_PENALTY) as (keyof typeof REPEAT_PENALTY)[]) {
-    s -= (seen.get(`${axis}=${axisValue(e, axis)}`) ?? 0) * REPEAT_PENALTY[axis] * NONE_EXTRA(axis, e);
+    s -= (seen.get(`${axis}=${axisValue(e, axis)}`) ?? 0) * REPEAT_PENALTY[axis] * NONE_EXTRA(axis, e) * CORE_REPEAT(axis, e);
   }
   if (plan.target && e.targets.includes(plan.target as ViolationCode)) s += 6;
   for (const t of e.targets) if (habits.has(t)) s += 1;

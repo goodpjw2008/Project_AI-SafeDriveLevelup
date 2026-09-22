@@ -24,6 +24,7 @@ import {
   layersOf,
   levelGuide,
   L1_EXCLUDES,
+  zoneKindOf,
 } from '../src/scenarios/library';
 import { GENERATED_ID_BASE, SCENARIOS } from '../src/scenarios/scenarios';
 import { challengeRule } from '../src/scenarios/challenge';
@@ -216,7 +217,8 @@ describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
   it('쉬운 판이 낮은 레벨에 선다 — 개념은 차례로 열린다', () => {
     const at = (key: string) => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].find((l) => levelGuide(l).includes(key))!;
     expect(at('arrow')).toBeLessThan(at('zone'));
-    expect(at('zone')).toBeLessThan(at('noSignalZone'));
+    // 신호기 없는 보호구역은 보호구역과 함께 연다 — 이 게임의 핵심이라 뒤로 미루지 않는다 (conceptStage)
+    expect(at('noSignalZone')).toBe(at('zone'));
     expect(at('noSignalZone')).toBeLessThan(at('lead'));
     expect(at('lead')).toBeLessThanOrEqual(at('rolling'));
     expect(at('lead')).toBeLessThanOrEqual(at('several'));
@@ -264,6 +266,24 @@ describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
       const ratio = es.filter((e) => e.tags.env === 'night').length / es.length;
       expect(Math.abs(ratio - overall), `L${l} ${(ratio * 100).toFixed(1)}%`).toBeLessThan(0.01);
     }
+  });
+
+  /*
+    **보호구역 판 중 신호기 없는 판이 레벨마다 고르게** — 사용자가 "각 레벨별로 어린이보호구역에 신호없는 횡단보도가
+    고르게 나오게" 해 달라고 했다. 신호기 없는 쪽을 한 단계 늦은 개념으로 줄 세우던 때는 L2 3% · L3 18% · L5 85% 였다.
+    보호구역이 열리는 L2 부터 본다 (L1 의 보호구역 판은 몇 개뿐이라 비율이 뜻이 없다).
+  */
+  it('보호구역 판 중 신호기 없는 판의 비율이 L2 ~ L10 에서 고르다', () => {
+    const lib = scenarioLibrary();
+    const ratios: number[] = [];
+    for (let l = 2; l <= 10; l++) {
+      const zone = lib.filter((e) => e.level === l && zoneKindOf(e.tags) !== 'none');
+      const ratio = zone.filter((e) => zoneKindOf(e.tags) === 'noSignal').length / zone.length;
+      expect(zone.length, `L${l} 보호구역 판`).toBeGreaterThan(20);
+      expect(ratio, `L${l} 무신호 ${(ratio * 100).toFixed(0)}%`).toBeGreaterThanOrEqual(0.45);
+      ratios.push(ratio);
+    }
+    expect(Math.max(...ratios) - Math.min(...ratios), '가장 높은 레벨과 낮은 레벨의 차').toBeLessThan(0.12);
   });
 });
 

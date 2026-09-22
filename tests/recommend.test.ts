@@ -18,6 +18,7 @@ import { parseReply, sanitize } from '../server/recommendHandler.mjs';
 import { HABIT_CLEARED_AFTER } from '../src/coach/badHabits';
 import type { HabitSummary } from '../src/coach/habits';
 import type { Plan } from '../src/scenarios/generate';
+import type { Difficulty } from '../src/scenarios/curriculum';
 import { libraryEntry } from '../src/scenarios/library';
 import { isCombinedLevel, levelGuide } from '../src/scenarios/library';
 import {
@@ -472,7 +473,7 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
   };
 
   /** 실제 흐름대로 n 판을 이어 달린다 (main.ts 의 plan 만들기와 같은 순서) */
-  const run = (level: 1 | 4 | 7 | 8, n: number) => {
+  const run = (level: Difficulty, n: number) => {
     const rnd = fixed();
     const played: number[] = [];
     const out: LibraryEntry[] = [];
@@ -539,6 +540,25 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
     const kinds = new Set(zone.map((e) => zoneKindOf(e.tags)));
     expect(kinds.has('noSignal'), '무신호를 겪는다').toBe(true);
     expect(kinds.size, `겪은 보호구역 종류 ${[...kinds].join(',')}`).toBeGreaterThanOrEqual(2);
+  });
+
+  /*
+    **레벨마다 고르게** — 사용자가 "각 레벨별로 어린이보호구역에 신호없는 횡단보도가 고르게 나오게" 해 달라고 했다.
+    고치기 전(레벨마다 300판 모의 주행)은 L1 · L2 0% · L3 30% · L5 73% 였다. 신호기 없는 보호구역을 보호구역과 같은
+    개념 단계로 두고(library.ts 의 conceptStage), 되풀이 감점을 절반만 걸어(CORE_REPEAT) 레벨마다 60% 안팎이 되었다.
+    보호구역이 열리는 L2 부터 본다.
+  */
+  it('보호구역 판 중 신호기 없는 판의 비율이 L2 ~ L10 에서 고르다', () => {
+    const ratios = ([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((level) => {
+      const zone = run(level, 160).filter((e) => zoneKindOf(e.tags) !== 'none');
+      return zone.filter((e) => zoneKindOf(e.tags) === 'noSignal').length / zone.length;
+    });
+    const shown = ratios.map((r, i) => `L${i + 2} ${(r * 100).toFixed(0)}%`).join(' · ');
+    for (const r of ratios) {
+      expect(r, shown).toBeGreaterThanOrEqual(0.5);
+      expect(r, shown).toBeLessThanOrEqual(0.8);
+    }
+    expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.2);
   });
 
   /*
