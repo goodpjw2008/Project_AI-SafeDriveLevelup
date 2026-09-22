@@ -3831,10 +3831,6 @@
       #t-up {
         grid-area: 1 / 2;
       }
-      #t-signal {
-        grid-area: 1 / 3;
-        font-size: 11px;
-      }
       #t-left {
         grid-area: 2 / 1;
       }
@@ -3852,10 +3848,6 @@
       #t-down.on {
         background: rgba(255, 69, 58, 0.88);
         color: #fff;
-      }
-      #t-signal.on {
-        background: rgba(255, 176, 32, 0.88);
-        color: #171100;
       }
 
       /*
@@ -3883,16 +3875,20 @@
       body.touch .keyhints {
         display: none;
       }
-      /* 방향키 십자(아래 12px + 높이 190px) 위 — 폭이 넓어도 방향키 위로 올라가 겹치지 않는다 */
+      /*
+        **플레이어 칸은 출발(↑) 버튼과 같은 줄**에 둔다 (사용자 요청). 아래 끝을 ↑ 의 아래 끝(12 + 60 + 5 + 60 + 5 =
+        142px)에 맞추고, 폭은 ↑ 왼쪽까지만 쓴다 — ↑ 의 왼쪽 끝이 화면 오른쪽에서 12 + 60 + 5 + 60 = 137px 이라
+        그보다 13px 더 비워 둔다. 예전에는 방향키 위(218px)에 넓게 떠 있어 차 뒤를 가렸다.
+      */
       body.touch .hud-player {
         left: max(12px, env(safe-area-inset-left));
-        bottom: 218px;
-        width: min(62vw, 300px);
+        bottom: calc(max(12px, env(safe-area-inset-bottom)) + 130px);
+        width: min(calc(100vw - 162px), 300px);
       }
       /* 자율 주행 표시도 같은 자리 — 그때는 플레이어 칸이 숨는다 */
       body.touch .hud-auto {
         left: max(12px, env(safe-area-inset-left));
-        bottom: 218px;
+        bottom: calc(max(12px, env(safe-area-inset-bottom)) + 130px);
       }
 
       /* 주행 지도 — 어디서 걸렸는지 */
@@ -5022,12 +5018,11 @@
       <!-- ── 모바일 컨트롤 ─────────────────────────────────────── -->
       <!--
         **키보드 방향키와 같은 모양** — 위(출발) · 좌 · 우 · 아래(정지)를 십자로 (사용자 요청).
-        깜빡이는 십자의 빈 오른쪽 위 칸에 둔다 — 키보드에서 Q 로 켜고 끄는 것을 손가락 하나 거리에.
+        깜빡이 버튼은 두지 않는다 — 판을 시작하면 저절로 켜져 있어 누를 일이 없다 (사용자 요청).
       -->
       <div id="touch">
         <div class="dpad">
           <div class="tbtn" id="t-up" aria-label="출발"><span class="ar">▲</span><span class="lb">출발</span></div>
-          <div class="tbtn" id="t-signal" aria-label="깜빡이">깜빡이</div>
           <div class="tbtn" id="t-left" aria-label="왼쪽"><span class="ar">◀</span></div>
           <div class="tbtn" id="t-right" aria-label="오른쪽"><span class="ar">▶</span></div>
           <div class="tbtn" id="t-down" aria-label="정지"><span class="ar">▼</span><span class="lb">정지</span></div>

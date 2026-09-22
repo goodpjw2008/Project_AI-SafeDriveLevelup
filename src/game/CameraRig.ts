@@ -170,7 +170,8 @@ export class CameraRig {
   private driverFov(): number {
     const targetHalf = (76 * Math.PI) / 180; // 우 65° 거울 + 여유 11° (거울 바깥 테두리까지)
     const vertical = 2 * Math.atan(Math.tan(targetHalf) / this.camera.aspect);
-    return clamp((vertical * 180) / Math.PI, 74, 90);
+    // 세로로 긴 화면(휴대폰 세로)은 상한을 조금 더 연다 — 90° 로는 가로가 49° 밖에 안 담긴다 (아래 PORTRAIT_MAX_FOV)
+    return clamp((vertical * 180) / Math.PI, 74, this.camera.aspect < 1 ? PORTRAIT_MAX_FOV : 90);
   }
 
   cycle(): ViewMode {
@@ -260,7 +261,10 @@ export class CameraRig {
         pos.z + lf.z * 14,
       );
       // 속도가 붙으면 조금 더 넓혀 속도감을 준다. 다만 총량은 묶는다 — 더 넓히면 어안처럼 휜다
-      fov = Math.min(92, this.driverFov() + Math.min(8, vehicle.speedKmh * 0.07));
+      fov = Math.min(
+        this.camera.aspect < 1 ? PORTRAIT_MAX_FOV + 2 : 92,
+        this.driverFov() + Math.min(8, vehicle.speedKmh * 0.07),
+      );
       // 운전석 시점은 지연 없이 붙는다 — 지연이 있으면 멀미가 난다
       this.smoothPos.copy(pos);
       this.smoothTarget.lerp(target, this.initialized ? Math.min(1, dt * 14) : 1);
@@ -271,7 +275,7 @@ export class CameraRig {
         vehicle.z - f.z * (dims.length * 1.9 + 3.2) + right.z * 0.4,
       );
       target = new THREE.Vector3(vehicle.x + f.x * 8, dims.height * 0.7, vehicle.z + f.z * 8);
-      fov = 66 + Math.min(12, vehicle.speedKmh * 0.11);
+      fov = fitHorizontal(66 + Math.min(12, vehicle.speedKmh * 0.11), this.camera.aspect, CHASE_MIN_HFOV);
       const k = this.initialized ? Math.min(1, dt * 6.5) : 1;
       this.smoothPos.lerp(pos, k);
       this.smoothTarget.lerp(target, k);
@@ -304,7 +308,7 @@ export class CameraRig {
       // 완전한 수직 부감은 차의 방향이 안 보인다. 남쪽으로 조금 물려 살짝 기울인다.
       pos = new THREE.Vector3(fx, h, fz + 14);
       target = new THREE.Vector3(fx, 0, fz);
-      fov = 55;
+      fov = fitHorizontal(55, this.camera.aspect, TOP_MIN_HFOV);
       const k = this.initialized ? Math.min(1, dt * 4) : 1;
       this.smoothPos.lerp(pos, k);
       this.smoothTarget.lerp(target, k);
@@ -333,6 +337,39 @@ export class CameraRig {
       this.camera.updateProjectionMatrix();
     }
   }
+}
+
+/*
+  ── 세로로 긴 화면 (휴대폰 세로) ────────────────────────────────────────
+
+  three.js 의 화각(`fov`)은 **세로**라, 화면이 세로로 길어지면 좌우로 담기는 범위가 그만큼 줄어든다. 후방 시점의
+  세로 66° 는 가로로 긴 PC 화면(16:9)에서 가로 98° 를 담지만, 휴대폰 세로(390×844)에서는 **가로 33°** 뿐이라 내 차
+  양옆의 횡단보도 · 보행자 · 신호등이 화면 밖으로 밀렸다 (사용자가 짚었다: "좌우 주변이 보이지 않아").
+
+  그래서 세로로 긴 화면에서는 **가로가 적어도 이만큼은 담기게** 세로 화각을 넓힌다. 끝없이 넓히면 화면 위아래가
+  어안렌즈처럼 늘어나므로 세로 화각의 상한을 둔다 — 휴대폰 세로에서 후방 시점의 가로가 33° → 약 57° 로 넓어진다.
+*/
+/** 세로로 긴 화면에서 세로 화각을 이보다 넓히지 않는다 (°) — 더 넓히면 화면 위아래가 늘어나 보인다 */
+export const PORTRAIT_MAX_FOV = 100;
+/** 후방 시점이 적어도 담아야 할 가로 화각 (°) */
+const CHASE_MIN_HFOV = 72;
+/** 상공 시점이 적어도 담아야 할 가로 화각 (°) — 교차로의 좌우 끝까지 */
+const TOP_MIN_HFOV = 60;
+
+/**
+ * 가로 화각이 `minHorizontal` 이상 되도록 세로 화각을 넓힌다 (`PORTRAIT_MAX_FOV` 까지). 가로로 긴 화면에서는
+ * 이미 넉넉하므로 `vertical` 을 그대로 돌려준다 — PC 화면은 달라지지 않는다.
+ */
+export function fitHorizontal(vertical: number, aspect: number, minHorizontal: number): number {
+  const half = (minHorizontal * Math.PI) / 360;
+  const needed = (2 * Math.atan(Math.tan(half) / aspect) * 180) / Math.PI;
+  if (needed <= vertical) return vertical;
+  return Math.min(needed, Math.max(vertical, PORTRAIT_MAX_FOV));
+}
+
+/** 세로 화각 · 화면 비율 → 가로 화각 (°) */
+export function horizontalFov(vertical: number, aspect: number): number {
+  return (2 * Math.atan(Math.tan((vertical * Math.PI) / 360) * aspect) * 180) / Math.PI;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

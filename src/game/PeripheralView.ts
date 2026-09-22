@@ -315,6 +315,11 @@ export class PeripheralView {
       밑변을 맞춰** 붙인다. 계기판이 없으면(다른 화면) 예전처럼 혼자 우측 상단에 선다.
     */
     const clusterRect = document.getElementById('cluster')?.getBoundingClientRect();
+    /*
+      **터치 기기는 방향키 바로 위**에 선다. 휴대폰에서는 계기판이 왼쪽 아래로 가고 그 오른쪽이 방향키 십자 자리라,
+      계기판 옆에 붙이면 창이 ◀ · ▼ 밑에 깔렸다. 방향키가 떠 있지 않으면(PC · 자율 주행 중) 계기판 옆 그대로다.
+    */
+    const padRect = document.querySelector('#touch .dpad')?.getBoundingClientRect();
     const rowGap = margin * 0.6;
 
     for (const u of this.units) {
@@ -323,7 +328,10 @@ export class PeripheralView {
       let cy: number;
       let labelBelow = false;
 
-      if (u.side === 0 && clusterRect && clusterRect.width > 0) {
+      if (u.side === 0 && padRect && padRect.width > 0) {
+        cx = padRect.right - (pw * box.outerW) / 2;
+        cy = padRect.top - rowGap - (pw * box.outerH) / 2;
+      } else if (u.side === 0 && clusterRect && clusterRect.width > 0) {
         /*
           후방 창은 좌·우 창과 **같은 크기**로 두고, 계기판 옆에 **밑변을 맞춰** 붙인다.
           셋이 같은 크기라야 창 안의 거리감을 서로 견줘 읽을 수 있다. 계기판보다 세로가

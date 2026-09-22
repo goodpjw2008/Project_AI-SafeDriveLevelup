@@ -462,11 +462,8 @@ if (window.matchMedia('(pointer: coarse)').matches) {
 
 const controls = new Controls(canvas, {
   onToggleView: () => game?.cycleView(),
-  onToggleSignal: () => {
-    void audio.resume();
-    const el = document.getElementById('t-signal');
-    el?.classList.toggle('on', controls.rightSignal);
-  },
+  // 깜빡이는 판을 시작할 때 저절로 켜진다 — 키보드(Q)로만 끄고 켤 수 있고, 휴대폰에는 버튼을 두지 않는다
+  onToggleSignal: () => void audio.resume(),
   onRestart: () => {
     if (seatPreview) return; // 좌석 맞추기 중에는 R 이 '기본 자리로'다
     if (currentScenario && screens.active === 'none') void startRun(currentScenario.id);
@@ -504,12 +501,6 @@ for (const [id, stop] of [
     controls.setStopped(stop);
   });
 }
-document.getElementById('t-signal')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  void audio.resume();
-  controls.rightSignal = !controls.rightSignal;
-  (e.currentTarget as HTMLElement).classList.toggle('on', controls.rightSignal);
-});
 
 // 주행 중 '홈으로' — 판을 버리고 첫 화면으로 돌아간다.
 // HUD 안에 있는 정적 요소라 여기서 한 번만 붙인다 (goMenu 가 HUD 를 숨긴다).
@@ -1070,8 +1061,6 @@ async function startRun(id: number): Promise<void> {
     판이고, 맵 체험은 시험용이라 세지 않는다 (둘 다 finishRun 에서 기록을 남기지 않는 것과 같은 선).
   */
   if (!aiDriving && !mapTrial) beginRun();
-  // 깜빡이는 기본 점등 상태로 시작하므로 터치 버튼도 켜진 모습으로 맞춘다
-  document.getElementById('t-signal')?.classList.toggle('on', controls.rightSignal);
   // 판은 가는 상태로 시작한다 (controls.reset) — ↑ 에 불을 켠다
   syncGoStop();
 
