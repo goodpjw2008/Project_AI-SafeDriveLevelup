@@ -780,20 +780,33 @@ export class Game {
       구간이 시작하기 **2m 앞**에 세운다. 실물도 구역 경계에 서고, 표지판을 지나는 순간
       노면이 붉어지면 둘이 한 사건으로 읽힌다.
     */
-    const spots: Array<[number, number, number]> = [];
+    /*
+      **표지판 앞면은 다가오는 운전자(+Z 쪽)를 본다 — 회전 없음.**
+
+      한때 반 바퀴(π) 돌려 달아 앞면이 운전자 반대쪽을 봤다. 앞면만 그리는 재질이라 운전자에게는 **표지판 없이 기둥만**
+      보였고, 그 기둥이 첫 횡단보도 모서리(z 26)에 서 있어 사용자가 짚었다: "보행자 신호등이 없을 때는 기둥도 없애 줘.
+      기둥은 남아 있어서 보행자 신호등과 헷갈려." 기둥의 주인은 신호등이 아니라 이 표지판이었다. 이제 앞면이 운전자를
+      보고, 뒤에서 볼 때는 회색 뒷판이 보인다 — 어느 쪽에서도 **빈 기둥**으로 읽히지 않는다.
+    */
+    const spots: Array<[number, number]> = [];
     if (this.scenario.isSchoolZone) {
-      spots.push([ROAD_HALF_WIDTH + 1.2, 26, Math.PI], [ROAD_HALF_WIDTH + 1.2, -26, Math.PI]);
+      spots.push([ROAD_HALF_WIDTH + 1.2, 26], [ROAD_HALF_WIDTH + 1.2, -26]);
     }
     if (this.scenario.approachSchoolZone) {
       // 진입 차로 쪽(오른쪽 보도)에만 — 운전자가 보는 쪽이다
-      spots.push([ROAD_HALF_WIDTH + 1.2, APPROACH_ZONE_FAR_Z + 2, Math.PI]);
+      spots.push([ROAD_HALF_WIDTH + 1.2, APPROACH_ZONE_FAR_Z + 2]);
     }
 
-    for (const [x, z, ry] of spots) {
+    // 뒷판 — 마름모(텍스처 속 마름모와 같은 크기)를 회색으로. 실물 표지판도 뒤는 무늬 없는 금속판이다
+    const backGeo = new THREE.PlaneGeometry(0.93, 0.93);
+    const backMat = new THREE.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.7, metalness: 0.3 });
+    for (const [x, z] of spots) {
       const sign = new THREE.Mesh(geo, mat);
       sign.position.set(x, 2.8, z);
-      sign.rotation.y = ry;
-      this.world.scene.add(sign, this.smallPole(x, z));
+      const back = new THREE.Mesh(backGeo, backMat);
+      back.position.set(x, 2.8, z - 0.02);
+      back.rotation.set(0, Math.PI, Math.PI / 4);
+      this.world.scene.add(sign, back, this.smallPole(x, z));
     }
   }
 
