@@ -13,9 +13,7 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소�
 https://safeturn.vercel.app
 
 <p align="center">
-  <img src="screenshot/05_safety_drive.png" alt="PC 브라우저" width="40.6%">
-  <img src="screenshot/01_main_mobile1.jpeg" alt="모바일 세로" width="9.7%">
-  <img src="screenshot/01_main_mobile2.jpeg" alt="모바일 가로" width="45.6%">
+  <img src="docs/platforms.png" alt="PC 브라우저와 모바일(세로 · 가로)" width="880">
 </p>
 
 ### ① AI 우회전 참교육은 PC와 모바일환경을 지원합니다.
