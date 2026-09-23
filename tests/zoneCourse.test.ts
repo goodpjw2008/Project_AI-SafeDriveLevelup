@@ -129,7 +129,7 @@ describe('보호구역 직진 코스 전수 검증', () => {
   it('AI 자율 주행이 모든 판을 위반 없이 완주한다', () => {
     const bad: string[] = [];
     for (const spec of courses) {
-      const r = playScenario(spec, { driver: 'careful' }).result;
+      const r = playScenario(spec, { persona: 'careful' }).result;
       if (r.violations.length || r.failReason) {
         bad.push(`${spec.title} — ${r.violations.map((v) => v.code).join(',') || r.failReason}`);
       }
@@ -140,7 +140,7 @@ describe('보호구역 직진 코스 전수 검증', () => {
   /* 시범으로 보여 주는 판이 100초 제한에 닿으면 보는 사람도 지친다 */
   it('AI 자율 주행이 제한시간 안에 넉넉히 끝난다', () => {
     const slow = courses
-      .map((spec) => ({ spec, t: playScenario(spec, { driver: 'careful' }).result.stats.elapsed }))
+      .map((spec) => ({ spec, t: playScenario(spec, { persona: 'careful' }).result.stats.elapsed }))
       .filter((x) => x.t > 90)
       .map((x) => `${x.spec.title} ${x.t.toFixed(0)}초`);
     expect(slow.slice(0, 5)).toEqual([]);
