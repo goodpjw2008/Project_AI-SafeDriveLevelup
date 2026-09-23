@@ -10,6 +10,7 @@ import {
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
   FINISH_X,
+  FINISH_Z,
   INTERSECTION_HALF,
   PLAYER_APPROACH_X,
   PLAYER_EXIT_Z,
@@ -260,6 +261,8 @@ export class Game {
   private vehicle: Vehicle;
   private carModel: CarModel;
   private judge: RightTurnJudge;
+  /** 어린이보호구역 직진 코스인가 — 우회전 코스와 완주선 · 의무 · 조작이 다르다 */
+  private readonly straight: boolean;
   /** 정지 안내를 띄우기 시작하는 거리 — 판정의 정지 구역보다 길면 안내를 보고 선 자리가 인정되지 않는다 */
   private stopAdviceLead = STOP_ADVICE_LEAD;
   /** 다가가는 속도와 브레이크 — 난이도가 정한다. 앞차도 이 속도로 달린다 */
@@ -354,7 +357,12 @@ export class Game {
     } = {},
   ) {
     const { seatOffset = 0, startView = 'driver' } = opts;
-    this.judge = new RightTurnJudge(opts.stopZone);
+    /*
+      **이 판을 어떻게 빠져나가는가** (scenarios.ts 의 `drive`). 판정 · 완주선 · 조작이 모두 이 값을 본다.
+      한 번 정해지면 판이 끝날 때까지 바뀌지 않으므로 필드에 담아 둔다.
+    */
+    this.straight = scenario.drive === 'straight';
+    this.judge = new RightTurnJudge(opts.stopZone, scenario.drive ?? 'rightTurn');
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
     if (opts.autoDrive) this.auto = new AutoDriver(carSpec.dims.length * 0.58);
@@ -1462,20 +1470,46 @@ export class Game {
   }
 
   private checkEnd(front: { x: number; z: number }): void {
-    if (front.x > FINISH_X) {
-      this.judge.markCompleted();
-      this.end();
-      return;
-    }
-    // 직진해서 교차로를 지나쳐 버린 경우
-    if (front.z < -(CROSSWALK_OUTER + 22)) {
-      this.cb.onToast('우회전하지 않고 직진했습니다.');
-      this.end();
-      return;
+    /*
+      **코스마다 빠져나가는 쪽이 다르다** (scenarios.ts 의 `drive`).
+
+       - 우회전 코스 — 동쪽으로 빠져나가면 완주, 북쪽으로 지나쳐 버리면 "우회전하지 않았다"
+       - 직진 코스(어린이보호구역 연습편) — 북쪽으로 빠져나가면 완주, 동쪽으로 돌면 "직진 코스다"
+
+      두 코스가 서로의 **완주 조건과 실패 조건을 정확히 맞바꾼 꼴**이라, 한쪽만 고치면
+      직진 코스가 완주하는 순간 "우회전하지 않았습니다" 로 끝나 버린다.
+    */
+    if (this.straight) {
+      if (front.z < FINISH_Z) {
+        this.judge.markCompleted();
+        this.end();
+        return;
+      }
+      if (front.x > CROSSWALK_OUTER + 14) {
+        this.cb.onToast('우회전했습니다. 이 코스는 어린이보호구역 직진 연습입니다.');
+        this.end();
+        return;
+      }
+    } else {
+      if (front.x > FINISH_X) {
+        this.judge.markCompleted();
+        this.end();
+        return;
+      }
+      // 직진해서 교차로를 지나쳐 버린 경우
+      if (front.z < -(CROSSWALK_OUTER + 22)) {
+        this.cb.onToast('우회전하지 않고 직진했습니다.');
+        this.end();
+        return;
+      }
     }
     // 좌회전해 버린 경우
     if (front.x < -(CROSSWALK_OUTER + 14)) {
-      this.cb.onToast('좌회전했습니다. 이 시나리오는 우회전 연습입니다.');
+      this.cb.onToast(
+        this.straight
+          ? '좌회전했습니다. 이 코스는 어린이보호구역 직진 연습입니다.'
+          : '좌회전했습니다. 이 시나리오는 우회전 연습입니다.',
+      );
       this.end();
       return;
     }

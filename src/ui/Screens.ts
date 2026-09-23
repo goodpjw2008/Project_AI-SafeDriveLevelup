@@ -68,6 +68,7 @@ import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
 import { TRACKS, TRACK_BRIEF, TRACK_LABEL, TRACK_READY, type PracticeTrack } from '../scenarios/tracks';
+import { zoneCourseByNumber, zoneCourseNumber } from '../scenarios/zoneCourse';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
@@ -385,7 +386,8 @@ function debriefTitle(sc: ScenarioSpec): { stage: string; title: string } {
   const demo = document.body.classList.contains('ai-drive');
   // 첫 화면에서 번호로 고른 판 — AI 가 고른 것이 아니므로 'AI 추천' 이라 부르지 않는다 (main.ts 의 mapTrial)
   const trial = document.body.classList.contains('map-trial');
-  const n = libraryNumber(sc.id);
+  // 보호구역 직진 코스는 자기 번호(50001~)를 쓴다 (scenarios/zoneCourse.ts)
+  const n = zoneCourseNumber(sc.id) ?? libraryNumber(sc.id);
   // 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 1363` (main.ts 의 hud.show)
   const stage = demo
     ? n !== undefined
@@ -1081,22 +1083,31 @@ export class Screens {
     };
     const update = (): void => {
       const n = read();
+      /*
+        **번호는 두 갈래다** — 1~8,958 은 우회전 라이브러리, 50001~ 은 보호구역 직진 코스
+        (scenarios/zoneCourse.ts). 직진 코스에는 레벨이 없으므로 이름표도 다르게 붙인다.
+      */
+      const zone = n === null ? undefined : zoneCourseByNumber(n);
       const entry = n === null ? undefined : libraryEntryByNumber(n);
-      button.disabled = !entry;
-      note.classList.toggle('bad', n !== null && !entry);
-      note.classList.toggle('ok', Boolean(entry));
+      const found = Boolean(entry ?? zone);
+      button.disabled = !found;
+      note.classList.toggle('bad', n !== null && !found);
+      note.classList.toggle('ok', found);
       note.innerHTML =
         n === null
-          ? '번호를 넣으면 여기에 그 맵의 이름이 뜹니다'
+          ? '번호를 넣으면 여기에 그 맵의 이름이 뜹니다 (50001번부터는 보호구역 직진)'
           : entry
             ? `<b>${esc(levelLabel(entry.level))}</b> · ${esc(entry.spec.title)}`
-            : `${n}번 맵은 없습니다 — 번호가 너무 크거나 점검으로 뺀 자리입니다`;
+            : zone
+              ? `<b>보호구역 직진</b> · ${esc(zone.title)}`
+              : `${n}번 맵은 없습니다 — 번호가 너무 크거나 점검으로 뺀 자리입니다`;
     };
     input.addEventListener('input', update);
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       const n = read();
-      if (n !== null && libraryEntryByNumber(n)) onTry(n);
+      // 보호구역 직진 코스(50001~)도 같은 창에서 연다 (scenarios/zoneCourse.ts)
+      if (n !== null && (libraryEntryByNumber(n) ?? zoneCourseByNumber(n))) onTry(n);
     });
     update();
   }

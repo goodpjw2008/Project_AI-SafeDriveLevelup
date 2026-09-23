@@ -143,6 +143,13 @@ export interface DriverConfig {
    */
   drive?: DriveMode;
   /**
+   * **정지선에서 정면 신호가 녹색이 될 때까지 기다린다** (직진 코스).
+   *
+   * 우회전은 적색에도 서고 나서 갈 수 있지만 직진은 갈 수 없다 — 그래서 "몇 초 서는가" 로는
+   * 규정을 지킨 주행을 흉내 낼 수 없다. 기다릴 시간은 판마다 다르므로 **신호를 보고** 기다린다.
+   */
+  waitForGreen?: boolean;
+  /**
    * 보행자가 아직 건너는 중이면 **다 건널 때까지 더 기다린다.**
    *
    * 고정 초(`stopBeforeExitCrosswalk`)만으로는 모범 운전을 흉내 낼 수 없다 — 보행자가
@@ -187,6 +194,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     stopBeforeExitCrosswalk = 0,
     turnSignal = 'always',
     turnStyle = 'tight',
+    waitForGreen = false,
     yieldUntilClear = false,
     maxYieldSeconds = 30,
     keepsDistance = true,
@@ -259,6 +267,14 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
   /** 진입 전 횡단보도(A) 직전 — 여기서도 보행자를 보내야 한다 */
   const gateA = distanceWhereFrontZ(CROSSWALK_OUTER + 0.5);
   /*
+    **진입로 보호구역 횡단보도(S) 직전.**
+
+    예전에는 여기에 양보 관문이 없어, 모범 운전자가 **고정 25초**를 서는 쪽으로만 통과할 수 있었다
+    (그 목록의 가장 긴 값). 보행자가 3초 만에 다 건너도 25초를 서 있으니 판마다 20초가 헛되이 쌓여,
+    보호구역 판의 모범 주행이 88초까지 갔다 — 제한시간 100초에 아슬아슬하다.
+  */
+  const gateS = distanceWhereFrontZ(STOP_LINE_S + 0.4);
+  /*
     진출 횡단보도(C) 직전. **루프 밖에서 한 번만 잰다** — 경로를 0.05m 씩 훑는 계산이라
     매 스텝 다시 재면 판 하나에 수천 번 돌고, 검증기가 몰기 서른여섯 가지를 돌리는 동안
     판 하나에 4초가 걸렸다.
@@ -307,16 +323,31 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     */
     let holding = false;
     wasHolding = false;
-    if (yieldUntilClear && yielded < maxYieldSeconds) {
-      const atGateA = Math.abs(s - gateA) < 0.6;
-      const atGateC = Math.abs(s - gateC) < 0.6;
-      const which = atGateA ? 'A' : atGateC ? 'C' : null;
-      if (which && peds.some((p) => p.crosswalk === which && p.intendsToCross && p.onConflictPath)) {
+    /*
+      **정지선에서 녹색을 기다린다** (직진 코스의 모범 운전). 서 있는 동안에도 판정 엔진은 계속
+      돌아가므로, 기다리는 것 자체가 위반이 되지는 않는다. 기다릴 수 있는 시간은 보행자 양보와
+      같은 한도를 쓴다 — 끝없이 기다려야 하는 판은 시간 초과로 걸러진다 (validate.ts).
+    */
+    if (waitForGreen && yielded < maxYieldSeconds) {
+      const atLine = Math.abs(s - distanceWhereFrontZ(STOP_LINE + lineGap)) < 0.6;
+      if (atLine && resolve(world.vehicleLight, t) !== 'green') {
         holding = true;
         yielded += DT;
       }
-      wasHolding = holding;
     }
+    if (!holding && yieldUntilClear && yielded < maxYieldSeconds) {
+      const atGateS = Math.abs(s - gateS) < 0.6;
+      const atGateA = Math.abs(s - gateA) < 0.6;
+      const atGateC = Math.abs(s - gateC) < 0.6;
+      const which = atGateS ? 'S' : atGateA ? 'A' : atGateC ? 'C' : null;
+      // 직진 코스의 '두 번째 관문' 은 B 다 (위 gateC 가 그 자리를 가리킨다)
+      const id = which === 'C' && drive === 'straight' ? 'B' : which;
+      if (id && peds.some((p) => p.crosswalk === id && p.intendsToCross && p.onConflictPath)) {
+        holding = true;
+        yielded += DT;
+      }
+    }
+    wasHolding = holding;
 
     const lead = world.lead
       ? world.lead(t, { frontX: pose.front.x, frontZ: pose.front.z }, peds)

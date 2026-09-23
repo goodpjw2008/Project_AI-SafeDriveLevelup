@@ -98,7 +98,12 @@ describe('구조 검사', () => {
 
   it('보행자 필드가 깨지면 걸린다', () => {
     const s = base();
-    (s.pedestrians as unknown[])[0] = { crosswalk: 'B', at: -1, from: '위' };
+    /*
+      **'B' 는 이제 있는 횡단보도다** (교차로 건너편 — 보호구역 직진 코스가 지난다). 예전에는 여기에
+      'B' 를 넣어 "없는 횡단보도" 를 흉내 냈는데, 그 판이 생기면서 이 검사가 하나를 덜 잡게 됐다.
+      없는 것을 넣어야 하는 자리이므로 아예 글자를 쓴다.
+    */
+    (s.pedestrians as unknown[])[0] = { crosswalk: '없음', at: -1, from: '위' };
     const issues = checkSchema(s);
     expect(issues.length).toBeGreaterThanOrEqual(3);
   });

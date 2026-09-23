@@ -107,6 +107,13 @@ export interface VehicleInput {
   steer: number;
   /** 우측 방향지시등 */
   rightSignal: boolean;
+  /**
+   * **운전자가 고른 목표 속도 (km/h)** — 어린이보호구역 직진 코스에서만 온다 (game/Controls.ts).
+   *
+   * 없으면 지금까지와 같이 차가 알아서 맞춘다. 있으면 **구간 제한과 함께 낮은 쪽**을 쓴다 —
+   * 30을 골라도 보호구역 안에서는 구간 제한이 먼저다. 스스로 줄이는 연습이지 제한을 넘는 연습이 아니다.
+   */
+  targetKmh?: number;
 }
 
 export class Vehicle {
@@ -193,7 +200,9 @@ export class Vehicle {
    * @param lead 앞차 — 내 앞범퍼에서 앞차 뒷범퍼까지의 간격(m)과 앞차 속도(m/s). 없으면 생략.
    */
   update(input: VehicleInput, dt: number, lead?: { gap: number; speedMs: number } | null): void {
-    const zone = this.zoneTargetKmh() / 3.6;
+    const limit = this.zoneTargetKmh() / 3.6;
+    // 운전자가 속도를 고르는 코스면 그 값과 구간 제한 중 **낮은 쪽**이 목표다
+    const zone = input.targetKmh === undefined ? limit : Math.min(limit, input.targetKmh / 3.6);
     const target = input.stop ? 0 : lead ? Math.min(zone, followTarget(lead, this.speed)) : zone;
 
     if (this.speed > target) {

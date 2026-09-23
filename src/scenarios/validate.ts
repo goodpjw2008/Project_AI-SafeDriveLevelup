@@ -102,8 +102,11 @@ const SIGNAL_CROSSWALKS = ['A', 'C'];
  * rules/lawRules.ts · scenarios/playSim.ts), 여기서만 막아 **AI 가 S 보행자를 쓴 판은 무조건 반려**됐다 —
  * 정작 difficulty.ts 의 비용표는 모델에게 `"crosswalk": "S"` 를 쓰라고 이르고 있었다. 라이브러리가
  * 그 횡단보도를 늘 비워 둔 까닭이기도 하다.
+ *
+ * **B(교차로 건너편)는 직진 코스에서만 쓴다** — 우회전 코스에서는 지나지 않으므로 보행자를 두면
+ * 아무 일도 일어나지 않는다. 아래 `checkCoherence` 가 그 어긋남을 잡는다.
  */
-const CROSSWALKS = ['A', 'C', 'S'];
+const CROSSWALKS = ['A', 'B', 'C', 'S'];
 const FROMS = ['left', 'right'];
 const KINDS = ['adult', 'child', 'elder'];
 const TIMES = ['day', 'dusk', 'night'];
@@ -495,6 +498,27 @@ const EXEMPLARY: DriverConfig[] = (() => {
       for (const stopBeforeExitCrosswalk of [0, 2]) {
         out.push({ ...common, stopAtSchoolZoneLine, stopAtLine, stopBeforeExitCrosswalk });
       }
+    }
+  }
+  /*
+    **직진 코스의 모범 운전자** (어린이보호구역 연습편).
+
+    다른 것이 둘 있다. ① 적색에는 **갈 수 없으므로** 정지선에서 녹색이 될 때까지 기다린다
+    (`waitForGreen`) — 몇 초 서는가로는 흉내 낼 수 없다. ② **방향지시등을 켜지 않는다** —
+    돌지 않으므로 켤 의무가 없고, 판정도 직진에서는 묻지 않는다 (rules/lawRules.ts).
+
+    `drive` 는 여기서 정하지 않는다 — 검증기가 판을 보고 붙인다 (checkPlayable).
+  */
+  for (const stopAtSchoolZoneLine of [2, 25]) {
+    for (const stopBeforeExitCrosswalk of [0, 2]) {
+      out.push({
+        ...common,
+        turnSignal: 'never',
+        waitForGreen: true,
+        stopAtSchoolZoneLine,
+        stopAtLine: 2,
+        stopBeforeExitCrosswalk,
+      });
     }
   }
   return out;

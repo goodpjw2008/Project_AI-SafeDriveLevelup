@@ -44,6 +44,7 @@ import {
   libraryNumber,
   scenarioLibrary,
 } from './scenarios/library';
+import { zoneCourse, zoneCourseByNumber, zoneCourseNumber } from './scenarios/zoneCourse';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
   masterPick,
@@ -530,8 +531,24 @@ for (const [id, action] of [
   동안 손가락을 계속 대고 있지 않아도 된다. 지금 상태의 버튼에 불이 들어온다 (index.html 의 #t-up.on · #t-down.on).
 */
 function syncGoStop(): void {
+  /*
+    **속도를 고르는 코스에서는 버튼의 뜻이 다르다** (game/Controls.ts) — ↑ 는 한 칸 빠르게,
+    ↓ 는 한 칸 느리게이고 맨 아래가 정지다. 불은 '지금 가고 있는가' 를 그대로 말한다.
+  */
+  const kmh = controls.targetKmh;
   document.getElementById('t-up')?.classList.toggle('on', !controls.isStopped);
   document.getElementById('t-down')?.classList.toggle('on', controls.isStopped);
+  const up = document.querySelector('#t-up .lb');
+  const down = document.querySelector('#t-down .lb');
+  if (up) up.textContent = kmh === null ? '출발' : '빠르게';
+  if (down) down.textContent = kmh === null ? '정지' : kmh <= 10 ? '정지' : '느리게';
+  const hint = document.getElementById('keyhint-drive');
+  if (hint) {
+    hint.innerHTML =
+      kmh === null
+        ? '<kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>출발 <kbd>↓</kbd>정지'
+        : `<kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>빠르게 <kbd>↓</kbd>느리게 · 목표 <b>${kmh}km/h</b>`;
+  }
 }
 for (const [id, stop] of [
   ['t-up', false],
@@ -540,7 +557,14 @@ for (const [id, stop] of [
   document.getElementById(id)?.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     void audio.resume();
-    controls.setStopped(stop);
+    /*
+      **속도를 고르는 코스에서는 같은 버튼이 한 칸씩 올리고 내린다** (game/Controls.ts 의 shiftSpeed).
+      버튼 자리를 바꾸지 않는 이유는 손가락이 이미 그 자리를 알기 때문이다 — 위는 빨라지고 아래는 느려지며,
+      맨 아래 칸이 정지다.
+    */
+    if (controls.targetKmh !== null) controls.nudgeSpeed(stop ? -1 : 1);
+    else controls.setStopped(stop);
+    syncGoStop();
   });
 }
 
@@ -778,11 +802,12 @@ function renderTrial(): void {
   screens.renderTrial(
     () => nav.back(),
     (no) => {
-      const entry = libraryEntryByNumber(no);
-      if (!entry) return;
+      // 50001 번부터는 보호구역 직진 코스다 (scenarios/zoneCourse.ts)
+      const spec = zoneCourseByNumber(no) ?? libraryEntryByNumber(no)?.spec;
+      if (!spec) return;
       aiCourse = false;
       mapTrial = true;
-      goRun(entry.spec.id);
+      goRun(spec.id);
     },
   );
 }
@@ -1042,7 +1067,10 @@ function handleSelectCar(id: string, opts: { adjust?: boolean } = {}): void {
  * stage id 로 묶이기 때문이다 — 겹치면 통계가 섞인다).
  */
 function resolveScenario(id: number): ScenarioSpec {
-  return aiTraining.made.find((s) => s.id === id) ?? libraryEntry(id)?.spec ?? getScenario(id);
+  // 보호구역 직진 코스는 자기 id 대역을 쓴다 (scenarios/zoneCourse.ts) — 라이브러리 번호를 밀지 않으려고 따로 둔다
+  return (
+    aiTraining.made.find((s) => s.id === id) ?? zoneCourse(id) ?? libraryEntry(id)?.spec ?? getScenario(id)
+  );
 }
 
 /**
@@ -1050,7 +1078,7 @@ function resolveScenario(id: number): ScenarioSpec {
  * AI 가 새로 만든 판(100번대)은 그 접속에만 있어서 지난 접속의 것은 이름을 되찾을 수 없다.
  */
 function recordTitle(id: number): string {
-  const found = aiTraining.made.find((s) => s.id === id) ?? libraryEntry(id)?.spec;
+  const found = aiTraining.made.find((s) => s.id === id) ?? zoneCourse(id) ?? libraryEntry(id)?.spec;
   if (found) return found.title;
   return id < GENERATED_ID_BASE ? getScenario(id).title : 'AI 생성 판';
 }
@@ -1115,6 +1143,12 @@ async function startRun(id: number): Promise<void> {
   audio.setCar(carSpec);
   // 설정에서 고른 소리 셋. 바뀐 것이 없으면 아무 일도 하지 않는다
   audio.setSounds(saveData.settings.sounds);
+  /*
+    **코스에 따라 조작이 다르다** (scenarios.ts 의 `drive`). 어린이보호구역 직진 코스에서는
+    위/아래로 목표 속도를 고르고(0 · 10 · 20 · 30km/h) 방향지시등은 끈 채로 시작한다 —
+    돌지 않으므로 켤 의무가 없다. `reset` 보다 먼저 정해야 리셋이 그 방식대로 돌아간다.
+  */
+  controls.setStraight(currentScenario.drive === 'straight');
   controls.reset();
   /*
     자율 주행 중에는 **사람 입력을 받지 않는다.** 핸들이 두 곳에서 들어오면 AI 가
@@ -1142,7 +1176,8 @@ async function startRun(id: number): Promise<void> {
     라이브러리 판은 **결과 화면과 같은 이름**으로 부른다 — `AI 추천 시나리오 3700 - 제목`
     (library.ts 의 libraryNumber). 달리는 동안과 끝난 뒤의 이름이 같아야 "그 판" 이 이어진다.
   */
-  const libNo = libraryNumber(currentScenario.id);
+  // 보호구역 직진 코스는 자기 번호를 쓴다 (scenarios/zoneCourse.ts) — 맵 체험 · 결과 화면이 같은 이름으로 부른다
+  const libNo = zoneCourseNumber(currentScenario.id) ?? libraryNumber(currentScenario.id);
   hud.show(
     /*
       **자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 1363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??

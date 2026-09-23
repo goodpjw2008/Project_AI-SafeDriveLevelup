@@ -104,9 +104,26 @@ export class Controls {
   private touch = { steer: 0 };
 
   /**
+   * **속도를 직접 고르는 코스인가** — 어린이보호구역 직진 연습편 (사용자가 정했다).
+   *
+   * 우회전 코스에서는 차가 알아서 속도를 맞춘다 — 거기서 배우는 것은 '언제 서는가' 이지
+   * '얼마나 밟는가' 가 아니다. 보호구역 코스는 **30km/h 이하로 스스로 줄이는 것**이 배울
+   * 내용이라, 위/아래로 목표 속도를 올리고 내린다.
+   */
+  private stepped = false;
+
+  /** 고를 수 있는 목표 속도 (km/h) — 맨 아래는 정지다 */
+  private static readonly SPEED_STEPS = [0, 10, 20, 30] as const;
+  /** 지금 고른 단계 — 시작은 30km/h (보호구역 제한속도) */
+  private speedStep = Controls.SPEED_STEPS.length - 1;
+
+  /**
    * 우측 방향지시등. 우회전 시나리오이므로 처음부터 켜진 상태로 시작한다.
    * 이 게임의 목적은 신호 준수와 상황 판단이지 깜빡이 조작 숙달이 아니다.
    * (Q 로 끌 수는 있고, 끈 채로 교차로에 들어가면 제38조 위반으로 잡힌다)
+   *
+   * **직진 코스에서는 꺼진 채로 시작한다** — 돌지 않으므로 켤 의무가 없고, 켜면 오히려
+   * 틀린 신호다. 판정도 직진에서는 지시등을 묻지 않는다 (rules/lawRules.ts).
    */
   rightSignal = true;
   private enabled = true;
@@ -138,8 +155,24 @@ export class Controls {
     }
   }
 
+  /**
+   * **이 코스의 조작 방식을 정한다** — 직진(보호구역) 코스면 속도를 단계로 고르고 지시등은 끈 채로 둔다.
+   * 판을 시작할 때 Game 이 한 번 부른다.
+   */
+  setStraight(on: boolean): void {
+    this.stepped = on;
+    this.rightSignal = !on;
+    this.speedStep = Controls.SPEED_STEPS.length - 1;
+  }
+
+  /** 지금 고른 목표 속도 (km/h) — 단계 조작이 아닌 코스에서는 `null` */
+  get targetKmh(): number | null {
+    return this.stepped ? Controls.SPEED_STEPS[this.speedStep] : null;
+  }
+
   reset(): void {
-    this.rightSignal = true;
+    this.rightSignal = !this.stepped;
+    this.speedStep = Controls.SPEED_STEPS.length - 1;
     this.stopped = false;
     this.keys = {
       go: false,
@@ -166,6 +199,29 @@ export class Controls {
 
   get isStopped(): boolean {
     return this.stopped;
+  }
+
+  /**
+   * 목표 속도를 한 칸 올리거나 내린다 (단계 코스).
+   *
+   * **0 칸은 정지와 같은 말이다** — 래치(`stopped`)도 함께 맞춰 둔다. 그래야 화면의 정지 표시,
+   * 소리, AI 말풍선이 지금까지의 '정지' 와 같은 것을 보고 말한다.
+   */
+  /** 화면 버튼이 부르는 속도 조절 — 키보드의 ↑ · ↓ 와 같은 일을 한다 */
+  nudgeSpeed(dir: 1 | -1): void {
+    if (this.stepped) this.shiftSpeed(dir);
+  }
+
+  private shiftSpeed(dir: 1 | -1): void {
+    const next = Math.max(0, Math.min(Controls.SPEED_STEPS.length - 1, this.speedStep + dir));
+    if (next === this.speedStep) return;
+    this.speedStep = next;
+    /*
+      **칸이 바뀔 때마다 알린다.** `setStopped` 은 멈춤 여부가 실제로 바뀔 때만 알리므로
+      (30 → 20 처럼 가는 중의 변화는 조용하다), 화면의 목표 속도 표시가 따라오지 않았다.
+    */
+    this.setStopped(Controls.SPEED_STEPS[next] === 0);
+    this.cb.onStopChange?.(this.stopped);
   }
 
   private bindKeyboard(): void {
@@ -207,8 +263,13 @@ export class Controls {
         e.preventDefault();
         if (e.repeat) return;
         this.keys[k] = true;
-        if (k === 'stop') this.setStopped(true);
-        if (k === 'go') this.setStopped(false);
+        /*
+          **단계 코스에서는 위/아래가 속도를 한 칸씩 옮긴다** (0 · 10 · 20 · 30km/h).
+          맨 아래 칸이 정지라, 지금까지의 '아래 = 정지 · 위 = 출발' 과 손가락이 같은 자리에 있다.
+        */
+        if (this.stepped && (k === 'go' || k === 'stop')) this.shiftSpeed(k === 'go' ? 1 : -1);
+        else if (k === 'stop') this.setStopped(true);
+        else if (k === 'go') this.setStopped(false);
         if (k === 'glanceLeft' || k === 'glanceRight') this.emitGlance();
       }
     };
@@ -286,7 +347,12 @@ export class Controls {
     if (this.keys.right) steer += 1;
     if (steer === 0) steer = this.touch.steer;
 
-    return { stop: this.stopped, steer, rightSignal: this.rightSignal };
+    return {
+      stop: this.stopped,
+      steer,
+      rightSignal: this.rightSignal,
+      ...(this.stepped ? { targetKmh: Controls.SPEED_STEPS[this.speedStep] } : {}),
+    };
   }
 
   dispose(): void {

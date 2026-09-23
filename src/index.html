@@ -5187,7 +5187,8 @@
           안내에서는 뺐다 — 줄이 길어질수록 아무도 읽지 않는다.
         -->
         <div class="keyhints">
-          <div><kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>출발 <kbd>↓</kbd>정지</div>
+          <!-- 보호구역 직진 코스에서는 ↑ · ↓ 가 속도를 고른다 (main.ts 의 syncGoStop) -->
+          <div id="keyhint-drive"><kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>출발 <kbd>↓</kbd>정지</div>
           <div><kbd>C</kbd>시점 전환</div>
         </div>
 
