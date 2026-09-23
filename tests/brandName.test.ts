@@ -10,8 +10,8 @@ import { APP_ICON_SVG, APP_NAME, APP_NAME_PARTS, APP_TAGLINE, APP_TAGLINE_PARTS 
   먼저 알려져 이름을 바꿨는데(사용자 요청), **신호등 딱지 셋은 부제의 '우회전' 으로 옮겨 그대로 산다.**
 */
 describe('이름', () => {
-  it("제목은 'AI' 배지 + 붉은 '일시정지' + 칠하지 않은 '안전교육'", () => {
-    expect(APP_NAME).toBe('AI 일시정지 안전교육');
+  it("제목은 'AI' 배지 + 붉은 '일시정지' + 칠하지 않은 '안전운전'", () => {
+    expect(APP_NAME).toBe('AI 일시정지 안전운전');
     expect(APP_NAME_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
       'AI:ai',
       '일시정지:stop',
@@ -24,7 +24,7 @@ describe('이름', () => {
   */
   it("제목에는 '우회전' 이 없고, 부제가 그것을 말한다", () => {
     expect(APP_NAME).not.toContain('우회전');
-    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 안전운전 학습');
+    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 운전 연습');
   });
 
   it("부제의 '우회전' 은 신호등 딱지 셋, '어린이보호구역' 은 보호구역 딱지", () => {
@@ -38,7 +38,7 @@ describe('이름', () => {
 
   /* About 창이 이름을 통째로 적는다 — 제목과 같은 딱지를 쓴다 (ui/Screens.ts 의 renderAbout) */
   it('이름 한 줄은 조각에서 만든다 — 두 벌로 적어 두지 않는다', () => {
-    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-stop">일시정지</span> 안전교육`);
+    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-stop">일시정지</span> 안전운전`);
   });
 });
 
