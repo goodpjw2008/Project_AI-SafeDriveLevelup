@@ -24,15 +24,15 @@ describe('이름', () => {
   */
   it("제목에는 '우회전' 이 없고, 부제가 그것을 말한다", () => {
     expect(APP_NAME).not.toContain('우회전');
-    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 운전 연습');
+    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 일시정지 안전운전 연습');
   });
 
-  it("부제의 '우회전' 은 신호등 딱지 셋, '어린이보호구역' 은 보호구역 딱지", () => {
+  /* 사용자가 색까지 정했다 — 우회전 노랑 · 어린이보호구역 보호구역색 · 일시정지 정지 표지색 */
+  it('부제는 낱말 셋을 딱지로 칠한다 — 어디서 · 어디서 · 무엇을', () => {
     expect(APP_TAGLINE_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
-      '우:red',
-      '회:yellow',
-      '전:green',
+      '우회전:yellow',
       '어린이보호구역:zone',
+      '일시정지:stop',
     ]);
   });
 

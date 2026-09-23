@@ -1,7 +1,7 @@
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/title-dark.png">
-    <img src="docs/title-light.png" alt="AI 일시정지 안전운전 — 우회전과 어린이보호구역 운전 연습" width="880">
+    <img src="docs/title-light.png" alt="AI 일시정지 안전운전 — 우회전과 어린이보호구역 일시정지 안전운전 연습" width="880">
   </picture>
 </h1>
 
