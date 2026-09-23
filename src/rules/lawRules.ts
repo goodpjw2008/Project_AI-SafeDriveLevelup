@@ -9,6 +9,8 @@
  */
 
 import {
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
   CROSSWALK_S_INNER,
@@ -40,13 +42,25 @@ export type PedSignal = 'green' | 'greenFlash' | 'red';
  *
  *  - `S` — **진입부 어린이보호구역**의 횡단보도. 교차로에 닿기 전, 오는 길에 있다
  *  - `A` — 교차로 진입 전(1차)
- *  - `C` — 우회전 후(2차)
+ *  - `C` — **우회전 후**(2차) — 우회전 코스에서 만난다
+ *  - `B` — **교차로 건너편**(북) — 직진 코스에서 만난다. A 와 같은 남북 도로를 가로지른다
  *
- * 만나는 순서는 **S → A → C** 다. 글자가 순서를 말하지 않는 이유는 A·C 가 교차로의
- * 네 횡단보도(A·B·C·D) 중 둘이라서다 — 거기에 끼워 넣으면 교차로 밖의 것을 교차로의
- * 것처럼 부르게 된다. S 는 그 체계 밖에 있다.
+ * 만나는 순서는 코스에 따라 **S → A → C**(우회전) 또는 **S → A → B**(직진)다.
+ * 글자가 순서를 말하지 않는 이유는 A·B·C 가 교차로의 네 횡단보도(A·B·C·D) 중 셋이라서다 —
+ * 거기에 끼워 넣으면 교차로 밖의 것을 교차로의 것처럼 부르게 된다. S 는 그 체계 밖에 있다.
  */
-export type CrosswalkId = 'A' | 'C' | 'S';
+export type CrosswalkId = 'A' | 'B' | 'C' | 'S';
+
+/**
+ * **이 판을 어떻게 빠져나가는가.**
+ *
+ *  - `rightTurn` — 교차로에서 우회전 (지금까지의 모든 판)
+ *  - `straight` — 교차로를 직진으로 통과 (어린이보호구역 연습편)
+ *
+ * 판정이 달라지는 것은 **우회전에만 있는 의무**들이다: 우측 가장자리 통행(대회전), 방향지시등,
+ * 우회전 후 횡단보도(C). 직진에서는 그 셋을 묻지 않고 대신 건너편 횡단보도(B)를 본다.
+ */
+export type DriveMode = 'rightTurn' | 'straight';
 
 /**
  * 교차로에 딸린 횡단보도만 — 신호가 교차로의 한 주기(STANDARD_PROGRAM)를 따른다.
@@ -54,6 +68,17 @@ export type CrosswalkId = 'A' | 'C' | 'S';
  * S 는 자기 주기를 따로 갖거나(SCHOOL_ZONE_PROGRAM) 아예 신호기가 없으므로 여기 없다.
  */
 export type IntersectionCrosswalk = 'A' | 'C';
+
+/**
+ * **B 는 A 와 같은 신호기를 쓴다.**
+ *
+ * 둘 다 남북 도로를 가로지르는 횡단보도이고 교차로를 사이에 두고 마주 본다 — 실제 교차로에서도
+ * 그 둘의 보행신호는 **같은 등화**다(동서 차량신호가 녹색일 때 함께 녹색). 그래서 `pedSignalInstalled`
+ * 에 B 자리를 따로 두지 않는다: 자리를 늘리면 시나리오 수천 개의 리터럴을 모두 고쳐야 하는데,
+ * 고쳐 봐야 두 값이 **어긋날 수 있는 자리**만 새로 생긴다.
+ */
+export const signalCrosswalk = (c: CrosswalkId): IntersectionCrosswalk | null =>
+  c === 'S' ? null : c === 'B' ? 'A' : c;
 
 export interface PedestrianSample {
   crosswalk: CrosswalkId;
@@ -318,7 +343,16 @@ function placeLabel(s: WorldSample): string {
   if (z > CROSSWALK_OUTER) return '정지선 위';
   if (z > CROSSWALK_INNER) return '횡단보도 A 위';
   if (z > INTERSECTION_HALF) return '횡단보도 A ~ 교차로 사이';
-  if (x < CROSSWALK_INNER) return '교차로 안 (우회전 중)';
+  /*
+    **교차로를 어느 쪽으로 빠져나갔는지는 좌표가 말해 준다.** 직진이면 x 가 진입 차로에 머문 채
+    z 만 줄고, 우회전이면 x 가 자란다. 코스를 따로 받지 않아도 갈리므로 여기서는 좌표만 본다.
+  */
+  if (z < -INTERSECTION_HALF) {
+    if (z > CROSSWALK_B_INNER) return '교차로 ~ 건너편 횡단보도 사이';
+    if (z >= CROSSWALK_B_OUTER) return '건너편 횡단보도(B) 위';
+    return '보호구역 진출로';
+  }
+  if (x < CROSSWALK_INNER) return '교차로 안';
   if (x <= CROSSWALK_OUTER) return '우회전 후 횡단보도(C) 위';
   return '우회전 진출로';
 }
@@ -354,7 +388,14 @@ export class RightTurnJudge {
    *   난이도가 오르면 좁힌다 (scenarios/challenge.ts 의 stopZone) — 무엇이 위반인지는 그대로이고,
    *   **정지선 직전**이라는 자리를 얼마나 엄격하게 읽는가만 바뀐다.
    */
-  constructor(private readonly stopZoneDepth: number = STOP_ZONE_DEPTH) {}
+  /**
+   * @param drive 이 판을 어떻게 빠져나가는가 (기본 우회전). 직진이면 **우회전에만 있는 의무**
+   *   (대회전 · 방향지시등 · 우회전 후 횡단보도 C)를 묻지 않고, 건너편 횡단보도 B 를 본다.
+   */
+  constructor(
+    private readonly stopZoneDepth: number = STOP_ZONE_DEPTH,
+    private readonly drive: DriveMode = 'rightTurn',
+  ) {}
 
   private violations: ViolationEvent[] = [];
   private seen = new Set<ViolationCode>();
@@ -363,7 +404,7 @@ export class RightTurnJudge {
   private stopTimer = 0;
 
   /** 횡단보도별로 '보행자를 방해한 채 움직인' 시간. PEDESTRIAN_TOLERANCE_SECONDS 를 넘으면 확정한다. */
-  private pedConflictTimer: Record<CrosswalkId, number> = { A: 0, C: 0, S: 0 };
+  private pedConflictTimer: Record<CrosswalkId, number> = { A: 0, B: 0, C: 0, S: 0 };
 
   /** 진입부 보호구역 횡단보도(S) 앞에서 완전히 섰는가 */
   private stoppedBeforeS = false;
@@ -374,6 +415,10 @@ export class RightTurnJudge {
   /** 정지선을 지나는 순간의 신호 — 교차로 진입 판정이 이것으로 본다 (trackIntersection) */
   private lightsAtLine: Pick<WorldSample, 'vehicleLight' | 'rightArrow'> | null = null;
   private enteredCrosswalkS = false;
+
+  /** 교차로 건너편 횡단보도(B) 앞에서 섰는가 — 직진 코스에서만 쓴다 */
+  private stopBeforeB = false;
+  private enteredCrosswalkB = false;
 
   private cleanStopBeforeA = false;
   private lateStopBeforeA = false;
@@ -434,7 +479,12 @@ export class RightTurnJudge {
     this.trackTurnSignal(s);
     this.trackCrosswalkA(s, dt);
     this.trackIntersection(s);
-    this.trackCrosswalkC(s, dt);
+    /*
+      **코스에 따라 교차로 다음 횡단보도가 다르다** — 우회전이면 C(동쪽), 직진이면 B(북쪽).
+      둘 다 보지 않는 이유는 지나지도 않은 횡단보도의 보행자를 방해했다고 적을 수 있어서다.
+    */
+    if (this.drive === 'straight') this.trackCrosswalkB(s, dt);
+    else this.trackCrosswalkC(s, dt);
   }
 
   /** 충돌 등으로 시나리오가 즉시 실패한 경우 */
@@ -444,9 +494,11 @@ export class RightTurnJudge {
     this.note(this.elapsed, 'bad', `주행 실패: ${FAIL_TEXT[reason]}`);
   }
 
-  /** 우회전을 완주했을 때 호출 */
+  /** 코스를 완주했을 때 호출 — 우회전으로 빠져나갔거나, 직진으로 보호구역을 통과했거나 */
   markCompleted(): void {
-    if (!this.completed) this.note(this.elapsed, 'ok', '우회전 완료');
+    if (!this.completed) {
+      this.note(this.elapsed, 'ok', this.drive === 'straight' ? '보호구역 통과 완료' : '우회전 완료');
+    }
     this.completed = true;
   }
 
@@ -485,14 +537,21 @@ export class RightTurnJudge {
           `교차로 내 최고 ${this.maxSpeedInIntersection.toFixed(0)}km/h (기준 ${SLOW_DOWN_LIMIT_KMH}km/h)`,
         );
       }
-      if (this.turnRadius > WIDE_TURN_RADIUS) {
+      /*
+        **대회전과 방향지시등은 우회전에만 있는 의무다.**
+
+        직진으로 통과하면 안쪽 코너(INNER_CORNER)에서 10m 넘게 떨어져 지나므로 기준(7m)을 그대로 대면
+        **규정대로 몬 주행이 전부 대회전 위반**이 된다. 지시등도 마찬가지다 — 직진에 우측 지시등을 켜면
+        오히려 틀린 신호다. 이 게임이 가장 피해야 할 것이 "규정대로 했는데 위반" 이라, 모드로 가른다.
+      */
+      if (this.drive === 'rightTurn' && this.turnRadius > WIDE_TURN_RADIUS) {
         this.record(
           'WIDE_TURN',
           this.lastSample,
           `안쪽 코너에서 최대 ${this.turnRadius.toFixed(1)}m 벌어짐 (기준 ${WIDE_TURN_RADIUS}m)`,
         );
       }
-      if (!this.signalAt30m || !this.signalAtEntry) {
+      if (this.drive === 'rightTurn' && (!this.signalAt30m || !this.signalAtEntry)) {
         this.record(
           'NO_TURN_SIGNAL',
           this.lastSample,
@@ -556,7 +615,8 @@ export class RightTurnJudge {
     if (this.pedToleranceUsed) return false;
     if (stats.lateStopBeforeA && !stats.cleanStopBeforeA) return false;
     if (stats.maxSpeedInIntersection > SLOW_DOWN_LIMIT_KMH) return false;
-    if (!stats.signalAt30m || !stats.signalAtEntry) return false;
+    // 방향지시등은 우회전에만 있는 의무다 — 직진 코스에서는 묻지 않는다 (trackTurnSignal)
+    if (this.drive === 'rightTurn' && (!stats.signalAt30m || !stats.signalAtEntry)) return false;
     return true;
   }
 
@@ -629,6 +689,24 @@ export class RightTurnJudge {
           `정지선 ${(s.frontZ - STOP_LINE).toFixed(1)}m 앞에서 정지 — 너무 멀어 정지선 앞 일시정지로 치지 않음 (정지선 ${this.stopZoneDepth}m 안이어야 함)`,
         );
       }
+    } else if (this.drive === 'straight') {
+      /*
+        **직진 코스에서 교차로를 지난 뒤의 정지는 건너편 횡단보도(B) 앞 정지다.**
+
+        우회전 코스의 C 와 같은 자리다 — 교차로를 빠져나가며 만나는 횡단보도이고, 보호구역에
+        신호기가 없으면 사람이 없어도 여기서 서야 한다. 앞차 뒤에 줄 서서 선 것은 치지 않는 것도 같다.
+      */
+      if (!this.enteredCrosswalkB && s.frontZ >= CROSSWALK_B_INNER) {
+        if (s.queuedBehind) return;
+        if (!this.stopBeforeB) {
+          this.note(
+            s.t,
+            'ok',
+            `건너편 횡단보도 앞 일시정지 인정 — 횡단보도까지 ${(s.frontZ - CROSSWALK_B_INNER).toFixed(2)}m`,
+          );
+        }
+        this.stopBeforeB = true;
+      }
     } else if (!this.enteredCrosswalkC && s.frontX <= CROSSWALK_INNER) {
       /*
         교차로 안, 횡단보도 C 직전에서의 정지. **앞차 뒤에 줄 서서 선 것은 치지 않는다** — 정지선(A)과 같은 규칙이다.
@@ -648,6 +726,11 @@ export class RightTurnJudge {
   }
 
   private trackTurnSignal(s: WorldSample): void {
+    /*
+      **직진 코스에서는 방향지시등을 묻지 않는다** — 돌지 않으므로 켤 의무가 없고, 오히려 켜면 틀린 신호다.
+      기록조차 남기지 않는다: 주행 기록에 "지시등 켜짐/꺼짐" 이 적히면 그것이 의무인 줄 읽힌다.
+    */
+    if (this.drive === 'straight') return;
     // 교차로 가장자리 30m 전 지점을 통과하는 순간의 지시등 상태를 기록
     if (!this.passedSignalGate && s.frontZ <= TURN_SIGNAL_GATE_Z) {
       this.passedSignalGate = true;
@@ -826,7 +909,7 @@ export class RightTurnJudge {
         'info',
         `교차로 진입 — 정면신호 ${LIGHT_TEXT[s.vehicleLight]}` +
           ` · 일시정지 ${this.stoppedBeforeA() ? '함' : '안 함'}` +
-          ` · 지시등 ${s.rightSignalOn ? '켜짐' : '꺼짐'}`,
+          (this.drive === 'straight' ? ' · 직진 통과' : ` · 지시등 ${s.rightSignalOn ? '켜짐' : '꺼짐'}`),
       );
       this.judgeApproach(s);
     }
@@ -849,6 +932,21 @@ export class RightTurnJudge {
   private judgeApproach(now: WorldSample): void {
     // 정지선을 지난 순간의 신호 (위 trackIntersection) — 기록이 없으면(정지선 안쪽에서 출발한 판) 지금 것
     const s = { ...now, ...(this.lightsAtLine ?? {}) };
+    /*
+      **직진은 적색에 갈 수 없다.**
+
+      같은 적색인데도 우회전과 정반대다 — 우회전은 서고 나서 갈 수 있지만([별표 2] 「적색의 등화」 제2호),
+      직진은 **녹색으로 바뀔 때까지 기다려야 한다.** 우회전 신호등은 직진과 무관하므로 보지 않는다.
+
+      황색도 함께 잡는다 — 멈출 수 있으면 멈추는 것이 원칙이고, 이 코스는 보호구역 안이라 더욱 그렇다.
+      이미 교차로에 들어선 뒤 바뀐 경우는 잡히지 않는다: 이 판정은 **정지선을 지나는 순간**의 신호만 본다.
+    */
+    if (this.drive === 'straight') {
+      if (s.vehicleLight === 'red' || s.vehicleLight === 'redFlash' || s.vehicleLight === 'yellow') {
+        this.record('STRAIGHT_RED', s, `정면신호 ${LIGHT_TEXT[s.vehicleLight]}에 직진 통과`);
+      }
+      return;
+    }
     if (s.rightArrow !== null) {
       if (s.rightArrow === 'redArrow') {
         this.record('RIGHT_ARROW_RED', s);
@@ -900,6 +998,37 @@ export class RightTurnJudge {
     }
 
     this.trackPedestrianConflict(s, dt, 'C', withinBand);
+  }
+
+  /**
+   * **횡단보도 B (교차로 건너편).** 직진 코스에서 교차로를 지나 만나는 횡단보도다.
+   *
+   * 판정 논리는 C 와 같다 — 다른 것은 **재는 축뿐**이다. C 는 동쪽(x)으로 빠져나가며 만나고
+   * B 는 북쪽(-z)으로 빠져나가며 만나므로, 가까운 가장자리가 `CROSSWALK_B_INNER`(-14.8)이고
+   * 지나고 나면 `CROSSWALK_B_OUTER`(-18.8) 다. z 가 **줄어드는** 방향이라 부등호가 뒤집힌다.
+   */
+  private trackCrosswalkB(s: WorldSample, dt: number): void {
+    if (!this.enteredIntersection) return;
+
+    const pastNearEdge = s.frontZ <= CROSSWALK_B_INNER;
+    const withinBand = pastNearEdge && s.frontZ >= CROSSWALK_B_OUTER;
+
+    if (!this.enteredCrosswalkB && pastNearEdge) {
+      this.enteredCrosswalkB = true;
+      this.note(
+        s.t,
+        'info',
+        `건너편 횡단보도 진입 — ${s.speedKmh.toFixed(0)}km/h` +
+          ` · 앞서 일시정지 ${this.stopBeforeB ? '함' : '안 함'}` +
+          ` · ${this.describePedestrians(this.conflictingPedestrians(s, 'B'))}`,
+      );
+      // 제27조 제7항 — 어린이보호구역 안, 신호기 없는 횡단보도는 보행자가 없어도 일시정지
+      if (s.isSchoolZone && s.pedSignal.B === null && !this.stopBeforeB) {
+        this.record('SCHOOL_ZONE_NO_STOP', s, '어린이보호구역 · 신호기 없는 건너편 횡단보도 앞 무정지');
+      }
+    }
+
+    this.trackPedestrianConflict(s, dt, 'B', withinBand);
   }
 
   private hasConflictingPedestrian(s: WorldSample, id: CrosswalkId): boolean {

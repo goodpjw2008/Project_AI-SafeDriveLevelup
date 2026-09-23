@@ -22,6 +22,8 @@
  */
 
 import {
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
   CROSSWALK_S_INNER,
@@ -581,9 +583,11 @@ export class PedWalk {
    * 화면의 진출 안내(Game.ts)가 쓰는 것과 같은 방식이라 표시와 동작이 어긋나지 않는다.
    */
   private playerDistance(carFront: CarFront): number {
-    // S 와 A 는 남북 도로를 가로지른다 — 남은 거리가 곧 z 차이다
+    // S · A · B 는 남북 도로를 가로지른다 — 남은 거리가 곧 z 차이다
     if (this.crosswalk === 'S') return carFront.z - CROSSWALK_S_OUTER;
     if (this.crosswalk === 'A') return carFront.z - CROSSWALK_OUTER;
+    // B 는 교차로 **건너편**이라 내가 먼저 닿는 가장자리가 INNER 다 (z 가 줄어드는 방향)
+    if (this.crosswalk === 'B') return carFront.z - CROSSWALK_B_INNER;
     return Math.max(0, CROSSWALK_INNER - carFront.x) + Math.max(0, carFront.z - PLAYER_EXIT_Z);
   }
 
@@ -591,6 +595,7 @@ export class PedWalk {
   private carHasPassed(carFront: CarFront): boolean {
     if (this.crosswalk === 'S') return carFront.z < CROSSWALK_S_INNER - 5;
     if (this.crosswalk === 'A') return carFront.z < CROSSWALK_INNER - 5;
+    if (this.crosswalk === 'B') return carFront.z < CROSSWALK_B_OUTER - 5;
     return carFront.x > CROSSWALK_OUTER + 5;
   }
 
@@ -598,7 +603,11 @@ export class PedWalk {
     if (this.crosswalk === 'S') {
       return carFront.z >= CROSSWALK_S_INNER && carFront.z <= CROSSWALK_S_OUTER;
     }
-    const v = this.crosswalk === 'A' ? carFront.z : carFront.x;
+    /*
+      A · B 는 z, C 는 x 로 잰다. **절댓값으로 재는 이유** — B 는 교차로 건너편이라 z 가 음수다
+      (z ∈ [-18.8, -14.8]). A 와 크기가 같고 부호만 반대라 절댓값 하나로 둘 다 걸린다.
+    */
+    const v = this.crosswalk === 'A' || this.crosswalk === 'B' ? carFront.z : carFront.x;
     return Math.abs(v) >= CROSSWALK_INNER && Math.abs(v) <= CROSSWALK_OUTER;
   }
 

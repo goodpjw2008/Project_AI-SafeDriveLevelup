@@ -45,6 +45,7 @@ import {
   type SchoolZonePhase,
 } from './scenarios';
 import type { CrosswalkId, JudgeResult, PedestrianSample } from '../rules/lawRules';
+import { signalCrosswalk } from '../rules/lawRules';
 
 /**
  * 이 횡단보도에 **지킬 보행신호가 있는가.**
@@ -53,8 +54,11 @@ import type { CrosswalkId, JudgeResult, PedestrianSample } from '../rules/lawRul
  * `approachSchoolZone.signal` 이다. 한 곳에 모아 두지 않으면 S 를 더한 뒤에도
  * 옛 자리만 보는 검사가 남는다.
  */
-const hasPedSignal = (spec: ScenarioSpec, id: CrosswalkId): boolean =>
-  id === 'S' ? spec.approachSchoolZone?.signal === true : spec.pedSignalInstalled[id];
+const hasPedSignal = (spec: ScenarioSpec, id: CrosswalkId): boolean => {
+  const at = signalCrosswalk(id);
+  // B 는 A 와 같은 신호기다 (rules/lawRules.ts 의 signalCrosswalk)
+  return at === null ? spec.approachSchoolZone?.signal === true : spec.pedSignalInstalled[at];
+};
 
 /** 한 건의 지적 — 어디가 왜 잘못됐는지 */
 export interface Issue {
@@ -388,11 +392,13 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
     pedestrians: (t, car, ctx): PedestrianSample[] => {
       const phase = at(t);
       return walkers.map((w, i) => {
+        // 횡단보도마다 자기 신호를 본다 — B 는 A 와 같은 등화다 (rules/lawRules.ts 의 signalCrosswalk)
+        const at = signalCrosswalk(w.crosswalk);
         const signal =
-          w.crosswalk === 'S'
+          at === null
             ? (zoneAt(t)?.ped ?? null)
-            : spec.pedSignalInstalled[w.crosswalk]
-              ? w.crosswalk === 'A'
+            : spec.pedSignalInstalled[at]
+              ? at === 'A'
                 ? phase.pedA
                 : phase.pedC
               : null;
@@ -413,6 +419,7 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
             rightArrow: spec.rightArrowInstalled ? phase.rightArrow : null,
             pedSignal: {
               A: spec.pedSignalInstalled.A ? phase.pedA : null,
+              B: spec.pedSignalInstalled.A ? phase.pedA : null,
               C: spec.pedSignalInstalled.C ? phase.pedC : null,
               S: zoneAt(t)?.ped ?? null,
             },
@@ -501,6 +508,8 @@ const EXEMPLARY: DriverConfig[] = (() => {
  * 잘못 고르면 47초를 서 있어야 하는 판이 나온다 — 불가능하지는 않지만 게임이 아니다.
  */
 function firstLegalTurnAt(spec: ScenarioSpec): number | null {
+  // 직진 코스는 우회전 신호등을 기다릴 일이 없다 — 곧장 통과한다
+  if (spec.drive === 'straight') return 0;
   if (!spec.rightArrowInstalled) return 0;
   const cycle = STANDARD_PROGRAM.reduce((sum, p) => sum + p.duration, 0);
   for (let t = 0; t <= cycle; t += 0.5) {
@@ -535,6 +544,11 @@ const RECKLESS: DriverConfig = {
  */
 export function checkPlayable(spec: ScenarioSpec): { issues: Issue[]; probes: ValidationResult['probes'] } {
   const issues: Issue[] = [];
+  /*
+    **어느 코스인지 먼저 정한다** — 우회전이면 지금까지와 같고, 직진이면 경로도 판정도 달라진다
+    (scenarios.ts 의 `drive`). 모범 운전자 · 막 모는 운전자 모두 같은 코스로 달려야 한다.
+  */
+  const drive = spec.drive ?? 'rightTurn';
 
   const always = spec.pedestrians.filter((p) => p.chance === undefined);
   const variants: { label: string; peds: PedSpawn[] }[] =
@@ -554,7 +568,7 @@ export function checkPlayable(spec: ScenarioSpec): { issues: Issue[]; probes: Va
     */
     let passed: JudgeResult | null = null;
     for (const driver of EXEMPLARY) {
-      const r = simulate(toWorld(spec, v.peds), { ...driver, startZ: spawnZ(spec) });
+      const r = simulate(toWorld(spec, v.peds), { ...driver, startZ: spawnZ(spec), drive });
       /*
         **제한시간을 넘긴 주행은 통과가 아니다.** 게임은 100초에 시간 초과로 실패시킨다.
         위반 없이 완주했더라도 110초가 걸렸다면 사람이 플레이하면 반드시 실패한다 —
@@ -594,6 +608,7 @@ export function checkPlayable(spec: ScenarioSpec): { issues: Issue[]; probes: Va
   const reckless = simulate(toWorld(spec, spec.pedestrians), {
     ...RECKLESS,
     startZ: spawnZ(spec),
+    drive,
   });
   if (reckless.violations.length === 0 && !reckless.failReason) {
     issues.push(

@@ -153,7 +153,11 @@ export function drawScenarioMap(canvas: HTMLCanvasElement, sc: ScenarioSpec): vo
       A 횡단보도의 보행자처럼 보인다 — 둘 다 판을 잘못 읽게 만든다.
       그 구간이 있다는 것은 카드의 조건표가 말한다 (Screens.ts 의 scenarioTags).
     */
-    if (ped.crosswalk === 'S') continue;
+    /*
+      S(진입로 보호구역)는 이 그림의 바깥이라 건너뛴다. B(교차로 건너편)도 아직 그리지 않는다 —
+      이 카드 그림은 우회전 코스를 위에서 본 것이라 북쪽이 잘려 있다 (직진 코스 그림은 나중에).
+    */
+    if (ped.crosswalk === 'S' || ped.crosswalk === 'B') continue;
     const chance = ped.chance ?? 1;
     ctx.globalAlpha = chance >= 1 ? 1 : 0.45;
     drawPedestrian(ctx, px, pz, m, ped.crosswalk, ped.from, ped.kind ?? 'adult');

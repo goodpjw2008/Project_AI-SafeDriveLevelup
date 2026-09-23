@@ -10,7 +10,7 @@
  * 법규 판정 엔진(rules/lawRules.ts)에는 규정이 남아 있다 — 시행규칙 [별표 2] 비고 제3호.
  */
 
-import type { CrosswalkId, IntersectionCrosswalk, LightColor, PedSignal, RightArrowColor } from '../rules/lawRules';
+import type { DriveMode, CrosswalkId, IntersectionCrosswalk, LightColor, PedSignal, RightArrowColor } from '../rules/lawRules';
 import { SPAWN_Z, SPAWN_Z_SCHOOL_ZONE, STOP_LINE } from '../layout';
 import { LEAD_HALF_LENGTH_MAX, LeadDrive, type LeadCarSpec } from '../game/leadDrive';
 import { CAR_HALF_LENGTH } from './turnPath';
@@ -294,6 +294,15 @@ export const GENERATED_ID_BASE = 100;
 export interface ScenarioSpec {
   id: number;
   title: string;
+  /**
+   * **이 판을 어떻게 빠져나가는가** (rules/lawRules.ts 의 DriveMode). 없으면 우회전 —
+   * 지금까지의 모든 판이 그렇다.
+   *
+   * `straight` 는 **어린이보호구역 연습편**이다: 교차로에서 돌지 않고 곧장 통과해 보호구역을
+   * 빠져나간다. 그 코스에서는 우회전에만 있는 의무(우측 가장자리 통행 · 방향지시등 · 우회전 후
+   * 횡단보도 C)를 묻지 않고, 대신 교차로 건너편 횡단보도(B)를 본다.
+   */
+  drive?: DriveMode;
   /** 플레이 전 안내 */
   brief: string;
   /** 이 시나리오가 가르치는 것 */
@@ -891,7 +900,7 @@ function straightLeadArrival(spec: ScenarioSpec): number | null {
     lead.update(dt, {
       vehicleLight: 'red',
       rightArrow: null,
-      pedSignal: { A: null, C: null, S: null },
+      pedSignal: { A: null, B: null, C: null, S: null },
       approachZone: zone,
       pedestrians: [],
       exitBlocked: false,

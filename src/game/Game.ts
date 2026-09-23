@@ -1076,6 +1076,8 @@ export class Game {
       rightArrow: this.scenario.rightArrowInstalled ? phase.rightArrow : null,
       pedSignal: {
         A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+        // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
+        B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
         C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
         S: this.schoolZonePhase()?.ped ?? null,
       },
@@ -1260,6 +1262,7 @@ export class Game {
         rightArrow: this.scenario.rightArrowInstalled ? phase.rightArrow : null,
         pedSignal: {
           A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+          B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
           C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
           S: zone?.ped ?? null,
         },
@@ -1335,6 +1338,8 @@ export class Game {
       rightArrow: this.scenario.rightArrowInstalled ? phase.rightArrow : null,
       pedSignal: {
         A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+        // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
+        B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
         C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
         S: this.schoolZonePhase()?.ped ?? null,
       },

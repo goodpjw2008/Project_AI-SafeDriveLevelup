@@ -42,7 +42,7 @@ import { validateScenario } from '../src/scenarios/validate';
 const world = (over: Partial<LeadWorld> = {}): LeadWorld => ({
   vehicleLight: 'red',
   rightArrow: null,
-  pedSignal: { A: 'red', C: 'red', S: null },
+  pedSignal: { A: 'red', B: 'red', C: 'red', S: null },
   approachZone: null,
   pedestrians: [],
   exitBlocked: false,

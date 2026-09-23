@@ -301,12 +301,17 @@ export class Pedestrian {
     const axis = this.walk.axis - this.walk.dir * WAIT_SETBACK * this.setback;
     const dir = this.walk.dir;
     /*
-      **S 는 A 와 같은 방향으로 걷는다** — 둘 다 남북 도로를 가로지르므로 x 축으로 간다.
-      다른 것은 자리 하나뿐이라(z 가 48 인가 16.8 인가) 걷는 코드는 그대로 쓴다.
+      **S · B 는 A 와 같은 방향으로 걷는다** — 셋 다 남북 도로를 가로지르므로 x 축으로 간다.
+      다른 것은 자리 하나뿐이다 — S 는 z 48, A 는 16.8, B 는 교차로 건너편이라 -16.8 이다.
     */
-    if (this.crosswalk === 'S' || this.crosswalk === 'A') {
-      const across =
-        (this.crosswalk === 'S' ? CROSSWALK_S_CENTER : CROSSWALK_CENTER) + this.offset;
+    if (this.crosswalk === 'S' || this.crosswalk === 'A' || this.crosswalk === 'B') {
+      const center =
+        this.crosswalk === 'S'
+          ? CROSSWALK_S_CENTER
+          : this.crosswalk === 'B'
+            ? -CROSSWALK_CENTER
+            : CROSSWALK_CENTER;
+      const across = center + this.offset;
       // 남북 도로를 가로지름 — x축으로 이동
       this.group.position.set(axis, 0, across);
       this.group.rotation.y = dir === 1 ? -Math.PI / 2 : Math.PI / 2;

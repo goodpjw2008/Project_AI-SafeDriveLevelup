@@ -59,6 +59,8 @@ const esc = (s: string): string =>
 const CROSSWALK_NAME = {
   S: '보호구역 횡단보도',
   A: '앞 횡단보도',
+  /* 직진으로 통과하면 만나는 교차로 건너편 횡단보도 (어린이보호구역 연습편) */
+  B: '건너편 횡단보도',
   C: '우회전 후 횡단보도',
 } as const;
 

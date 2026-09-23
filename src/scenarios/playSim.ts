@@ -149,7 +149,10 @@ const PED_KIND_WORD = { adult: '어른', child: '어린이', elder: '노인' } a
 
 function pedLabel(p: PedSpawn, i: number, spec: ScenarioSpec): string {
   const who = PED_KIND_WORD[p.kind ?? 'adult'];
-  const hasSignal = p.crosswalk === 'S' ? spec.approachSchoolZone?.signal === true : spec.pedSignalInstalled[p.crosswalk];
+  const hasSignal =
+    p.crosswalk === 'S'
+      ? spec.approachSchoolZone?.signal === true
+      : spec.pedSignalInstalled[p.crosswalk === 'B' ? 'A' : p.crosswalk];
   // 신호기가 없는 횡단보도의 사람은 지킬 신호가 없다 — '신호무시' 라고 적으면 무단횡단자로 읽힌다
   const how = !hasSignal ? '신호없음' : p.obeysSignal === false ? '신호무시' : '신호준수';
   const tags = [how, p.afterLead ? '앞차뒤' : '', p.letsCarPass ? '내차보냄' : '', p.chance !== undefined ? `확률${p.chance}` : '']
@@ -281,6 +284,8 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     const exitBlocked = Boolean(spec.exitBlocked) && t < JAM_CLEAR_SECONDS;
     const pedSignal: Record<CrosswalkId, PedSignal | null> = {
       A: spec.pedSignalInstalled.A ? phase.pedA : null,
+      // B 는 A 와 같은 도로를 가로지른다 — 같은 등화다 (lawRules.ts 의 signalCrosswalk)
+      B: spec.pedSignalInstalled.A ? phase.pedA : null,
       C: spec.pedSignalInstalled.C ? phase.pedC : null,
       S: zone?.ped ?? null,
     };

@@ -41,7 +41,9 @@ export type ViolationCode =
   /** 정지선을 넘어서 정지 */
   | 'OVER_STOP_LINE'
   /** 진입부 어린이보호구역의 신호기 있는 횡단보도를 적색에 통과 */
-  | 'SCHOOL_ZONE_RED';
+  | 'SCHOOL_ZONE_RED'
+  /** 직진으로 교차로를 통과하는데 정면 신호가 적색(또는 황색)이었다 — 어린이보호구역 연습편 */
+  | 'STRAIGHT_RED';
 
 export interface ViolationSpec {
   code: ViolationCode;
@@ -223,6 +225,31 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     fix:
       '정지선 앞에서 완전히 서고, 차량신호등이 녹색으로 바뀐 뒤에 출발하세요. ' +
       '보행자가 다 건넜더라도 적색인 동안에는 갈 수 없습니다.',
+    fine: 60_000,
+    penaltyPoints: 15,
+    schoolZoneFine: 120_000,
+    schoolZonePenaltyPoints: 30,
+    citations: [CITATION_RED_LIGHT, CITATION_ART5],
+  },
+
+  /*
+    **직진으로 지나는 교차로의 적색.**
+
+    같은 적색인데도 우회전과 해야 할 일이 정반대다 — 우회전은 **서고 나서 갈 수 있지만**
+    (시행규칙 [별표 2] 「적색의 등화」 제2호), 직진은 **녹색으로 바뀔 때까지 갈 수 없다**.
+    RED_NO_STOP 과 한 코드로 묶으면 결과 화면이 둘 중 하나에는 반드시 틀린 말을 한다.
+
+    황색도 여기서 잡는다. 뒤에 빠져나갈 교차로가 없는 것이 아니라, **직진은 멈출 수 있으면
+    멈추는 것이 원칙**이고(별표 2 「황색의 등화」), 이 코스는 보호구역 안이라 더욱 그렇다.
+    다만 이미 교차로에 들어선 뒤 황색으로 바뀐 경우는 잡지 않는다 (판정은 진입 순간만 본다).
+  */
+  STRAIGHT_RED: {
+    code: 'STRAIGHT_RED',
+    title: '신호·지시 위반 (적색 직진)',
+    reason:
+      '정면 차량신호등이 적색인데 교차로를 그대로 직진해 통과했습니다. ' +
+      '우회전과 달리 직진은 **일시정지 후 통행이 허용되지 않습니다** — 녹색으로 바뀔 때까지 기다려야 합니다.',
+    fix: '정지선 앞에서 서고, 정면 신호가 녹색으로 바뀐 뒤에 출발하세요.',
     fine: 60_000,
     penaltyPoints: 15,
     schoolZoneFine: 120_000,

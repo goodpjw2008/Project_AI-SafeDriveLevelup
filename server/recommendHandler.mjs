@@ -38,6 +38,7 @@ const CODES = [
   'NO_TURN_SIGNAL',
   'OVER_STOP_LINE',
   'SCHOOL_ZONE_RED',
+  'STRAIGHT_RED',
 ];
 const LEAD_TURNS = ['straight', 'rolling', 'lawful'];
 /** 보호구역의 종류 (src/scenarios/library.ts 의 `zoneKindOf`) */

@@ -15,11 +15,21 @@
  * 검증이 **테스트에서만 쓰는 도구**로 남으면 제품이 그것을 쓸 수 없다. 그래서 옮겼다.
  */
 
-import { CROSSWALK_INNER, CROSSWALK_OUTER, STOP_LINE, STOP_LINE_S } from '../layout';
-import { CAR_HALF_LENGTH, arcLengths, buildPath, poseAt, type TurnStyle } from './turnPath';
+import {
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
+  CROSSWALK_INNER,
+  CROSSWALK_OUTER,
+  FINISH_Z,
+  SPAWN_Z,
+  STOP_LINE,
+  STOP_LINE_S,
+} from '../layout';
+import { CAR_HALF_LENGTH, arcLengths, buildPath, buildStraightPath, poseAt, type TurnStyle } from './turnPath';
 import {
   RightTurnJudge,
   type CrosswalkId,
+  type DriveMode,
   type JudgeResult,
   type LightColor,
   type PedSignal,
@@ -117,11 +127,21 @@ export interface DriverConfig {
   stopPastLine?: number;
   /** 정지선을 얼마나 넘어서 멈추는가 (m). 0.5m 이하면 횡단보도를 밟지 않는다. */
   pastLineDepth?: number;
-  /** 우회전 후 횡단보도 앞에서 멈출 시간 */
+  /**
+   * **교차로를 지나 만나는 횡단보도 앞에서 멈출 시간** — 우회전이면 C(동쪽), 직진이면 B(북쪽).
+   * 두 코스에서 같은 자리를 뜻하므로 이름 하나로 둔다.
+   */
   stopBeforeExitCrosswalk?: number;
   /** 방향지시등: 항상 켬 / 안 켬 / 늦게 켬(교차로 20m 앞부터) */
   turnSignal?: 'always' | 'never' | 'late';
   turnStyle?: TurnStyle;
+  /**
+   * **이 판을 어떻게 빠져나가는가** (rules/lawRules.ts 의 DriveMode). 기본 우회전.
+   *
+   * `straight` 면 경로가 교차로를 지나 북쪽으로 곧게 뻗고, 판정도 우회전 전용 의무
+   * (대회전 · 방향지시등 · 횡단보도 C)를 묻지 않는다. 어린이보호구역 연습편이 이 모드다.
+   */
+  drive?: DriveMode;
   /**
    * 보행자가 아직 건너는 중이면 **다 건널 때까지 더 기다린다.**
    *
@@ -172,7 +192,15 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     keepsDistance = true,
   } = driver;
 
-  const pts = buildPath(turnStyle, driver.startZ);
+  /*
+    **직진 코스는 곧은 경로를 쓴다.** 완주선(FINISH_Z) 을 넘어 조금 더 뻗어 두는 것은 우회전 경로와
+    같은 이유다 — 경로 끝에서 완주를 찍으므로(아래 markCompleted) 선을 지난 직후에 끝나야 한다.
+  */
+  const drive = driver.drive ?? 'rightTurn';
+  const pts =
+    drive === 'straight'
+      ? buildStraightPath(driver.startZ ?? SPAWN_Z, FINISH_Z - 6)
+      : buildPath(turnStyle, driver.startZ);
   const acc = arcLengths(pts);
   const total = acc[acc.length - 1];
 
@@ -213,9 +241,12 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     });
   }
   if (stopBeforeExitCrosswalk > 0 || yieldUntilClear) {
-    // 두 번째 횡단보도 직전에서 멈춘다
+    // 교차로를 지나 만나는 횡단보도 직전에서 멈춘다 — 우회전이면 C, 직진이면 B
     stops.push({
-      atDistance: distanceWhereFrontX(CROSSWALK_INNER - 1),
+      atDistance:
+        drive === 'straight'
+          ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
+          : distanceWhereFrontX(CROSSWALK_INNER - 1),
       seconds: stopBeforeExitCrosswalk,
     });
   }
@@ -223,7 +254,8 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
 
   // 첫 횡단보도부터 두 번째 횡단보도까지를 '회전 구간'으로 보고 turnKmh 로 달린다.
   const turnStart = distanceWhereFrontZ(CROSSWALK_OUTER);
-  const turnEnd = distanceWhereFrontX(CROSSWALK_OUTER);
+  const turnEnd =
+    drive === 'straight' ? distanceWhereFrontZ(CROSSWALK_B_OUTER) : distanceWhereFrontX(CROSSWALK_OUTER);
   /** 진입 전 횡단보도(A) 직전 — 여기서도 보행자를 보내야 한다 */
   const gateA = distanceWhereFrontZ(CROSSWALK_OUTER + 0.5);
   /*
@@ -231,9 +263,10 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     매 스텝 다시 재면 판 하나에 수천 번 돌고, 검증기가 몰기 서른여섯 가지를 돌리는 동안
     판 하나에 4초가 걸렸다.
   */
-  const gateC = distanceWhereFrontX(CROSSWALK_INNER - 1);
+  const gateC =
+    drive === 'straight' ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1) : distanceWhereFrontX(CROSSWALK_INNER - 1);
 
-  const judge = new RightTurnJudge(world.stopZone);
+  const judge = new RightTurnJudge(world.stopZone, drive);
   const resolve = <T>(v: T | ((t: number) => T), t: number): T =>
     typeof v === 'function' ? (v as (t: number) => T)(t) : v;
 
@@ -330,6 +363,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
       rightArrow: resolve(world.rightArrow ?? null, t),
       pedSignal: {
         A: resolve(world.pedSignalA ?? null, t),
+        B: resolve(world.pedSignalA ?? null, t),
         C: resolve(world.pedSignalC ?? null, t),
         S: resolve(world.pedSignalS ?? null, t),
       },

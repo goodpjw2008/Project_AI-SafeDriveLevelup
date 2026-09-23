@@ -61,7 +61,8 @@ import type { ViolationCode } from '../rules/violations';
 const jaywalks = (s: ScenarioSpec, p: ScenarioSpec['pedestrians'][number]): boolean => {
   if (p.obeysSignal !== false) return false;
   if (p.crosswalk === 'S') return s.approachSchoolZone?.signal === true;
-  return s.pedSignalInstalled[p.crosswalk];
+  // B 는 A 와 같은 신호기다 (rules/lawRules.ts 의 signalCrosswalk)
+  return s.pedSignalInstalled[p.crosswalk === 'B' ? 'A' : p.crosswalk];
 };
 
 export type ConditionKey =
@@ -496,6 +497,12 @@ export const TARGET_KIT: Readonly<Record<ViolationCode, readonly ConditionKey[]>
   BLOCKING_INTERSECTION: ['exitBlocked'],
   PEDESTRIAN_BLOCKED: ['lateStart'],
   SCHOOL_ZONE_RED: ['approachZone'],
+  /*
+    **직진 적색은 라이브러리가 만드는 조건으로 낼 수 없다** — 지금 라이브러리의 판은 모두
+    우회전이고, 직진 코스는 따로 만든 보호구역 연습편이 낸다 (scenarios.ts 의 `drive`).
+    그래서 조건 묶음은 비워 두고, 그 코스가 이 습관을 맡는다.
+  */
+  STRAIGHT_RED: [],
   NO_SLOW_DOWN: [],
   WIDE_TURN: [],
   NO_TURN_SIGNAL: [],

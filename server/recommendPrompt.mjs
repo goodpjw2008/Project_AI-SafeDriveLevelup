@@ -22,6 +22,7 @@ const VIOLATION_TEXT = {
   NO_TURN_SIGNAL: '방향지시등 안 켬',
   OVER_STOP_LINE: '정지선을 넘어서 정지',
   SCHOOL_ZONE_RED: '보호구역 신호 있는 횡단보도 적색 통과',
+  STRAIGHT_RED: '적색에 교차로 직진 통과 (보호구역 연습편)',
 };
 
 export const SYSTEM_PROMPT = [

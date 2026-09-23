@@ -46,6 +46,7 @@ export const CODE_BRIEF = {
   NO_TURN_SIGNAL: '방향지시등을 켜지 않음',
   OVER_STOP_LINE: '정지선을 넘어 정지',
   SCHOOL_ZONE_RED: '어린이보호구역 횡단보도의 차량신호 적색에 통과 (서서 기다려야 함)',
+  STRAIGHT_RED: '적색인데 교차로를 직진으로 통과 (우회전과 달리 서고 나서도 갈 수 없음)',
 };
 
 /** 앞차 종류별로 프롬프트에 적을 모양과 한 줄 설명 (src/scenarios/scenarios.ts 의 LeadPlan) */
