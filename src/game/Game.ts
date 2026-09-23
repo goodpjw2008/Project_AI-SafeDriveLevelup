@@ -33,7 +33,7 @@ import type {
   RightArrowColor,
   WorldSample,
 } from '../rules/lawRules';
-import { RightTurnJudge } from '../rules/lawRules';
+import { RightTurnJudge, ZONE_ROAD_EDGES } from '../rules/lawRules';
 import { pedSignalFor } from './pedSignalFor';
 import { isSignalWait } from './stopReason';
 import {
@@ -196,6 +196,8 @@ export interface StopStatus {
   /** 정지 지점까지 남은 거리(m). 이미 지났으면 음수. */
   distance: number;
   target: StopTarget;
+  /** 노면 띠를 깔 자리 (StopMarkers.StopMarkerState 의 bandZ) */
+  bandZ?: number;
 }
 
 export interface GameSnapshot {
@@ -1917,7 +1919,7 @@ export class Game {
       view: this.rig.mode,
       rightArrow: this.scenario.rightArrowInstalled ? phase.rightArrow : null,
       // 신호기가 있는 진입로 보호구역 횡단보도의 등화 — 화면이 '신호 대기' 와 '일시정지' 를 가려 말한다
-      zoneLight: this.scenario.approachSchoolZone?.signal ? (this.schoolZonePhase()?.vehicle ?? null) : null,
+      zoneLight: this.currentZoneLight(),
       elapsed: this.elapsed,
       stopHold: this.stopHold,
       advice: this.advise(sample),
@@ -1926,6 +1928,18 @@ export class Game {
       fps: this.fps.fps,
       renderScale: this.renderScale,
     };
+  }
+
+  /**
+   * **지금 겨누는 보호구역 횡단보도의 차량 등화** — 화면이 '신호 대기' 와 '일시정지' 를 가려 말하는 데 쓴다
+   * (game/stopReason.ts). 신호기가 없으면 null 이고, 그때가 일시정지 의무 자리다 (제27조 제7항).
+   */
+  private currentZoneLight(): LightColor | null {
+    if (this.scenario.drive === 'zoneOnly') {
+      const at = this.nextZoneCrosswalk();
+      return at ? (this.zoneRoadPhases()[at]?.vehicle ?? null) : null;
+    }
+    return this.scenario.approachSchoolZone?.signal ? (this.schoolZonePhase()?.vehicle ?? null) : null;
   }
 
   /** 앞차가 건너뛴 일시정지 자리 중 내가 아직 지나지 않은 곳 (GameSnapshot.leadCue) */
@@ -1944,6 +1958,17 @@ export class Game {
   }
 
   /**
+   * **사거리 없는 보호구역 도로에서 지금 겨누는 횡단보도** — 아직 들어서지 않은 첫 곳.
+   *
+   * 판정(lawRules.ts 의 trackZoneRoad)이 세는 것과 같은 값을 본다. 화면이 따로 세면 판정은
+   * 세 번째를 보는데 화면은 두 번째를 말하는 어긋남이 생긴다.
+   */
+  private nextZoneCrosswalk(): 'S' | 'A' | 'B' | null {
+    const entered = this.judge.progress.zoneEntered;
+    return (['S', 'A', 'B'] as const).find((id) => !entered[id]) ?? null;
+  }
+
+  /**
    * 지금 지켜야 할 정지 지점과 그 이행 여부.
    * 이 게임의 채점 기준이라 화면(HUD·노면 표시)에서 가장 눈에 띄어야 한다.
    */
@@ -1951,6 +1976,26 @@ export class Game {
     const prog = this.judge.progress;
     const advice = this.advise(s);
     const beforeIntersection = s.frontZ > INTERSECTION_HALF;
+
+    /*
+      **사거리 없는 보호구역 도로는 횡단보도 셋을 차례로 겨눈다** (scenarios/zoneCourse.ts).
+
+      아래 가지들은 사거리 맵을 기준으로 쓰여 있다 — 진입로(S) · 교차로 정지선(A) · 우회전 후(C).
+      전용 도로에 그대로 대면 첫 번째와 세 번째가 어느 가지에도 걸리지 않아, **노면 띠가 뜨지 않고**
+      말풍선도 엉뚱한 신호를 보고 말한다. 두 번째만 정지선 좌표가 우연히 같아 맞았을 뿐이다.
+    */
+    if (this.scenario.drive === 'zoneOnly') {
+      const at = this.nextZoneCrosswalk();
+      if (!at) return { required: false, satisfied: false, distance: -1, target: 'zone' };
+      const stopLine = ZONE_ROAD_EDGES[at].stopLine;
+      return {
+        required: advice === 'stop',
+        satisfied: prog.zoneStopped[at],
+        distance: s.frontZ - stopLine,
+        target: 'zone',
+        bandZ: stopLine,
+      };
+    }
 
     // 진입부 보호구역 횡단보도(S) 앞 — 교차로 정지선보다 먼저 만난다 (advise 와 같은 경계)
     if (s.approachZone && !prog.enteredCrosswalkS && s.frontZ > CROSSWALK_S_OUTER) {
@@ -2001,6 +2046,21 @@ export class Game {
       (적색은 "정지 후 진행" 이 아니다), 없으면 보행자 유무와 무관하게 **일시정지**한다
       (제27조 제7항). 건너려는 사람이 있으면 어느 쪽이든 선다.
     */
+    /*
+      **사거리 없는 보호구역 도로** — 지금 겨누는 횡단보도 하나만 보고 말한다 (stopStatus 와 같은 가지).
+      규칙은 판정(lawRules.ts 의 trackZoneRoad)과 같다: 신호기가 있으면 **녹색이 될 때까지 기다리고**,
+      없으면 보행자 유무와 무관하게 **일시정지**한다 (제27조 제7항). 건너려는 사람이 있으면 어느 쪽이든 선다.
+    */
+    if (this.scenario.drive === 'zoneOnly') {
+      const at = this.nextZoneCrosswalk();
+      if (!at) return 'go';
+      if (s.frontZ > ZONE_ROAD_EDGES[at].stopLine + this.stopAdviceLead) return 'go';
+      if (pedBlocking(at)) return 'stop';
+      const light = s.zoneLights?.[at] ?? null;
+      if (light !== null) return light === 'green' ? 'go' : 'stop';
+      return prog.zoneStopped[at] ? 'go' : 'stop';
+    }
+
     if (s.approachZone && !prog.enteredCrosswalkS && s.frontZ > CROSSWALK_S_OUTER) {
       const nearLineS = s.frontZ <= STOP_LINE_S + this.stopAdviceLead;
       if (nearLineS) {

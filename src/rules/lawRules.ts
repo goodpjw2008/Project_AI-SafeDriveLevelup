@@ -381,7 +381,13 @@ function placeLabel(s: WorldSample): string {
 /** 이 코스가 지나는 횡단보도 — C(우회전 후)는 사거리가 없으니 없다 */
 type ZoneRoadCrosswalk = 'S' | 'A' | 'B';
 const ZONE_ROAD_ORDER: readonly ZoneRoadCrosswalk[] = ['S', 'A', 'B'];
-const ZONE_ROAD_EDGES: Record<ZoneRoadCrosswalk, { near: number; far: number; stopLine: number }> = {
+/**
+ * 전용 도로 횡단보도의 가장자리와 정지선.
+ *
+ * **밖으로 내보낸다** — 화면 쪽(game/Game.ts 의 정지 안내 · 노면 띠)도 같은 표를 봐야 한다.
+ * 따로 적어 두었더니 판정은 세 곳을 보는데 화면은 사거리 기준 한 곳만 보고 있었다.
+ */
+export const ZONE_ROAD_EDGES: Record<ZoneRoadCrosswalk, { near: number; far: number; stopLine: number }> = {
   S: { near: CROSSWALK_S_OUTER, far: CROSSWALK_S_INNER, stopLine: STOP_LINE_S },
   A: { near: CROSSWALK_OUTER, far: CROSSWALK_INNER, stopLine: STOP_LINE },
   B: { near: CROSSWALK_B_INNER, far: CROSSWALK_B_OUTER, stopLine: CROSSWALK_B_INNER + 2 },
@@ -565,6 +571,9 @@ export class RightTurnJudge {
     enteredCrosswalkA: boolean;
     enteredCrosswalkC: boolean;
     enteredCrosswalkS: boolean;
+    /** 사거리 없는 보호구역 도로 — 횡단보도별로 앞에서 일시정지했는가 · 들어섰는가 */
+    zoneStopped: Record<CrosswalkId, boolean>;
+    zoneEntered: Record<CrosswalkId, boolean>;
   } {
     return {
       stoppedBeforeA: this.stoppedBeforeA(),
@@ -574,6 +583,8 @@ export class RightTurnJudge {
       enteredCrosswalkA: this.enteredCrosswalkA,
       enteredCrosswalkC: this.enteredCrosswalkC,
       enteredCrosswalkS: this.enteredCrosswalkS,
+      zoneStopped: this.zoneStopped,
+      zoneEntered: this.zoneEntered,
     };
   }
 

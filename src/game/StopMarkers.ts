@@ -65,6 +65,15 @@ export interface StopMarkerState {
   /** 이번 정지 지점에서 이미 완전정지를 인정받았는가 */
   satisfied: boolean;
   target: StopTarget;
+  /**
+   * 보호구역 띠를 **깔 자리** (그 정지선의 z). `target` 이 `'zone'` 일 때만 본다.
+   *
+   * 사거리 맵에서는 늘 진입로 횡단보도(S) 하나뿐이라 자리가 고정이었다. 그런데 **사거리 없는 전용
+   * 도로**는 횡단보도가 셋이고 저마다 정지선을 가진다 — 자리를 고정해 두었더니 첫·세 번째 횡단보도
+   * 앞에서는 띠가 엉뚱한 곳(두 번째 정지선)에 깔려 **화면에 아무것도 보이지 않았다.**
+   * 사용자가 세 번째 횡단보도 앞에서 짚었다: "바닥에 안내해 주는 노란색→녹색 부분이 나오지 않아."
+   */
+  bandZ?: number;
 }
 
 export class StopMarkers {
@@ -173,6 +182,11 @@ export class StopMarkers {
 
   update(state: StopMarkerState, dt: number): void {
     this.pulse = (this.pulse + dt) % 1.0;
+
+    // 보호구역 띠는 겨누는 정지선 앞으로 옮겨 깐다 (위 bandZ)
+    if (state.bandZ !== undefined) {
+      this.bandS.position.z = state.bandZ + LINE_WIDTH + BAND_GAP + BAND_DEPTH / 2;
+    }
 
     const mats = { line: this.bandMatA, crosswalk: this.bandMatC, zone: this.bandMatS } as const;
     // 겨누는 자리의 띠 하나만 켠다 — 나머지는 끈다
