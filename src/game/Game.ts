@@ -401,6 +401,7 @@ export class Game {
       Boolean(scenario.approachSchoolZone),
       spawnZ(scenario),
       opts.pace,
+      scenario.drive === 'zoneOnly',
     );
     this.carModel = buildCar(carSpec, { isPlayer: true });
     this.myCarMarker = new PlayerMarker(carSpec);
@@ -585,16 +586,19 @@ export class Game {
     if (this.scenario.isSchoolZone || this.scenario.approachSchoolZone) {
       this.buildSchoolZoneSigns();
       /*
-        **과속 단속 카메라는 구간 초입에 선다** — 표지판(구간 시작 2m 앞)을 지나고 곧바로 보이는 자리다.
-        오는 길이 보호구역인 판은 그 구간 안(z 95)에, 교차로만 보호구역인 판은 교차로 앞(z 38)에 세운다.
+        **단속 카메라는 횡단보도와 한 자리에 선다** — 사용자가 실제 도로를 들어 짚었다:
+        "어린이 보호단속신호등은 횡단보도와 같이 있어야 해. 중간 횡단보도에 같이 나오게 해 줘."
+        실물도 그렇다 — 보호구역 카메라는 구간 아무 데나가 아니라 **건너는 자리**를 잰다.
+
+        정지선 10m 앞에 세운다. 다가가면서 보면 횡단보도와 한 덩어리로 보이고, 정지선에 섰을 때는
+        머리 위가 아니라 앞쪽 위에 있어 신호와 보행자를 가리지 않는다.
+
+        오는 길이 보호구역인 판은 그 길의 횡단보도(S)에, 나머지는 교차로 앞 횡단보도(A)에 —
+        사거리 없는 전용 도로에서는 그 자리가 **가운데 횡단보도**다.
       */
-      /*
-        **단속 카메라는 구간 초입이 아니라 중간부에 선다** — 사용자가 실제 도로를 들어 짚었다:
-        "보통 단속카메라는 어린이보호구역 초입을 지나서 중간부에 있어." 초입에 두었더니
-        보호구역 표지판 · 노면 문자 · 카메라가 몇 미터 안에 한꺼번에 몰려, 속도를 줄일
-        틈도 없이 지나쳤다. 지금은 **첫 횡단보도를 지난 뒤** 다음 횡단보도 전에 선다.
-      */
-      this.buildSpeedCamera(this.scenario.approachSchoolZone || this.straight ? 50 : 38);
+      this.buildSpeedCamera(
+        this.scenario.approachSchoolZone ? STOP_LINE_S + 10 : STOP_LINE + 10,
+      );
     }
 
     /*
@@ -826,7 +830,7 @@ export class Game {
   }
 
   /**
-   * **과속 단속 카메라** — 어린이보호구역 중간부에 선 주황색 갠트리.
+   * **과속 단속 카메라** — 어린이보호구역 횡단보도 앞에 선 주황색 갠트리.
    *
    * 사용자가 실제 사진을 주며 "사진과 같은 30km 단속 카메라도 달아서 실감나게 해 줘" 라고 했다.
    * 실물의 구성을 그대로 따른다 — 주황 지주 + 가로암, 노란 '과속 단속장비' 표지, 카메라 두 대,
@@ -839,9 +843,9 @@ export class Game {
    * 이 게임에서 속도는 차가 알아서 조이므로(Vehicle.zoneTargetKmh) 카메라가 판정을 바꾸지는 않는다 —
    * **여기가 그런 구간이라는 것**을 눈으로 알리는 물건이다.
    *
-   * 자리는 **구간 중간부**다 — 첫 횡단보도를 지난 뒤, 다음 횡단보도 전. 실물도 초입이 아니라
-   * 구간 안쪽에 서고(사용자가 짚었다), 그래야 표지판 · 노면 문자 · 카메라가 한자리에 몰리지 않고
-   * "표지를 보고 줄였는데 여기서 재고 있다" 는 차례로 이어진다.
+   * 자리는 **보호구역 횡단보도 앞**이다 — 실물도 구간 아무 데나가 아니라 건너는 자리를 잰다.
+   * 정지선 10m 앞이라 다가가면서 보면 횡단보도와 한 덩어리로 보이고, 정지선에 섰을 때는
+   * 머리 위가 아니라 앞쪽 위에 있어 신호와 보행자를 가리지 않는다.
    */
   private buildSpeedCamera(z: number): void {
     const g = new THREE.Group();

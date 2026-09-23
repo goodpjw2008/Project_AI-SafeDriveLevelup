@@ -20,6 +20,10 @@ import {
   APPROACH_ZONE_FAR_Z,
   APPROACH_ZONE_NEAR_Z,
   CROSSWALK_S_OUTER,
+  CROSSWALK_S_INNER,
+  CROSSWALK_INNER,
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   STOP_LINE_S,
 } from '../layout';
 import type { DrivePace } from '../scenarios/challenge';
@@ -143,6 +147,8 @@ export class Vehicle {
    * @param schoolZone   교차로가 어린이보호구역인가. 참이면 모든 구간을 30km/h 이하로 조인다.
    * @param approachZone 교차로에 닿기 전 **오는 길**이 보호구역인가. 그 구간(layout.ts 의 APPROACH_ZONE_*)
    *                     에서만 30km/h 로 조이고, 횡단보도 S 앞에서는 서행까지 내린다.
+   * @param zoneRoad     사거리 없는 보호구역 전용 도로인가 (scenarios.ts 의 `drive === 'zoneOnly'`).
+   *                     횡단보도 셋 앞에서 각각 교차로 정지선과 같은 두 단계로 줄인다.
    */
   constructor(
     private carLength: number,
@@ -157,6 +163,7 @@ export class Vehicle {
     spawnZ: number = SPAWN_Z,
     /** 다가가는 속도와 브레이크 — 난이도가 정한다 (위 DEFAULT_PACE) */
     private pace: DrivePace = DEFAULT_PACE,
+    private zoneRoad = false,
   ) {
     this.wheelbase = carLength * 0.58;
     this.z = spawnZ;
@@ -186,7 +193,7 @@ export class Vehicle {
   }
 
   private zoneTargetKmh(): number {
-    return zoneTargetKmh(this.x, this.z, this.schoolZone, this.approachZone, this.pace);
+    return zoneTargetKmh(this.x, this.z, this.schoolZone, this.approachZone, this.pace, this.zoneRoad);
   }
 
   /**
@@ -230,6 +237,18 @@ export class Vehicle {
 }
 
 /**
+ * **사거리 없는 보호구역 도로의 감속 지점** — 횡단보도 셋을 오는 순서대로.
+ *
+ * `stop` 은 그 횡단보도의 정지선, `clear` 는 다 건넌 자리다 (z 가 작을수록 앞).
+ * 판정 쪽의 같은 표는 rules/lawRules.ts 의 `ZONE_ROAD_EDGES` 다 — 자리를 옮기면 둘 다 고친다.
+ */
+const ZONE_ROAD_SLOWDOWNS: ReadonlyArray<{ stop: number; clear: number }> = [
+  { stop: STOP_LINE_S, clear: CROSSWALK_S_INNER },
+  { stop: STOP_LINE, clear: CROSSWALK_INNER },
+  { stop: CROSSWALK_B_INNER + 2, clear: CROSSWALK_B_OUTER },
+];
+
+/**
  * 그 자리(차 중심)에서의 목표 속도.
  * 교차로에 가까워질수록 자동으로 느려져, 플레이어는 정지 여부만 판단하면 된다.
  *
@@ -242,6 +261,7 @@ export function zoneTargetKmh(
   schoolZone: boolean,
   approachZone: boolean,
   pace: DrivePace = DEFAULT_PACE,
+  zoneRoad = false,
 ): number {
   /*
     어린이보호구역에서는 어느 구간이든 30km/h 를 넘지 않는다 (제12조 제1항).
@@ -254,6 +274,30 @@ export function zoneTargetKmh(
     approachZone && z <= APPROACH_ZONE_FAR_Z && z >= APPROACH_ZONE_NEAR_Z;
   const limit = (kmh: number): number =>
     schoolZone || inApproachZone ? Math.min(kmh, SCHOOL_ZONE_KMH) : kmh;
+
+  /*
+    **사거리 없는 보호구역 도로도 횡단보도마다 미리 줄인다.**
+
+    이 길에는 교차로가 없어서 아래의 '교차로 정지선까지 남은 거리' 가지가 걸리지 않았고,
+    `approachSchoolZone` 도 쓰지 않으므로 바로 아래 가지도 걸리지 않았다. 그래서 **세 횡단보도
+    모두를 30km/h 그대로 달려와** 정지를 눌렀다 — 우회전 코스에서는 같은 자리를 서행(12km/h)으로
+    다가가므로, 같은 브레이크인데 멈추는 거리가 7.2m 대 1.2m 로 벌어졌다. 사용자가 그대로 짚었다:
+    "브레이크가 덜 듣는 느낌이야. 우회전 부분과 동일하게 제동부가 작동하도록 해 줘."
+
+    **감속도를 키우는 것이 아니라 다가가는 속도를 맞춘다.** 브레이크(pace.brakeDecel)는 난이도가
+    정하는 값이라 코스마다 다르면 난이도의 뜻이 흔들린다. 두 코스가 같은 속도로 다가가면 같은
+    브레이크가 같게 듣는다.
+  */
+  if (zoneRoad) {
+    for (const { stop, clear } of ZONE_ROAD_SLOWDOWNS) {
+      if (z < clear) continue; // 이미 건너 지난 횡단보도 — 다음 것을 본다
+      const toLine = z - stop;
+      if (toLine < SLOW_BEFORE_LINE) return limit(pace.slowKmh);
+      if (toLine < APPROACH_BEFORE_LINE) return limit(pace.approachKmh);
+      break; // 가장 가까운 횡단보도도 아직 멀다
+    }
+    return limit(CRUISE_KMH);
+  }
 
   /*
     **진입부 보호구역 횡단보도 앞에서도 선다.** 교차로 정지선과 같은 규칙으로

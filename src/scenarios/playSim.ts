@@ -257,7 +257,14 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     return WAIT_SLOTS[slot % WAIT_SLOTS.length];
   });
 
-  const vehicle = new Vehicle(CAR_LENGTH, spec.isSchoolZone, Boolean(spec.approachSchoolZone), spawnZ(spec), pace);
+  const vehicle = new Vehicle(
+    CAR_LENGTH,
+    spec.isSchoolZone,
+    Boolean(spec.approachSchoolZone),
+    spawnZ(spec),
+    pace,
+    spec.drive === 'zoneOnly',
+  );
   const driver = new AutoDriver(CAR_LENGTH * 0.58, pace.brakeDecel, spec.drive ?? 'rightTurn');
   const lead = spec.leadCar
     ? new LeadDrive(spec.leadCar, {
