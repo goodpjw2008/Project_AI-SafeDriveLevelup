@@ -194,6 +194,15 @@ export const STOP_LINE_S = CROSSWALK_S_OUTER + 2.0; // 72
  */
 export const SPAWN_Z_SCHOOL_ZONE = 174.0;
 
+/**
+ * **어린이보호구역 직진 코스의 출발 자리.**
+ *
+ * 우회전 코스보다 앞(가까이)에서 출발한다. 직진 코스는 구간을 **끝까지 통과**하므로 갈 길이 길다 —
+ * 174m 에서 출발하면 AI 자율 주행 시범이 한 판에 90초를 넘겨, 제한시간 100초에 닿을 만큼 지루해진다.
+ * 보호구역이 시작되는 자리(APPROACH_ZONE_FAR_Z = 114)보다 조금 뒤라 **표지를 보고 들어가는 것**은 그대로다.
+ */
+export const SPAWN_Z_STRAIGHT = 126.0;
+
 /** 스폰 시 초기 속도 (km/h). 정지 상태가 아니라 '교차로에 접근 중'인 상황을 재현한다. */
 export const SPAWN_SPEED_KMH = 30;
 

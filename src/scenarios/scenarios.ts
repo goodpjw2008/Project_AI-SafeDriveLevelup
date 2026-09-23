@@ -11,7 +11,7 @@
  */
 
 import type { DriveMode, CrosswalkId, IntersectionCrosswalk, LightColor, PedSignal, RightArrowColor } from '../rules/lawRules';
-import { SPAWN_Z, SPAWN_Z_SCHOOL_ZONE, STOP_LINE } from '../layout';
+import { SPAWN_Z, SPAWN_Z_SCHOOL_ZONE, SPAWN_Z_STRAIGHT, STOP_LINE } from '../layout';
 import { LEAD_HALF_LENGTH_MAX, LeadDrive, type LeadCarSpec } from '../game/leadDrive';
 import { CAR_HALF_LENGTH } from './turnPath';
 
@@ -1120,8 +1120,13 @@ export function randomizeScenario(base: ScenarioSpec): ScenarioSpec {
  * 함수를 쓴다.** 세 곳이 각자 정하면 검증이 통과한 판이 실제로는 다른 자리에서 시작하고,
  * 그 어긋남은 아무도 눈치채지 못한다.
  */
-export const spawnZ = (spec: Pick<ScenarioSpec, 'approachSchoolZone'>): number =>
-  spec.approachSchoolZone ? SPAWN_Z_SCHOOL_ZONE : SPAWN_Z;
+export const spawnZ = (spec: Pick<ScenarioSpec, 'approachSchoolZone' | 'drive'>): number =>
+  // 직진 코스는 구간을 끝까지 통과하므로 더 가까이에서 출발한다 (layout.ts 의 SPAWN_Z_STRAIGHT)
+  spec.drive === 'straight'
+    ? SPAWN_Z_STRAIGHT
+    : spec.approachSchoolZone
+      ? SPAWN_Z_SCHOOL_ZONE
+      : SPAWN_Z;
 
 export function phaseAt<T extends { duration: number }>(
   program: readonly T[],

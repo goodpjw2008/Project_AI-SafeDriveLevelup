@@ -16,18 +16,23 @@
  */
 
 import {
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
   FINISH_X,
+  FINISH_Z,
   PLAYER_APPROACH_X,
   PLAYER_EXIT_Z,
   SPAWN_Z,
+  SPAWN_Z_STRAIGHT,
   STOP_LINE,
   CROSSWALK_S_OUTER,
   STOP_LINE_S,
 } from '../layout';
 import type {
   CrosswalkId,
+  DriveMode,
   LightColor,
   PedSignal,
   PedestrianSample,
@@ -111,6 +116,18 @@ const TURN_END_X = 14;
  * 거리가 대회전 판정 기준(WIDE_TURN_RADIUS = 7.0m)을 넘지 않아야 한다 — 이 선은
  * 3m 안쪽으로 지난다.
  */
+/**
+ * **직진 코스의 길** (어린이보호구역 연습편) — 차로를 그대로 따라 북쪽으로 빠져나간다.
+ *
+ * 코너가 없으므로 점 둘이면 충분하지만, 추종 알고리즘이 **앞을 내다본 점**을 찾으려면
+ * 촘촘한 점이 필요하다 (아래 steer 의 lookahead). 완주선 너머까지 뻗어 두는 것도 같은 이유다.
+ */
+function buildStraightLine(): Array<{ x: number; z: number }> {
+  const pts: Array<{ x: number; z: number }> = [];
+  for (let z = SPAWN_Z_STRAIGHT + 20; z > FINISH_Z - 25; z -= 1) pts.push({ x: PLAYER_APPROACH_X, z });
+  return pts;
+}
+
 function buildPath(): Array<{ x: number; z: number }> {
   const pts: Array<{ x: number; z: number }> = [];
   const lane = PLAYER_APPROACH_X;
@@ -134,7 +151,8 @@ function buildPath(): Array<{ x: number; z: number }> {
   return pts;
 }
 
-const PATH = buildPath();
+const TURN_PATH = buildPath();
+const STRAIGHT_PATH = buildStraightLine();
 
 /** 조향 최대각 (Vehicle 의 MAX_STEER 와 같아야 -1~1 로 정규화된다) */
 const MAX_STEER = 0.62;
@@ -145,7 +163,7 @@ export class AutoDriver {
     관문은 만나는 순서다 — **S → 정지선 → C**. `schoolZone` 이 먼저인 이유는
     그 횡단보도가 교차로보다 앞(z 46~50)에 있기 때문이다.
   */
-  private gate: 'schoolZone' | 'stopLine' | 'crosswalkC' | 'clear' = 'schoolZone';
+  private gate: 'schoolZone' | 'stopLine' | 'exitCrosswalk' | 'clear' = 'schoolZone';
   /** 그 관문에서 요구되는 일시정지를 이미 마쳤는가 */
   private heldAtGate = false;
   /** 길 위에서 지금 어디쯤인지 (뒤로 되돌아가지 않게 앞으로만 움직인다) */
@@ -155,10 +173,20 @@ export class AutoDriver {
    * @param brakeDecel 이 차의 제동 감속도 (m/s²). 난이도가 오르면 브레이크가 무르고 더 빨리 다가가므로
    *   (scenarios/challenge.ts 의 pace) 제동을 시작할 거리를 늘린다. 시범 주행은 기본값(쉬움)이다.
    */
+  /**
+   * @param drive 이 판을 어떻게 빠져나가는가 (기본 우회전). `straight` 면 어린이보호구역을 직진으로
+   *   통과한다 — 길도, 마지막 관문(건너편 횡단보도 B)도, 지켜야 할 신호의 뜻도 다르다.
+   */
   constructor(
     private wheelbase: number,
     private brakeDecel = 4.8,
-  ) {}
+    private readonly drive: DriveMode = 'rightTurn',
+  ) {
+    this.path = drive === 'straight' ? STRAIGHT_PATH : TURN_PATH;
+  }
+
+  /** 따라갈 길 — 코스마다 다르다 (위 buildPath · buildStraightLine) */
+  private readonly path: Array<{ x: number; z: number }>;
 
   /** 관문 앞에서 제동을 시작할 거리 — 지금 속도로 서는 거리에 여유를 더한다 (BRAKE_DISTANCE 보다 짧지 않게) */
   private brakeDistance(speedKmh: number): number {
@@ -171,8 +199,8 @@ export class AutoDriver {
     return {
       stop: this.shouldStop(s),
       steer: this.steer(s),
-      // 우회전 시나리오라 깜빡이는 처음부터 끝까지 켜 둔다 (제38조 제1항)
-      rightSignal: true,
+      // 우회전이면 처음부터 끝까지 켜 둔다 (제38조 제1항). 직진은 켤 의무가 없고, 켜면 틀린 신호다
+      rightSignal: this.drive !== 'straight',
     };
   }
 
@@ -189,10 +217,12 @@ export class AutoDriver {
       this.heldAtGate = false;
     }
     if (this.gate === 'stopLine' && s.frontZ <= STOP_LINE) {
-      this.gate = 'crosswalkC';
+      this.gate = 'exitCrosswalk';
       this.heldAtGate = false;
     }
-    if (this.gate === 'crosswalkC' && s.frontX >= CROSSWALK_INNER) {
+    // 교차로를 지나 만나는 횡단보도 — 우회전이면 C(동쪽), 직진이면 B(북쪽)
+    const passedExit = this.drive === 'straight' ? s.frontZ <= CROSSWALK_B_INNER : s.frontX >= CROSSWALK_INNER;
+    if (this.gate === 'exitCrosswalk' && passedExit) {
       this.gate = 'clear';
       this.heldAtGate = false;
     }
@@ -217,7 +247,9 @@ export class AutoDriver {
         ? s.frontZ - STOP_LINE_S
         : this.gate === 'stopLine'
           ? s.frontZ - STOP_LINE
-          : CROSSWALK_INNER - s.frontX;
+          : this.drive === 'straight'
+            ? s.frontZ - CROSSWALK_B_INNER
+            : CROSSWALK_INNER - s.frontX;
 
     /*
       완전히 선 채로 충분히 버텼으면 그 관문의 일시정지 의무는 끝난 것이다 — **관문 앞에서
@@ -248,6 +280,15 @@ export class AutoDriver {
       // 진출로가 막혔는데 들어가면 교차로 안에 갇힌다 (제25조 제5항 · 꼬리물기)
       if (s.exitBlocked) return true;
       /*
+        **직진은 적색에 갈 수 없다.** 우회전은 서고 나서 갈 수 있지만(별표 2 적색의 등화 제2호)
+        직진에는 그 단서가 없다 — 녹색이 될 때까지 기다린다 (violations.ts 의 STRAIGHT_RED).
+        우회전 신호등은 직진과 무관하므로 보지 않는다.
+      */
+      if (this.drive === 'straight') {
+        if (s.vehicleLight !== 'green') return true;
+        return pedConflict(s, 'A');
+      }
+      /*
         우회전 신호등이 있으면 **다른 신호등에도 불구하고 이 등화를 따른다**
         (시행규칙 [별표 2] 비고 제3호). 녹색 화살표가 아니면 우회전 자체가 금지다.
       */
@@ -266,12 +307,19 @@ export class AutoDriver {
         것이지(제27조 제1항) 두 정거장 앞에서 하는 것이 아니다.
       */
     }
-    // 우회전 후 횡단보도 — 보행신호 색이 아니라 **보행자의 통행 여부**가 기준이다
-    return pedConflict(s, 'C');
+    // 교차로를 지나 만나는 횡단보도 — 보행신호 색이 아니라 **보행자의 통행 여부**가 기준이다
+    return pedConflict(s, this.drive === 'straight' ? 'B' : 'C');
   }
 
   /** 갈 수는 있으나 **한 번은 완전히 서야** 한다 */
   private gateNeedsFullStop(s: AutoDriveState): boolean {
+    if (this.gate === 'stopLine' && this.drive === 'straight') {
+      /*
+        직진의 적색은 '서고 나서 통행' 이 아니라 **기다림**이라 위 gateBlocked 가 맡는다.
+        여기서 남는 것은 보호구역의 신호기 없는 횡단보도뿐이다 (제27조 제7항).
+      */
+      return s.isSchoolZone && s.pedSignal.A === null;
+    }
     if (this.gate === 'stopLine') {
       /*
         우회전 신호등이 있으면 그것이 정면 차량신호등을 대신한다 — 녹색 화살표는
@@ -289,7 +337,7 @@ export class AutoDriver {
       // 신호기가 없으면 보행자 유무와 무관하게 일시정지 (제27조 제7항)
       return s.approachZone !== null && s.approachZone.light === null;
     }
-    return s.isSchoolZone && s.pedSignal.C === null;
+    return s.isSchoolZone && s.pedSignal[this.drive === 'straight' ? 'B' : 'C'] === null;
   }
 
   // ── 조향 ─────────────────────────────────────────────────────────────────
@@ -308,8 +356,8 @@ export class AutoDriver {
     // 길 위에서 지금 가장 가까운 점 — 앞으로만 찾는다 (되돌아가면 코너에서 갇힌다)
     let best = this.pathIndex;
     let bestDist = Infinity;
-    for (let i = this.pathIndex; i < Math.min(PATH.length, this.pathIndex + 60); i += 1) {
-      const d = Math.hypot(PATH[i].x - s.x, PATH[i].z - s.z);
+    for (let i = this.pathIndex; i < Math.min(this.path.length, this.pathIndex + 60); i += 1) {
+      const d = Math.hypot(this.path[i].x - s.x, this.path[i].z - s.z);
       if (d < bestDist) {
         bestDist = d;
         best = i;
@@ -318,12 +366,12 @@ export class AutoDriver {
     this.pathIndex = best;
 
     // 거기서부터 내다보는 거리만큼 더 간 점
-    let target = PATH[PATH.length - 1];
+    let target = this.path[this.path.length - 1];
     let walked = 0;
-    for (let i = best; i < PATH.length - 1; i += 1) {
-      walked += Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].z - PATH[i].z);
+    for (let i = best; i < this.path.length - 1; i += 1) {
+      walked += Math.hypot(this.path[i + 1].x - this.path[i].x, this.path[i + 1].z - this.path[i].z);
       if (walked >= lookahead) {
-        target = PATH[i + 1];
+        target = this.path[i + 1];
         break;
       }
     }
@@ -359,8 +407,10 @@ function pedConflict(s: AutoDriveState, id: CrosswalkId): boolean {
   );
 }
 
-/** 완주선을 넘었는가 — 자율 주행이 끝났는지 판단하는 데 쓴다 */
-export const isFinished = (s: AutoDriveState): boolean => s.frontX > FINISH_X;
+/** 완주선을 넘었는가 — 자율 주행이 끝났는지 판단하는 데 쓴다. 코스마다 완주선이 다르다 */
+export const isFinished = (s: AutoDriveState, drive: DriveMode = 'rightTurn'): boolean =>
+  drive === 'straight' ? s.frontZ < FINISH_Z : s.frontX > FINISH_X;
 
-/** 진출 횡단보도를 완전히 벗어났는가 */
-export const passedExitCrosswalk = (s: AutoDriveState): boolean => s.frontX > CROSSWALK_OUTER;
+/** 교차로를 지나 만난 횡단보도를 완전히 벗어났는가 */
+export const passedExitCrosswalk = (s: AutoDriveState, drive: DriveMode = 'rightTurn'): boolean =>
+  drive === 'straight' ? s.frontZ < CROSSWALK_B_OUTER : s.frontX > CROSSWALK_OUTER;

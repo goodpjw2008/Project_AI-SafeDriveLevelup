@@ -945,11 +945,12 @@ export class RightTurnJudge {
       같은 적색인데도 우회전과 정반대다 — 우회전은 서고 나서 갈 수 있지만([별표 2] 「적색의 등화」 제2호),
       직진은 **녹색으로 바뀔 때까지 기다려야 한다.** 우회전 신호등은 직진과 무관하므로 보지 않는다.
 
-      황색도 함께 잡는다 — 멈출 수 있으면 멈추는 것이 원칙이고, 이 코스는 보호구역 안이라 더욱 그렇다.
-      이미 교차로에 들어선 뒤 바뀐 경우는 잡히지 않는다: 이 판정은 **정지선을 지나는 순간**의 신호만 본다.
+      **황색은 잡지 않는다.** 원형등화의 황색을 우회전에서 잡지 않는 것과 같은 이유다 — 정지선 앞
+      딜레마 구간에서는 멈출 수도 지날 수도 있는데, 그 순간을 단속처럼 가르면 억울한 판정만 늘어난다.
+      실제로 규정대로 몬 자율 주행이 보행자를 보내고 출발하다 황색에 정지선을 지나 걸렸다.
     */
     if (this.drive === 'straight') {
-      if (s.vehicleLight === 'red' || s.vehicleLight === 'redFlash' || s.vehicleLight === 'yellow') {
+      if (s.vehicleLight === 'red' || s.vehicleLight === 'redFlash') {
         this.record('STRAIGHT_RED', s, `정면신호 ${LIGHT_TEXT[s.vehicleLight]}에 직진 통과`);
       }
       return;

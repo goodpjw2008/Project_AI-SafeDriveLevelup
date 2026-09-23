@@ -20,6 +20,7 @@ import {
 } from '../src/scenarios/zoneCourse';
 import { habitsTestedBy, scenarioLibrary, libraryNumber } from '../src/scenarios/library';
 import { validateScenario } from '../src/scenarios/validate';
+import { playScenario } from '../src/scenarios/playSim';
 
 const courses = zoneCourses();
 
@@ -118,6 +119,33 @@ describe('직진 코스가 시험하는 습관', () => {
   방향지시등을 채점해, **규정대로 몬 주행이 전부 위반**이 됐다 (rules/lawRules.ts 의 DriveMode).
 */
 describe('보호구역 직진 코스 전수 검증', () => {
+  /*
+    **AI 자율 주행이 전 판을 규정대로 몰 수 있어야 한다** — 오프라인 교육에서 이 코스를 시범으로
+    보여 주기 때문이다 (game/AutoDriver.ts). 한 판이라도 위반이 나오면 "규정대로 모는 시범" 이 거짓말이 된다.
+
+    처음 돌렸을 때 362판이 모두 걸렸다: 판정이 직진에도 대회전 · 방향지시등을 채점했고(playSim 이 코스를
+    넘기지 않았다), 황색 딜레마 구간을 적색 직진으로 잡았다. 그 둘을 고치고 나서야 0판이 됐다.
+  */
+  it('AI 자율 주행이 모든 판을 위반 없이 완주한다', () => {
+    const bad: string[] = [];
+    for (const spec of courses) {
+      const r = playScenario(spec, { driver: 'careful' }).result;
+      if (r.violations.length || r.failReason) {
+        bad.push(`${spec.title} — ${r.violations.map((v) => v.code).join(',') || r.failReason}`);
+      }
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  }, 180_000);
+
+  /* 시범으로 보여 주는 판이 100초 제한에 닿으면 보는 사람도 지친다 */
+  it('AI 자율 주행이 제한시간 안에 넉넉히 끝난다', () => {
+    const slow = courses
+      .map((spec) => ({ spec, t: playScenario(spec, { driver: 'careful' }).result.stats.elapsed }))
+      .filter((x) => x.t > 90)
+      .map((x) => `${x.spec.title} ${x.t.toFixed(0)}초`);
+    expect(slow.slice(0, 5)).toEqual([]);
+  }, 180_000);
+
   it('모든 판이 검증을 통과한다 — 치명적 지적 없이', () => {
     const bad: string[] = [];
     for (const spec of courses) {

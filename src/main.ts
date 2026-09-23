@@ -44,7 +44,7 @@ import {
   libraryNumber,
   scenarioLibrary,
 } from './scenarios/library';
-import { zoneCourse, zoneCourseByNumber, zoneCourseNumber } from './scenarios/zoneCourse';
+import { zoneCourse, zoneCourseByNumber, zoneCourseNumber, zoneDemoCourses } from './scenarios/zoneCourse';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
   masterPick,
@@ -640,7 +640,14 @@ function renderMenu(): void {
     onAiDrive: () => {
       aiDriving = true;
       aiCourse = false;
-      demoQueue = demoCourses().map((e) => e.spec.id);
+      /*
+        **시범은 두 코스를 한 줄로 이어 보여 준다** — 우회전 열 판 + 보호구역 직진 셋
+        (library.ts 의 demoCourses · scenarios/zoneCourse.ts 의 zoneDemoCourses). 배우는 사람에게는
+        '오프라인 교육 한 차례' 이지 두 묶음이 아니라, 쉬운 것부터 이어서 돈다.
+      */
+      demoQueue = [...demoCourses(), ...zoneDemoCourses()]
+        .sort((p, q) => p.level - q.level || p.cost - q.cost)
+        .map((e) => e.spec.id);
       goRun(demoQueue[0]);
     },
     onShop: () => nav.go({ name: 'shop', enter: renderShop }),

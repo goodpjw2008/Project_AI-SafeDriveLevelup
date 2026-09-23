@@ -34,6 +34,7 @@ import {
   CROSSWALK_S_INNER,
   CROSSWALK_S_OUTER,
   FINISH_X,
+  FINISH_Z,
   PLAYER_EXIT_Z,
   ROAD_HALF_WIDTH,
   STOP_LINE,
@@ -227,7 +228,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
   });
 
   const vehicle = new Vehicle(CAR_LENGTH, spec.isSchoolZone, Boolean(spec.approachSchoolZone), spawnZ(spec), pace);
-  const driver = new AutoDriver(CAR_LENGTH * 0.58, pace.brakeDecel);
+  const driver = new AutoDriver(CAR_LENGTH * 0.58, pace.brakeDecel, spec.drive ?? 'rightTurn');
   const lead = spec.leadCar
     ? new LeadDrive(spec.leadCar, {
         playerSpawnZ: spawnZ(spec),
@@ -238,7 +239,12 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
         pace,
       })
     : null;
-  const judge = new RightTurnJudge(opts.stopZone ?? STOP_ZONE_DEPTH);
+  /*
+    **코스에 맞는 판정으로 돈다** (scenarios.ts 의 `drive`). 직진 코스에 우회전 판정을 대면
+    규정대로 몬 주행이 대회전 · 지시등 위반으로 잡힌다 (rules/lawRules.ts 의 DriveMode).
+  */
+  const drive = spec.drive ?? 'rightTurn';
+  const judge = new RightTurnJudge(opts.stopZone ?? STOP_ZONE_DEPTH, drive);
 
   const summaries: PedSummary[] = spawns.map((p, i) => ({
     label: labels[i],
@@ -494,7 +500,8 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     if (!ended) {
       const onNS = Math.abs(vehicle.x) <= ROAD_HALF_WIDTH + 1.5;
       const onEW = Math.abs(vehicle.z) <= ROAD_HALF_WIDTH + 1.5;
-      if (f.x > FINISH_X) {
+      // 완주선은 코스마다 다르다 — 우회전은 동쪽(x), 직진은 북쪽(z)
+      if (drive === 'straight' ? f.z < FINISH_Z : f.x > FINISH_X) {
         judge.markCompleted();
         ended = true;
       } else if (!onNS && !onEW) {

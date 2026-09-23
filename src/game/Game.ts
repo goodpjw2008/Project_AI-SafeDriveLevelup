@@ -365,7 +365,8 @@ export class Game {
     this.judge = new RightTurnJudge(opts.stopZone, scenario.drive ?? 'rightTurn');
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
-    if (opts.autoDrive) this.auto = new AutoDriver(carSpec.dims.length * 0.58);
+    // 자율 주행도 코스에 맞는 길을 따라간다 — 직진 코스면 돌지 않고 곧장 통과한다 (game/AutoDriver.ts)
+    if (opts.autoDrive) this.auto = new AutoDriver(carSpec.dims.length * 0.58, undefined, scenario.drive ?? 'rightTurn');
     // 판마다 새로 만들지 않는다 — 모델의 텍스처·셰이더가 그대로 남는다 (renderer.ts)
     this.renderer = sharedRenderer(canvas);
     this.renderScale = startScale(this.graphics.resolution);

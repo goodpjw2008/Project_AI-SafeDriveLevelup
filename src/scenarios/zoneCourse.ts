@@ -114,7 +114,15 @@ export const zoneId = (i: number): number => ZONE_ID_BASE + i;
  */
 const PHASE = {
   green: { startPhase: 0, startPhaseElapsed: 2 },
-  red: { startPhase: 5, startPhaseElapsed: 14 },
+  /*
+    적색 판은 **도착할 즈음 적색이고 곧 녹색이 되는 자리**에서 시작한다. 주기가 64초라 아무 데서나
+    적색을 만나면 30초 가까이 서 있게 되는데, 그러면 배우는 것 없이 기다리기만 하는 판이 된다.
+
+    도착 시각은 진입로 신호기가 있는지에 따라 갈린다 — 있으면 그 신호를 한 번 더 기다리므로 10초쯤 늦다.
+    그래서 **두 자리를 따로 둔다**. 실제로 달려 보고 맞춘 값이다 (자율 주행 전수 측정).
+  */
+  red: { startPhase: 3, startPhaseElapsed: 0 },
+  redAfterZoneSignal: { startPhase: 2, startPhaseElapsed: 4 },
 } as const;
 
 const pedOf = (
@@ -177,7 +185,7 @@ export function buildZoneSpec(t: ZoneTags, id: number): ScenarioSpec {
     title: titleOf(t),
     brief: briefOf(t),
     teaches: teachesOf(t),
-    ...PHASE[t.start],
+    ...PHASE[t.start === 'red' ? (t.sSignal === 'signal' ? 'redAfterZoneSignal' : 'red') : 'green'],
     // C 는 이 코스에서 지나지 않는다 — 값은 두되 판정이 보지 않는다 (drive: 'straight')
     pedSignalInstalled: { A: t.abSignal === 'yes', C: true },
     approachSchoolZone: { signal: t.sSignal === 'signal', signalElapsed: 6 },
@@ -308,4 +316,28 @@ let entries: LibraryEntry[] | null = null;
 /** id 로 추천용 판 찾기 */
 export function zoneEntry(id: number): LibraryEntry | undefined {
   return isZoneCourseId(id) ? zoneEntries()[id - ZONE_ID_BASE] : undefined;
+}
+
+/**
+ * **오프라인 교육 시범에 넣을 보호구역 직진 코스 셋.**
+ *
+ * 우회전 시범(library.ts 의 demoCourses)에 없는 세 장면을 맡는다 — **사람이 없어도 서는 무신호
+ * 횡단보도**, **적색에는 직진이 아예 안 된다**(우회전과 정반대다), **교차로를 지난 뒤의 횡단보도도
+ * 보호구역이다**. 합치는 일은 부르는 쪽이 한다 (main.ts) — 라이브러리와 서로를 부르지 않게.
+ */
+export function zoneDemoCourses(): LibraryEntry[] {
+  const want: Partial<ZoneTags>[] = [
+    { sSignal: 'noSignal', start: 'green', sPed: 'none', aPed: 'none', bPed: 'none' },
+    { sSignal: 'noSignal', start: 'red', sPed: 'none', aPed: 'none', bPed: 'none' },
+    { sSignal: 'noSignal', start: 'green', sPed: 'waiting', aPed: 'none', bPed: 'crossing', kind: 'child' },
+  ];
+  const tags = allCombinations();
+  const entries = zoneEntries();
+  return want
+    .map((w) => {
+      const i = tags.findIndex((t) => (Object.keys(w) as (keyof ZoneTags)[]).every((k) => t[k] === w[k]));
+      if (i < 0) throw new Error(`시범 코스가 없습니다: ${JSON.stringify(w)}`);
+      return entries[i];
+    })
+    .sort((p, q) => p.level - q.level || p.cost - q.cost);
 }
