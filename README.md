@@ -1,7 +1,7 @@
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/title-dark.png">
-    <img src="docs/title-light.png" alt="AI 일시정지 안전운전 — 우회전과 어린이보호구역 일시정지 안전운전 연습" width="880">
+    <img src="docs/title-light.png" alt="AI 안전운전 교실 — 우회전과 어린이보호구역 일시정지 연습편" width="880">
   </picture>
 </h1>
 
@@ -14,7 +14,7 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소�
 * 서비스 주소 : https://safeturn.vercel.app
 * 포트폴리오 : https://safeturn.vercel.app/AI_safeturn_portfolio.html
 
-<a href="https://safeturn.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 일시정지 안전운전 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
+<a href="https://safeturn.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 교실 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
 
 ---
 

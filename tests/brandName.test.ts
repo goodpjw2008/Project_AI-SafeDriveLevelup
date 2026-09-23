@@ -1,21 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { AI_BADGE_HTML, BRAND_NAME_HTML, withAiBadge } from '../src/ui/brandName';
 import { APP_ICON_SVG, APP_NAME, APP_NAME_PARTS, APP_TAGLINE, APP_TAGLINE_PARTS } from '../src/brand';
+import { courseTitle } from '../src/scenarios/curriculum';
 
 /*
-  **이름의 '일시정지' 는 정지 표지다** (brand.ts) — 붉은 바탕의 딱지 한 장.
-  'AI' 는 배지다 — AI 공모전 작품이라 'AI' 가 돋보여야 한다는 사용자 요청이 있었다.
+  **제목은 여기가 무엇 하는 곳인지, 부제는 이번 편이 무엇을 다루는지** (brand.ts).
+  '안전운전' 은 신호의 녹색 딱지, 'AI' 는 배지다 — AI 공모전 작품이라 'AI' 가 돋보여야 한다는 사용자 요청이 있었다.
 
   예전 이름은 'AI 우회전 참교육' 이었고 '우회전' 세 글자가 신호등 딱지 셋이었다. 같은 낱말을 쓴 다른 작품이
-  먼저 알려져 이름을 바꿨는데(사용자 요청), **신호등 딱지 셋은 부제의 '우회전' 으로 옮겨 그대로 산다.**
+  먼저 알려져 이름을 바꿨는데(사용자 요청), **신호등 세 색은 제목의 녹색 하나와 부제의 노랑 둘 · 빨강 하나로 이어진다.**
 */
 describe('이름', () => {
-  it("제목은 'AI' 배지 + 붉은 '일시정지' + 칠하지 않은 '안전운전'", () => {
-    expect(APP_NAME).toBe('AI 일시정지 안전운전');
+  it("제목은 'AI' 배지 + 녹색 '안전운전' + 칠하지 않은 '교실'", () => {
+    expect(APP_NAME).toBe('AI 안전운전 교실');
     expect(APP_NAME_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
       'AI:ai',
-      '일시정지:stop',
+      '안전운전:green',
     ]);
+  });
+
+  /*
+    **제목과 화면의 호칭이 같은 낱말이다** — 'AI 안전운전 교실' 과 '안전운전 Level6'(curriculum.ts 의 courseTitle).
+    이름을 바꿀 때 호칭을 따라 바꾸지 않으면, 레벨이 무엇의 레벨인지부터 다시 알아봐야 한다.
+  */
+  it('제목의 낱말이 학습자 호칭과 같다', () => {
+    expect(courseTitle({ level: 6, mastered: false })).toBe('안전운전 Level6');
+    expect(APP_NAME).toContain('안전운전');
   });
 
   /*
@@ -24,7 +34,7 @@ describe('이름', () => {
   */
   it("제목에는 '우회전' 이 없고, 부제가 그것을 말한다", () => {
     expect(APP_NAME).not.toContain('우회전');
-    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 일시정지 안전운전 연습');
+    expect(APP_TAGLINE).toBe('우회전과 어린이보호구역 일시정지 연습편');
   });
 
   /* 사용자가 색까지 정했다 — '어디서'(우회전 · 어린이보호구역)는 노랑, '무엇을'(일시정지)은 정지 표지색 */
@@ -38,7 +48,7 @@ describe('이름', () => {
 
   /* About 창이 이름을 통째로 적는다 — 제목과 같은 딱지를 쓴다 (ui/Screens.ts 의 renderAbout) */
   it('이름 한 줄은 조각에서 만든다 — 두 벌로 적어 두지 않는다', () => {
-    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-stop">일시정지</span> 안전운전`);
+    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-green">안전운전</span> 교실`);
   });
 });
 
@@ -79,7 +89,8 @@ describe('홀로 선 AI 배지', () => {
 
 /*
   **탭 아이콘** — 붉은 팔각형에 '정' 한 글자 (brand.ts 의 APP_ICON_SVG).
-  16px 에서 글자가 안 읽혀도 **정지 표지의 모양**만으로 '서라' 가 읽힌다. 예전 이름일 때는 주황 네모에 '우' 였다.
+  16px 에서 글자가 안 읽혀도 **정지 표지의 모양**만으로 '서라' 가 읽힌다. 이름이 '안전운전 교실' 로 바뀐 뒤에도
+  아이콘은 이대로 둔다 — 이번 편이 가르치는 것이 일시정지라, 탭에서 그 한 가지가 보이는 편이 낫다.
 */
 describe('탭 아이콘', () => {
   it("붉은 팔각형에 '정' 한 글자다", () => {

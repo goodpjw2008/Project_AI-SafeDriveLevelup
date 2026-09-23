@@ -288,7 +288,7 @@ export const levelLabel = (level: Difficulty): string => `Level${level}`;
 export function courseTitle(state: Pick<CurriculumState, 'level' | 'mastered'>): string {
   /*
     호칭은 **학습자가 키우는 능력**의 이름이다. 오래 '우회전 Level6' 이었는데, 작품 이름이
-    'AI 일시정지 안전운전' 이 되며 **'안전운전 Level6' 로 맞췄다** (사용자 요청) — 화면 곳곳에서 부르는
+    'AI 안전운전 교실' 이 되며 **'안전운전 Level6' 로 맞췄다** (사용자 요청) — 화면 곳곳에서 부르는
     말과 이름이 다른 것을 가리키면, 레벨이 무엇의 레벨인지부터 다시 알아봐야 한다.
   */
   if (state.mastered) return '안전운전 마스터';
