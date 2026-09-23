@@ -531,24 +531,8 @@ for (const [id, action] of [
   동안 손가락을 계속 대고 있지 않아도 된다. 지금 상태의 버튼에 불이 들어온다 (index.html 의 #t-up.on · #t-down.on).
 */
 function syncGoStop(): void {
-  /*
-    **속도를 고르는 코스에서는 버튼의 뜻이 다르다** (game/Controls.ts) — ↑ 는 한 칸 빠르게,
-    ↓ 는 한 칸 느리게이고 맨 아래가 정지다. 불은 '지금 가고 있는가' 를 그대로 말한다.
-  */
-  const kmh = controls.targetKmh;
   document.getElementById('t-up')?.classList.toggle('on', !controls.isStopped);
   document.getElementById('t-down')?.classList.toggle('on', controls.isStopped);
-  const up = document.querySelector('#t-up .lb');
-  const down = document.querySelector('#t-down .lb');
-  if (up) up.textContent = kmh === null ? '출발' : '빠르게';
-  if (down) down.textContent = kmh === null ? '정지' : kmh <= 10 ? '정지' : '느리게';
-  const hint = document.getElementById('keyhint-drive');
-  if (hint) {
-    hint.innerHTML =
-      kmh === null
-        ? '<kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>출발 <kbd>↓</kbd>정지'
-        : `<kbd>←</kbd><kbd>→</kbd>좌우 <kbd>↑</kbd>빠르게 <kbd>↓</kbd>느리게 · 목표 <b>${kmh}km/h</b>`;
-  }
 }
 for (const [id, stop] of [
   ['t-up', false],
@@ -557,14 +541,7 @@ for (const [id, stop] of [
   document.getElementById(id)?.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     void audio.resume();
-    /*
-      **속도를 고르는 코스에서는 같은 버튼이 한 칸씩 올리고 내린다** (game/Controls.ts 의 shiftSpeed).
-      버튼 자리를 바꾸지 않는 이유는 손가락이 이미 그 자리를 알기 때문이다 — 위는 빨라지고 아래는 느려지며,
-      맨 아래 칸이 정지다.
-    */
-    if (controls.targetKmh !== null) controls.nudgeSpeed(stop ? -1 : 1);
-    else controls.setStopped(stop);
-    syncGoStop();
+    controls.setStopped(stop);
   });
 }
 
@@ -1151,11 +1128,14 @@ async function startRun(id: number): Promise<void> {
   // 설정에서 고른 소리 셋. 바뀐 것이 없으면 아무 일도 하지 않는다
   audio.setSounds(saveData.settings.sounds);
   /*
-    **코스에 따라 조작이 다르다** (scenarios.ts 의 `drive`). 어린이보호구역 직진 코스에서는
-    위/아래로 목표 속도를 고르고(0 · 10 · 20 · 30km/h) 방향지시등은 끈 채로 시작한다 —
-    돌지 않으므로 켤 의무가 없다. `reset` 보다 먼저 정해야 리셋이 그 방식대로 돌아간다.
+    **조작은 어느 코스에서나 같다** (사용자가 정했다: "어린이 보호구역에서만 키제어 방법이 다르면
+    헷갈릴 것 같아"). ↑ 출발 · ↓ 정지이고 속도는 차가 알아서 맞춘다 — 보호구역에 들어서면 30km/h
+    이하로 스스로 조인다 (game/Vehicle.ts 의 zoneTargetKmh).
+
+    다른 것은 **방향지시등 기본값** 하나뿐이다 — 돌지 않는 코스에서는 꺼진 채로 시작한다.
+    `reset` 보다 먼저 정해야 리셋이 그 방식대로 돌아간다.
   */
-  controls.setStraight(currentScenario.drive !== undefined && currentScenario.drive !== 'rightTurn');
+  controls.setNoTurn(currentScenario.drive !== undefined && currentScenario.drive !== 'rightTurn');
   controls.reset();
   /*
     자율 주행 중에는 **사람 입력을 받지 않는다.** 핸들이 두 곳에서 들어오면 AI 가
