@@ -101,6 +101,23 @@ describe('직진 코스가 시험하는 습관', () => {
     expect(habitsTestedBy(empty).has('PEDESTRIAN_BLOCKED')).toBe(false);
   });
 
+  /*
+    **신호기가 있는 횡단보도에는 무단횡단자만 둔다** (플레이테스트가 잡았다).
+
+    직진 코스에서 내가 지나는 횡단보도의 보행신호는 **내 정면이 적색일 때만 녹색**이다 — 신호를 지키는
+    사람은 내가 서 있는 동안 건너고 내가 갈 때는 연석에 서 있다. '건너는 중' 을 두었더니 건너편에 아이를
+    세워 두고도 그 아이가 끝내 나서지 않는, 아무 일도 일어나지 않는 판이 됐다 (50106번).
+  */
+  it('신호기가 있는 횡단보도에는 신호를 지키는 보행자를 두지 않는다', () => {
+    for (const s of courses) {
+      for (const p of s.pedestrians) {
+        if (p.obeysSignal === false) continue; // 무단횡단자는 어디든 선다
+        if (p.crosswalk === 'S') expect(s.approachSchoolZone?.signal, s.title).toBe(false);
+        else expect(s.pedSignalInstalled.A, s.title).toBe(false);
+      }
+    }
+  });
+
   /* 레벨은 학습자와 함께 쓰는 하나뿐이다 — 이 코스도 레벨 1~10 에 고루 있어야 한다 */
   it('레벨마다 판이 있다', () => {
     const per = new Map<number, number>();
@@ -133,6 +150,37 @@ describe('보호구역 직진 코스 전수 검증', () => {
       if (r.violations.length || r.failReason) {
         bad.push(`${spec.title} — ${r.violations.map((v) => v.code).join(',') || r.failReason}`);
       }
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  }, 180_000);
+
+  /*
+    **보행자는 역할이 있다** — 보행자를 보지 않는 운전자가 걸려야 한다. 걸리지 않으면 그 사람은
+    서 있는 그림이고, 학습자는 "보행자는 신경 안 써도 된다" 를 배운다.
+
+    처음에는 39판이 이 검사에 걸렸다. 까닭은 **나서는 때**였다 — 적색 판에서는 누구나 정지선에 서 있어
+    그 사이에 다 건너 버렸고, 무신호 보호구역 횡단보도에서도 의무 정지 동안 건너기를 마쳤다.
+    내가 가려는 순간에 나서도록 시각을 맞춰 고쳤다 (scenarios/zoneCourse.ts 의 `at`).
+  */
+  it('보행자가 있는 판은 보행자를 보지 않으면 걸린다', () => {
+    const bad: string[] = [];
+    for (const spec of courses) {
+      if (!spec.pedestrians.length) continue;
+      const codes = playScenario(spec, { persona: 'pedBlind' }).result.violations.map((v) => v.code);
+      if (!codes.includes('PEDESTRIAN_BLOCKED')) bad.push(spec.title);
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  }, 180_000);
+
+  /*
+    **사람이 보고 설 수 있다** — 1초 늦게 알아차리는 사람이 위반 없이 끝나야 한다.
+    어려움은 판단할 시간이 짧은 데서 와야지, 피할 수 없는 데서 오면 함정이다.
+  */
+  it('1초 늦게 알아차리는 사람도 위반 없이 끝낸다', () => {
+    const bad: string[] = [];
+    for (const spec of courses) {
+      const r = playScenario(spec, { persona: 'human', reaction: 1.0 }).result;
+      if (r.violations.length || r.failReason) bad.push(`${spec.title} — ${r.violations.map((v) => v.code).join(',')}`);
     }
     expect(bad.slice(0, 5)).toEqual([]);
   }, 180_000);

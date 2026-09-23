@@ -33,6 +33,8 @@ import {
   CROSSWALK_OUTER,
   CROSSWALK_S_INNER,
   CROSSWALK_S_OUTER,
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   FINISH_X,
   FINISH_Z,
   PLAYER_EXIT_Z,
@@ -166,6 +168,8 @@ function pedLabel(p: PedSpawn, i: number, spec: ScenarioSpec): string {
 function distanceTo(id: CrosswalkId, front: { x: number; z: number }): number {
   if (id === 'S') return front.z - CROSSWALK_S_OUTER;
   if (id === 'A') return front.z - CROSSWALK_OUTER;
+  // B 는 교차로 건너편이라 z 가 줄어드는 쪽이다 (직진 코스)
+  if (id === 'B') return front.z - CROSSWALK_B_INNER;
   // C 는 코너 너머라 (가로 + 세로)로 근사한다 — 보행자 상태기계(pedWalk.ts 의 playerDistance)와 같은 식
   return front.x >= CROSSWALK_INNER
     ? CROSSWALK_INNER - front.x
@@ -175,15 +179,26 @@ function distanceTo(id: CrosswalkId, front: { x: number; z: number }): number {
 /** 내 앞범퍼가 그 횡단보도 위에 있는가 */
 function onCrosswalk(id: CrosswalkId, front: { x: number; z: number }): boolean {
   if (id === 'S') return front.z <= CROSSWALK_S_OUTER && front.z >= CROSSWALK_S_INNER;
+  if (id === 'B') return front.z <= CROSSWALK_B_INNER && front.z >= CROSSWALK_B_OUTER;
   const v = id === 'A' ? front.z : front.x;
   return (id === 'A' ? v <= CROSSWALK_OUTER && v >= CROSSWALK_INNER : v >= CROSSWALK_INNER && v <= CROSSWALK_OUTER);
 }
 
-/** 내 차가 어디쯤 서 있는가 — 사람이 읽을 말로 */
-function whereStopped(front: { x: number; z: number }, hasS: boolean): string {
+/**
+ * 내 차가 어디쯤 서 있는가 — 사람이 읽을 말로.
+ *
+ * **코스마다 교차로 다음이 다르다** — 우회전이면 동쪽의 C, 직진이면 북쪽의 건너편 횡단보도(B).
+ * 직진 코스를 'C 까지 8m' 라고 적으면 읽는 사람이 지나지도 않을 횡단보도를 찾게 된다.
+ */
+function whereStopped(front: { x: number; z: number }, hasS: boolean, straight = false): string {
   if (hasS && front.z > CROSSWALK_S_OUTER) return `보호구역 정지선 ${(front.z - STOP_LINE_S).toFixed(1)}m 앞`;
   if (front.z > STOP_LINE - 1) return `정지선 ${(front.z - STOP_LINE).toFixed(1)}m 앞`;
   if (front.z > CROSSWALK_INNER) return `첫 횡단보도 위 (정지선 ${(STOP_LINE - front.z).toFixed(1)}m 넘음)`;
+  if (straight) {
+    if (front.z > CROSSWALK_B_INNER) return `교차로 안 · 건너편 횡단보도까지 ${(front.z - CROSSWALK_B_INNER).toFixed(1)}m`;
+    if (front.z >= CROSSWALK_B_OUTER) return '건너편 횡단보도 위';
+    return '건너편 횡단보도를 지난 뒤';
+  }
   if (front.x < CROSSWALK_INNER) return `교차로 안 · C 까지 ${(CROSSWALK_INNER - front.x).toFixed(1)}m`;
   if (front.x <= CROSSWALK_OUTER) return 'C 횡단보도 위';
   return 'C 를 지난 뒤';
@@ -275,7 +290,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
 
   const finishStop = (now: number): void => {
     if (stopStart === null) return;
-    const where = whereStopped(vehicle.front, spec.approachSchoolZone !== undefined);
+    const where = whereStopped(vehicle.front, spec.approachSchoolZone !== undefined, drive === 'straight');
     stops.push({ at: stopStart, where, seconds: now - stopStart });
     log(now, 'car', `출발 — ${where}에서 ${(now - stopStart).toFixed(1)}초 서 있었음`);
     stopStart = null;
@@ -297,7 +312,13 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     };
     const rightArrow = spec.rightArrowInstalled ? phase.rightArrow : null;
 
-    const sigLine = `정면 ${word(phase.vehicle)}${rightArrow ? ` · 우회전 ${word(rightArrow)}` : ''} · 보행A ${word(pedSignal.A)} · 보행C ${word(pedSignal.C)}${
+    /*
+      **직진 코스는 지나지 않는 횡단보도의 신호를 적지 않는다** — C(우회전 후)는 이 코스에 없고,
+      대신 건너편(B)을 본다. B 의 등화는 A 와 같다 (rules/lawRules.ts 의 signalCrosswalk).
+    */
+    const sigLine = `정면 ${word(phase.vehicle)}${rightArrow ? ` · 우회전 ${word(rightArrow)}` : ''} · 보행A ${word(pedSignal.A)} · ${
+      drive === 'straight' ? `보행B ${word(pedSignal.B)}` : `보행C ${word(pedSignal.C)}`
+    }${
       spec.approachSchoolZone ? ` · 보호구역 ${word(zone?.vehicle ?? null)}` : ''
     }`;
     if (sigLine !== lastSig) {
@@ -444,7 +465,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     else stopHold = 0;
     if (vehicle.speedKmh <= 0.5 && stopStart === null) {
       stopStart = t;
-      log(t, 'car', `섬 — ${whereStopped(f, spec.approachSchoolZone !== undefined)}`);
+      log(t, 'car', `섬 — ${whereStopped(f, spec.approachSchoolZone !== undefined, drive === 'straight')}`);
     } else if (vehicle.speedKmh > 1.5 && stopStart !== null) {
       finishStop(t);
     }

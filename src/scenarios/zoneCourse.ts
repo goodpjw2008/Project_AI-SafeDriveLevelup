@@ -75,14 +75,30 @@ export function zoneCombinationAllowed(t: ZoneTags): boolean {
   // '무단횡단' 은 지킬 신호가 있을 때만 성립한다
   if (t.sPed === 'jaywalk' && t.sSignal !== 'signal') return false;
   if (t.bPed === 'jaywalk' && t.abSignal !== 'yes') return false;
-  // 신호기가 있는 횡단보도에서 '연석에서 기다림' 은 신호를 기다리는 것이라 판이 달라진다 — 무신호에서만 쓴다
-  if (t.sPed === 'waiting' && t.sSignal === 'signal') return false;
-  if (t.bPed === 'waiting' && t.abSignal === 'yes') return false;
   /*
-    **A 를 건너는 사람은 내 차량신호가 적색일 때다.** 신호기가 있으면 A 의 보행신호는 내 정면이
-    적색일 때 녹색이다 — 녹색에 건너는 사람을 두면 그 사람은 무단횡단자가 되어 제목과 어긋난다.
+    **신호기가 있는 횡단보도에서는 무단횡단자만 나와 마주친다.**
+
+    직진 코스에서 내가 지나는 횡단보도(A · B)의 보행신호는 **내 정면이 적색일 때만 녹색**이다 —
+    신호를 지키는 사람은 내가 서 있는 동안 건너고, 내가 갈 때는 연석에 서 있다. 그래서 신호기가 있는
+    자리에 '건너는 중' · '건너려고 서 있음' 을 두면 **아무 일도 일어나지 않는 판**이 된다
+    (플레이테스트가 잡았다 — 50106번은 건너편에 어린이를 세워 두고도 그 아이가 끝내 나서지 않았다).
+
+    진입로 보호구역 횡단보도(S)도 같다 — 거기 신호기가 있으면 그 사람의 녹색은 내 적색이다.
+
+    예외는 **교차로 앞 횡단보도(A)에 내 정면이 적색일 때**다. 그때는 내가 정지선에 서 있고 사람은
+    제 녹색에 건넌다 — 신호가 바뀌어도 **다 건널 때까지 기다려야 한다**는 것이 그 판의 배울 거리다.
   */
-  if (t.aPed === 'crossing' && t.abSignal === 'yes' && t.start !== 'red') return false;
+  if (t.sPed !== 'none' && t.sPed !== 'jaywalk' && t.sSignal === 'signal') return false;
+  if (t.bPed !== 'none' && t.bPed !== 'jaywalk' && t.abSignal === 'yes') return false;
+  /*
+    **교차로 앞 횡단보도(A)의 사람은 신호기가 없을 때만 둔다.**
+
+    신호기가 있으면 그 사람의 녹색은 **내 적색과 겹친다** — 내가 정지선에 서 있는 동안 건너고,
+    그들의 녹색이 끝나는 25초에 마지막으로 나서도 내 녹색(30초)에는 이미 다 건넌 뒤다. 실제로
+    달려 보니 0.1초 차이로 스쳐, 보행자를 보지 않는 운전자조차 걸리지 않았다 (50125번).
+    **아무 일도 일어나지 않는 판**이므로 조합에서 뺀다 — 신호기 없는 A 에서는 언제든 건너므로 역할이 있다.
+  */
+  if (t.aPed === 'crossing' && t.abSignal === 'yes') return false;
   // 사람이 아무도 없으면 나이는 아무 뜻이 없다 — 같은 판을 셋으로 늘리지 않는다
   if (t.sPed === 'none' && t.aPed === 'none' && t.bPed === 'none' && t.kind !== 'child') return false;
   return true;
@@ -113,7 +129,15 @@ export const zoneId = (i: number): number => ZONE_ID_BASE + i;
  * **곧 녹색이 되는 자리**에서 만나게 한다 — 100초 제한 안에 들어오고, 기다림도 배움으로 남는다.
  */
 const PHASE = {
-  green: { startPhase: 0, startPhaseElapsed: 2 },
+  /*
+    **'정면 녹색' 판은 녹색이 막 시작한 자리에서 만난다.**
+
+    녹색은 34초뿐인데 보호구역 진입로를 지나 정지선까지 20~25초가 걸리고, 그 사이 보행자를 보내면
+    녹색이 끝난다 — 규정대로 몬 운전자가 **사람을 다 보내고 나서 30초를 더 서 있는** 판이 나왔다
+    (플레이테스트가 잡았다 — 50028번, 한 자리에서 30초 · 전체 80초). 적색에서 시작해 15초쯤 녹색이
+    되게 하면, 내가 닿을 때 갓 켜진 녹색이라 사람을 보내고도 여유가 남는다.
+  */
+  green: { startPhase: 5, startPhaseElapsed: 10 },
   /*
     적색 판은 **도착할 즈음 적색이고 곧 녹색이 되는 자리**에서 시작한다. 주기가 64초라 아무 데서나
     적색을 만나면 30초 가까이 서 있게 되는데, 그러면 배우는 것 없이 기다리기만 하는 판이 된다.
@@ -130,17 +154,25 @@ const pedOf = (
   how: (typeof PEDS)[number] | (typeof A_PEDS)[number],
   kind: ZoneTags['kind'],
   startWithin: number,
+  /**
+   * **나서는 때**(초). 거리 방아쇠와 함께 걸린다 — 시각이 지나고 거리도 가까워야 나선다.
+   *
+   * 적색 판의 교차로 앞 보행자에게 늦은 시각을 준다. 적색에는 **누구나 정지선에 서 있으므로**,
+   * 그 사이에 다 건너 버리면 그 사람은 아무 역할이 없다 (플레이테스트가 잡았다 — 50060번).
+   * 녹색이 될 즈음 나서면 "신호가 바뀌어도 아직 건너는 사람이 있으면 기다린다" 를 배우게 된다.
+   */
+  at = 2,
 ): PedSpawn[] => {
   if (how === 'none') return [];
-  const base = { crosswalk, from: 'right' as const, kind, startWithin };
+  const base = { crosswalk, from: 'right' as const, kind, startWithin, at };
   /*
     `at` 은 거리 방아쇠와 **함께** 걸린다 (scenarios.ts 의 PedSpawn) — 시각이 지나고 거리도 가까워야
     나선다. 여기서는 거리로만 연출하고 싶으므로 시각은 일찍 열어 둔다.
   */
-  if (how === 'waiting') return [{ ...base, at: 2 }];
-  if (how === 'crossing') return [{ ...base, at: 1, startWithin: startWithin + 6 }];
+  if (how === 'waiting') return [base];
+  if (how === 'crossing') return [{ ...base, startWithin: startWithin + 6 }];
   // 무단횡단 — 지킬 신호가 있는데 지키지 않는다
-  return [{ ...base, at: 2, obeysSignal: false }];
+  return [{ ...base, obeysSignal: false }];
 };
 
 const titleOf = (t: ZoneTags): string => {
@@ -188,11 +220,32 @@ export function buildZoneSpec(t: ZoneTags, id: number): ScenarioSpec {
     ...PHASE[t.start === 'red' ? (t.sSignal === 'signal' ? 'redAfterZoneSignal' : 'red') : 'green'],
     // C 는 이 코스에서 지나지 않는다 — 값은 두되 판정이 보지 않는다 (drive: 'straight')
     pedSignalInstalled: { A: t.abSignal === 'yes', C: true },
-    approachSchoolZone: { signal: t.sSignal === 'signal', signalElapsed: 6 },
+    /*
+      **신호기가 있는 진입로는 적색으로 맞이한다.**
+
+      `signalElapsed` 가 6 일 때는 도착(9초쯤)에 늘 녹색이라, '보호구역 횡단보도의 적색은 서서 기다리는
+      것' 을 한 번도 못 가르쳤다 (플레이테스트가 잡았다 — 50155번). 주기(녹18 · 황3 · 적18)에서
+      **적색 구간의 4초째**(25 = 18+3+4)에서 시작하면, 도착할 즈음 적색이고 14초쯤 녹색이 된다.
+    */
+    approachSchoolZone: { signal: t.sSignal === 'signal', signalElapsed: 25 },
     pedestrians: [
-      ...pedOf('S', t.sPed, t.kind, 16),
-      ...pedOf('A', t.aPed, t.kind, 14),
-      ...pedOf('B', t.bPed, t.kind, 14),
+      /*
+        **신호기가 있는 진입로의 무단횡단자는 내가 출발할 즈음 나선다.** 적색에 맞이하는 판이라
+        (아래 approachSchoolZone) 내가 서 있는 동안 건너면 아무 역할이 없다 — 녹색이 되는 14초쯤에
+        나서야 "신호가 녹색이어도 사람이 있으면 선다" 를 배운다 (플레이테스트가 잡았다 — 50171번).
+      */
+      ...pedOf('S', t.sPed, t.kind, 12, t.sSignal === 'signal' ? 15 : 2),
+      /*
+        **교차로 앞 횡단보도의 사람은 내 신호가 녹색이 될 즈음 건넌다** (위 pedOf 의 `at`).
+
+        적색에는 누구나 정지선에 서 있으므로, 그 사이에 다 건너면 아무 역할이 없다. 그래서 **내 녹색이
+        켜지기 4초쯤 전**에 나서게 한다 — 늦게 건너는 사람이 실제로 가장 위험한 장면이다.
+
+        내 녹색이 언제 켜지는지는 **진입로 신호기가 있느냐**에 달렸다. 있으면 그 신호를 한 번 더 기다리느라
+        10초쯤 늦게 도착하므로 시작 위상도 그만큼 뒤에 두었다(아래 PHASE) — 녹색이 30초가 아니라 40초에 온다.
+      */
+      ...pedOf('A', t.aPed, t.kind, 12, t.start === 'red' ? (t.sSignal === 'signal' ? 36 : 26) : 2),
+      ...pedOf('B', t.bPed, t.kind, 12),
     ],
     crossTraffic: 0,
     exitBlocked: false,
