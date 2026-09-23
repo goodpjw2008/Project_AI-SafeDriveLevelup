@@ -465,6 +465,7 @@ function drawSchoolZonePavement(
   ctx: CanvasRenderingContext2D,
   schoolZone: boolean,
   approachZone: boolean,
+  zoneOnly: boolean,
 ): void {
   ctx.save();
   ctx.globalAlpha = 0.58;
@@ -475,16 +476,23 @@ function drawSchoolZonePavement(
     schoolZone ? STOP_LINE + 32 : -Infinity,
     approachZone ? APPROACH_ZONE_FAR_Z : -Infinity,
   );
-  const near = Math.min(
-    schoolZone ? STOP_LINE : Infinity,
-    approachZone ? APPROACH_ZONE_NEAR_Z : Infinity,
-  );
+  /*
+    **사거리 없는 전용 도로는 길 끝까지 붉다.**
+
+    이 길은 **전체가 어린이보호구역**이다 (scenarios/zoneCourse.ts). 그런데 진입로 구간의
+    끝(APPROACH_ZONE_NEAR_Z = 24)에서 칠을 멈추고 있었다 — 두 번째·세 번째 횡단보도를
+    지나면 노면이 회색으로 돌아가, 아직 구역 안인데 **구역을 빠져나온 것처럼** 읽혔다.
+    사용자가 짚은 그대로다: "끝부분에는 바닥에 어린이 보호구역이 없어져 있어."
+  */
+  const near = zoneOnly
+    ? EXT.zMin
+    : Math.min(schoolZone ? STOP_LINE : Infinity, approachZone ? APPROACH_ZONE_NEAR_Z : Infinity);
   if (Number.isFinite(far) && Number.isFinite(near)) {
     ctx.fillRect(cx(PAINT_X0), cy(near), toPx(PAINT_W), toPx(far - near));
   }
 
-  // 진출 차도 — 교차로가 보호구역일 때만
-  if (schoolZone) {
+  // 진출 차도 — 교차로가 보호구역일 때만. 사거리가 없는 길에는 진출 차도 자체가 없다
+  if (schoolZone && !zoneOnly) {
     ctx.fillRect(cx(CROSSWALK_OUTER), cy(PAINT_X0), toPx(32), toPx(PAINT_W));
   }
   ctx.globalAlpha = 1;
@@ -522,6 +530,26 @@ function drawApproachZone(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+/**
+ * **사거리 없는 전용 도로의 뒷구간 노면 표시.**
+ *
+ * 이 길은 끝까지 보호구역이므로, 붉은 칠만 늘여서는 부족하다 — 실제 보호구역도 구간이 길면
+ * 노면 문자를 **되풀이해서** 찍는다. 앞구간(drawApproachZone · drawSchoolZoneMarks)에 이어
+ * **두 번째 횡단보도 뒤**와 **세 번째 횡단보도 뒤**에 한 벌씩 더 찍어, 끝까지 달리는 동안
+ * "아직 보호구역" 이 눈에서 끊기지 않게 한다.
+ *
+ * z 가 클수록 남쪽(먼저 만난다)이라, 한 벌 안에서는 '어린이' → '보호구역' → '30' 순으로 내려간다.
+ */
+function drawZoneRoadMarks(ctx: CanvasRenderingContext2D): void {
+  const MID_X = PAINT_X0 + PAINT_W / 2;
+  // 첫 횡단보도(70) 뒤 · 두 번째(20.8) 뒤 · 세 번째(-20.8) 뒤 — 횡단보도 사이마다 한 벌
+  for (const top of [40.0, 8.0, -24.0]) {
+    drawRoadTextRow(ctx, '어린이', MID_X, top);
+    drawRoadTextRow(ctx, '보호구역', MID_X, top - 5.5);
+    drawSpeedLimitMark(ctx, 30, MID_X, top - 10.5, 3.0);
+  }
+}
+
 /** 노면 문자와 속도표시 — 차선 위에 얹는다 */
 function drawSchoolZoneMarks(ctx: CanvasRenderingContext2D): void {
   // 적색 포장의 한가운데를 기준으로 가로로 채운다.
@@ -545,9 +573,15 @@ function makeRoadTexture(schoolZone: boolean, approachZone: boolean, zoneOnly = 
 
   drawAsphalt(ctx);
   drawOffRoad(ctx, zoneOnly);
-  if (schoolZone || approachZone) drawSchoolZonePavement(ctx, schoolZone, approachZone);
+  if (schoolZone || approachZone) drawSchoolZonePavement(ctx, schoolZone, approachZone, zoneOnly);
   drawLaneMarkings(ctx, schoolZone, zoneOnly);
-  if (schoolZone) drawSchoolZoneMarks(ctx);
+  /*
+    사거리 없는 전용 도로는 **교차로용 노면 문자를 쓰지 않는다** — 그 한 벌은 교차로를
+    기준으로 자리가 정해져 있어, 사거리가 없는 길에서는 한가운데에 한 번만 찍히고
+    뒷구간은 비었다. 대신 길 전체에 고르게 되풀이하는 drawZoneRoadMarks 가 맡는다.
+  */
+  if (schoolZone && !zoneOnly) drawSchoolZoneMarks(ctx);
+  if (zoneOnly) drawZoneRoadMarks(ctx);
   /*
     진입부 구간의 노면 문자·정지선·횡단보도. **구간에 들어서자마자 읽히도록** 문자를
     앞쪽(z 68~57)에 둔다 — 횡단보도(z 46~50)에 닿기 전에 "여기가 보호구역" 을 알아야
