@@ -25,6 +25,9 @@
  */
 
 import type { ScenarioSpec, PedSpawn } from './scenarios';
+import type { ViolationCode } from '../rules/violations';
+import { LEVEL_SHARE, type LibraryEntry, type LibraryTags } from './library';
+import type { Difficulty } from './curriculum';
 
 /** 이 코스 판의 id 는 여기서부터 — 라이브러리 id(1000 + 12자리)와 겹치지 않는 자리다 */
 export const ZONE_ID_BASE = 2_000_000_000_000;
@@ -213,4 +216,96 @@ export function zoneCourseNumber(id: number): number | undefined {
 /** 번호로 찾기 */
 export function zoneCourseByNumber(no: number): ScenarioSpec | undefined {
   return zoneCourse(ZONE_ID_BASE + (no - ZONE_NUMBER_BASE));
+}
+
+// ── 추천이 고를 수 있게 ─────────────────────────────────────────────────────
+
+/**
+ * **이 판이 시험할 수 있는 위반** — 추천이 "이 습관을 고칠 판인가" 를 이것으로 본다.
+ *
+ * 우회전 코스의 `targets`(library.ts)와 같은 자리다. 직진 코스에는 **우회전에만 있는 습관이 없다** —
+ * 방향지시등 · 대회전 · 교차로 서행은 여기서 일어날 수 없으므로 적지 않는다. 적어 두면 그 습관이
+ * 보호구역 판 몇 번으로 '고쳐졌다' 가 된다.
+ */
+export function zoneTargets(t: ZoneTags): ViolationCode[] {
+  const out = new Set<ViolationCode>();
+  // 신호기 없는 보호구역 횡단보도 — 진입로든 교차로든 (제27조 제7항)
+  if (t.sSignal === 'noSignal' || t.abSignal === 'no') out.add('SCHOOL_ZONE_NO_STOP');
+  // 신호기 있는 진입로 횡단보도의 적색 — 서서 기다려야 한다
+  if (t.sSignal === 'signal') out.add('SCHOOL_ZONE_RED');
+  // 직진은 적색에 갈 수 없다
+  if (t.start === 'red') out.add('STRAIGHT_RED');
+  if (t.sPed !== 'none' || t.aPed !== 'none' || t.bPed !== 'none') out.add('PEDESTRIAN_BLOCKED');
+  return [...out];
+}
+
+/**
+ * **이 판이 얼마나 복잡한가** — 레벨을 매기는 기준. 겹친 조건의 수다 (difficulty.ts 의 costOf 와 같은 생각).
+ */
+function zoneCost(t: ZoneTags): number {
+  let n = 0;
+  if (t.sSignal === 'noSignal') n += 1; // 사람이 없어도 서야 하는 자리
+  if (t.abSignal === 'no') n += 1;
+  if (t.start === 'red') n += 1;
+  for (const p of [t.sPed, t.aPed, t.bPed]) {
+    if (p === 'none') continue;
+    n += p === 'jaywalk' ? 2 : 1; // 무단횡단은 신호만 보고 가면 걸린다
+  }
+  if (t.kind !== 'adult') n += 1; // 어린이 · 노인은 걸음이 다르다
+  return n;
+}
+
+/**
+ * **추천이 쓰는 꼴로 판을 내준다** — 라이브러리 판과 같은 모양(LibraryEntry)이라
+ * 후보 추리기 · 점수 매기기 · AI 프롬프트가 그대로 돈다 (scenarios/recommend.ts).
+ *
+ * ## 태그는 '비슷한 자리' 로 옮겨 적는다
+ *
+ * 태그 어휘는 우회전 코스에서 자란 것이라 이 코스의 모든 것을 담지 못한다. 그래서 **뜻이 가장 가까운
+ * 자리**에 넣는다 — `a` 는 내가 **처음 만나는 횡단보도**(여기서는 진입로 S), `c` 는 **마지막 횡단보도**
+ * (여기서는 교차로 건너편 B). 교차로 앞 횡단보도(A)의 보행자는 태그에 자리가 없다 — 이 값들은 추천이
+ * "비슷한 판이 이어지지 않게" 고르는 데만 쓰이므로, 하나가 빠져도 판 자체는 정확하다.
+ */
+export function zoneEntries(): LibraryEntry[] {
+  return (entries ??= (() => {
+    const tags = allCombinations();
+    const built = tags.map((t, i) => {
+      const spec = zoneCourses()[i];
+      const libTags: LibraryTags = {
+        signal: t.start === 'red' ? 'red' : 'green',
+        zone: 'yes',
+        sigA: t.abSignal,
+        sigC: t.abSignal,
+        a: t.sPed === 'jaywalk' ? 'jaywalk' : t.sPed,
+        c: t.bPed === 'jaywalk' ? 'jaywalk' : t.bPed,
+        kind: t.kind,
+        approach: t.sSignal === 'signal' ? 'signal' : 'noSignal',
+        lead: 'none',
+        pressure: 'calm',
+        env: 'day',
+        jam: 'none',
+      };
+      return { spec, tags: libTags, targets: zoneTargets(t), cost: zoneCost(t), level: 1 as Difficulty };
+    });
+    /*
+      **쉬운 판부터 줄 세워 레벨마다 정원만큼 담는다** (library.ts 의 assignLevels 와 같은 규칙 · 같은 정원).
+      레벨은 학습자와 함께 쓰는 하나뿐이라(사용자가 정했다), 같은 레벨이면 두 코스의 판이 비슷하게 어려워야 한다.
+    */
+    const sorted = [...built].sort((p, q) => p.cost - q.cost || p.spec.id - q.spec.id);
+    const total = Object.values(LEVEL_SHARE).reduce((n, x) => n + x, 0);
+    let at = 0;
+    for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+      const take = level === 10 ? sorted.length - at : Math.round((sorted.length * LEVEL_SHARE[level]) / total);
+      for (const e of sorted.slice(at, at + take)) e.level = level;
+      at += take;
+    }
+    return built;
+  })());
+}
+
+let entries: LibraryEntry[] | null = null;
+
+/** id 로 추천용 판 찾기 */
+export function zoneEntry(id: number): LibraryEntry | undefined {
+  return isZoneCourseId(id) ? zoneEntries()[id - ZONE_ID_BASE] : undefined;
 }

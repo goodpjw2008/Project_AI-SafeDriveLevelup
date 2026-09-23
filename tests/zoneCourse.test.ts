@@ -16,8 +16,9 @@ import {
   zoneCourseByNumber,
   zoneCourseNumber,
   zoneCourses,
+  zoneEntries,
 } from '../src/scenarios/zoneCourse';
-import { scenarioLibrary, libraryNumber } from '../src/scenarios/library';
+import { habitsTestedBy, scenarioLibrary, libraryNumber } from '../src/scenarios/library';
 import { validateScenario } from '../src/scenarios/validate';
 
 const courses = zoneCourses();
@@ -68,6 +69,43 @@ describe('보호구역 직진 코스', () => {
       const no = ZONE_NUMBER_BASE + i;
       expect(zoneCourseByNumber(no)?.id).toBe(courses[i].id);
       expect(zoneCourseNumber(courses[i].id)).toBe(no);
+    }
+  });
+});
+
+/*
+  **이 코스가 시험하는 습관.**
+
+  직진 코스에는 우회전에만 있는 습관(방향지시등 · 대회전 · 교차로 서행)이 **없다.** 그것을 시험한다고
+  적어 두면, 그 습관이 보호구역 판 몇 번으로 '고쳐졌다' 가 된다 (scenarios/library.ts 의 habitsTestedBy).
+*/
+describe('직진 코스가 시험하는 습관', () => {
+  it('우회전 습관은 시험하지 않는다', () => {
+    for (const spec of courses) {
+      const tested = habitsTestedBy(spec);
+      for (const code of ['NO_TURN_SIGNAL', 'WIDE_TURN', 'NO_SLOW_DOWN'] as const) {
+        expect(tested.has(code), `${spec.title} → ${code}`).toBe(false);
+      }
+    }
+  });
+
+  it('보호구역 일시정지 · 적색 직진 · 보행자 양보를 시험한다', () => {
+    const all = courses.map((s) => habitsTestedBy(s));
+    expect(all.some((t) => t.has('SCHOOL_ZONE_NO_STOP'))).toBe(true);
+    expect(all.some((t) => t.has('SCHOOL_ZONE_RED'))).toBe(true);
+    expect(all.some((t) => t.has('STRAIGHT_RED'))).toBe(true);
+    expect(all.some((t) => t.has('PEDESTRIAN_BLOCKED'))).toBe(true);
+    // 사람이 없는 판은 보행자 양보를 시험하지 않는다 — 그 판의 배울 것은 '사람이 없어도 선다' 다
+    const empty = courses.find((s) => s.pedestrians.length === 0)!;
+    expect(habitsTestedBy(empty).has('PEDESTRIAN_BLOCKED')).toBe(false);
+  });
+
+  /* 레벨은 학습자와 함께 쓰는 하나뿐이다 — 이 코스도 레벨 1~10 에 고루 있어야 한다 */
+  it('레벨마다 판이 있다', () => {
+    const per = new Map<number, number>();
+    for (const e of zoneEntries()) per.set(e.level, (per.get(e.level) ?? 0) + 1);
+    for (const level of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      expect(per.get(level) ?? 0, `L${level}`).toBeGreaterThan(4);
     }
   });
 });

@@ -35,14 +35,14 @@ describe('갈래 가르기', () => {
   });
 
   /*
-    **지금 라이브러리에는 보호구역 전용 판이 없다** — 8,958판 모두가 교차로에서 우회전한다.
-    그래서 'zone' 갈래는 직진 통과 맵이 생기기 전까지 '준비 중' 이다. 이 테스트가 그 사실을 못 박는다:
-    새 맵이 들어오면 여기가 깨지고, 그때 TRACK_READY 를 함께 열어야 한다.
+    **보호구역 전용 판은 이 라이브러리에 없다** — 8,958판 모두가 교차로에서 우회전한다. 그 갈래는
+    따로 만든 직진 코스가 맡는다 (scenarios/zoneCourse.ts). 여기서 확인하는 것은 **두 묶음이 섞이지
+    않는다**는 것이다 — 우회전 라이브러리에서 'zone' 이 나오면 갈래를 고르는 기준이 흐려진다.
   */
-  it("보호구역 전용 판은 아직 없다 — 'zone' 은 준비 중", () => {
+  it("우회전 라이브러리에는 보호구역 전용 판이 없다 — 그 갈래는 직진 코스가 맡는다", () => {
     expect(lib.filter((e) => trackOf(e.tags) === 'zone')).toHaveLength(0);
-    expect(TRACK_READY.zone).toBe(false);
-    expect(TRACK_READY.turn && TRACK_READY.both).toBe(true);
+    // 셋 다 달릴 수 있다 (직진 코스 362판이 생기며 열렸다)
+    expect(TRACK_READY).toEqual({ turn: true, zone: true, both: true });
   });
 
   it('우회전 전용에도 레벨마다 판이 있다 — 그 레벨 이하까지 합쳐서', () => {
@@ -81,6 +81,35 @@ describe('추천이 갈래를 지킨다', () => {
     const cands = candidatesFor(plan({ level: 6, track: 'turn', noSignalZoneDue: true, schoolZone: true }), []);
     expect(cands.length).toBeGreaterThan(0);
     for (const e of cands) expect(e.tags.zone === 'yes' || e.tags.approach !== 'none').toBe(false);
+  });
+
+  /*
+    **보호구역 전용은 다른 판 묶음에서 고른다** (scenarios/zoneCourse.ts) — 우회전이 없는 직진 코스다.
+    기존 라이브러리에는 그런 판이 하나도 없으므로, 거르는 것이 아니라 묶음을 갈아 끼운다.
+  */
+  it('어린이보호구역 전용은 직진 코스만 준다', () => {
+    for (const level of [1, 5, 10] as const) {
+      const cands = candidatesFor(plan({ level, track: 'zone' }), []);
+      expect(cands.length, `L${level} 후보`).toBeGreaterThan(5);
+      for (const e of cands) {
+        expect(e.spec.drive).toBe('straight');
+        expect(e.spec.isSchoolZone).toBe(true);
+      }
+    }
+  });
+
+  it('보호구역 전용에서도 고칠 습관을 겨냥한다', () => {
+    const cands = candidatesFor(
+      plan({
+        level: 6,
+        track: 'zone',
+        target: 'SCHOOL_ZONE_NO_STOP',
+        badHabits: [{ code: 'SCHOOL_ZONE_NO_STOP', count: 3, cleanRuns: 0, lastRun: 5 }],
+      }),
+      [],
+    );
+    expect(cands.length).toBeGreaterThan(10);
+    for (const e of cands) expect(e.targets).toContain('SCHOOL_ZONE_NO_STOP');
   });
 
   it('갈래를 안 고르면 지금까지와 같다 — 보호구역 차례면 보호구역 판', () => {

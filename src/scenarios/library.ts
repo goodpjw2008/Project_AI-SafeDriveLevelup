@@ -1231,6 +1231,20 @@ export const ALWAYS_TESTED: readonly ViolationCode[] = ['NO_TURN_SIGNAL', 'NO_SL
  * 보행자는 이미 빠져 있다.
  */
 export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
+  /*
+    **직진 코스는 우회전 습관을 시험하지 않는다** (scenarios/zoneCourse.ts). 방향지시등 · 대회전 ·
+    교차로 서행은 돌 때의 의무라 여기서는 일어날 수 없다 — 적어 두면 그 습관이 보호구역 판 몇 번으로
+    '고쳐졌다' 가 된다. 이 코스가 시험하는 것은 보호구역 일시정지 · 적색 직진 · 보행자 양보다.
+  */
+  if (spec.drive === 'straight') {
+    const zone = new Set<ViolationCode>();
+    const noSignalCrosswalk = spec.approachSchoolZone?.signal === false || !spec.pedSignalInstalled.A;
+    if (noSignalCrosswalk) zone.add('SCHOOL_ZONE_NO_STOP');
+    if (spec.approachSchoolZone?.signal === true) zone.add('SCHOOL_ZONE_RED');
+    if ((STANDARD_PROGRAM[spec.startPhase] ?? STANDARD_PROGRAM[0]).vehicle !== 'green') zone.add('STRAIGHT_RED');
+    if (spec.pedestrians.length) zone.add('PEDESTRIAN_BLOCKED');
+    return zone;
+  }
   const out = new Set<ViolationCode>(ALWAYS_TESTED);
   const entry = libraryEntry(spec.id);
   if (entry) {

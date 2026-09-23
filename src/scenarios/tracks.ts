@@ -41,11 +41,11 @@ export const TRACK_BRIEF: Record<PracticeTrack, string> = {
 /**
  * **지금 달릴 수 있는 갈래인가.**
  *
- * `zone`(우회전 없는 보호구역 전용)은 **직진 통과 맵을 만드는 중**이라 아직 달릴 판이 없다.
- * 화면에서 아예 감추지 않고 '준비 중' 으로 보여 준다 — 셋으로 나뉜다는 것이 먼저 보여야
- * 학습자가 "우회전만 골라 연습할 수도 있구나" 를 안다.
+ * 셋 다 열렸다. `zone`(우회전 없는 보호구역 전용)은 직진 통과 코스 362판이 생기며 열렸다
+ * (scenarios/zoneCourse.ts). 이 표를 남겨 두는 것은 **다음 편을 만드는 동안** 다시 쓰기 위해서다 —
+ * 판이 없는 갈래를 버튼으로 내밀면 눌러도 아무 일이 없다.
  */
-export const TRACK_READY: Record<PracticeTrack, boolean> = { turn: true, zone: false, both: true };
+export const TRACK_READY: Record<PracticeTrack, boolean> = { turn: true, zone: true, both: true };
 
 /**
  * **이 판은 어느 갈래인가.**

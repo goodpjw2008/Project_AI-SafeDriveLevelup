@@ -530,7 +530,14 @@ export class RightTurnJudge {
   finish(): JudgeResult {
     // 교차로를 통과한 뒤에야 판정할 수 있는 항목들
     if (this.enteredIntersection) {
-      if (this.maxSpeedInIntersection > SLOW_DOWN_LIMIT_KMH) {
+      /*
+        **서행 의무는 '회전할 때' 의 것이다** (제25조 — 교차로 통행방법). 직진으로 지나는 차에는
+        그 의무가 없다. 보호구역의 30km/h 제한은 구간 전체에 걸리는 다른 규정이고, 그쪽은 차가
+        구간에 들어서며 자동으로 조인다 (game/Vehicle.ts 의 zoneTargetKmh).
+
+        가르지 않았더니 **규정대로 30km/h 로 직진한 주행이 서행의무 위반**으로 잡혔다.
+      */
+      if (this.drive === 'rightTurn' && this.maxSpeedInIntersection > SLOW_DOWN_LIMIT_KMH) {
         this.record(
           'NO_SLOW_DOWN',
           this.lastSample,
@@ -614,7 +621,7 @@ export class RightTurnJudge {
     // 사람이 아직 횡단보도 위에 있는데 출발했다면 최고 등급은 아니다
     if (this.pedToleranceUsed) return false;
     if (stats.lateStopBeforeA && !stats.cleanStopBeforeA) return false;
-    if (stats.maxSpeedInIntersection > SLOW_DOWN_LIMIT_KMH) return false;
+    if (this.drive === 'rightTurn' && stats.maxSpeedInIntersection > SLOW_DOWN_LIMIT_KMH) return false;
     // 방향지시등은 우회전에만 있는 의무다 — 직진 코스에서는 묻지 않는다 (trackTurnSignal)
     if (this.drive === 'rightTurn' && (!stats.signalAt30m || !stats.signalAtEntry)) return false;
     return true;
