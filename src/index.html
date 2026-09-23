@@ -2581,6 +2581,32 @@
       .map-trial-note.bad {
         color: #ffc400;
       }
+      /*
+        **배우는 길이 둘이라는 것을 버튼 위에서 말한다** (ui/Screens.ts 의 aiTrainingSection · 사용자가 정한 개념) —
+        온라인 가상 연습(내가 직접 운전)과 오프라인 교육(AI 가 모는 것을 함께 봄).
+
+        이름표는 **작고 조용하다.** 눌러야 하는 것은 여전히 아래 버튼이고, 이름표는 "지금 누르는 것이 어느 길인가" 만
+        말해 주면 된다. 굵게 칠한 앞 낱말(온라인 가상 연습 · 오프라인 교육)만 읽어도 갈래가 잡힌다.
+      */
+      .mode-group + .mode-group {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+      }
+      .mode-label {
+        margin: 14px 0 0;
+        font-size: 14px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+      .mode-label b {
+        color: var(--text);
+        font-weight: 800;
+      }
+      /* 이름표 바로 아래에 버튼이 붙는다 — 이름표가 이미 간격을 냈으므로 버튼 줄은 좁게 띄운다 */
+      .mode-group .ai-course-actions {
+        margin-top: 8px;
+      }
       .ai-course-actions {
         margin-top: 14px;
         display: flex;

@@ -1128,12 +1128,12 @@ async function startRun(id: number): Promise<void> {
   const libNo = libraryNumber(currentScenario.id);
   hud.show(
     /*
-      **자율 주행도 번호를 적는다** — `자율주행 - 시나리오 1363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
+      **자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 1363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
       시나리오 내용 이렇게 나왔잖아. 자율주행도 자율주행 - 시나리오 ??? 시나리오 상황 이렇게 나오게 해 줘" 라고 했다.
       번호가 있으면 맵 체험으로 같은 판을 직접 달려 볼 수 있다.
     */
     aiDriving
-      ? `자율주행 - 시나리오 ${libNo ?? ''}`.trim()
+      ? `오프라인 교육 - 시나리오 ${libNo ?? ''}`.trim()
       : mapTrial && libNo !== undefined
       ? `맵 체험 ${libNo}`
       : libNo !== undefined
@@ -1340,7 +1340,7 @@ function finishRun(result: JudgeResult): void {
   /*
     **시범 주행은 학습자의 기록이 아니다.** AI 가 몬 판이라 통계 · 주행 기록 · 습관 ·
     레벨에 하나도 남기지 않는다 — 남기면 시범을 한 바퀴 본 사람의 습관 진단이 AI 의 운전으로
-    채워진다. 결과 화면만 잠깐 보여 주고 다음 시범 코스로 넘어간다.
+    채워진다. 결과 화면만 잠깐 보여 주고 다음 교육 코스로 넘어간다.
   */
   if (aiDriving) {
     finishDemoRun(sc, result);
@@ -1623,10 +1623,10 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
         null,
         [],
         /*
-          **자율 주행** — AI 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적는다, 다음 시범 코스(마지막이면 첫 화면)로 가는
+          **자율 주행(오프라인 교육)** — AI 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적는다, 다음 교육 코스(마지막이면 첫 화면)로 가는
           버튼과 카운트다운은 일반 판과 같은 자리에 둔다 (사용자 요청 — Screens.renderDebrief 의 options.demo).
         */
-        { demo: { nextLabel: nextId !== undefined ? '다음 시범 코스' : '첫 화면으로' } },
+        { demo: { nextLabel: nextId !== undefined ? '다음 교육 코스' : '첫 화면으로' } },
       );
       // 마지막 시범 판은 다 세면 첫 화면으로 — 같은 카운트다운이 남은 초를 보여 준다
       startAutoNext(nextId ?? sc.id, nextId === undefined ? goHome : undefined);

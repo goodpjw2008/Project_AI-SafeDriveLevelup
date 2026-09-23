@@ -385,11 +385,11 @@ function debriefTitle(sc: ScenarioSpec): { stage: string; title: string } {
   // 첫 화면에서 번호로 고른 판 — AI 가 고른 것이 아니므로 'AI 추천' 이라 부르지 않는다 (main.ts 의 mapTrial)
   const trial = document.body.classList.contains('map-trial');
   const n = libraryNumber(sc.id);
-  // 자율 주행도 주행 화면과 같은 이름 — `자율주행 - 시나리오 1363` (main.ts 의 hud.show)
+  // 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 1363` (main.ts 의 hud.show)
   const stage = demo
     ? n !== undefined
-      ? `자율주행 - 시나리오 ${n}`
-      : '자율주행'
+      ? `오프라인 교육 - 시나리오 ${n}`
+      : '오프라인 교육'
     : n !== undefined
       ? trial
         ? `맵 체험 ${n}`
@@ -776,7 +776,7 @@ export class Screens {
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
-          (이어서 안전운전 연습 · 시범 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
+          (이어서 안전운전 연습 · 자율 주행 시범 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
         -->
         <button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>
         <button class="icon ghost" id="btn-settings" title="설정" aria-label="설정">${icon(
@@ -934,7 +934,7 @@ export class Screens {
           */
           `<button class="btn primary" id="btn-generate">${icon('play')}마스터 운행</button>` +
           `<button class="btn" id="btn-ending">엔딩 다시 보기</button>`
-        : `<button class="btn primary" id="btn-generate">${icon('play')}${c.runs ? '이어서 안전운전 연습' : '우회전 안전운전 연습'}</button>`;
+        : `<button class="btn primary" id="btn-generate">${icon('play')}${c.runs ? '이어서 안전운전 연습' : '안전운전 연습 시작'}</button>`;
 
     const resetButton = this.resetCourseButton(save);
 
@@ -1014,12 +1014,25 @@ export class Screens {
         </div>
 
         <!--
-          **AI 자율 주행 시범** — 규정대로 몰면 어떻게 되는지를 AI 가 대표 코스로 보여 준다.
-          시연에서 가장 먼저 누르는 버튼이라 훈련 버튼 옆에 두되, primary 는 훈련에 남긴다.
+          **이 교실에는 배우는 길이 둘이다** (사용자가 정한 개념).
+
+           - **온라인 가상 연습** — 내가 직접 몬다. 혼자서, 아무 때나. 이 교실의 본래 자리다.
+           - **오프라인 교육 (자율 주행)** — AI 가 규정대로 모는 것을 **보여 준다.** 교실에서 화면을
+             띄워 놓고 함께 보는 쓰임이라(포트폴리오 '활용 · 오프라인 교육'), 배우는 사람은 운전대를 잡지 않는다.
+
+          예전에는 세 버튼이 한 줄에 나란했다 — 무엇이 '내가 하는 것' 이고 무엇이 '보는 것' 인지 버튼 이름
+          말고는 알 수 없었다. **묶음마다 한 줄짜리 이름표**를 달아 두면 누르기 전에 어느 길인지 읽힌다.
         -->
-        <div class="ai-course-actions">${button}<button class="btn" id="btn-ai-drive">${icon(
-          'auto',
-        )}자율 주행</button>${resetButton}</div>
+        <div class="mode-group">
+          <p class="mode-label"><b>온라인 가상 연습</b> — 내가 직접 운전합니다</p>
+          <div class="ai-course-actions">${button}${resetButton}</div>
+        </div>
+        <div class="mode-group">
+          <p class="mode-label"><b>오프라인 교육</b> — AI 가 규정대로 모는 것을 함께 봅니다</p>
+          <div class="ai-course-actions">
+            <button class="btn" id="btn-ai-drive">${icon('auto')}자율 주행 시범 보기</button>
+          </div>
+        </div>
         ${ai.error ? `<p class="ai-note" style="color:var(--amber)">${esc(ai.error)}</p>` : ''}
 
       </div>
@@ -1686,7 +1699,7 @@ export class Screens {
               <div class="verdict-head">${icon('guide')}<span id="coach-head">AI 주행결과 분석</span></div>
               <div class="verdict-row">
                 <img class="verdict-robot" src="${robotTurn}" alt="" aria-hidden="true" />
-                <div class="coach-body" id="coach-body">자율주행은 교통법규를 준수하는 주행으로 AI가 분석을 하지 않습니다.</div>
+                <div class="coach-body" id="coach-body">오프라인 교육(자율 주행)은 교통법규를 준수하는 주행으로 AI가 분석을 하지 않습니다.</div>
               </div>
             </div>`
             : ''
