@@ -910,7 +910,7 @@ function straightLeadArrival(spec: ScenarioSpec): number | null {
  * 게임의 버릇이고, 버릇으로 익힌 것은 보호구역이 없는 길에서도 그대로 나온다.
  * 늘 없으면 배울 일이 없다. **네 판에 한 판**이면 매번 표지판과 노면을 보게 된다.
  *
- * AI 우회전 주행도 같은 비율을 쓴다 (generate.ts 의 `Plan.schoolZone`). 그쪽은 예전에
+ * AI 주행도 같은 비율을 쓴다 (generate.ts 의 `Plan.schoolZone`). 그쪽은 예전에
  * 이 값과 무관하게 **늘** 보호구역이 나왔다 — 학습자의 약점이 보호구역이면 그 조건이
  * 공짜 묶음(difficulty.ts 의 `TARGET_KIT`)에 들어가 프롬프트가 "반드시 켜십시오" 라고
  * 시켰기 때문이다. 약점을 시험하는 것은 맞지만, 네 판 내리 같은 판이면 그 판이

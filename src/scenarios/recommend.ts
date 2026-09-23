@@ -344,7 +344,7 @@ export const PICKER_LABEL: Record<Picker, string> = {
   openrouter: 'OpenRouter',
   nvidia: 'NVIDIA',
   openai: 'OpenAI',
-  quota: 'AI 우회전',
+  quota: 'AI',
   rule: '우회전 규칙',
   random: '무작위 뽑기',
 };

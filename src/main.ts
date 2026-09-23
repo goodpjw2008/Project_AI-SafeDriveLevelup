@@ -69,7 +69,7 @@ import { beginRun, cachedSiteStats, endRun, loadSiteStats, outcomeOf } from './s
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 // 시트 바깥을 누르면 한 칸 되돌아간다 — 어디로 돌아가는지는 히스토리가 안다
 const screens = new Screens({ onDismiss: () => nav.back() });
-/** AI 우회전이 코스를 고르는 장면 — 분석 연출 → 추천 결과 (ui/AiPick.ts) */
+/** AI 가 코스를 고르는 장면 — 분석 연출 → 추천 결과 (ui/AiPick.ts) */
 const aiPick = new AiPickOverlay();
 const hud = new Hud();
 const audio = new GameAudio();
@@ -125,7 +125,7 @@ const aiTraining: AiTrainingState = {
 };
 
 /**
- * AI 우회전 주행 중인가 — 판이 끝나면 **다음 판을 이어서 만들지** 정한다.
+ * AI 주행 중인가 — 판이 끝나면 **다음 판을 이어서 만들지** 정한다.
  *
  * 수동 주행과 갈라 두는 이유는 같은 판이라도 끝난 뒤 할 일이 다르기 때문이다.
  * 수동은 다음 Stage 로 넘어가고, AI 는 방금 결과로 단계를 올리거나 내린 뒤 그에 맞는
@@ -296,8 +296,8 @@ async function makeAiScenario(): Promise<void> {
             : `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
         () =>
           many
-            ? `AI 우회전이 먼저 고칠 습관을 정하고 후보 ${counts.courses}개 중 코스를 고르는 중`
-            : `AI 우회전이 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+            ? `AI 가 먼저 고칠 습관을 정하고 후보 ${counts.courses}개 중 코스를 고르는 중`
+            : `AI 가 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
       ],
       picking,
     );
@@ -1394,7 +1394,7 @@ function finishRun(result: JudgeResult): void {
   });
 
   /*
-    **AI 우회전 주행이면 여기서 단계가 움직인다.**
+    **AI 주행이면 여기서 단계가 움직인다.**
 
     무위반이면 올라가고, 이어서 두 번 틀리면 내려간다. 위반 코드는 그대로 메모되어
     다음 판이 그 상황을 다시 낸다 (scenarios/curriculum.ts).
@@ -1554,7 +1554,7 @@ function finishRun(result: JudgeResult): void {
 }
 
 /**
- * **엔딩** — L10 을 마치고 우회전 마스터가 되면 AI 우회전이 축하한다. 그 뒤로는 **마스터 운행**이 이어진다.
+ * **엔딩** — L10 을 마치고 우회전 마스터가 되면 AI 가 축하한다. 그 뒤로는 **마스터 운행**이 이어진다.
  *
  * 한때 엔딩에서 게임이 끝났다(첫 화면에 '엔딩 다시 보기' 만 남음). 그 뒤 사용자가 "마스터 단계가 되고, 처음부터 다시
  * 시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게 해 줘" 라고 해서, 첫 화면의 '마스터 운행' 으로 L10

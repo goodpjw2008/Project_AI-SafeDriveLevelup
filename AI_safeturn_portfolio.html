@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  AI 우회전 참교육 포트폴리오 — README 를 슬라이드처럼 한 장씩 넘겨 본다.
+  AI 일시정지 안전교육 포트폴리오 — README 를 슬라이드처럼 한 장씩 넘겨 본다.
 
   장표는 모두 docs/slides/ 의 그림이다 (포트폴리오 장표를 1920×1080 으로 뽑은 것, 파일 이름 앞 숫자는 장표 쪽 번호).
   이 파일은 그림을 **상대 경로**로 부르므로 저장소를 내려받아 두 번 눌러도 열리고,
@@ -13,8 +13,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AI 우회전 참교육 포트폴리오</title>
-<meta name="description" content="AI 우회전 참교육 — 우회전과 어린이보호구역 안전운전 참교육. 모두의 AI · 모두의 AI 안전 부문 포트폴리오를 한 장씩 넘겨 봅니다.">
+<title>AI 일시정지 안전교육 포트폴리오</title>
+<meta name="description" content="AI 일시정지 안전교육 — 우회전과 어린이보호구역 안전운전 학습. 모두의 AI · 모두의 AI 안전 부문 포트폴리오를 한 장씩 넘겨 봅니다.">
 <meta name="theme-color" content="#0C0F14">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='2' width='20' height='60' rx='6' fill='%23A8322C'/%3E%3Crect x='22' y='2' width='20' height='60' rx='6' fill='%23F2A900'/%3E%3Crect x='42' y='2' width='20' height='60' rx='6' fill='%23117332'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,6 +61,8 @@
   .brand .r { background: var(--red); }
   .brand .y { background: var(--yellow); color: #1A1300; }
   .brand .g { background: var(--green); }
+  /* 이름의 '일시정지' — 정지 표지의 붉은 바탕 (src/index.html 의 .brand-stop 과 같은 값) */
+  .brand .s { background: #c1272d; }
   .brand .rest { margin-left: 4px; }
   .brand small { margin-left: 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
   .chapters { flex: 1; min-width: 0; display: flex; justify-content: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
@@ -218,8 +220,8 @@
 <body>
 
 <header class="top">
-  <a class="brand" href="https://safeturn.vercel.app" aria-label="AI 우회전 참교육 — 사이트로 가기">
-    <span class="ai">AI</span><span class="t r">우</span><span class="t y">회</span><span class="t g">전</span><span class="rest">참교육</span>
+  <a class="brand" href="https://safeturn.vercel.app" aria-label="AI 일시정지 안전교육 — 사이트로 가기">
+    <span class="ai">AI</span><span class="t s">일시정지</span><span class="rest">안전교육</span>
     <small>포트폴리오</small>
   </a>
   <nav class="chapters" aria-label="장 바로 가기">
@@ -242,17 +244,17 @@
   </div>
 </header>
 
-<main class="stage" id="stage" aria-roledescription="슬라이드 쇼" aria-label="AI 우회전 참교육 포트폴리오">
+<main class="stage" id="stage" aria-roledescription="슬라이드 쇼" aria-label="AI 일시정지 안전교육 포트폴리오">
   <button class="nav prev" type="button" data-step="-1" aria-label="이전 장">
     <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
   </button>
 
   <div class="frame" id="frame">
     <section class="slide" data-chapter="처음" data-title="표지">
-      <img src="docs/slides/01-cover.png" alt="AI 우회전 참교육 — 우회전과 어린이보호구역 안전운전 참교육. 모두의 AI · 모두의 AI 안전, 박진우 · 한국디지털미디어고등학교" decoding="async" fetchpriority="high">
+      <img src="docs/slides/01-cover.png" alt="AI 일시정지 안전교육 — 우회전과 어린이보호구역 안전운전 학습. 모두의 AI · 모두의 AI 안전, 박진우 · 한국디지털미디어고등학교" decoding="async" fetchpriority="high">
     </section>
-    <section class="slide" data-chapter="처음" data-title="들어가며 · AI 우회전 참교육을 만든 이유">
-      <img src="docs/slides/02-intro.png" alt="들어가며 — AI 우회전 참교육을 만든 이유" loading="lazy" decoding="async">
+    <section class="slide" data-chapter="처음" data-title="들어가며 · AI 일시정지 안전교육을 만든 이유">
+      <img src="docs/slides/02-intro.png" alt="들어가며 — AI 일시정지 안전교육을 만든 이유" loading="lazy" decoding="async">
     </section>
 
     <section class="slide" data-chapter="1. 개요" data-title="① 필요성 · 법 개정 뒤에도 줄지 않은 우회전 사고">
@@ -426,7 +428,7 @@
     chapterButtons.forEach((b) => b.setAttribute('aria-current', String(b.dataset.chapter === s.dataset.chapter)));
     prevButtons.forEach((b) => { b.disabled = i === 0; });
     nextButtons.forEach((b) => { b.disabled = i === total - 1; });
-    document.title = `${s.dataset.title} — AI 우회전 참교육 포트폴리오`;
+    document.title = `${s.dataset.title} — AI 일시정지 안전교육 포트폴리오`;
     history.replaceState(null, '', `#${i + 1}`);
   }
 

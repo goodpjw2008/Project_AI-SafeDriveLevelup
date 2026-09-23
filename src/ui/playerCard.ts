@@ -26,7 +26,7 @@
 
 import { MAX_LEVEL, courseTitle, levelLabel, XP_PER_CLEAN_RUN, type Difficulty } from '../scenarios/curriculum';
 import { levelBadge, masterBadge } from './badges';
-import { withBrandChips } from './brandName';
+
 
 export interface PlayerInfo {
   level: Difficulty;
@@ -53,8 +53,12 @@ const withinNeed = (p: PlayerInfo): PlayerInfo => (p.xp > p.need ? { ...p, xp: p
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
-/** 호칭 맨 앞의 '우회전' 을 이름과 같은 신호등 딱지 셋으로 칠한다 (brandName.ts) */
-const branded = (text: string): string => withBrandChips(esc(text));
+/*
+  **호칭('우회전 Level6')은 칠하지 않는다.** 이름이 'AI 일시정지 안전교육' 으로 바뀌며 '우회전' 은 더 이상
+  작품 이름이 아니라 **학습자가 키우는 능력의 이름**이 됐다 (brand.ts). 이름이 아닌 것에 이름의 딱지를
+  입히면, 화면에서 무엇이 이름인지 다시 흐려진다.
+*/
+const branded = (text: string): string => esc(text);
 
 /**
  * 막대 아래 한 줄 — 다음 레벨까지 얼마나 남았는가.

@@ -44,7 +44,7 @@ export function pickedByCard(picker?: Picker, model?: string): string {
  * 분석 화면의 제목 — **답이 오는 순간** 이 문장으로 바뀐다.
  *
  * 분석을 시작할 때는 어느 AI 가 받을지 알 수 없다. 자리를 돌려 쓰고(server/llm.mjs), 앞 자리가 한도를 다 썼으면
- * 다음 자리가 받기 때문이다 — **답이 와야 누가 했는지 안다.** 그래서 처음에는 'AI 우회전이 …' 로 두고, 답이
+ * 다음 자리가 받기 때문이다 — **답이 와야 누가 했는지 안다.** 그래서 처음에는 'AI 가 …' 로 두고, 답이
  * 오면 그 자리에서 이름을 갈아 끼운다. 미리 지어내 붙이면 결과 카드와 다른 이름이 뜰 수 있다.
  *
  * 코드가 고른 판(한도 초과 · AI 없음 · 무작위)에는 빈 문자열을 준다 — 부르는 쪽이 제목을 그대로 둔다.
@@ -58,7 +58,7 @@ export function analyzingBy(picker?: Picker, model?: string): string {
 
 /**
  * **결과 화면의 AI 코치 · 습관 리포트에 붙는 줄** — "Gemini gemini-3.1-flash-lite 모델이 조언해 준
- * AI 우회전의 코칭이에요."
+ * AI 의 코칭이에요."
  *
  * 코치 문장도 추천과 같은 배관을 지나므로(server/llm.mjs) 판마다 쓴 AI 가 다르다. AI 활용 공모전 작품이라
  * 그 사실이 글 옆에 보여야 한다는 사용자 요청이다 — **누가 쓴 글인지 밝히는 것**이기도 하다.
@@ -69,7 +69,7 @@ export function advisedBy(picker?: Picker, model?: string): string {
   if (!picker || picker === 'quota' || picker === 'rule' || picker === 'random') return '';
   return `${chip(picker)}${
     model ? ` ${modelName(model)} 모델이` : '이'
-  } 조언해 준 AI 우회전의 코칭이에요`;
+  } 조언해 준 AI 의 코칭이에요`;
 }
 
 /**

@@ -22,7 +22,7 @@ import robotTurn from '../assets/airobot/turnlight.webp';
 import robotCaution from '../assets/airobot/yello.webp';
 
 /**
- * AI 우회전의 얼굴 — 원본은 `assets/airobot/`, 굽는 법은 scripts/build-airobot.mjs.
+ * AI 의 얼굴 — 원본은 `assets/airobot/`, 굽는 법은 scripts/build-airobot.mjs.
  *
  *  - `normal` — 평소. 웃는 얼굴, 신호등은 초록
  *  - `stop`    — 일시정지 · 보행자 확인. 얼굴에 느낌표, 신호등은 빨간 손바닥
@@ -169,7 +169,7 @@ export class Hud {
    *
    * 사용자가 부탁했다 — "운전화면에서도 내 레벨과 경험치를 볼 수 있게." 첫 화면과 결과 화면에만 있으면 달리는 동안
    * 이 판이 무엇을 향해 가는지가 안 보인다. 자리는 조작 안내 바로 위다 — 위쪽 양 끝은 운전석 시점의 좌우 시야 창,
-   * 가운데 위는 과제 상자와 AI 우회전, 오른쪽 아래는 계기판이 쓴다.
+   * 가운데 위는 과제 상자와 AI, 오른쪽 아래는 계기판이 쓴다.
    *
    * AI 과정의 판에서만 띄운다 (`null` 이면 감춘다) — 시범 주행은 내 기록이 아니다.
    */

@@ -66,7 +66,7 @@ import { levelBadge, masterBadge } from './badges';
 import { playerCard } from './playerCard';
 import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
-import { AI_BADGE_HTML, BRAND_CHIPS_HTML, withAiBadge } from './brandName';
+import { BRAND_NAME_HTML, withAiBadge } from './brandName';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
@@ -724,8 +724,9 @@ export class Screens {
           비튼 그림이라 이 게임이 무엇을 가르치는 물건인지와 상관이 없었다.
           이름이 길어진 지금은 그 자리를 이름이 쓴다.
 
-          **'우회전' 세 글자가 신호등의 세 등이다** — 우 적색 · 회 황색 · 전 녹색 딱지. 부제에서도 '우회전' 은 같은
-          딱지 셋이고, '어린이보호구역' 은 보호구역 노면과 같은 붉은 딱지다.
+          **제목의 '일시정지' 는 정지 표지다** — 붉은 바탕의 딱지 한 장.
+          부제의 '우회전' 은 신호등의 세 등(우 적색 · 회 황색 · 전 녹색)이고, '어린이보호구역' 은 보호구역
+          노면과 같은 붉은 딱지다.
           어느 글자에 무슨 색인지는 brand.ts 가 정하고, 그 색이 실제로 무엇인지는 index.html 이 정한다.
         -->
         <div class="brand-wrap">
@@ -743,7 +744,7 @@ export class Screens {
           ).join('')}</p>
         </div>
         <!--
-          **연습은 하나다 — AI 우회전 연습.**
+          **연습은 하나다 — AI 연습.**
 
           한때 '수동 우회전 연습' 탭이 있어 손으로 쓴 11판을 순서대로 돌 수 있었다. AI 가
           6천여 코스 라이브러리에서 습관에 맞는 코스를 고르고, 습관을 고쳐야 레벨이 오르게
@@ -1460,7 +1461,7 @@ export class Screens {
       onToggleAutoNextPause(): void;
     },
     /**
-     * AI 우회전 주행이었다면 **이 판을 마친 뒤 단계가 어떻게 움직였는지.**
+     * AI 주행이었다면 **이 판을 마친 뒤 단계가 어떻게 움직였는지.**
      * 수동 주행이면 `null` 이다.
      */
     course: CourseStep | null = null,
@@ -1661,8 +1662,8 @@ export class Screens {
           ? /*
               **판정에 따라 색과 로봇이 바뀐다** (사용자가 정했다).
 
-               - 깨끗하게 통과 → 초록 · `turnlight.webp` (신호등을 들고 웃는 AI 우회전)
-               - 규정을 어겼거나 완주 못 함 → 붉은색 · `stop.webp` (손을 들어 세우는 AI 우회전)
+               - 깨끗하게 통과 → 초록 · `turnlight.webp` (신호등을 들고 웃는 AI)
+               - 규정을 어겼거나 완주 못 함 → 붉은색 · `stop.webp` (손을 들어 세우는 AI)
 
               같은 칸에 같은 색으로 칭찬과 지적을 담으면, 읽기 전에는 어느 쪽인지 알 수 없다. 색과 그림이
               먼저 말하고 글이 잇는다 — 위쪽 등급 배지(PERFECT · FAIL)와도 같은 편을 든다.
@@ -2440,7 +2441,7 @@ export class Screens {
    *
    * 글은 만든 사람이 직접 쓴 것이다. 맞춤법 세 군데('헷갈리는' · '잘 지키고' · '있을 것')만 고치고 말투와 문장은 그대로
    * 둔다 — 공모전 심사자가 읽는 것은 다듬은 문장이 아니라 **왜 만들었는가**다. 마지막 한 줄은 이 작품의 바람이라 따로
-   * 세운다. 옆에는 주행 중 곁을 지키는 AI 우회전(normal.webp)이 선다 — 글이 말하는 'AI 의 도움' 이 누구인지 보이게.
+   * 세운다. 옆에는 주행 중 곁을 지키는 AI (normal.webp)이 선다 — 글이 말하는 'AI 의 도움' 이 누구인지 보이게.
    */
   /**
    * **맵 체험하기** — 시나리오 번호를 넣으면 그 판을 바로 달린다 (main.ts 의 mapTrial).
@@ -2485,11 +2486,11 @@ export class Screens {
         id: 'about',
         title: 'About',
         backLabel: '닫기',
-        // 이름(배지 + 딱지 + ' 참교육')과 부제 — 첫 화면 제목과 같은 말이다 (brand.ts)
-        sub: `${AI_BADGE_HTML} ${BRAND_CHIPS_HTML} 참교육 — ${esc(APP_TAGLINE)}`,
+        // 이름(AI 배지 + 표지 딱지 둘)과 부제 — 첫 화면 제목과 같은 말이다 (brand.ts)
+        sub: `${BRAND_NAME_HTML} — ${esc(APP_TAGLINE)}`,
       })}
       <div class="about-body">
-        <img class="about-robot" src="${robotNormal}" alt="AI 우회전" />
+        <img class="about-robot" src="${robotNormal}" alt="AI" />
         <div class="about-text">
           <p>이 프로그램은 교통법규 중 지키기 힘든 부분을 <b>AI의 도움을 받아서 훈련</b>을 하는 프로그램입니다.</p>
           <p>아빠 차를 타며 헷갈리는 상황들을 많이 봤었습니다. 그리고 AI를 활용해서 훈련하는 곳을 만들면 많은 사람들이

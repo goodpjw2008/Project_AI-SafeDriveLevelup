@@ -1,5 +1,5 @@
 /**
- * AI 우회전 주행의 **커리큘럼** — 쉬운 판에서 시작해 마스터까지 데려간다.
+ * AI 주행의 **커리큘럼** — 쉬운 판에서 시작해 마스터까지 데려간다.
  *
  * ## 왜 난이도를 코드가 정하는가
  *
@@ -286,7 +286,7 @@ export const levelLabel = (level: Difficulty): string => `Level${level}`;
  * 닿은 것과 해낸 것을 같은 말로 부르면 목표가 사라진다.
  */
 export function courseTitle(state: Pick<CurriculumState, 'level' | 'mastered'>): string {
-  // 호칭은 작품 이름을 따른다 — 'AI 우회전 참교육' 의 우회전 (brand.ts)
+  // 호칭은 작품 이름이 아니라 **학습자가 키우는 능력**의 이름이다 — 이름이 바뀌어도 그대로 둔다 (brand.ts)
   if (state.mastered) return '우회전 마스터';
   if (state.level >= MAX_LEVEL) return `우회전 ${levelLabel(MAX_LEVEL)} 도전`;
   return `우회전 ${levelLabel(state.level)}`;
