@@ -1213,7 +1213,7 @@ export class Screens {
     const gate =
       level < MAX_LEVEL
         ? `모두 고치면 <b>${esc(levelLabel((level + 1) as Difficulty))}</b>로 올라갑니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.`
-        : '모두 고쳐야 <b>우회전 마스터</b>가 됩니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.';
+        : '모두 고쳐야 <b>안전운전 마스터</b>가 됩니다. AI 가 첫 번째 습관을 시험하는 코스를 추천합니다.';
     return wrap(`<div class="ai-note">${gate}</div><ul class="habit-list">${rows}</ul>`);
   }
 

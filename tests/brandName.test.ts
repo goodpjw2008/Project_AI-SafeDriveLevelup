@@ -61,10 +61,10 @@ describe('홀로 선 AI 배지', () => {
     );
   });
 
-  /* 호칭('우회전 Level6')은 이름이 아니라 **학습자가 키우는 능력**이다 — 딱지도 배지도 붙지 않는다 */
+  /* 호칭('안전운전 Level6')은 이름이 아니라 **학습자가 키우는 능력**이다 — 딱지도 배지도 붙지 않는다 */
   it("호칭의 '우회전' 은 칠하지 않는다", () => {
-    expect(withAiBadge('우회전 Level6')).toBe('우회전 Level6');
-    expect(withAiBadge('우회전 마스터')).toBe('우회전 마스터');
+    expect(withAiBadge('안전운전 Level6')).toBe('안전운전 Level6');
+    expect(withAiBadge('안전운전 마스터')).toBe('안전운전 마스터');
   });
 
   it('AI 가 없는 이름은 건드리지 않는다', () => {

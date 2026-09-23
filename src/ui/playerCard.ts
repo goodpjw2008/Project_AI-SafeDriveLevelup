@@ -2,7 +2,7 @@
  * **플레이어 칸** — 내 레벨과 경험치를 보여 주는 **단 하나의 모양**.
  *
  * ```
- * ⬢6  우회전 Level6                150 / 500 XP
+ * ⬢6  안전운전 Level6                150 / 500 XP
  *     ███████████░░░░░░░░░░░░░░░░░░░░░░░░░
  *     L7까지 350 XP · 새 맵 무위반 +100          (아랫줄은 있을 때만)
  * ```
@@ -32,7 +32,7 @@ export interface PlayerInfo {
   level: Difficulty;
   /** 지금 레벨에서 모은 경험치 */
   xp: number;
-  /** 다음 레벨(L10 은 우회전 마스터)까지 필요한 경험치 — 난이도가 곱해진 값 (curriculum.ts 의 xpToNext) */
+  /** 다음 레벨(L10 은 안전운전 마스터)까지 필요한 경험치 — 난이도가 곱해진 값 (curriculum.ts 의 xpToNext) */
   need: number;
   mastered: boolean;
   /** 남은 나쁜 운전 습관 수 — 막대가 찼는데 오르지 못한 이유를 아랫줄이 말한다 */
@@ -54,9 +54,8 @@ const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 
 /*
-  **호칭('우회전 Level6')은 칠하지 않는다.** 이름이 'AI 일시정지 안전운전' 으로 바뀌며 '우회전' 은 더 이상
-  작품 이름이 아니라 **학습자가 키우는 능력의 이름**이 됐다 (brand.ts). 이름이 아닌 것에 이름의 딱지를
-  입히면, 화면에서 무엇이 이름인지 다시 흐려진다.
+  **호칭('안전운전 Level6')은 칠하지 않는다.** 호칭은 작품 이름이 아니라 **학습자가 키우는 능력의 이름**이다
+  (brand.ts). 이름이 아닌 것에 이름의 딱지를 입히면, 화면에서 무엇이 이름인지 흐려진다.
 */
 const branded = (text: string): string => esc(text);
 
@@ -69,7 +68,7 @@ const branded = (text: string): string => esc(text);
 export function playerFoot(given: PlayerInfo): string {
   const p = withinNeed(given);
   if (p.mastered) return `마스터 운행 — 처음부터 다시 시작하기 전까지 ${levelLabel(MAX_LEVEL)} 코스가 무작위로 이어집니다`;
-  const target = p.level >= MAX_LEVEL ? '우회전 마스터' : levelLabel((p.level + 1) as Difficulty);
+  const target = p.level >= MAX_LEVEL ? '안전운전 마스터' : levelLabel((p.level + 1) as Difficulty);
   if (p.xp >= p.need) {
     return p.habitsLeft
       ? `경험치가 가득 찼습니다 — 나쁜 습관 ${p.habitsLeft}개를 고치면 ${target}`

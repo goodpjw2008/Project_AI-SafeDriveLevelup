@@ -108,7 +108,7 @@ export const BADGES: readonly BadgeDef[] = [
   { id: 'schoolZoneFirst', group: 'growth', name: '스쿨존 첫 완주', how: '어린이보호구역 신호 없는 횡단보도 코스를 처음으로 위반 없이 통과', steps: [1] },
   { id: 'explorer', group: 'growth', name: '상황 탐험가', how: '밤 · 비 · 어린이 · 노인 · 앞차 · 뒤차 경적을 모두 겪음', steps: [SITUATIONS.length] },
   { id: 'leadJudge', group: 'growth', name: '앞차 판단가', how: '앞차가 일시정지를 무시하고 가도 따라가지 않고 규정대로 통과', steps: [1] },
-  { id: 'master', group: 'growth', name: '우회전 마스터', how: '레벨 10 을 마치고 우회전 마스터가 됨', steps: [1] },
+  { id: 'master', group: 'growth', name: '안전운전 마스터', how: '레벨 10 을 마치고 안전운전 마스터가 됨', steps: [1] },
 ];
 
 export const badgeDef = (id: BadgeId): BadgeDef => BADGES.find((b) => b.id === id)!;
@@ -215,7 +215,7 @@ export interface BadgeRun {
   tested: ReadonlySet<ViolationCode>;
   /** 이 판으로 고친 나쁜 습관 수 */
   habitsFixed: number;
-  /** 이 판을 마친 뒤 우회전 마스터인가 */
+  /** 이 판을 마친 뒤 안전운전 마스터인가 */
   mastered: boolean;
 }
 

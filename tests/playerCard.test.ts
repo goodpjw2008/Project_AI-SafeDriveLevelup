@@ -14,7 +14,7 @@ describe('플레이어 칸', () => {
       expect(html).toContain(`class="player ${size}`);
       expect(html).toContain('level-badge-wrap earned');
       // 호칭은 이름이 아니라 학습자가 키우는 능력이다 — 이름 딱지를 입히지 않는다 (ui/playerCard.ts)
-      expect(html).toContain('<span class="player-name">우회전 Level6</span>');
+      expect(html).toContain('<span class="player-name">안전운전 Level6</span>');
       expect(html).not.toContain('brand-');
       expect(html).toContain('<b>150</b> / 400 XP');
       expect(html).toContain('width:37.5%');
@@ -44,7 +44,7 @@ describe('플레이어 칸', () => {
     const done = playerCard({ ...l10, mastered: true }, 'md');
     expect(done).toContain('level-badge-wrap earned');
     expect(done).toContain('>MAX<');
-    expect(done).toContain('>우회전 마스터<');
+    expect(done).toContain('>안전운전 마스터<');
     // 마스터의 뱃지는 숫자 10 이 아니라 M — 첫 화면 레벨 길의 마지막 칸과 같은 그림이다
     expect(done).toContain('>M</text>');
     expect(done).not.toContain('>10</text>');

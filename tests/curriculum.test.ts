@@ -126,7 +126,7 @@ describe('진급', () => {
       return n;
     };
     expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([2, 2, 3, 3, 3, 3, 4, 4, 4]);
-    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 우회전 마스터').toBe(4);
+    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 안전운전 마스터').toBe(4);
     for (let l = 1; l <= MAX_LEVEL; l++) {
       expect(XP_TO_NEXT[l as 1] / XP_PER_CLEAN_RUN, `L${l} 은 한 판으로 오르지 않는다`).toBeGreaterThanOrEqual(2);
     }
@@ -548,7 +548,7 @@ describe('깎았는데 글이 그대로면 잡는다', () => {
   });
 });
 
-describe('레벨 — Level1 에서 우회전 마스터까지', () => {
+describe('레벨 — Level1 에서 안전운전 마스터까지', () => {
   const step = (s: CurriculumState, r: JudgeResult): CurriculumState => advance(s, r).next;
 
   it('레벨은 열이고 1에서 시작해 빈틈없이 이어진다', () => {
@@ -583,15 +583,15 @@ describe('레벨 — Level1 에서 우회전 마스터까지', () => {
     expect(new Set(LEVELS.map((l) => levelLabel(l.level))).size).toBe(MAX_LEVEL);
   });
 
-  it('처음은 우회전 Level1 이다 — 기본 두 규칙부터', () => {
-    expect(courseTitle(freshCurriculum())).toBe('우회전 Level1');
+  it('처음은 안전운전 Level1 이다 — 기본 두 규칙부터', () => {
+    expect(courseTitle(freshCurriculum())).toBe('안전운전 Level1');
   });
 
   it('경험치가 차면 호칭이 따라 오른다', () => {
     let s = freshCurriculum();
     for (let n = START_LEVEL + 1; n <= MAX_LEVEL; n++) {
       while (s.level < n) s = step(s, clean());
-      expect(courseTitle(s), `${n}레벨`).toBe(n === MAX_LEVEL ? '우회전 Level10 도전' : `우회전 Level${n}`);
+      expect(courseTitle(s), `${n}레벨`).toBe(n === MAX_LEVEL ? '안전운전 Level10 도전' : `안전운전 Level${n}`);
     }
   });
 
@@ -603,21 +603,21 @@ describe('레벨 — Level1 에서 우회전 마스터까지', () => {
     let s = freshCurriculum();
     while (s.level < MAX_LEVEL) s = step(s, clean());
     expect(s.mastered).toBe(false);
-    expect(courseTitle(s)).toBe('우회전 Level10 도전');
+    expect(courseTitle(s)).toBe('안전운전 Level10 도전');
   });
 
-  it('L10 의 경험치를 채워야 우회전 마스터가 된다', () => {
+  it('L10 의 경험치를 채워야 안전운전 마스터가 된다', () => {
     let s = freshCurriculum();
     while (s.level < MAX_LEVEL) s = step(s, clean());
     while (!s.mastered) s = step(s, clean());
-    expect(courseTitle(s)).toBe('우회전 마스터');
+    expect(courseTitle(s)).toBe('안전운전 마스터');
   });
 
   it('틀려도 호칭은 그대로다 — 레벨은 내려가지 않는다', () => {
     let s = at(5);
     s = step(s, run(['NO_SLOW_DOWN']));
     s = step(s, run(['WIDE_TURN']));
-    expect(courseTitle(s)).toBe('우회전 Level5');
+    expect(courseTitle(s)).toBe('안전운전 Level5');
   });
 
   /*
