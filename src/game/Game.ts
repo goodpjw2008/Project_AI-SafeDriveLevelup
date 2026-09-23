@@ -12,6 +12,7 @@ import {
   FINISH_X,
   FINISH_Z,
   INTERSECTION_HALF,
+  LANE_1_OFFSET,
   PLAYER_APPROACH_X,
   PLAYER_EXIT_Z,
   ROAD_HALF_WIDTH,
@@ -576,6 +577,21 @@ export class Game {
 
   private buildSignals(): void {
     /*
+      **보호구역 표지판과 단속 카메라는 코스와 상관없이 먼저 세운다.**
+
+      예전에는 이 블록이 함수 끝에 있었는데, 사거리 없는 도로는 그 위에서 일찍 빠져나가(아래) **표지판도
+      카메라도 세워지지 않았다** — 정작 보호구역만 달리는 코스에서 보호구역 표지가 없었다.
+    */
+    if (this.scenario.isSchoolZone || this.scenario.approachSchoolZone) {
+      this.buildSchoolZoneSigns();
+      /*
+        **과속 단속 카메라는 구간 초입에 선다** — 표지판(구간 시작 2m 앞)을 지나고 곧바로 보이는 자리다.
+        오는 길이 보호구역인 판은 그 구간 안(z 95)에, 교차로만 보호구역인 판은 교차로 앞(z 38)에 세운다.
+      */
+      this.buildSpeedCamera(this.scenario.approachSchoolZone || this.straight ? 95 : 38);
+    }
+
+    /*
       **사거리가 없는 보호구역 도로**는 교차로 신호등이 없다 — 지나는 횡단보도마다 자기 신호등이
       서거나(그 판이 정한 자리), 아예 서지 않는다. 신호기가 **없다는 사실 자체**가 이 판이 묻는
       것이므로(제27조 제7항), 없는 자리에는 아무것도 세우지 않는다.
@@ -724,7 +740,6 @@ export class Game {
       this.world.scene.add(this.rightSignal.group, this.smallPole(rx, rz, RIGHT_SIGNAL_POLE_HEIGHT));
     }
 
-    if (this.scenario.isSchoolZone || this.scenario.approachSchoolZone) this.buildSchoolZoneSigns();
   }
 
   /**
@@ -802,6 +817,185 @@ export class Game {
     );
     mesh.position.set(x, height / 2, z);
     return mesh;
+  }
+
+  /**
+   * **과속 단속 카메라** — 어린이보호구역 입구에 선 주황색 갠트리.
+   *
+   * 사용자가 실제 사진을 주며 "사진과 같은 30km 단속 카메라도 달아서 실감나게 해 줘" 라고 했다.
+   * 실물의 구성을 그대로 따른다 — 주황 지주 + 가로암, 노란 '과속 단속장비' 표지, 카메라 두 대,
+   * 붉은 테 원형 30 표지와 파란 사각 30 표지, 그리고 태양광 패널.
+   *
+   * ## 왜 이것이 교육에 보탬이 되는가
+   *
+   * 보호구역의 30km/h 는 **단속이 실제로 따라붙는** 규정이다. 표지만 서 있는 길과 카메라가 달린 길은
+   * 운전자가 받는 압박이 다르고, 그 압박이 현실의 보호구역에서 속도를 줄이게 만드는 것이기도 하다.
+   * 이 게임에서 속도는 차가 알아서 조이므로(Vehicle.zoneTargetKmh) 카메라가 판정을 바꾸지는 않는다 —
+   * **여기가 그런 구간이라는 것**을 눈으로 알리는 물건이다.
+   *
+   * 자리는 **구간이 시작한 뒤, 첫 횡단보도 전**이다. 실물도 구역 초입에 서고, 학습자가 표지를 지나
+   * 곧바로 이것을 보게 되면 "여기서부터 조인다" 가 한 장면으로 이어진다.
+   */
+  private buildSpeedCamera(z: number): void {
+    const g = new THREE.Group();
+    const orange = new THREE.MeshStandardMaterial({ color: 0xe0651f, roughness: 0.55, metalness: 0.35 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.5, metalness: 0.4 });
+    const pale = new THREE.MeshStandardMaterial({ color: 0xd8dade, roughness: 0.5, metalness: 0.3 });
+    /** 운전자를 향한 면 — 표지는 모두 이 면에 붙는다 (운전자는 +Z 쪽에서 온다) */
+    const face = (w: number, h: number, tex: THREE.Texture): THREE.Mesh =>
+      new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.72, side: THREE.DoubleSide }),
+      );
+
+    /*
+      ── 지주와 가로암.
+
+      사진에서 팔은 **네모난 굵은 보**다 — 가는 원기둥으로 뽑았더니 표지와 카메라를 붙일 면이
+      없어 물건들이 허공에 뜬 것처럼 보였다. 지주도 보보다 굵다.
+    */
+    const poleX = ROAD_HALF_WIDTH + 1.1;
+    const armY = 5.4;
+    const armDepth = 0.46;
+    const armH = 0.56;
+    /*
+      팔은 **북행 두 차로를 모두 덮는다** (실물 갠트리가 그렇다). 짧게 뽑았더니 표지 둘과
+      카메라와 명판이 한 자리에서 서로 겹쳐, 사진처럼 **왼쪽부터 카메라 · 명판 · 30 표지**로
+      늘어놓을 길이가 나오지 않았다.
+    */
+    const armEndX = LANE_1_OFFSET - 1.1;
+    const armLen = poleX - armEndX;
+    const armMidX = (poleX + armEndX) / 2;
+
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.44, armY + 0.7, 0.44), orange);
+    pole.position.set(poleX, (armY + 0.7) / 2, z);
+    g.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(armLen, armH, armDepth), orange);
+    arm.position.set(armMidX, armY, z);
+    g.add(arm);
+    // 지주와 팔이 만나는 곳의 삼각 보강재 (사진의 사선 브래킷)
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 0.12), orange);
+    brace.position.set(poleX - 0.62, armY - 0.62, z);
+    brace.rotation.z = Math.PI / 4;
+    g.add(brace);
+
+    /*
+      ── 표지 둘은 **지주 쪽 끝**에 붙는다 (사진 그대로) — 붉은 테 원형 30 과 파란 사각 30.
+      팔 높이만큼 크다. 앞면(+Z)에 살짝 띄워 붙여 보에 묻히지 않게 한다.
+    */
+    const signZ = z + armDepth / 2 + 0.03;
+    const square = face(1.22, 1.22, this.speedSignTexture(true));
+    square.position.set(poleX - 0.95, armY - 0.1, signZ);
+    const round = face(1.34, 1.34, this.speedSignTexture(false));
+    round.position.set(poleX - 2.4, armY + 0.05, signZ);
+    g.add(square, round);
+
+    // ── 노란 '과속 단속장비' 표지 — 팔 앞면에 **붙어 있다** (매달린 것이 아니다)
+    const plate = face(2.7, 0.46, this.gantryPlateTexture());
+    plate.position.set(armEndX + 1.55, armY, signZ);
+    g.add(plate);
+
+    /*
+      ── 카메라는 팔 **위에** 올라앉아 다가오는 차를 내려다본다. 사진에는 큰 단속 카메라와
+      작은 보조 장비가 섞여 있으므로 크기를 달리해 둘·하나로 얹는다.
+    */
+    const camAt = (cx: number, s: number, mat: THREE.Material): void => {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s, 0.34 * s, 0.7 * s), mat);
+      body.position.set(cx, armY + armH / 2 + 0.17 * s, z);
+      body.rotation.x = 0.3;
+      // 햇빛 가리개 — 렌즈 위로 내민 차양
+      const hood = new THREE.Mesh(new THREE.BoxGeometry(0.46 * s, 0.06 * s, 0.5 * s), mat);
+      hood.position.set(cx, armY + armH / 2 + 0.33 * s, z + 0.2 * s);
+      hood.rotation.x = 0.3;
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.14 * s, 0.24 * s, 12), dark);
+      lens.rotation.x = Math.PI / 2 + 0.3;
+      lens.position.set(cx, armY + armH / 2 + 0.11 * s, z + 0.4 * s);
+      // 팔과 카메라를 잇는 짧은 목
+      const neck = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.16 * s, 0.1 * s), dark);
+      neck.position.set(cx, armY + armH / 2 + 0.06 * s, z);
+      g.add(body, hood, lens, neck);
+    };
+    // 왼쪽부터: 큰 단속 카메라 · (명판) · 보조 카메라 · 작은 장비 — 사진의 늘어선 차례 그대로
+    camAt(armEndX + 0.35, 1.15, dark);
+    camAt(poleX - 4.1, 0.95, pale);
+    camAt(poleX - 3.35, 0.62, pale);
+
+    /*
+      ── 태양광 패널 — 사진에서는 지주 가까운 팔 위에 짧은 기둥으로 서서 남쪽(운전자 쪽)을
+      보고 비스듬히 눕는다. 전원이 따로 없는 길에도 세울 수 있게 하는 물건이라, 이것이
+      있어야 "길가에 세운 장비" 로 보인다.
+    */
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), dark);
+    mast.position.set(poleX - 0.55, armY + armH / 2 + 0.3, z);
+    const panel = new THREE.Mesh(
+      new THREE.BoxGeometry(0.95, 0.05, 0.62),
+      new THREE.MeshStandardMaterial({ color: 0x1b2a4a, roughness: 0.32, metalness: 0.55 }),
+    );
+    panel.position.set(poleX - 0.55, armY + armH / 2 + 0.66, z + 0.06);
+    panel.rotation.x = -0.5;
+    g.add(mast, panel);
+
+    this.world.scene.add(g);
+  }
+
+  /** 노란 '과속 단속장비' 명판 — 팔 앞면에 붙는 가로 띠 */
+  private gantryPlateTexture(): THREE.CanvasTexture {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 88;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#f2c200';
+    ctx.fillRect(0, 0, 512, 88);
+    ctx.strokeStyle = '#6b3a12';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, 506, 82);
+    ctx.fillStyle = '#4a1d12';
+    ctx.font = 'bold 58px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('과속 단속장비', 256, 48);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  /**
+   * 30 제한속도 표지 — 붉은 테 원형(법정 제한속도)과, 그것을 담은 파란 사각(보호구역 표시).
+   * 사진에 둘이 나란히 붙어 있다: 둥근 것이 "여기 제한은 30", 파란 것이 "어린이보호구역이라 30".
+   */
+  private speedSignTexture(boxed: boolean): THREE.CanvasTexture {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const ctx = c.getContext('2d')!;
+    const r = boxed ? 92 : 122;
+    if (boxed) {
+      ctx.fillStyle = '#12418f';
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = '#f2f2f2';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(6, 6, 244, 244);
+    } else {
+      ctx.clearRect(0, 0, 256, 256);
+    }
+    ctx.fillStyle = '#fbfbfb';
+    ctx.beginPath();
+    ctx.arc(128, 128, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d0342c';
+    ctx.lineWidth = r * 0.26;
+    ctx.beginPath();
+    ctx.arc(128, 128, r * 0.87, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#17181a';
+    ctx.font = `bold ${Math.round(r * 1.08)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('30', 128, 134);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
   }
 
   /** 어린이보호구역 표지판 — 시각적으로 바로 알 수 있어야 한다 */
