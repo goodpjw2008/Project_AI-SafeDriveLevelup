@@ -88,16 +88,15 @@ describe('홀로 선 AI 배지', () => {
 });
 
 /*
-  **탭 아이콘** — 붉은 팔각형에 '정' 한 글자 (brand.ts 의 APP_ICON_SVG).
-  16px 에서 글자가 안 읽혀도 **정지 표지의 모양**만으로 '서라' 가 읽힌다. 이름이 '안전운전 교실' 로 바뀐 뒤에도
-  아이콘은 이대로 둔다 — 이번 편이 가르치는 것이 일시정지라, 탭에서 그 한 가지가 보이는 편이 낫다.
+  **탭 아이콘** — 녹색 네모에 '안' 한 글자 (brand.ts 의 APP_ICON_SVG · 사용자가 정했다).
+  이름의 첫 글자이고, 바탕은 제목의 '안전운전' 딱지와 **같은 녹색**이다 — 탭에서 본 색이 화면을 열었을 때 제목에 있다.
 */
 describe('탭 아이콘', () => {
-  it("붉은 팔각형에 '정' 한 글자다", () => {
-    expect(APP_ICON_SVG).toContain('>정<');
-    // 정지 표지의 붉은색 (index.html 의 .brand-stop 과 같은 값)
-    expect(APP_ICON_SVG).toContain('#c1272d');
-    expect(APP_ICON_SVG).not.toContain('<rect');
+  it("녹색 네모에 '안' 한 글자다", () => {
+    expect(APP_ICON_SVG).toContain('>안<');
+    // 제목의 '안전운전' 딱지와 같은 녹색 (index.html 의 .brand-green)
+    expect(APP_ICON_SVG).toContain('#117332');
+    expect(APP_ICON_SVG).not.toContain('정<');
     expect(APP_ICON_SVG).not.toContain('우');
   });
 

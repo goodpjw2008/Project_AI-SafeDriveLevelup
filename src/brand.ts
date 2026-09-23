@@ -96,11 +96,15 @@ export const APP_NAME_PARTS: readonly NamePart[] = [
 export const APP_NAME = APP_NAME_PARTS.map((p) => p.text).join('');
 
 /**
- * **브라우저 탭 아이콘** — 붉은 **팔각형**에 흰 '정' 한 글자.
+ * **브라우저 탭 아이콘** — 녹색 네모에 흰 '안' 한 글자 (사용자가 정했다).
  *
  * 16px 짜리 탭 아이콘에 이름을 다 넣으면 뭉개져 아무것도 읽히지 않으므로 한 글자만 남긴다. 그 한 글자를
- * '일시정지' 의 '정' 으로 두고, 바탕을 **정지 표지의 붉은 팔각형**으로 그린다 — 글자가 안 읽히는 크기에서도
- * **모양만으로 '서라' 가 읽힌다.** (예전 이름일 때는 주황 네모에 흰 '우' 였다. 이름에서 '우회전' 이 빠지며 함께 바꿨다.)
+ * 이름의 첫 글자 '안'(안전운전)으로 두고, 바탕을 **제목의 녹색 딱지와 같은 값**으로 칠한다 — 탭에서 본 색이
+ * 화면을 열었을 때 제목에 그대로 있다.
+ *
+ * 한때 붉은 팔각형에 '정'(일시정지)이었다. 모양만으로 '서라' 가 읽히는 장점이 있었지만, **이름과 다른 낱말을
+ * 가리켰다** — 사용자가 이름의 첫 글자로 맞췄다. 팔각형도 함께 버린다: 팔각형은 정지 표지의 모양이라
+ * 녹색으로 칠하면 뜻이 어긋난다.
  *
  * **그림 파일이 아니라 SVG 다.** 크기마다 흐려지지 않고(탭 16 · 즐겨찾기 32 · 홈 화면 180), 몇백 바이트라
  * 단일 파일 빌드에 통째로 심어도 부담이 없다 (vite.config.ts 가 data URI 로 넣는다). 레벨 뱃지를 그림에서
@@ -111,11 +115,11 @@ export const APP_NAME = APP_NAME_PARTS.map((p) => p.text).join('');
  */
 export const APP_ICON_SVG = [
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`,
-  // 정지 표지의 팔각형 — 64칸 안에 꽉 차게 앉히고, 모서리를 살짝 둥글려 탭에서 거칠어 보이지 않게 한다
-  `<path d="M20.7 2h22.6L62 20.7v22.6L43.3 62H20.7L2 43.3V20.7Z" fill="#c1272d" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>`,
-  `<text x="32" y="34" text-anchor="middle" dominant-baseline="central"`,
+  // 모서리를 둥글린 사각형 — 탭에서는 원처럼 보이고, 홈 화면 아이콘으로도 어색하지 않다
+  `<rect width="64" height="64" rx="14" fill="#117332"/>`,
+  `<text x="32" y="33" text-anchor="middle" dominant-baseline="central"`,
   ` font-family="Pretendard,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"`,
-  ` font-size="34" font-weight="800" fill="#ffffff">정</text>`,
+  ` font-size="44" font-weight="800" fill="#ffffff">안</text>`,
   `</svg>`,
 ].join('');
 
