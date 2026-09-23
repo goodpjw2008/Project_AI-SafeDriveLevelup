@@ -275,6 +275,14 @@ export class Game {
   private zoneSignal: VehicleSignal | null = null;
   /** 사거리 없는 보호구역 도로의 횡단보도별 신호등 (drive: 'zoneOnly') */
   private zoneRoadSignals: Partial<Record<CrosswalkId, VehicleSignal>> = {};
+
+  /**
+   * **신호 갠트리를 세운 자리** (횡단보도별 z).
+   *
+   * 과속 단속 카메라를 **그 지주에 같이 올리려고** 적어 둔다 — 사진의 '신호 과속단속장비' 가
+   * 그렇게 생겼다 (buildZoneSpeedCamera).
+   */
+  private signalGantryZ: Partial<Record<CrosswalkId, number>> = {};
   /** 우회전신호등 — 설치된 시나리오에서만 만든다 */
   private rightSignal: RightTurnSignal | null = null;
   /** AI 자율 주행 중이면 값이 있다 — 사람 입력 대신 이쪽이 운전한다 */
@@ -583,23 +591,7 @@ export class Game {
       예전에는 이 블록이 함수 끝에 있었는데, 사거리 없는 도로는 그 위에서 일찍 빠져나가(아래) **표지판도
       카메라도 세워지지 않았다** — 정작 보호구역만 달리는 코스에서 보호구역 표지가 없었다.
     */
-    if (this.scenario.isSchoolZone || this.scenario.approachSchoolZone) {
-      this.buildSchoolZoneSigns();
-      /*
-        **단속 카메라는 횡단보도와 한 자리에 선다** — 사용자가 실제 도로를 들어 짚었다:
-        "어린이 보호단속신호등은 횡단보도와 같이 있어야 해. 중간 횡단보도에 같이 나오게 해 줘."
-        실물도 그렇다 — 보호구역 카메라는 구간 아무 데나가 아니라 **건너는 자리**를 잰다.
-
-        정지선 10m 앞에 세운다. 다가가면서 보면 횡단보도와 한 덩어리로 보이고, 정지선에 섰을 때는
-        머리 위가 아니라 앞쪽 위에 있어 신호와 보행자를 가리지 않는다.
-
-        오는 길이 보호구역인 판은 그 길의 횡단보도(S)에, 나머지는 교차로 앞 횡단보도(A)에 —
-        사거리 없는 전용 도로에서는 그 자리가 **가운데 횡단보도**다.
-      */
-      this.buildSpeedCamera(
-        this.scenario.approachSchoolZone ? STOP_LINE_S + 10 : STOP_LINE + 10,
-      );
-    }
+    if (this.scenario.isSchoolZone || this.scenario.approachSchoolZone) this.buildSchoolZoneSigns();
 
     /*
       **사거리가 없는 보호구역 도로**는 교차로 신호등이 없다 — 지나는 횡단보도마다 자기 신호등이
@@ -608,6 +600,7 @@ export class Game {
     */
     if (this.scenario.drive === 'zoneOnly') {
       this.buildZoneRoadSignals();
+      this.buildZoneSpeedCamera();
       return;
     }
     // 플레이어(남행 접근) 차량신호등 — 교차로 건너편(북측)에 지주를 세우고 팔을 도로 위로 뻗는다.
@@ -700,6 +693,7 @@ export class Game {
         this.zoneSignal.group,
         this.cantileverPole(ROAD_HALF_WIDTH + 1.5, zoneSignalZ, zoneSignalX, ZONE_SIGNAL_ARM_Y),
       );
+      this.signalGantryZ.S = zoneSignalZ;
 
       this.pedSignals.S = [];
       for (const sx of [1, -1]) {
@@ -750,6 +744,38 @@ export class Game {
       this.world.scene.add(this.rightSignal.group, this.smallPole(rx, rz, RIGHT_SIGNAL_POLE_HEIGHT));
     }
 
+    this.buildZoneSpeedCamera();
+  }
+
+  /**
+   * **과속 단속 카메라를 어디에 세울 것인가.**
+   *
+   * 카메라가 지키는 자리는 **보호구역 횡단보도**다 — 오는 길이 보호구역이면 그 길의 횡단보도(S),
+   * 아니면 교차로 앞 횡단보도(A)이고, 사거리 없는 전용 도로에서는 그 자리가 가운데 횡단보도다.
+   *
+   * **그 횡단보도에 신호기가 서 있으면 같은 지주에 올린다** — 사용자가 실제 도로 사진을 주며
+   * "사진처럼 단속카메라를 신호등과 같이 넣어 줘" 라고 했다. 실물의 이름부터가 그렇다:
+   * 명판에 '**신호** 과속단속장비' 라고 적혀 있고, 신호위반과 과속을 한 장비가 함께 잰다.
+   * 신호기가 없는 횡단보도에서는 잴 신호가 없으므로 '과속 단속장비' 한 대가 홀로 서고,
+   * 자리도 정지선 10m 앞이다 (신호 갠트리는 횡단보도 건너편에 서기 때문에 기댈 지주가 없다).
+   */
+  private buildZoneSpeedCamera(): void {
+    if (!this.scenario.isSchoolZone && !this.scenario.approachSchoolZone) return;
+    const at: CrosswalkId = this.scenario.approachSchoolZone ? 'S' : 'A';
+    const onSignal = this.signalGantryZ[at];
+    if (onSignal !== undefined) {
+      /*
+        신호 갠트리와 **같은 지주 · 같은 자리**에 세우고, 팔만 신호 팔 위로 올린다.
+        카메라 지주(굵은 각기둥)가 신호 지주(가는 원기둥)를 품어 하나로 보인다.
+      */
+      this.buildSpeedCamera(onSignal, {
+        poleX: ROAD_HALF_WIDTH + 1.5,
+        armY: ZONE_SIGNAL_ARM_Y + 1.5,
+        withSignal: true,
+      });
+      return;
+    }
+    this.buildSpeedCamera((at === 'S' ? STOP_LINE_S : STOP_LINE) + 10);
   }
 
   /**
@@ -808,6 +834,7 @@ export class Game {
         this.cantileverPole(ROAD_HALF_WIDTH + 1.5, signalZ, PLAYER_APPROACH_X, ZONE_SIGNAL_ARM_Y),
       );
       this.zoneRoadSignals[id] = signal;
+      this.signalGantryZ[id] = signalZ;
 
       this.pedSignals[id] = [];
       for (const sx of [1, -1]) {
@@ -847,7 +874,10 @@ export class Game {
    * 정지선 10m 앞이라 다가가면서 보면 횡단보도와 한 덩어리로 보이고, 정지선에 섰을 때는
    * 머리 위가 아니라 앞쪽 위에 있어 신호와 보행자를 가리지 않는다.
    */
-  private buildSpeedCamera(z: number): void {
+  private buildSpeedCamera(
+    z: number,
+    mount: { poleX?: number; armY?: number; withSignal?: boolean } = {},
+  ): void {
     const g = new THREE.Group();
     const orange = new THREE.MeshStandardMaterial({ color: 0xe0651f, roughness: 0.55, metalness: 0.35 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.5, metalness: 0.4 });
@@ -865,8 +895,8 @@ export class Game {
       사진에서 팔은 **네모난 굵은 보**다 — 가는 원기둥으로 뽑았더니 표지와 카메라를 붙일 면이
       없어 물건들이 허공에 뜬 것처럼 보였다. 지주도 보보다 굵다.
     */
-    const poleX = ROAD_HALF_WIDTH + 1.1;
-    const armY = 5.4;
+    const poleX = mount.poleX ?? ROAD_HALF_WIDTH + 1.1;
+    const armY = mount.armY ?? 5.4;
     const armDepth = 0.46;
     const armH = 0.56;
     /*
@@ -901,8 +931,13 @@ export class Game {
     round.position.set(poleX - 2.4, armY + 0.05, signZ);
     g.add(square, round);
 
-    // ── 노란 '과속 단속장비' 표지 — 팔 앞면에 **붙어 있다** (매달린 것이 아니다)
-    const plate = face(2.7, 0.46, this.gantryPlateTexture());
+    /*
+      ── 노란 명판 — 팔 앞면에 **붙어 있다** (매달린 것이 아니다).
+
+      신호 갠트리에 같이 올린 것은 '**신호** 과속단속장비' 다 — 신호위반과 과속을 한 장비가
+      함께 재기 때문이고, 실물 명판에도 그렇게 적혀 있다. 홀로 선 것은 '과속 단속장비' 다.
+    */
+    const plate = face(2.7, 0.46, this.gantryPlateTexture(mount.withSignal ?? false));
     plate.position.set(armEndX + 1.55, armY, signZ);
     g.add(plate);
 
@@ -949,8 +984,8 @@ export class Game {
     this.world.scene.add(g);
   }
 
-  /** 노란 '과속 단속장비' 명판 — 팔 앞면에 붙는 가로 띠 */
-  private gantryPlateTexture(): THREE.CanvasTexture {
+  /** 노란 단속장비 명판 — 팔 앞면에 붙는 가로 띠 */
+  private gantryPlateTexture(withSignal: boolean): THREE.CanvasTexture {
     const c = document.createElement('canvas');
     c.width = 512;
     c.height = 88;
@@ -964,7 +999,7 @@ export class Game {
     ctx.font = 'bold 58px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('과속 단속장비', 256, 48);
+    ctx.fillText(withSignal ? '신호 과속단속장비' : '과속 단속장비', 256, 48);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
