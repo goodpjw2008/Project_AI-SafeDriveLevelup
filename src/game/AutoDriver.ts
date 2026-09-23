@@ -57,6 +57,11 @@ export interface AutoDriveState {
   /** 우회전 신호등. 미설치 교차로는 null. */
   rightArrow: RightArrowColor | null;
   pedSignal: Record<CrosswalkId, PedSignal | null>;
+  /**
+   * **사거리 없는 보호구역 도로**의 횡단보도별 차량신호 (drive: 'zoneOnly').
+   * 자리가 없으면 그 횡단보도에는 신호기가 없다 — 보행자가 없어도 서야 하는 자리다.
+   */
+  zoneLights?: Partial<Record<CrosswalkId, LightColor>>;
   pedestrians: PedestrianSample[];
   exitBlocked: boolean;
   isSchoolZone: boolean;
@@ -164,6 +169,16 @@ export class AutoDriver {
     그 횡단보도가 교차로보다 앞(z 46~50)에 있기 때문이다.
   */
   private gate: 'schoolZone' | 'stopLine' | 'exitCrosswalk' | 'clear' = 'schoolZone';
+  /*
+    **사거리 없는 보호구역 도로**(zoneOnly)는 관문이 횡단보도 셋이다 — 교차로가 없으므로 정지선 ·
+    진입 · 우회전 관문이 없다. 자리는 교차로 맵과 같은 좌표를 쓴다 (rules/lawRules.ts 의 ZONE_ROAD_EDGES).
+  */
+  private zoneGate = 0;
+  private static readonly ZONE_GATES: ReadonlyArray<{ id: CrosswalkId; near: number }> = [
+    { id: 'S', near: CROSSWALK_S_OUTER },
+    { id: 'A', near: CROSSWALK_OUTER },
+    { id: 'B', near: CROSSWALK_B_INNER },
+  ];
   /** 그 관문에서 요구되는 일시정지를 이미 마쳤는가 */
   private heldAtGate = false;
   /** 길 위에서 지금 어디쯤인지 (뒤로 되돌아가지 않게 앞으로만 움직인다) */
@@ -182,7 +197,7 @@ export class AutoDriver {
     private brakeDecel = 4.8,
     private readonly drive: DriveMode = 'rightTurn',
   ) {
-    this.path = drive === 'straight' ? STRAIGHT_PATH : TURN_PATH;
+    this.path = drive === 'rightTurn' ? TURN_PATH : STRAIGHT_PATH;
   }
 
   /** 따라갈 길 — 코스마다 다르다 (위 buildPath · buildStraightLine) */
@@ -195,6 +210,9 @@ export class AutoDriver {
   }
 
   decide(s: AutoDriveState): VehicleInput {
+    if (this.drive === 'zoneOnly') {
+      return { stop: this.zoneShouldStop(s), steer: this.steer(s), rightSignal: false };
+    }
     this.advanceGate(s);
     return {
       stop: this.shouldStop(s),
@@ -202,6 +220,34 @@ export class AutoDriver {
       // 우회전이면 처음부터 끝까지 켜 둔다 (제38조 제1항). 직진은 켤 의무가 없고, 켜면 틀린 신호다
       rightSignal: this.drive !== 'straight',
     };
+  }
+
+  /**
+   * **사거리 없는 보호구역 도로에서의 정지 판단** — 횡단보도 셋을 차례로 지난다.
+   *
+   * 자리마다 묻는 것이 둘이다: ① 신호기가 없으면 **보행자가 없어도** 한 번 서야 하고(제27조 제7항),
+   * ② 신호기가 있으면 녹색이 아닌 동안 갈 수 없다. 사람이 건너고 있으면 어느 쪽이든 선다(제27조 제1항).
+   */
+  private zoneShouldStop(s: AutoDriveState): boolean {
+    if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) return true;
+    while (this.zoneGate < AutoDriver.ZONE_GATES.length && s.frontZ <= AutoDriver.ZONE_GATES[this.zoneGate].near) {
+      this.zoneGate += 1;
+      this.heldAtGate = false;
+    }
+    if (this.zoneGate >= AutoDriver.ZONE_GATES.length) return false;
+
+    const { id, near } = AutoDriver.ZONE_GATES[this.zoneGate];
+    const light = s.zoneLights?.[id] ?? null;
+    const distance = s.frontZ - near;
+    const blocked = (light !== null && light !== 'green') || pedConflict(s, id);
+    const needHold = light === null;
+
+    // 그 횡단보도 앞에서 완전히 섰으면 일시정지 의무는 끝난 것이다 (판정과 같은 기준)
+    if (s.speedKmh <= 0.5 && s.stopHold >= HOLD_TARGET && distance <= this.brakeDistance(0) + 0.5) {
+      this.heldAtGate = true;
+    }
+    if (!blocked && (!needHold || this.heldAtGate)) return false;
+    return distance <= this.brakeDistance(s.speedKmh);
   }
 
   // ── 정지 판단 ────────────────────────────────────────────────────────────
@@ -409,8 +455,8 @@ function pedConflict(s: AutoDriveState, id: CrosswalkId): boolean {
 
 /** 완주선을 넘었는가 — 자율 주행이 끝났는지 판단하는 데 쓴다. 코스마다 완주선이 다르다 */
 export const isFinished = (s: AutoDriveState, drive: DriveMode = 'rightTurn'): boolean =>
-  drive === 'straight' ? s.frontZ < FINISH_Z : s.frontX > FINISH_X;
+  drive === 'rightTurn' ? s.frontX > FINISH_X : s.frontZ < FINISH_Z;
 
 /** 교차로를 지나 만난 횡단보도를 완전히 벗어났는가 */
 export const passedExitCrosswalk = (s: AutoDriveState, drive: DriveMode = 'rightTurn'): boolean =>
-  drive === 'straight' ? s.frontZ < CROSSWALK_B_OUTER : s.frontX > CROSSWALK_OUTER;
+  drive === 'rightTurn' ? s.frontX > CROSSWALK_OUTER : s.frontZ < CROSSWALK_B_OUTER;

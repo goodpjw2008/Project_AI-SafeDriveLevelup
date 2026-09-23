@@ -44,7 +44,7 @@ import {
   type ScenarioSpec,
   type SchoolZonePhase,
 } from './scenarios';
-import type { CrosswalkId, JudgeResult, PedestrianSample } from '../rules/lawRules';
+import type { CrosswalkId, JudgeResult, LightColor, PedSignal, PedestrianSample } from '../rules/lawRules';
 import { signalCrosswalk } from '../rules/lawRules';
 
 /**
@@ -55,6 +55,8 @@ import { signalCrosswalk } from '../rules/lawRules';
  * 옛 자리만 보는 검사가 남는다.
  */
 const hasPedSignal = (spec: ScenarioSpec, id: CrosswalkId): boolean => {
+  // 사거리 없는 보호구역 도로는 횡단보도마다 신호기를 따로 둔다 (scenarios.ts 의 zoneSignals)
+  if (spec.drive === 'zoneOnly') return spec.zoneSignals?.[id as 'S' | 'A' | 'B'] !== undefined;
   const at = signalCrosswalk(id);
   // B 는 A 와 같은 신호기다 (rules/lawRules.ts 의 signalCrosswalk)
   return at === null ? spec.approachSchoolZone?.signal === true : spec.pedSignalInstalled[at];
@@ -205,10 +207,13 @@ export function checkSchema(spec: unknown): Issue[] {
       const at = (m: string): string => `보행자[${i}] ${m}`;
       if (typeof p !== 'object' || p === null) return push(at('가 객체가 아닙니다'));
       if (typeof p.crosswalk !== 'string' || !CROSSWALKS.includes(p.crosswalk)) {
-        push(at('crosswalk 가 A·C·S 가 아닙니다'));
+        push(at('crosswalk 가 A·B·C·S 가 아닙니다'));
       }
-      // S 보행자는 **그 횡단보도가 있는 판**에만 설 수 있다 — 없으면 화면에 그릴 자리가 없다
-      if (p.crosswalk === 'S' && s.approachSchoolZone === undefined) {
+      /*
+        S 보행자는 **그 횡단보도가 있는 판**에만 설 수 있다 — 없으면 화면에 그릴 자리가 없다.
+        사거리 없는 보호구역 도로(drive: 'zoneOnly')는 S 가 그 길의 **첫 번째 횡단보도**라 늘 있다.
+      */
+      if (p.crosswalk === 'S' && s.drive !== 'zoneOnly' && s.approachSchoolZone === undefined) {
         push(at('S 는 진입로 어린이보호구역이 있는 판에만 쓸 수 있습니다'));
       }
       if (!num(p.at) || p.at < 0) push(at('at 이 0 이상의 숫자가 아닙니다'));
@@ -255,10 +260,13 @@ export function checkCoherence(spec: ScenarioSpec): Issue[] {
 
   for (const p of spec.pedestrians) {
     /*
-      신호기가 없는 횡단보도인데 '신호를 지키는' 보행자다. 지킬 신호가 없으므로 이 사람은
+      신호기가 없는 횡단보도인데 '신호를 지킨다' 고 **적어 둔** 보행자다. 지킬 신호가 없으므로 이 사람은
       `obeysSignal` 이 무시되고 언제든 건넌다 — 시나리오를 쓴 쪽의 의도와 어긋난다.
+
+      **적지 않은 것은 주장이 아니다.** 예전에는 `!== false` 로 보아 값을 생략한 판까지 짚었는데,
+      신호기 없는 횡단보도에서는 생략이 오히려 맞는 표기다 (사거리 없는 보호구역 도로의 판 대부분).
     */
-    if (p.obeysSignal !== false && !hasPedSignal(spec, p.crosswalk)) {
+    if (p.obeysSignal === true && !hasPedSignal(spec, p.crosswalk)) {
       out.push(
         warn(
           'coherence',
@@ -385,8 +393,25 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
       ? phaseAt(SCHOOL_ZONE_PROGRAM, 0, spec.approachSchoolZone.signalElapsed ?? 0, t)
       : null;
 
+  /*
+    **사거리 없는 보호구역 도로는 횡단보도마다 자기 신호를 돈다** (drive: 'zoneOnly').
+    적힌 자리만 신호기가 있고(spec.zoneSignals), 나머지는 없다 — 그 '없음' 이 제27조 제7항의 자리다.
+  */
+  const zoneLightAt = (t: number): Partial<Record<CrosswalkId, LightColor>> => {
+    const out: Partial<Record<CrosswalkId, LightColor>> = {};
+    for (const [id, offset] of Object.entries(spec.zoneSignals ?? {})) {
+      out[id as CrosswalkId] = phaseAt(SCHOOL_ZONE_PROGRAM, 0, offset, t).vehicle;
+    }
+    return out;
+  };
+  const zonePedAt = (t: number, id: CrosswalkId): PedSignal | null => {
+    const offset = spec.zoneSignals?.[id as 'S' | 'A' | 'B'];
+    return offset === undefined ? null : phaseAt(SCHOOL_ZONE_PROGRAM, 0, offset, t).ped;
+  };
+
   return {
     vehicleLight: (t) => at(t).vehicle,
+    ...(spec.drive === 'zoneOnly' ? { zoneLights: zoneLightAt } : {}),
     rightArrow: spec.rightArrowInstalled ? (t) => at(t).rightArrow : null,
     pedSignalA: (t) => (spec.pedSignalInstalled.A ? at(t).pedA : null),
     pedSignalC: (t) => (spec.pedSignalInstalled.C ? at(t).pedC : null),
@@ -395,6 +420,15 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
     pedestrians: (t, car, ctx): PedestrianSample[] => {
       const phase = at(t);
       return walkers.map((w, i) => {
+        // 사거리 없는 도로에서는 그 횡단보도의 보호구역 신호를 본다 (위 zonePedAt)
+        if (spec.drive === 'zoneOnly') {
+          const busyZone = lead?.blocksCrosswalk(w.crosswalk) ?? false;
+          w.update(t, DT, zonePedAt(t, w.crosswalk), { x: car.frontX, z: car.frontZ }, ctx.speedKmh > 0.5, busyZone, {
+            leadInWay: lead?.inWayOf(w.crosswalk) ?? false,
+            carSpeedMs: ctx.speedKmh / 3.6,
+          });
+          return { ...w.sample(), id: i };
+        }
         // 횡단보도마다 자기 신호를 본다 — B 는 A 와 같은 등화다 (rules/lawRules.ts 의 signalCrosswalk)
         const at = signalCrosswalk(w.crosswalk);
         const signal =
@@ -509,16 +543,31 @@ const EXEMPLARY: DriverConfig[] = (() => {
 
     `drive` 는 여기서 정하지 않는다 — 검증기가 판을 보고 붙인다 (checkPlayable).
   */
+  return out;
+})();
+
+/**
+ * **곧게 가는 코스의 모범 운전자** — 교차로 직진 통과(straight)와 사거리 없는 보호구역 도로(zoneOnly).
+ *
+ * 우회전 목록과 다른 것이 둘 있다. ① 적색에는 **갈 수 없으므로** 녹색이 될 때까지 기다린다
+ * (`waitForGreen`) — 몇 초 서는가로는 흉내 낼 수 없다. ② **방향지시등을 켜지 않는다** — 돌지 않으므로
+ * 켤 의무가 없고, 판정도 묻지 않는다 (rules/lawRules.ts).
+ *
+ * **목록을 갈라 두는 이유**는 빠르기다. 한 판에 서른여섯 가지를 다 돌리면 보호구역 판 553개를 검증하는 데
+ * 4분이 넘었다 — 우회전 운전자는 이 코스를 통과할 수 없으니 처음부터 돌리지 않는다.
+ */
+const EXEMPLARY_STRAIGHT: DriverConfig[] = (() => {
+  const common = {
+    yieldUntilClear: true,
+    turnSignal: 'never',
+    waitForGreen: true,
+    turnKmh: 12,
+    maxYieldSeconds: 90,
+  } as const;
+  const out: DriverConfig[] = [];
   for (const stopAtSchoolZoneLine of [2, 25]) {
-    for (const stopBeforeExitCrosswalk of [0, 2]) {
-      out.push({
-        ...common,
-        turnSignal: 'never',
-        waitForGreen: true,
-        stopAtSchoolZoneLine,
-        stopAtLine: 2,
-        stopBeforeExitCrosswalk,
-      });
+    for (const stopBeforeExitCrosswalk of [2, 0]) {
+      out.push({ ...common, stopAtSchoolZoneLine, stopAtLine: 2, stopBeforeExitCrosswalk });
     }
   }
   return out;
@@ -591,7 +640,8 @@ export function checkPlayable(spec: ScenarioSpec): { issues: Issue[]; probes: Va
       그건 이 게임이 가르치려는 것의 정반대다.
     */
     let passed: JudgeResult | null = null;
-    for (const driver of EXEMPLARY) {
+    // 코스에 맞는 모범 운전자만 돌린다 (위 EXEMPLARY_STRAIGHT)
+    for (const driver of drive === 'rightTurn' ? EXEMPLARY : EXEMPLARY_STRAIGHT) {
       const r = simulate(toWorld(spec, v.peds), { ...driver, startZ: spawnZ(spec), drive });
       /*
         **제한시간을 넘긴 주행은 통과가 아니다.** 게임은 100초에 시간 초과로 실패시킨다.

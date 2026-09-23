@@ -1232,12 +1232,23 @@ export const ALWAYS_TESTED: readonly ViolationCode[] = ['NO_TURN_SIGNAL', 'NO_SL
  */
 export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
   /*
-    **직진 코스는 우회전 습관을 시험하지 않는다** (scenarios/zoneCourse.ts). 방향지시등 · 대회전 ·
+    **곧게 가는 코스는 우회전 습관을 시험하지 않는다** (scenarios/zoneCourse.ts). 방향지시등 · 대회전 ·
     교차로 서행은 돌 때의 의무라 여기서는 일어날 수 없다 — 적어 두면 그 습관이 보호구역 판 몇 번으로
     '고쳐졌다' 가 된다. 이 코스가 시험하는 것은 보호구역 일시정지 · 적색 직진 · 보행자 양보다.
   */
-  if (spec.drive === 'straight') {
+  if (spec.drive !== undefined && spec.drive !== 'rightTurn') {
     const zone = new Set<ViolationCode>();
+    if (spec.drive === 'zoneOnly') {
+      /*
+        **사거리 없는 보호구역 도로** — 지나는 횡단보도 셋이 전부다. 신호기가 없는 자리가 하나라도
+        있으면 '사람이 없어도 선다' 를, 있는 자리가 하나라도 있으면 '적색은 서서 기다린다' 를 시험한다.
+      */
+      const signalled = Object.keys(spec.zoneSignals ?? {}).length;
+      if (signalled < 3) zone.add('SCHOOL_ZONE_NO_STOP');
+      if (signalled > 0) zone.add('SCHOOL_ZONE_RED');
+      if (spec.pedestrians.length) zone.add('PEDESTRIAN_BLOCKED');
+      return zone;
+    }
     const noSignalCrosswalk = spec.approachSchoolZone?.signal === false || !spec.pedSignalInstalled.A;
     if (noSignalCrosswalk) zone.add('SCHOOL_ZONE_NO_STOP');
     if (spec.approachSchoolZone?.signal === true) zone.add('SCHOOL_ZONE_RED');

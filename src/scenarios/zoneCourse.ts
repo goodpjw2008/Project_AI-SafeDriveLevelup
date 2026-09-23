@@ -40,12 +40,22 @@ export const ZONE_ID_BASE = 2_000_000_000_000;
  */
 export const ZONE_NUMBER_BASE = 50_001;
 
-/** 진입로 보호구역 횡단보도(S)에 신호기가 있는가 */
-const S_SIGNALS = ['noSignal', 'signal'] as const;
-/** 교차로 횡단보도(A·B)에 보행신호기가 있는가 */
-const AB_SIGNALS = ['no', 'yes'] as const;
-/** 교차로에 닿을 때의 정면 차량신호 */
-const STARTS = ['green', 'red'] as const;
+/**
+ * **신호기가 어디에 있는가** — 사거리가 없는 도로라 횡단보도마다 따로 정한다.
+ *
+ * 사용자가 정했다: "중간에 신호등 있는 횡단보도와 신호등 없는 횡단보도가 섞여 나오게." 그래서
+ * 셋 중 **하나만** 있는 경우와 **둘**이 있는 경우를 함께 둔다 — 셋 다 없는 길(가장 흔한 보호구역)도,
+ * 셋 다 있는 길(신호를 계속 보는 길)도 나온다.
+ */
+const SIGNAL_SETS = [
+  [],
+  ['S'],
+  ['A'],
+  ['B'],
+  ['S', 'B'],
+  ['A', 'B'],
+  ['S', 'A', 'B'],
+] as const;
 /**
  * 횡단보도마다 사람이 어떻게 있는가.
  *
@@ -55,197 +65,170 @@ const STARTS = ['green', 'red'] as const;
  *  - `jaywalk` — 보행 적색인데 건넌다 (신호기가 있는 곳에서만 '무단횡단' 이라는 말이 성립한다)
  */
 const PEDS = ['none', 'waiting', 'crossing', 'jaywalk'] as const;
-const A_PEDS = ['none', 'crossing'] as const;
 const KINDS = ['child', 'adult', 'elder'] as const;
 
 export interface ZoneTags {
-  sSignal: (typeof S_SIGNALS)[number];
-  abSignal: (typeof AB_SIGNALS)[number];
-  start: (typeof STARTS)[number];
+  /** 신호기가 있는 횡단보도들 (SIGNAL_SETS 의 몇 번째인가) */
+  signals: number;
   sPed: (typeof PEDS)[number];
-  aPed: (typeof A_PEDS)[number];
+  aPed: (typeof PEDS)[number];
   bPed: (typeof PEDS)[number];
   kind: (typeof KINDS)[number];
 }
+
+/** 이 판에서 그 횡단보도에 신호기가 있는가 */
+export const hasSignal = (t: ZoneTags, at: 'S' | 'A' | 'B'): boolean =>
+  (SIGNAL_SETS[t.signals] as readonly string[]).includes(at);
 
 /**
  * 성립하는 조합인가 — **판의 글이 거짓말이 되는 조합**을 여기서 뺀다 (library.ts 의 combinationAllowed 와 같은 자리).
  */
 export function zoneCombinationAllowed(t: ZoneTags): boolean {
-  // '무단횡단' 은 지킬 신호가 있을 때만 성립한다
-  if (t.sPed === 'jaywalk' && t.sSignal !== 'signal') return false;
-  if (t.bPed === 'jaywalk' && t.abSignal !== 'yes') return false;
+  for (const at of ['S', 'A', 'B'] as const) {
+    const ped = at === 'S' ? t.sPed : at === 'A' ? t.aPed : t.bPed;
+    if (ped === 'none') continue;
+    /*
+      **'무단횡단' 은 지킬 신호가 있을 때만 성립한다.** 신호기가 없는 횡단보도에서는 언제 건너도
+      규정을 어기는 것이 아니다 — 그런 사람을 '무단횡단' 이라 적으면 판의 글이 거짓말이 된다.
+    */
+    if (ped === 'jaywalk' && !hasSignal(t, at)) return false;
+    /*
+      **신호기가 있는 자리에는 무단횡단자만 둔다.**
+
+      보행신호와 차량신호는 번갈아 켜진다 — 신호를 지키는 사람은 **내가 서 있는 동안** 건너고,
+      내 신호가 녹색이 될 즈음에는 이미 다 건넌 뒤다. 보행 녹색이 끝나는 순간에 나서게 해 봐도
+      내 녹색까지 0.1초가 남아, 보행자를 보지 않는 운전자조차 걸리지 않았다 (플레이테스트가 잡았다).
+      **아무 일도 일어나지 않는 판**이므로 조합에서 뺀다 — 신호기 없는 자리에서는 언제든 건너므로 역할이 있다.
+    */
+    if (ped !== 'jaywalk' && hasSignal(t, at)) return false;
+  }
   /*
-    **신호기가 있는 횡단보도에서는 무단횡단자만 나와 마주친다.**
+    **나이는 한 사람이 나오는 판에서만 가른다.**
 
-    직진 코스에서 내가 지나는 횡단보도(A · B)의 보행신호는 **내 정면이 적색일 때만 녹색**이다 —
-    신호를 지키는 사람은 내가 서 있는 동안 건너고, 내가 갈 때는 연석에 서 있다. 그래서 신호기가 있는
-    자리에 '건너는 중' · '건너려고 서 있음' 을 두면 **아무 일도 일어나지 않는 판**이 된다
-    (플레이테스트가 잡았다 — 50106번은 건너편에 어린이를 세워 두고도 그 아이가 끝내 나서지 않았다).
-
-    진입로 보호구역 횡단보도(S)도 같다 — 거기 신호기가 있으면 그 사람의 녹색은 내 적색이다.
-
-    예외는 **교차로 앞 횡단보도(A)에 내 정면이 적색일 때**다. 그때는 내가 정지선에 서 있고 사람은
-    제 녹색에 건넌다 — 신호가 바뀌어도 **다 건널 때까지 기다려야 한다**는 것이 그 판의 배울 거리다.
+    아무도 없으면 나이는 뜻이 없고, 여럿이 나오는 판에서 셋을 다 돌리면 같은 장면이 세 벌씩 생긴다 —
+    판이 세 배가 되고 전수 검증도 세 배 걸린다. 어른 · 노인을 따로 겪는 것은 한 사람 판으로 충분하다.
   */
-  if (t.sPed !== 'none' && t.sPed !== 'jaywalk' && t.sSignal === 'signal') return false;
-  if (t.bPed !== 'none' && t.bPed !== 'jaywalk' && t.abSignal === 'yes') return false;
-  /*
-    **교차로 앞 횡단보도(A)의 사람은 신호기가 없을 때만 둔다.**
-
-    신호기가 있으면 그 사람의 녹색은 **내 적색과 겹친다** — 내가 정지선에 서 있는 동안 건너고,
-    그들의 녹색이 끝나는 25초에 마지막으로 나서도 내 녹색(30초)에는 이미 다 건넌 뒤다. 실제로
-    달려 보니 0.1초 차이로 스쳐, 보행자를 보지 않는 운전자조차 걸리지 않았다 (50125번).
-    **아무 일도 일어나지 않는 판**이므로 조합에서 뺀다 — 신호기 없는 A 에서는 언제든 건너므로 역할이 있다.
-  */
-  if (t.aPed === 'crossing' && t.abSignal === 'yes') return false;
-  // 사람이 아무도 없으면 나이는 아무 뜻이 없다 — 같은 판을 셋으로 늘리지 않는다
-  if (t.sPed === 'none' && t.aPed === 'none' && t.bPed === 'none' && t.kind !== 'child') return false;
+  const people = [t.sPed, t.aPed, t.bPed].filter((x) => x !== 'none').length;
+  if (people !== 1 && t.kind !== 'child') return false;
   return true;
 }
 
 const allCombinations = (): ZoneTags[] => {
   const out: ZoneTags[] = [];
-  for (const sSignal of S_SIGNALS)
-    for (const abSignal of AB_SIGNALS)
-      for (const start of STARTS)
-        for (const sPed of PEDS)
-          for (const aPed of A_PEDS)
-            for (const bPed of PEDS)
-              for (const kind of KINDS) {
-                const t = { sSignal, abSignal, start, sPed, aPed, bPed, kind };
-                if (zoneCombinationAllowed(t)) out.push(t);
-              }
+  for (let signals = 0; signals < SIGNAL_SETS.length; signals++)
+    for (const sPed of PEDS)
+      for (const aPed of PEDS)
+        for (const bPed of PEDS)
+          for (const kind of KINDS) {
+            const t = { signals, sPed, aPed, bPed, kind };
+            if (zoneCombinationAllowed(t)) out.push(t);
+          }
   return out;
 };
 
 export const zoneId = (i: number): number => ZONE_ID_BASE + i;
 
 /**
- * **신호 주기 안에서 어디쯤 출발할까.**
+ * **신호기가 있는 횡단보도의 주기 오프셋** (초).
  *
- * 직진은 적색에 갈 수 없으므로(rules/violations.ts 의 STRAIGHT_RED) 적색 판은 **기다리는 시간**이
- * 곧 판의 길이가 된다. 보호구역 진입로가 174m 라 거기서만 이미 20초가 걸리므로, 적색은
- * **곧 녹색이 되는 자리**에서 만나게 한다 — 100초 제한 안에 들어오고, 기다림도 배움으로 남는다.
+ * 보호구역 주기는 녹18 · 황3 · 적18 이다 (scenarios.ts 의 SCHOOL_ZONE_PROGRAM).
+ *
+ * **적색 구간이 도착 시각의 폭을 덮도록** 맞춘다. 도착이 앞 횡단보도에서 몇 초를 서느냐에 따라 10초 넘게
+ * 흔들리는데, '곧 녹색이 되는 자리' 로만 맞추면 조금만 늦어도 녹색에 닿아 **적색을 한 번도 못 만난다**
+ * (플레이테스트가 잡았다 — 세 번째 신호등 판이 그랬다). 그래서 적색 18초의 **앞쪽**에 닿게 한다:
+ * 첫 번째는 5~23초, 두 번째는 16~34초, 세 번째는 28~46초가 적색이다.
  */
-const PHASE = {
-  /*
-    **'정면 녹색' 판은 녹색이 막 시작한 자리에서 만난다.**
+const ZONE_SIGNAL_OFFSET: Record<'S' | 'A' | 'B', number> = { S: 16, A: 5, B: 32 };
 
-    녹색은 34초뿐인데 보호구역 진입로를 지나 정지선까지 20~25초가 걸리고, 그 사이 보행자를 보내면
-    녹색이 끝난다 — 규정대로 몬 운전자가 **사람을 다 보내고 나서 30초를 더 서 있는** 판이 나왔다
-    (플레이테스트가 잡았다 — 50028번, 한 자리에서 30초 · 전체 80초). 적색에서 시작해 15초쯤 녹색이
-    되게 하면, 내가 닿을 때 갓 켜진 녹색이라 사람을 보내고도 여유가 남는다.
-  */
-  green: { startPhase: 5, startPhaseElapsed: 10 },
-  /*
-    적색 판은 **도착할 즈음 적색이고 곧 녹색이 되는 자리**에서 시작한다. 주기가 64초라 아무 데서나
-    적색을 만나면 30초 가까이 서 있게 되는데, 그러면 배우는 것 없이 기다리기만 하는 판이 된다.
-
-    도착 시각은 진입로 신호기가 있는지에 따라 갈린다 — 있으면 그 신호를 한 번 더 기다리므로 10초쯤 늦다.
-    그래서 **두 자리를 따로 둔다**. 실제로 달려 보고 맞춘 값이다 (자율 주행 전수 측정).
-  */
-  red: { startPhase: 3, startPhaseElapsed: 0 },
-  redAfterZoneSignal: { startPhase: 2, startPhaseElapsed: 4 },
-} as const;
+/**
+ * **사람이 나서는 때** (초).
+ *
+ * 신호기가 없는 자리에서는 일찍부터 뜻을 보이고 거리로 나선다(`startWithin`). 신호기가 있는 자리에는
+ * **무단횡단자만** 서는데(zoneCombinationAllowed), 그 사람은 **내 신호가 녹색이 되기 2~3초 전**에
+ * 나서야 역할이 있다 — 그보다 이르면 내가 서 있는 동안 다 건너고, 제 보행 녹색에 건너면 무단횡단이
+ * 아니게 된다 (플레이테스트가 잡았다 — 50057번은 보행 녹색에 건너 '무단횡단' 이라는 제목과 어긋났다).
+ *
+ * 내 녹색은 위 오프셋에서 나온다 — 첫 번째 23초 · 두 번째 34초 · 세 번째 46초.
+ */
+const PED_AT: Record<'S' | 'A' | 'B', { signal: number; plain: number }> = {
+  S: { signal: 20, plain: 2 },
+  A: { signal: 31, plain: 2 },
+  B: { signal: 43, plain: 2 },
+};
 
 const pedOf = (
-  crosswalk: PedSpawn['crosswalk'],
-  how: (typeof PEDS)[number] | (typeof A_PEDS)[number],
+  crosswalk: 'S' | 'A' | 'B',
+  how: (typeof PEDS)[number],
   kind: ZoneTags['kind'],
-  startWithin: number,
-  /**
-   * **나서는 때**(초). 거리 방아쇠와 함께 걸린다 — 시각이 지나고 거리도 가까워야 나선다.
-   *
-   * 적색 판의 교차로 앞 보행자에게 늦은 시각을 준다. 적색에는 **누구나 정지선에 서 있으므로**,
-   * 그 사이에 다 건너 버리면 그 사람은 아무 역할이 없다 (플레이테스트가 잡았다 — 50060번).
-   * 녹색이 될 즈음 나서면 "신호가 바뀌어도 아직 건너는 사람이 있으면 기다린다" 를 배우게 된다.
-   */
-  at = 2,
+  signalled: boolean,
 ): PedSpawn[] => {
   if (how === 'none') return [];
-  const base = { crosswalk, from: 'right' as const, kind, startWithin, at };
-  /*
-    `at` 은 거리 방아쇠와 **함께** 걸린다 (scenarios.ts 의 PedSpawn) — 시각이 지나고 거리도 가까워야
-    나선다. 여기서는 거리로만 연출하고 싶으므로 시각은 일찍 열어 둔다.
-  */
+  const at = signalled ? PED_AT[crosswalk].signal : PED_AT[crosswalk].plain;
+  const base = { crosswalk, from: 'right' as const, kind, startWithin: 12, at };
   if (how === 'waiting') return [base];
-  if (how === 'crossing') return [{ ...base, startWithin: startWithin + 6 }];
+  if (how === 'crossing') return [{ ...base, startWithin: 18 }];
   // 무단횡단 — 지킬 신호가 있는데 지키지 않는다
   return [{ ...base, obeysSignal: false }];
 };
 
+const WHERE: Record<'S' | 'A' | 'B', string> = { S: '첫 번째', A: '두 번째', B: '세 번째' };
+
 const titleOf = (t: ZoneTags): string => {
-  const where: string[] = [];
-  if (t.sPed !== 'none') where.push('진입로');
-  if (t.aPed !== 'none') where.push('교차로 앞');
-  if (t.bPed !== 'none') where.push('건너편');
+  const sig = SIGNAL_SETS[t.signals];
+  const light = sig.length === 0 ? '신호등 없는 길' : `${sig.map((x) => WHERE[x]).join('·')} 신호등`;
   const who = { child: '어린이', adult: '어른', elder: '노인' }[t.kind];
-  const sig = t.sSignal === 'noSignal' ? '진입로 무신호' : '진입로 신호';
-  const light = t.start === 'red' ? '정면 적색' : '정면 녹색';
-  const people = where.length ? `${where.join('·')} ${who}` : '보행자 없음';
-  return `보호구역 직진 - ${sig} · ${light} - ${people}`;
+  const people = (['S', 'A', 'B'] as const)
+    .filter((at) => (at === 'S' ? t.sPed : at === 'A' ? t.aPed : t.bPed) !== 'none')
+    .map((at) => WHERE[at]);
+  return `어린이보호구역 - ${light} - ${people.length ? `${people.join('·')} 횡단보도 ${who}` : '보행자 없음'}`;
 };
 
-const briefOf = (t: ZoneTags): string =>
-  '어린이보호구역입니다. 우회전하지 않고 곧장 통과하세요. ' +
-  (t.sSignal === 'noSignal'
-    ? '진입로 횡단보도에는 신호기가 없습니다 — 보행자가 없어도 일시정지해야 합니다.'
-    : '진입로 횡단보도의 신호를 확인하세요.') +
-  ' 속도는 ↑ · ↓ 로 직접 고릅니다 (최대 30km/h).';
+const briefOf = (t: ZoneTags): string => {
+  const sig = SIGNAL_SETS[t.signals];
+  return (
+    '어린이보호구역 도로입니다. 교차로 없이 횡단보도 셋을 지납니다. ' +
+    (sig.length === 0
+      ? '세 곳 모두 신호기가 없습니다 — 보행자가 없어도 일시정지해야 합니다.'
+      : `${sig.map((x) => WHERE[x]).join('·')} 횡단보도에만 신호기가 있습니다. 나머지는 신호기가 없어 보행자가 없어도 일시정지해야 합니다.`) +
+    ' 속도는 ↑ · ↓ 로 직접 고릅니다 (최대 30km/h).'
+  );
+};
 
 const teachesOf = (t: ZoneTags): string => {
+  const sig = SIGNAL_SETS[t.signals];
   const lines = [
-    t.sSignal === 'noSignal'
-      ? '신호기 없는 보호구역 횡단보도는 보행자의 통행 여부와 관계없이 일시정지합니다 (제27조 제7항).'
-      : '보호구역 횡단보도의 차량신호가 적색이면 서서 기다립니다 — 서고 나서 가는 것이 아닙니다.',
+    '신호기 없는 보호구역 횡단보도는 보행자의 통행 여부와 관계없이 일시정지합니다 (제27조 제7항).',
   ];
-  if (t.start === 'red') {
-    lines.push('직진은 적색에 통과할 수 없습니다. 우회전과 달리 일시정지 후 통행이 허용되지 않습니다.');
+  if (sig.length) {
+    lines.push('신호기가 있는 횡단보도의 적색은 서서 기다리는 것입니다 — 서고 나서 가는 것이 아닙니다.');
   }
-  if (t.bPed !== 'none') {
-    lines.push('교차로를 지난 뒤의 횡단보도도 같은 보호구역입니다 — 통과했다고 끝이 아닙니다.');
-  }
+  if (t.bPed !== 'none') lines.push('마지막 횡단보도까지가 보호구역입니다 — 다 왔다고 끝이 아닙니다.');
   return lines.join(' ');
 };
 
 /** 태그 하나를 판으로 — 화면 · 판정 · 검증기가 모두 이 스펙 하나를 본다 */
 export function buildZoneSpec(t: ZoneTags, id: number): ScenarioSpec {
+  const sig = SIGNAL_SETS[t.signals];
+  const zoneSignals: Partial<Record<'S' | 'A' | 'B', number>> = {};
+  for (const at of sig) zoneSignals[at] = ZONE_SIGNAL_OFFSET[at];
   return {
     id,
-    drive: 'straight',
+    drive: 'zoneOnly',
     title: titleOf(t),
     brief: briefOf(t),
     teaches: teachesOf(t),
-    ...PHASE[t.start === 'red' ? (t.sSignal === 'signal' ? 'redAfterZoneSignal' : 'red') : 'green'],
-    // C 는 이 코스에서 지나지 않는다 — 값은 두되 판정이 보지 않는다 (drive: 'straight')
-    pedSignalInstalled: { A: t.abSignal === 'yes', C: true },
     /*
-      **신호기가 있는 진입로는 적색으로 맞이한다.**
-
-      `signalElapsed` 가 6 일 때는 도착(9초쯤)에 늘 녹색이라, '보호구역 횡단보도의 적색은 서서 기다리는
-      것' 을 한 번도 못 가르쳤다 (플레이테스트가 잡았다 — 50155번). 주기(녹18 · 황3 · 적18)에서
-      **적색 구간의 4초째**(25 = 18+3+4)에서 시작하면, 도착할 즈음 적색이고 14초쯤 녹색이 된다.
+      교차로가 없으므로 교차로 신호 주기는 쓰이지 않는다 — 값은 두되 판정도 화면도 보지 않는다
+      (rules/lawRules.ts 의 trackZoneRoad · game/Intersection.ts 의 zoneOnly).
     */
-    approachSchoolZone: { signal: t.sSignal === 'signal', signalElapsed: 25 },
+    startPhase: 0,
+    startPhaseElapsed: 0,
+    pedSignalInstalled: { A: false, C: false },
+    zoneSignals,
     pedestrians: [
-      /*
-        **신호기가 있는 진입로의 무단횡단자는 내가 출발할 즈음 나선다.** 적색에 맞이하는 판이라
-        (아래 approachSchoolZone) 내가 서 있는 동안 건너면 아무 역할이 없다 — 녹색이 되는 14초쯤에
-        나서야 "신호가 녹색이어도 사람이 있으면 선다" 를 배운다 (플레이테스트가 잡았다 — 50171번).
-      */
-      ...pedOf('S', t.sPed, t.kind, 12, t.sSignal === 'signal' ? 15 : 2),
-      /*
-        **교차로 앞 횡단보도의 사람은 내 신호가 녹색이 될 즈음 건넌다** (위 pedOf 의 `at`).
-
-        적색에는 누구나 정지선에 서 있으므로, 그 사이에 다 건너면 아무 역할이 없다. 그래서 **내 녹색이
-        켜지기 4초쯤 전**에 나서게 한다 — 늦게 건너는 사람이 실제로 가장 위험한 장면이다.
-
-        내 녹색이 언제 켜지는지는 **진입로 신호기가 있느냐**에 달렸다. 있으면 그 신호를 한 번 더 기다리느라
-        10초쯤 늦게 도착하므로 시작 위상도 그만큼 뒤에 두었다(아래 PHASE) — 녹색이 30초가 아니라 40초에 온다.
-      */
-      ...pedOf('A', t.aPed, t.kind, 12, t.start === 'red' ? (t.sSignal === 'signal' ? 36 : 26) : 2),
-      ...pedOf('B', t.bPed, t.kind, 12),
+      ...pedOf('S', t.sPed, t.kind, hasSignal(t, 'S')),
+      ...pedOf('A', t.aPed, t.kind, hasSignal(t, 'A')),
+      ...pedOf('B', t.bPed, t.kind, hasSignal(t, 'B')),
     ],
     crossTraffic: 0,
     exitBlocked: false,
@@ -290,12 +273,11 @@ export function zoneCourseByNumber(no: number): ScenarioSpec | undefined {
  */
 export function zoneTargets(t: ZoneTags): ViolationCode[] {
   const out = new Set<ViolationCode>();
-  // 신호기 없는 보호구역 횡단보도 — 진입로든 교차로든 (제27조 제7항)
-  if (t.sSignal === 'noSignal' || t.abSignal === 'no') out.add('SCHOOL_ZONE_NO_STOP');
-  // 신호기 있는 진입로 횡단보도의 적색 — 서서 기다려야 한다
-  if (t.sSignal === 'signal') out.add('SCHOOL_ZONE_RED');
-  // 직진은 적색에 갈 수 없다
-  if (t.start === 'red') out.add('STRAIGHT_RED');
+  const sig = SIGNAL_SETS[t.signals];
+  // 신호기 없는 횡단보도가 하나라도 있으면 '사람이 없어도 선다' 를 시험한다 (제27조 제7항)
+  if (sig.length < 3) out.add('SCHOOL_ZONE_NO_STOP');
+  // 신호기가 있으면 그 적색은 서서 기다리는 것이다
+  if (sig.length > 0) out.add('SCHOOL_ZONE_RED');
   if (t.sPed !== 'none' || t.aPed !== 'none' || t.bPed !== 'none') out.add('PEDESTRIAN_BLOCKED');
   return [...out];
 }
@@ -305,9 +287,10 @@ export function zoneTargets(t: ZoneTags): ViolationCode[] {
  */
 function zoneCost(t: ZoneTags): number {
   let n = 0;
-  if (t.sSignal === 'noSignal') n += 1; // 사람이 없어도 서야 하는 자리
-  if (t.abSignal === 'no') n += 1;
-  if (t.start === 'red') n += 1;
+  // 신호기가 없는 자리마다 '사람이 없어도 선다' 를 스스로 판단해야 한다
+  n += 3 - SIGNAL_SETS[t.signals].length;
+  // 신호기가 있는 자리는 적색을 만날 수 있다
+  n += SIGNAL_SETS[t.signals].length > 0 ? 1 : 0;
   for (const p of [t.sPed, t.aPed, t.bPed]) {
     if (p === 'none') continue;
     n += p === 'jaywalk' ? 2 : 1; // 무단횡단은 신호만 보고 가면 걸린다
@@ -323,9 +306,9 @@ function zoneCost(t: ZoneTags): number {
  * ## 태그는 '비슷한 자리' 로 옮겨 적는다
  *
  * 태그 어휘는 우회전 코스에서 자란 것이라 이 코스의 모든 것을 담지 못한다. 그래서 **뜻이 가장 가까운
- * 자리**에 넣는다 — `a` 는 내가 **처음 만나는 횡단보도**(여기서는 진입로 S), `c` 는 **마지막 횡단보도**
- * (여기서는 교차로 건너편 B). 교차로 앞 횡단보도(A)의 보행자는 태그에 자리가 없다 — 이 값들은 추천이
- * "비슷한 판이 이어지지 않게" 고르는 데만 쓰이므로, 하나가 빠져도 판 자체는 정확하다.
+ * 자리**에 넣는다 — `a` 는 내가 **처음 만나는 횡단보도**, `c` 는 **마지막 횡단보도**. 가운데 횡단보도의
+ * 보행자는 태그에 자리가 없다 — 이 값들은 추천이 "비슷한 판이 이어지지 않게" 고르는 데만 쓰이므로,
+ * 하나가 빠져도 판 자체는 정확하다.
  */
 export function zoneEntries(): LibraryEntry[] {
   return (entries ??= (() => {
@@ -333,14 +316,15 @@ export function zoneEntries(): LibraryEntry[] {
     const built = tags.map((t, i) => {
       const spec = zoneCourses()[i];
       const libTags: LibraryTags = {
-        signal: t.start === 'red' ? 'red' : 'green',
+        // 교차로가 없는 길이라 '정면 신호' 도 없다 — 추천이 모양을 가르는 데만 쓰는 값이다
+        signal: 'green',
         zone: 'yes',
-        sigA: t.abSignal,
-        sigC: t.abSignal,
+        sigA: hasSignal(t, 'A') ? 'yes' : 'no',
+        sigC: hasSignal(t, 'B') ? 'yes' : 'no',
         a: t.sPed === 'jaywalk' ? 'jaywalk' : t.sPed,
         c: t.bPed === 'jaywalk' ? 'jaywalk' : t.bPed,
         kind: t.kind,
-        approach: t.sSignal === 'signal' ? 'signal' : 'noSignal',
+        approach: hasSignal(t, 'S') ? 'signal' : 'noSignal',
         lead: 'none',
         pressure: 'calm',
         env: 'day',
@@ -374,15 +358,18 @@ export function zoneEntry(id: number): LibraryEntry | undefined {
 /**
  * **오프라인 교육 시범에 넣을 보호구역 직진 코스 셋.**
  *
- * 우회전 시범(library.ts 의 demoCourses)에 없는 세 장면을 맡는다 — **사람이 없어도 서는 무신호
- * 횡단보도**, **적색에는 직진이 아예 안 된다**(우회전과 정반대다), **교차로를 지난 뒤의 횡단보도도
- * 보호구역이다**. 합치는 일은 부르는 쪽이 한다 (main.ts) — 라이브러리와 서로를 부르지 않게.
+ * 우회전 시범(library.ts 의 demoCourses)에 없는 세 장면을 맡는다 — **신호등이 하나도 없는 보호구역 길**,
+ * **한 곳에만 신호등이 있는 길**(적색은 서서 기다린다), **세 곳을 지나며 사람을 만나는 길**.
+ * 합치는 일은 부르는 쪽이 한다 (main.ts) — 라이브러리와 서로를 부르지 않게.
  */
 export function zoneDemoCourses(): LibraryEntry[] {
   const want: Partial<ZoneTags>[] = [
-    { sSignal: 'noSignal', start: 'green', sPed: 'none', aPed: 'none', bPed: 'none' },
-    { sSignal: 'noSignal', start: 'red', sPed: 'none', aPed: 'none', bPed: 'none' },
-    { sSignal: 'noSignal', start: 'green', sPed: 'waiting', aPed: 'none', bPed: 'crossing', kind: 'child' },
+    // 신호등이 하나도 없는 길 — 사람이 없어도 세 곳 모두에서 선다
+    { signals: 0, sPed: 'none', aPed: 'none', bPed: 'none' },
+    // 가운데만 신호등 — 적색은 서서 기다리고, 나머지 둘은 신호가 없어 스스로 선다
+    { signals: 2, sPed: 'none', aPed: 'none', bPed: 'none' },
+    // 사람이 있는 길 — 첫 곳에 기다리는 아이, 마지막 곳에 건너는 아이
+    { signals: 0, sPed: 'waiting', aPed: 'none', bPed: 'crossing', kind: 'child' },
   ];
   const tags = allCombinations();
   const entries = zoneEntries();

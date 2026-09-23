@@ -84,15 +84,16 @@ describe('추천이 갈래를 지킨다', () => {
   });
 
   /*
-    **보호구역 전용은 다른 판 묶음에서 고른다** (scenarios/zoneCourse.ts) — 우회전이 없는 직진 코스다.
-    기존 라이브러리에는 그런 판이 하나도 없으므로, 거르는 것이 아니라 묶음을 갈아 끼운다.
+    **보호구역 전용은 다른 판 묶음에서 고른다** (scenarios/zoneCourse.ts) — **사거리가 없는** 전용 도로다
+    (사용자가 정했다: "어린이 보호구역 연습은 사거리가 나오지 말아야 해"). 기존 라이브러리에는 그런 판이
+    하나도 없으므로, 거르는 것이 아니라 묶음을 갈아 끼운다.
   */
-  it('어린이보호구역 전용은 직진 코스만 준다', () => {
+  it('어린이보호구역 전용은 사거리 없는 도로만 준다', () => {
     for (const level of [1, 5, 10] as const) {
       const cands = candidatesFor(plan({ level, track: 'zone' }), []);
       expect(cands.length, `L${level} 후보`).toBeGreaterThan(5);
       for (const e of cands) {
-        expect(e.spec.drive).toBe('straight');
+        expect(e.spec.drive).toBe('zoneOnly');
         expect(e.spec.isSchoolZone).toBe(true);
       }
     }

@@ -120,10 +120,23 @@ function drawAsphalt(ctx: CanvasRenderingContext2D): void {
   ctx.putImageData(img, 0, 0);
 }
 
-/** 도로 밖 구역(보도 안쪽 바닥)을 어둡게 깔아 도로 경계를 만든다 */
-function drawOffRoad(ctx: CanvasRenderingContext2D): void {
+/**
+ * 도로 밖 구역(보도 안쪽 바닥)을 어둡게 깔아 도로 경계를 만든다.
+ *
+ * **사거리가 없는 보호구역 도로**(zoneOnly)에서는 동서 도로가 아예 없으므로, 남북 도로 양옆을
+ * 위에서 아래까지 통째로 덮는다 — 네 모서리로 나눠 덮으면 교차로 자리가 아스팔트로 남아 사거리처럼 보인다.
+ */
+function drawOffRoad(ctx: CanvasRenderingContext2D, zoneOnly: boolean): void {
   ctx.save();
   ctx.fillStyle = '#5d5d61';
+  if (zoneOnly) {
+    const w = EXT.xHalf - ROAD_HALF_WIDTH;
+    const h = EXT.zMax - EXT.zMin;
+    ctx.fillRect(cx(-EXT.xHalf), cy(EXT.zMax), toPx(w), toPx(h));
+    ctx.fillRect(cx(ROAD_HALF_WIDTH), cy(EXT.zMax), toPx(w), toPx(h));
+    ctx.restore();
+    return;
+  }
   /*
     네 모서리(도로가 아닌 구역). 텍스처가 정사각형이 아니라 **모서리마다 크기가 다르다** —
     남쪽은 출발 지점까지 길고 북쪽은 배경으로 보이는 만큼뿐이다.
@@ -143,33 +156,43 @@ function drawOffRoad(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 }
 
-function drawLaneMarkings(ctx: CanvasRenderingContext2D, schoolZone: boolean): void {
+function drawLaneMarkings(ctx: CanvasRenderingContext2D, schoolZone: boolean, zoneOnly = false): void {
   ctx.save();
+
+  /*
+    **사거리가 없으면 선이 끊기지 않는다.** 교차로 맵은 교차로 박스에서 모든 선을 끊는데,
+    그 끊김 자체가 "여기 교차로가 있다" 는 표시다 — 곧게 이어 그려야 한 줄기 도로로 보인다.
+  */
+  const zRanges: number[][] = zoneOnly
+    ? [[EXT.zMin, EXT.zMax]]
+    : [
+        [EXT.zMin, -ROAD_HALF_WIDTH],
+        [ROAD_HALF_WIDTH, EXT.zMax],
+      ];
 
   // 중앙선 (황색 실선 2줄) — 남북 도로
   ctx.strokeStyle = '#f0c419';
   ctx.lineWidth = toPx(0.15);
   for (const off of [-0.12, 0.12]) {
-    for (const [z0, z1] of [
-      [EXT.zMin, -ROAD_HALF_WIDTH],
-      [ROAD_HALF_WIDTH, EXT.zMax],
-    ]) {
+    for (const [z0, z1] of zRanges) {
       ctx.beginPath();
       ctx.moveTo(cx(off), cy(z0));
       ctx.lineTo(cx(off), cy(z1));
       ctx.stroke();
     }
   }
-  // 중앙선 — 동서 도로
-  for (const off of [-0.12, 0.12]) {
-    for (const [x0, x1] of [
-      [-EXT.xHalf, -ROAD_HALF_WIDTH],
-      [ROAD_HALF_WIDTH, EXT.xHalf],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(cx(x0), cy(off));
-      ctx.lineTo(cx(x1), cy(off));
-      ctx.stroke();
+  // 중앙선 — 동서 도로 (사거리가 없으면 그리지 않는다)
+  if (!zoneOnly) {
+    for (const off of [-0.12, 0.12]) {
+      for (const [x0, x1] of [
+        [-EXT.xHalf, -ROAD_HALF_WIDTH],
+        [ROAD_HALF_WIDTH, EXT.xHalf],
+      ]) {
+        ctx.beginPath();
+        ctx.moveTo(cx(x0), cy(off));
+        ctx.lineTo(cx(x1), cy(off));
+        ctx.stroke();
+      }
     }
   }
 
@@ -180,31 +203,35 @@ function drawLaneMarkings(ctx: CanvasRenderingContext2D, schoolZone: boolean): v
   for (const off of [-LANE_WIDTH, LANE_WIDTH]) {
     // 노면 문자는 차도 폭을 가로로 채우므로 그 구간에서는 북행 차로 구분선을 끊는다.
     // 점선이 글자 한가운데를 세로로 관통하면 글자가 갈라져 읽히지 않는다.
-    const zRanges =
+    const dashRanges =
       schoolZone && off > 0
-        ? [
-            [EXT.zMin, -ROAD_HALF_WIDTH],
-            [ROAD_HALF_WIDTH, SCHOOL_MARK_Z[0]],
-            [SCHOOL_MARK_Z[1], EXT.zMax],
-          ]
-        : [
-            [EXT.zMin, -ROAD_HALF_WIDTH],
-            [ROAD_HALF_WIDTH, EXT.zMax],
-          ];
-    for (const [z0, z1] of zRanges) {
+        ? zoneOnly
+          ? [
+              [EXT.zMin, SCHOOL_MARK_Z[0]],
+              [SCHOOL_MARK_Z[1], EXT.zMax],
+            ]
+          : [
+              [EXT.zMin, -ROAD_HALF_WIDTH],
+              [ROAD_HALF_WIDTH, SCHOOL_MARK_Z[0]],
+              [SCHOOL_MARK_Z[1], EXT.zMax],
+            ]
+        : zRanges;
+    for (const [z0, z1] of dashRanges) {
       ctx.beginPath();
       ctx.moveTo(cx(off), cy(z0));
       ctx.lineTo(cx(off), cy(z1));
       ctx.stroke();
     }
-    for (const [x0, x1] of [
-      [-EXT.xHalf, -ROAD_HALF_WIDTH],
-      [ROAD_HALF_WIDTH, EXT.xHalf],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(cx(x0), cy(off));
-      ctx.lineTo(cx(x1), cy(off));
-      ctx.stroke();
+    if (!zoneOnly) {
+      for (const [x0, x1] of [
+        [-EXT.xHalf, -ROAD_HALF_WIDTH],
+        [ROAD_HALF_WIDTH, EXT.xHalf],
+      ]) {
+        ctx.beginPath();
+        ctx.moveTo(cx(x0), cy(off));
+        ctx.lineTo(cx(x1), cy(off));
+        ctx.stroke();
+      }
     }
   }
   ctx.setLineDash([]);
@@ -214,23 +241,22 @@ function drawLaneMarkings(ctx: CanvasRenderingContext2D, schoolZone: boolean): v
   ctx.lineWidth = toPx(0.12);
   const edge = ROAD_HALF_WIDTH - 0.25;
   for (const off of [-edge, edge]) {
-    for (const [z0, z1] of [
-      [EXT.zMin, -ROAD_HALF_WIDTH],
-      [ROAD_HALF_WIDTH, EXT.zMax],
-    ]) {
+    for (const [z0, z1] of zRanges) {
       ctx.beginPath();
       ctx.moveTo(cx(off), cy(z0));
       ctx.lineTo(cx(off), cy(z1));
       ctx.stroke();
     }
-    for (const [x0, x1] of [
-      [-EXT.xHalf, -ROAD_HALF_WIDTH],
-      [ROAD_HALF_WIDTH, EXT.xHalf],
-    ]) {
-      ctx.beginPath();
-      ctx.moveTo(cx(x0), cy(off));
-      ctx.lineTo(cx(x1), cy(off));
-      ctx.stroke();
+    if (!zoneOnly) {
+      for (const [x0, x1] of [
+        [-EXT.xHalf, -ROAD_HALF_WIDTH],
+        [ROAD_HALF_WIDTH, EXT.xHalf],
+      ]) {
+        ctx.beginPath();
+        ctx.moveTo(cx(x0), cy(off));
+        ctx.lineTo(cx(x1), cy(off));
+        ctx.stroke();
+      }
     }
   }
   ctx.restore();
@@ -240,7 +266,7 @@ function drawLaneMarkings(ctx: CanvasRenderingContext2D, schoolZone: boolean): v
  * 횡단보도 4개. 실제 규격에 맞춰 폭 4m, 흰 띠 45cm, 간격 45cm로 그린다.
  * 띠는 도로를 가로지르는 방향으로 늘어선다.
  */
-function drawCrosswalks(ctx: CanvasRenderingContext2D): void {
+function drawCrosswalks(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   ctx.save();
   ctx.fillStyle = '#f2f2f2';
   const stripe = 0.45;
@@ -253,21 +279,34 @@ function drawCrosswalks(ctx: CanvasRenderingContext2D): void {
       ctx.fillRect(cx(x), cy(z0), toPx(stripe), toPx(CROSSWALK_OUTER - CROSSWALK_INNER));
     }
   }
-  // 동·서 (동서 도로를 가로지름 — 띠가 x 방향으로 길다)
-  for (const sign of [1, -1]) {
-    const x0 = sign > 0 ? CROSSWALK_INNER : -CROSSWALK_OUTER;
-    for (let z = -ROAD_HALF_WIDTH + 0.3; z < ROAD_HALF_WIDTH - 0.3; z += stripe + gap) {
-      ctx.fillRect(cx(x0), cy(z), toPx(CROSSWALK_OUTER - CROSSWALK_INNER), toPx(stripe));
+  // 동·서 (동서 도로를 가로지름 — 띠가 x 방향으로 길다). 사거리가 없으면 그 도로 자체가 없다
+  if (!zoneOnly) {
+    for (const sign of [1, -1]) {
+      const x0 = sign > 0 ? CROSSWALK_INNER : -CROSSWALK_OUTER;
+      for (let z = -ROAD_HALF_WIDTH + 0.3; z < ROAD_HALF_WIDTH - 0.3; z += stripe + gap) {
+        ctx.fillRect(cx(x0), cy(z), toPx(CROSSWALK_OUTER - CROSSWALK_INNER), toPx(stripe));
+      }
     }
   }
   ctx.restore();
 }
 
 /** 정지선 — 진행 방향 차로 쪽에만 그린다 (폭 40cm) */
-function drawStopLines(ctx: CanvasRenderingContext2D): void {
+function drawStopLines(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   ctx.save();
   ctx.fillStyle = '#fbfbfb';
   const w = 0.6;
+
+  /*
+    **사거리가 없는 보호구역 도로**는 횡단보도 앞마다 정지선을 그린다 (두 번째 · 세 번째).
+    첫 번째(진입로)의 정지선은 drawApproachZone 이 이미 그린다. 교차로 쪽 접근선(동·서·북)은 없다.
+  */
+  if (zoneOnly) {
+    ctx.fillRect(cx(0.15), cy(STOP_LINE), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
+    ctx.fillRect(cx(0.15), cy(-CROSSWALK_INNER + 2), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
+    ctx.restore();
+    return;
+  }
 
   // 남쪽 접근(북행 차로: x ∈ [0, ROAD_HALF])
   ctx.fillRect(cx(0.15), cy(STOP_LINE), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
@@ -324,7 +363,9 @@ function drawRoadTextRow(
 }
 
 /** 노면 화살표 — 플레이어 진입 차로(북행 2차로)에 우회전 표시 */
-function drawRoadArrows(ctx: CanvasRenderingContext2D, schoolZone: boolean): void {
+function drawRoadArrows(ctx: CanvasRenderingContext2D, schoolZone: boolean, zoneOnly = false): void {
+  // 사거리가 없으면 돌 곳이 없다 — 우회전 화살표를 그리면 없는 길을 가리킨다
+  if (zoneOnly) return;
   ctx.save();
   ctx.fillStyle = '#ededed';
 
@@ -496,16 +537,16 @@ function drawSchoolZoneMarks(ctx: CanvasRenderingContext2D): void {
   drawSpeedLimitMark(ctx, 30, MID_X, 42.5, 3.0);
 }
 
-function makeRoadTexture(schoolZone: boolean, approachZone: boolean): THREE.CanvasTexture {
+function makeRoadTexture(schoolZone: boolean, approachZone: boolean, zoneOnly = false): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = TEX_W;
   canvas.height = TEX_H;
   const ctx = canvas.getContext('2d')!;
 
   drawAsphalt(ctx);
-  drawOffRoad(ctx);
+  drawOffRoad(ctx, zoneOnly);
   if (schoolZone || approachZone) drawSchoolZonePavement(ctx, schoolZone, approachZone);
-  drawLaneMarkings(ctx, schoolZone);
+  drawLaneMarkings(ctx, schoolZone, zoneOnly);
   if (schoolZone) drawSchoolZoneMarks(ctx);
   /*
     진입부 구간의 노면 문자·정지선·횡단보도. **구간에 들어서자마자 읽히도록** 문자를
@@ -513,9 +554,9 @@ function makeRoadTexture(schoolZone: boolean, approachZone: boolean): THREE.Canv
     한다. 교차로 쪽 문자(z 32~43)는 이미 그 안쪽에 있다.
   */
   if (approachZone) drawApproachZone(ctx);
-  drawRoadArrows(ctx, schoolZone);
-  drawCrosswalks(ctx);
-  drawStopLines(ctx);
+  drawRoadArrows(ctx, schoolZone, zoneOnly);
+  drawCrosswalks(ctx, zoneOnly);
+  drawStopLines(ctx, zoneOnly);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.anisotropy = 8;
@@ -560,6 +601,13 @@ function makeBuildingTexture(night: boolean): THREE.CanvasTexture {
 
 export interface IntersectionOptions {
   schoolZone: boolean;
+  /**
+   * **사거리가 없는 어린이보호구역 도로인가** (scenarios.ts 의 drive: 'zoneOnly').
+   *
+   * 남북 도로만 곧게 뻗고 횡단보도 셋이 있다 — 교차로 박스 · 동서 도로 · 우회전 화살표가 없다
+   * (사용자가 정했다: "어린이 보호구역 연습은 사거리가 나오지 말아야 해").
+   */
+  zoneOnly?: boolean;
   /** 교차로에 닿기 전 지나는 어린이보호구역 구간이 있는가 */
   approachZone?: boolean;
   night: boolean;
@@ -575,8 +623,8 @@ export class Intersection {
       있는 판은 출발 지점이 112m 라 훨씬 넓게 덮어야 하고, 없는 판은 좁게 덮어 또렷하게 둔다.
     */
     setRoadExtent(opts.approachZone ?? false);
-    this.buildRoad(opts.schoolZone, opts.approachZone ?? false);
-    this.buildSidewalks();
+    this.buildRoad(opts.schoolZone, opts.approachZone ?? false, opts.zoneOnly ?? false);
+    this.buildSidewalks(opts.zoneOnly ?? false);
     this.buildBuildings(opts.night);
     this.buildStreetFurniture();
   }
@@ -586,8 +634,8 @@ export class Intersection {
     return o;
   }
 
-  private buildRoad(schoolZone: boolean, approachZone: boolean): void {
-    const tex = this.track(makeRoadTexture(schoolZone, approachZone));
+  private buildRoad(schoolZone: boolean, approachZone: boolean, zoneOnly: boolean): void {
+    const tex = this.track(makeRoadTexture(schoolZone, approachZone, zoneOnly));
     /*
       **판이 정사각형이 아니다.** 텍스처가 덮는 세계 범위를 그대로 따른다 —
       남쪽(플레이어가 오는 쪽)이 길고 북쪽은 배경으로 보이는 만큼뿐이다.
@@ -622,7 +670,7 @@ export class Intersection {
   }
 
   /** 보도 — 도로 가장자리보다 15cm 높은 연석 */
-  private buildSidewalks(): void {
+  private buildSidewalks(zoneOnly = false): void {
     const H = 0.15;
     const geo = this.track(new THREE.BoxGeometry(1, 1, 1));
     const mat = this.track(new THREE.MeshStandardMaterial({ color: 0xa9a9a4, roughness: 0.85 }));
@@ -655,6 +703,19 @@ export class Intersection {
       mesh.receiveShadow = true;
       this.group.add(mesh);
     };
+
+    /*
+      **사거리가 없으면 보도도 곧게 이어진다.** 네 모서리 블록과 동서 도로를 따라가는 팔은
+      교차로가 있어야 뜻이 있는 모양이다 — 없는 길에 두면 보도가 허공에서 꺾인다.
+    */
+    if (zoneOnly) {
+      for (const sx of [1, -1]) {
+        const len = EXT.zMax - EXT.zMin;
+        place(width, len, sx * (ROAD_HALF_WIDTH + width / 2), (EXT.zMax + EXT.zMin) / 2, mat);
+        place(0.25, len, sx * (ROAD_HALF_WIDTH + 0.12), (EXT.zMax + EXT.zMin) / 2, curbMat, H + 0.02);
+      }
+      return;
+    }
 
     for (const sx of [1, -1]) {
       for (const sz of [1, -1]) {

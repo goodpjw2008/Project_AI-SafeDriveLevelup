@@ -303,6 +303,13 @@ export interface ScenarioSpec {
    * 횡단보도 C)를 묻지 않고, 대신 교차로 건너편 횡단보도(B)를 본다.
    */
   drive?: DriveMode;
+  /**
+   * **사거리 없는 보호구역 도로**(drive: 'zoneOnly')에서 **신호기가 있는 횡단보도**와 그 주기 오프셋(초).
+   *
+   * 적지 않은 횡단보도는 **신호기가 없다** — 보행자가 없어도 일시정지해야 하는 자리다(제27조 제7항).
+   * 한 도로에 있는 곳과 없는 곳이 섞이는 것이 이 코스의 핵심이라, 자리마다 따로 적는다.
+   */
+  zoneSignals?: Partial<Record<'S' | 'A' | 'B', number>>;
   /** 플레이 전 안내 */
   brief: string;
   /** 이 시나리오가 가르치는 것 */
@@ -1121,8 +1128,8 @@ export function randomizeScenario(base: ScenarioSpec): ScenarioSpec {
  * 그 어긋남은 아무도 눈치채지 못한다.
  */
 export const spawnZ = (spec: Pick<ScenarioSpec, 'approachSchoolZone' | 'drive'>): number =>
-  // 직진 코스는 구간을 끝까지 통과하므로 더 가까이에서 출발한다 (layout.ts 의 SPAWN_Z_STRAIGHT)
-  spec.drive === 'straight'
+  // 곧게 가는 코스는 구간을 끝까지 통과하므로 더 가까이에서 출발한다 (layout.ts 의 SPAWN_Z_STRAIGHT)
+  spec.drive === 'straight' || spec.drive === 'zoneOnly'
     ? SPAWN_Z_STRAIGHT
     : spec.approachSchoolZone
       ? SPAWN_Z_SCHOOL_ZONE

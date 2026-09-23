@@ -55,12 +55,15 @@ export type CrosswalkId = 'A' | 'B' | 'C' | 'S';
  * **이 판을 어떻게 빠져나가는가.**
  *
  *  - `rightTurn` — 교차로에서 우회전 (지금까지의 모든 판)
- *  - `straight` — 교차로를 직진으로 통과 (어린이보호구역 연습편)
+ *  - `straight` — 교차로를 직진으로 통과
+ *  - `zoneOnly` — **사거리가 없는 어린이보호구역 전용 도로**를 곧장 지난다 (사용자가 정했다:
+ *    "어린이 보호구역 연습은 사거리가 나오지 말아야 해"). 교차로가 없으므로 교차로 규칙을 하나도
+ *    묻지 않고, 지나는 횡단보도 셋을 **모두 보호구역 횡단보도로** 본다
  *
  * 판정이 달라지는 것은 **우회전에만 있는 의무**들이다: 우측 가장자리 통행(대회전), 방향지시등,
  * 우회전 후 횡단보도(C). 직진에서는 그 셋을 묻지 않고 대신 건너편 횡단보도(B)를 본다.
  */
-export type DriveMode = 'rightTurn' | 'straight';
+export type DriveMode = 'rightTurn' | 'straight' | 'zoneOnly';
 
 /**
  * 교차로에 딸린 횡단보도만 — 신호가 교차로의 한 주기(STANDARD_PROGRAM)를 따른다.
@@ -134,6 +137,14 @@ export interface WorldSample {
     /** 차량신호등. 신호기 없는 횡단보도면 `null` — 그때가 제27조 제7항의 자리다 */
     light: LightColor | null;
   } | null;
+  /**
+   * **사거리 없는 보호구역 전용 도로**에서, 지나는 횡단보도마다의 차량신호 (`zoneOnly` 코스).
+   *
+   * 값이 없는 자리는 **신호기가 없는 횡단보도**다 — 보행자가 없어도 일시정지해야 하는 자리
+   * (제27조 제7항). 한 도로에 신호기가 있는 곳과 없는 곳이 섞이는 것이 이 코스의 핵심이라,
+   * 교차로 주기 하나로 묶지 않고 **횡단보도마다** 따로 받는다.
+   */
+  zoneLights?: Partial<Record<CrosswalkId, LightColor>>;
   pedestrians: PedestrianSample[];
   /** 교차로 진출로가 정체되어 교차로 안에 갇힐 상황인가 (꼬리물기 판정) */
   exitBlocked: boolean;
@@ -357,6 +368,30 @@ function placeLabel(s: WorldSample): string {
   return '우회전 진출로';
 }
 
+/**
+ * **사거리 없는 보호구역 도로의 횡단보도 셋** (drive: 'zoneOnly') — 만나는 차례대로.
+ *
+ * 자리는 교차로 맵과 **같은 좌표**를 쓴다 (진입로 70 · 가운데 16.8 · 끝 -16.8). 좌표를 새로 잡지 않는
+ * 이유는 보행자 · 차 · 검증기가 모두 이 값으로 움직이기 때문이다 — 길만 바뀌고 자리는 그대로다.
+ *
+ *  - `near` — 내가 **먼저 닿는** 가장자리 (z 가 줄어드는 방향으로 달린다)
+ *  - `far` — 다 지난 가장자리
+ *  - `stopLine` — 그 앞 정지선 (횡단보도에서 2m 앞)
+ */
+/** 이 코스가 지나는 횡단보도 — C(우회전 후)는 사거리가 없으니 없다 */
+type ZoneRoadCrosswalk = 'S' | 'A' | 'B';
+const ZONE_ROAD_ORDER: readonly ZoneRoadCrosswalk[] = ['S', 'A', 'B'];
+const ZONE_ROAD_EDGES: Record<ZoneRoadCrosswalk, { near: number; far: number; stopLine: number }> = {
+  S: { near: CROSSWALK_S_OUTER, far: CROSSWALK_S_INNER, stopLine: STOP_LINE_S },
+  A: { near: CROSSWALK_OUTER, far: CROSSWALK_INNER, stopLine: STOP_LINE },
+  B: { near: CROSSWALK_B_INNER, far: CROSSWALK_B_OUTER, stopLine: CROSSWALK_B_INNER + 2 },
+};
+const ZONE_ROAD_NAME: Record<ZoneRoadCrosswalk, string> = {
+  S: '첫 번째 횡단보도',
+  A: '두 번째 횡단보도',
+  B: '세 번째 횡단보도',
+};
+
 /** 주행 기록에 쓰는 사람이 읽는 표기 */
 const LIGHT_TEXT: Record<LightColor, string> = {
   green: '녹색',
@@ -420,6 +455,10 @@ export class RightTurnJudge {
   private stopBeforeB = false;
   private enteredCrosswalkB = false;
 
+  /** 사거리 없는 보호구역 도로의 횡단보도별 상태 (drive: 'zoneOnly') */
+  private zoneStopped: Record<CrosswalkId, boolean> = { S: false, A: false, B: false, C: false };
+  private zoneEntered: Record<CrosswalkId, boolean> = { S: false, A: false, B: false, C: false };
+
   private cleanStopBeforeA = false;
   private lateStopBeforeA = false;
   private stopBeforeC = false;
@@ -474,6 +513,17 @@ export class RightTurnJudge {
       }
     }
 
+    /*
+      **사거리가 없는 보호구역 도로는 교차로 규칙을 하나도 묻지 않는다** (drive: 'zoneOnly').
+      정지선 · 교차로 진입 · 우회전 후 횡단보도 같은 것이 아예 없는 길이라, 그 추적을 돌리면
+      있지도 않은 자리에서 판정이 난다. 지나는 횡단보도 셋만 본다.
+    */
+    if (this.drive === 'zoneOnly') {
+      this.updateStopTimer(s, dt);
+      this.trackZoneRoad(s, dt);
+      return;
+    }
+
     this.trackStopTimer(s, dt);
     this.trackSchoolZoneCrossing(s, dt);
     this.trackTurnSignal(s);
@@ -497,7 +547,7 @@ export class RightTurnJudge {
   /** 코스를 완주했을 때 호출 — 우회전으로 빠져나갔거나, 직진으로 보호구역을 통과했거나 */
   markCompleted(): void {
     if (!this.completed) {
-      this.note(this.elapsed, 'ok', this.drive === 'straight' ? '보호구역 통과 완료' : '우회전 완료');
+      this.note(this.elapsed, 'ok', this.drive === 'rightTurn' ? '우회전 완료' : '보호구역 통과 완료');
     }
     this.completed = true;
   }
@@ -628,6 +678,12 @@ export class RightTurnJudge {
   }
 
   // ── 세부 추적 ────────────────────────────────────────────────────────────
+
+  /** 완전히 선 시간을 센다 — 두 코스가 함께 쓴다 (교차로 코스의 trackStopTimer · 보호구역 도로의 trackZoneRoad) */
+  private updateStopTimer(s: WorldSample, dt: number): void {
+    if (s.speedKmh > STOP_SPEED_KMH) this.stopTimer = 0;
+    else this.stopTimer += dt;
+  }
 
   private trackStopTimer(s: WorldSample, dt: number): void {
     if (s.speedKmh > STOP_SPEED_KMH) {
@@ -892,6 +948,75 @@ export class RightTurnJudge {
 
     // 제27조 제1항 — 보행자 방해는 신호기 유무와 상관없이 걸린다
     this.trackPedestrianConflict(s, dt, 'S', withinBand);
+  }
+
+  /**
+   * **사거리 없는 어린이보호구역 도로** (drive: 'zoneOnly').
+   *
+   * 지나는 횡단보도 셋(진입로 S · 중간 A · 끝 B)을 **모두 보호구역 횡단보도로** 본다 —
+   * 신호기가 없으면 보행자가 없어도 일시정지(제27조 제7항), 있으면 적색에 서서 기다린다.
+   * 교차로가 없으므로 정지선 · 진입 · 우회전 관련 판정은 하나도 하지 않는다.
+   *
+   * 한 도로에 신호기가 **있는 곳과 없는 곳이 섞인다** — 그 둘을 갈라 판단하는 것이 이 코스가
+   * 가르치려는 것이다 (사용자가 정했다).
+   */
+  private trackZoneRoad(s: WorldSample, dt: number): void {
+    for (const id of ZONE_ROAD_ORDER) {
+      const { near, far, stopLine } = ZONE_ROAD_EDGES[id];
+      /*
+        **그 횡단보도 앞에서 완전히 섰는가.** 정지선 앞 정지 구역 안이어야 하고(난이도가 정한
+        stopZoneDepth), **앞차 뒤에 줄 서서 선 것은 치지 않는다** — 교차로 정지선과 같은 규칙이다.
+      */
+      if (
+        !this.zoneEntered[id] &&
+        !s.queuedBehind &&
+        this.stopTimer >= STOP_HOLD_SECONDS &&
+        s.frontZ >= near &&
+        s.frontZ <= stopLine + this.stopZoneDepth
+      ) {
+        if (!this.zoneStopped[id]) {
+          this.note(s.t, 'ok', `${ZONE_ROAD_NAME[id]} 앞 일시정지 인정 — 횡단보도까지 ${(s.frontZ - near).toFixed(2)}m`);
+        }
+        this.zoneStopped[id] = true;
+      }
+
+      if (!this.zoneEntered[id] && s.frontZ <= near) {
+        this.zoneEntered[id] = true;
+        const light = s.zoneLights?.[id] ?? null;
+        this.note(
+          s.t,
+          'info',
+          `${ZONE_ROAD_NAME[id]} 진입 — ${s.speedKmh.toFixed(0)}km/h · ` +
+            (light === null ? '신호기 없음' : `차량신호 ${LIGHT_TEXT[light]}`) +
+            ` · 일시정지 ${this.zoneStopped[id] ? '함' : '안 함'}` +
+            ` · ${this.describePedestrians(this.conflictingPedestrians(s, id))}`,
+        );
+        if (light === null) {
+          // 제27조 제7항 — 신호기 없는 보호구역 횡단보도는 보행자가 없어도 일시정지
+          if (!this.zoneStopped[id]) {
+            this.record('SCHOOL_ZONE_NO_STOP', s, `어린이보호구역 · 신호기 없는 ${ZONE_ROAD_NAME[id]} 앞 무정지`);
+          }
+        } else if (light !== 'green') {
+          /*
+            **황색도 잡는다.** 뒤에 빠져나갈 교차로가 없는 단일 횡단보도라, 설 수 있으면 서야 한다
+            ([별표 2] 황색의 등화). 이미 선 뒤라면 걸지 않는다 — 서서 기다리는 중인 차를 위반으로 볼 수 없다.
+          */
+          if (!this.zoneStopped[id]) {
+            this.record('SCHOOL_ZONE_RED', s, `어린이보호구역 ${ZONE_ROAD_NAME[id]} ${LIGHT_TEXT[light]} 통과`);
+          }
+        }
+      }
+
+      /*
+        제27조 제1항 — 보행자가 통행 중이거나 통행하려는데 밀고 들어갔는가.
+
+        **횡단보도 위에 있을 때만 본다** (진입로 보호구역 횡단보도와 같은 기준). 정지선부터 보면
+        **서려고 속도를 줄이는 중인 차**가 걸린다 — 실제로 규정대로 몬 자율 주행이 횡단보도 1.9m 앞에서
+        2km/h 로 굴러가다 '방해' 로 잡혔다. 교차로의 A 가 정지선부터 보는 것은 거기에 정지선이 실제로
+        그어져 있고 그 앞에서 서야 하기 때문이다.
+      */
+      this.trackPedestrianConflict(s, dt, id, s.frontZ <= near && s.frontZ >= far);
+    }
   }
 
   private stoppedBeforeA(): boolean {

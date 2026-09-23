@@ -261,7 +261,7 @@ export class Game {
   private vehicle: Vehicle;
   private carModel: CarModel;
   private judge: RightTurnJudge;
-  /** 어린이보호구역 직진 코스인가 — 우회전 코스와 완주선 · 의무 · 조작이 다르다 */
+  /** 곧게 가는 코스인가 (교차로 직진 · 사거리 없는 보호구역 도로) — 우회전과 완주선 · 의무 · 조작이 다르다 */
   private readonly straight: boolean;
   /** 정지 안내를 띄우기 시작하는 거리 — 판정의 정지 구역보다 길면 안내를 보고 선 자리가 인정되지 않는다 */
   private stopAdviceLead = STOP_ADVICE_LEAD;
@@ -272,6 +272,8 @@ export class Game {
   private pedSignals: Partial<Record<CrosswalkId, PedestrianSignal[]>> = {};
   /** 진입부 보호구역의 차량신호등. 신호기가 없는 판에서는 세우지 않는다 */
   private zoneSignal: VehicleSignal | null = null;
+  /** 사거리 없는 보호구역 도로의 횡단보도별 신호등 (drive: 'zoneOnly') */
+  private zoneRoadSignals: Partial<Record<CrosswalkId, VehicleSignal>> = {};
   /** 우회전신호등 — 설치된 시나리오에서만 만든다 */
   private rightSignal: RightTurnSignal | null = null;
   /** AI 자율 주행 중이면 값이 있다 — 사람 입력 대신 이쪽이 운전한다 */
@@ -361,7 +363,7 @@ export class Game {
       **이 판을 어떻게 빠져나가는가** (scenarios.ts 의 `drive`). 판정 · 완주선 · 조작이 모두 이 값을 본다.
       한 번 정해지면 판이 끝날 때까지 바뀌지 않으므로 필드에 담아 둔다.
     */
-    this.straight = scenario.drive === 'straight';
+    this.straight = scenario.drive !== undefined && scenario.drive !== 'rightTurn';
     this.judge = new RightTurnJudge(opts.stopZone, scenario.drive ?? 'rightTurn');
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
@@ -380,7 +382,12 @@ export class Game {
     this.pending.push(this.world.loadEnvironment(this.renderer));
     this.intersection = new Intersection({
       schoolZone: scenario.isSchoolZone,
-      approachZone: Boolean(scenario.approachSchoolZone),
+      /*
+        **사거리 없는 보호구역 도로**는 구간 표시를 진입로 방식으로 그린다 — 그 길 전체가 보호구역이고,
+        첫 번째 횡단보도가 진입로의 그 자리다 (scenarios/zoneCourse.ts).
+      */
+      approachZone: scenario.drive !== 'rightTurn' || Boolean(scenario.approachSchoolZone),
+      zoneOnly: scenario.drive === 'zoneOnly',
       night: scenario.timeOfDay === 'night',
     });
     this.world.scene.add(this.intersection.group);
@@ -568,6 +575,15 @@ export class Game {
   // ── 구성 ─────────────────────────────────────────────────────────────────
 
   private buildSignals(): void {
+    /*
+      **사거리가 없는 보호구역 도로**는 교차로 신호등이 없다 — 지나는 횡단보도마다 자기 신호등이
+      서거나(그 판이 정한 자리), 아예 서지 않는다. 신호기가 **없다는 사실 자체**가 이 판이 묻는
+      것이므로(제27조 제7항), 없는 자리에는 아무것도 세우지 않는다.
+    */
+    if (this.scenario.drive === 'zoneOnly') {
+      this.buildZoneRoadSignals();
+      return;
+    }
     // 플레이어(남행 접근) 차량신호등 — 교차로 건너편(북측)에 지주를 세우고 팔을 도로 위로 뻗는다.
     // 등화는 플레이어 진입 차로(북행 2차로) 위에 오게 하고, 팔은 지주에서 거기까지 닿을 만큼 뻗는다.
     // (도로 폭이 바뀌면 둘 다 따라가야 한다 — 고정 길이로 두면 팔이 등화에 닿지 않는다)
@@ -736,6 +752,47 @@ export class Game {
     g.add(arm);
 
     return g;
+  }
+
+  /**
+   * **사거리 없는 보호구역 도로의 신호등** — 횡단보도 셋 가운데 신호기가 있는 자리에만 세운다.
+   *
+   * 모양은 진입로 보호구역 신호등과 같다 (보도에 지주 · 가로암으로 차로 위까지 · 좌회전 없는 3색등) —
+   * 실제 단일 횡단보도 신호기가 그렇게 서고, 학습자가 이미 그 모양을 안다. 신호기가 **없는 자리에는
+   * 아무것도 세우지 않는다** — 없다는 사실 자체가 그 판이 묻는 것이다 (제27조 제7항).
+   */
+  private buildZoneRoadSignals(): void {
+    const pedY = PED_SIGNAL_POLE_HEIGHT - PED_SIGNAL_HALF_HEIGHT * 0.55;
+    for (const [id, near, far] of [
+      ['S', CROSSWALK_S_OUTER, CROSSWALK_S_INNER],
+      ['A', CROSSWALK_OUTER, CROSSWALK_INNER],
+      ['B', -CROSSWALK_INNER, -CROSSWALK_OUTER],
+    ] as const) {
+      if (this.scenario.zoneSignals?.[id] === undefined) continue;
+      const mid = (near + far) / 2;
+      // 차량신호등은 **횡단보도 건너편**에 — 남쪽에서 오는 운전자가 횡단보도 너머로 보는 자리다
+      const signalZ = far - 1.6;
+      const signal = new VehicleSignal(ZONE_SIGNAL_SCALE, false);
+      signal.group.position.set(
+        PLAYER_APPROACH_X,
+        ZONE_SIGNAL_ARM_Y - 0.09 - ZONE_SIGNAL_HALF_HEIGHT,
+        signalZ,
+      );
+      this.world.scene.add(
+        signal.group,
+        this.cantileverPole(ROAD_HALF_WIDTH + 1.5, signalZ, PLAYER_APPROACH_X, ZONE_SIGNAL_ARM_Y),
+      );
+      this.zoneRoadSignals[id] = signal;
+
+      this.pedSignals[id] = [];
+      for (const sx of [1, -1]) {
+        const p = new PedestrianSignal();
+        p.group.position.set(sx * (ROAD_HALF_WIDTH + 1.0), pedY, mid);
+        p.group.rotation.y = sx > 0 ? -Math.PI / 2 + 0.55 : Math.PI / 2 - 0.55;
+        this.world.scene.add(p.group, this.smallPole(sx * (ROAD_HALF_WIDTH + 1.0), mid));
+        this.pedSignals[id]!.push(p);
+      }
+    }
   }
 
   private smallPole(x: number, z: number, height = PED_SIGNAL_POLE_HEIGHT): THREE.Mesh {
@@ -1093,6 +1150,17 @@ export class Game {
       approachZone: this.scenario.approachSchoolZone
         ? { light: this.schoolZonePhase()?.vehicle ?? null }
         : null,
+      /*
+        **사거리 없는 보호구역 도로의 횡단보도별 등화** (drive: 'zoneOnly') — 운전자(AI)와 판정이
+        같은 값을 본다. 자리가 없으면 그 횡단보도에는 신호기가 없다.
+      */
+      ...(this.scenario.drive === 'zoneOnly'
+        ? {
+            zoneLights: Object.fromEntries(
+              Object.entries(this.zoneRoadPhases()).map(([id, ph]) => [id, ph.vehicle]),
+            ) as Partial<Record<CrosswalkId, LightColor>>,
+          }
+        : {}),
       pedestrians: this.pedestrians.map((p) => p.sample()),
       exitBlocked,
       isSchoolZone: this.scenario.isSchoolZone,
@@ -1114,6 +1182,20 @@ export class Game {
     const zone = this.scenario.approachSchoolZone;
     if (!zone?.signal) return null;
     return phaseAt(SCHOOL_ZONE_PROGRAM, 0, zone.signalElapsed ?? 0, this.elapsed);
+  }
+
+  /**
+   * **사거리 없는 보호구역 도로의 횡단보도별 등화** (drive: 'zoneOnly').
+   *
+   * 자리마다 주기가 따로 돈다 (scenarios.ts 의 zoneSignals) — 신호기가 없는 자리는 값이 없고,
+   * 그 '없음' 이 곧 제27조 제7항의 자리다.
+   */
+  private zoneRoadPhases(): Partial<Record<CrosswalkId, SchoolZonePhase>> {
+    const out: Partial<Record<CrosswalkId, SchoolZonePhase>> = {};
+    for (const [id, offset] of Object.entries(this.scenario.zoneSignals ?? {})) {
+      out[id as CrosswalkId] = phaseAt(SCHOOL_ZONE_PROGRAM, 0, offset, this.elapsed);
+    }
+    return out;
   }
 
   private currentPhase(): SignalPhase {
@@ -1168,9 +1250,21 @@ export class Game {
     this.carModel.lights.setHeadlights(headlightsOn);
 
     // ── 신호등 ──
-    this.vehicleSignal.set(phase.vehicle, dt);
-    for (const s of this.pedSignals.A ?? []) s.set(phase.pedA, dt);
-    for (const s of this.pedSignals.C ?? []) s.set(phase.pedC, dt);
+    /*
+      **사거리 없는 보호구역 도로는 횡단보도마다 자기 주기를 돈다** (drive: 'zoneOnly').
+      교차로 신호등은 세우지도 않았으므로 건드리지 않는다.
+    */
+    const roadPhases = this.scenario.drive === 'zoneOnly' ? this.zoneRoadPhases() : null;
+    if (roadPhases) {
+      for (const [id, ph] of Object.entries(roadPhases) as [CrosswalkId, SchoolZonePhase][]) {
+        this.zoneRoadSignals[id]?.set(ph.vehicle, dt);
+        for (const p of this.pedSignals[id] ?? []) p.set(ph.ped, dt);
+      }
+    } else {
+      this.vehicleSignal.set(phase.vehicle, dt);
+      for (const s of this.pedSignals.A ?? []) s.set(phase.pedA, dt);
+      for (const s of this.pedSignals.C ?? []) s.set(phase.pedC, dt);
+    }
     // 진입부 보호구역은 자기 주기를 돈다 (교차로 주기와 무관하다)
     const zone = this.schoolZonePhase();
     if (zone) {
@@ -1183,6 +1277,7 @@ export class Game {
     const front = this.vehicle.front;
     const carMoving = this.vehicle.speedKmh > 1.5;
     const zonePhase = this.schoolZonePhase();
+    const roadPhasesNow = this.scenario.drive === 'zoneOnly' ? this.zoneRoadPhases() : null;
     for (const p of this.pedestrians) {
       /*
         **횡단보도마다 자기 신호를 본다.**
@@ -1195,11 +1290,14 @@ export class Game {
         검증기는 **처음부터 제 신호를 보고 있어서**(scenarios/playSim.ts 의 pedSignal) 검증은
         통과하는데 실제 게임에서만 사람이 엉뚱한 때에 건넜다.
       */
-      const signal = pedSignalFor(p.crosswalk, {
-        intersection: { pedA: phase.pedA, pedC: phase.pedC },
-        installed: this.scenario.pedSignalInstalled,
-        zonePed: zonePhase?.ped ?? null,
-      });
+      // 사거리 없는 도로에서는 그 횡단보도의 보호구역 신호를 본다 (위 zoneRoadPhases)
+      const signal = roadPhasesNow
+        ? (roadPhasesNow[p.crosswalk]?.ped ?? null)
+        : pedSignalFor(p.crosswalk, {
+            intersection: { pedA: phase.pedA, pedC: phase.pedC },
+            installed: this.scenario.pedSignalInstalled,
+            zonePed: zonePhase?.ped ?? null,
+          });
       /*
         코앞까지 온 교차 통행 차량이 있으면 그 사람은 한 발 기다린다 (TrafficCar 주석 참고).
 
@@ -1355,6 +1453,17 @@ export class Game {
       approachZone: this.scenario.approachSchoolZone
         ? { light: this.schoolZonePhase()?.vehicle ?? null }
         : null,
+      /*
+        **사거리 없는 보호구역 도로의 횡단보도별 등화** (drive: 'zoneOnly') — 운전자(AI)와 판정이
+        같은 값을 본다. 자리가 없으면 그 횡단보도에는 신호기가 없다.
+      */
+      ...(this.scenario.drive === 'zoneOnly'
+        ? {
+            zoneLights: Object.fromEntries(
+              Object.entries(this.zoneRoadPhases()).map(([id, ph]) => [id, ph.vehicle]),
+            ) as Partial<Record<CrosswalkId, LightColor>>,
+          }
+        : {}),
       // id 는 배열 순서 — 판정기가 같은 보행자의 발자국을 이어 붙이는 데 쓴다
       pedestrians: this.pedestrians.map((p, i) => ({ ...p.sample(), id: i })),
       exitBlocked,

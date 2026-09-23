@@ -47,6 +47,7 @@ import {
   STOP_ZONE_DEPTH,
   type CrosswalkId,
   type JudgeResult,
+  type LightColor,
   type PedSignal,
   type PedestrianSample,
   type WorldSample,
@@ -190,7 +191,21 @@ function onCrosswalk(id: CrosswalkId, front: { x: number; z: number }): boolean 
  * **코스마다 교차로 다음이 다르다** — 우회전이면 동쪽의 C, 직진이면 북쪽의 건너편 횡단보도(B).
  * 직진 코스를 'C 까지 8m' 라고 적으면 읽는 사람이 지나지도 않을 횡단보도를 찾게 된다.
  */
-function whereStopped(front: { x: number; z: number }, hasS: boolean, straight = false): string {
+function whereStopped(front: { x: number; z: number }, hasS: boolean, straight = false, zoneOnly = false): string {
+  /*
+    **사거리 없는 보호구역 도로**는 지나는 것이 횡단보도 셋뿐이다 — 정지선 · 교차로로 부르면
+    읽는 사람이 있지도 않은 자리를 찾는다 (rules/lawRules.ts 의 ZONE_ROAD_NAME 과 같은 이름).
+  */
+  if (zoneOnly) {
+    for (const [name, near] of [
+      ['첫 번째', CROSSWALK_S_OUTER],
+      ['두 번째', CROSSWALK_OUTER],
+      ['세 번째', CROSSWALK_B_INNER],
+    ] as const) {
+      if (front.z > near) return `${name} 횡단보도 ${(front.z - near).toFixed(1)}m 앞`;
+    }
+    return '세 번째 횡단보도를 지난 뒤';
+  }
   if (hasS && front.z > CROSSWALK_S_OUTER) return `보호구역 정지선 ${(front.z - STOP_LINE_S).toFixed(1)}m 앞`;
   if (front.z > STOP_LINE - 1) return `정지선 ${(front.z - STOP_LINE).toFixed(1)}m 앞`;
   if (front.z > CROSSWALK_INNER) return `첫 횡단보도 위 (정지선 ${(STOP_LINE - front.z).toFixed(1)}m 넘음)`;
@@ -259,6 +274,8 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     규정대로 몬 주행이 대회전 · 지시등 위반으로 잡힌다 (rules/lawRules.ts 의 DriveMode).
   */
   const drive = spec.drive ?? 'rightTurn';
+  /** 곧게 가는 코스인가 — 교차로 직진 통과와 사거리 없는 보호구역 도로 */
+  const goesStraight = drive !== 'rightTurn';
   const judge = new RightTurnJudge(opts.stopZone ?? STOP_ZONE_DEPTH, drive);
 
   const summaries: PedSummary[] = spawns.map((p, i) => ({
@@ -290,7 +307,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
 
   const finishStop = (now: number): void => {
     if (stopStart === null) return;
-    const where = whereStopped(vehicle.front, spec.approachSchoolZone !== undefined, drive === 'straight');
+    const where = whereStopped(vehicle.front, spec.approachSchoolZone !== undefined, goesStraight, drive === 'zoneOnly');
     stops.push({ at: stopStart, where, seconds: now - stopStart });
     log(now, 'car', `출발 — ${where}에서 ${(now - stopStart).toFixed(1)}초 서 있었음`);
     stopStart = null;
@@ -302,25 +319,42 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     const zone = spec.approachSchoolZone?.signal
       ? phaseAt(SCHOOL_ZONE_PROGRAM, 0, spec.approachSchoolZone.signalElapsed ?? 0, t)
       : null;
+    /*
+      **사거리 없는 보호구역 도로는 횡단보도마다 자기 신호를 돈다** (drive: 'zoneOnly').
+      적힌 자리만 신호기가 있고, 나머지는 없다 — 그 '없음' 이 제27조 제7항의 자리다.
+    */
+    const zoneLights: Partial<Record<CrosswalkId, LightColor>> = {};
+    const zonePed: Partial<Record<CrosswalkId, PedSignal>> = {};
+    for (const [id, offset] of Object.entries(spec.zoneSignals ?? {})) {
+      const ph = phaseAt(SCHOOL_ZONE_PROGRAM, 0, offset, t);
+      zoneLights[id as CrosswalkId] = ph.vehicle;
+      zonePed[id as CrosswalkId] = ph.ped;
+    }
     const exitBlocked = Boolean(spec.exitBlocked) && t < JAM_CLEAR_SECONDS;
-    const pedSignal: Record<CrosswalkId, PedSignal | null> = {
-      A: spec.pedSignalInstalled.A ? phase.pedA : null,
-      // B 는 A 와 같은 도로를 가로지른다 — 같은 등화다 (lawRules.ts 의 signalCrosswalk)
-      B: spec.pedSignalInstalled.A ? phase.pedA : null,
-      C: spec.pedSignalInstalled.C ? phase.pedC : null,
-      S: zone?.ped ?? null,
-    };
+    const pedSignal: Record<CrosswalkId, PedSignal | null> =
+      drive === 'zoneOnly'
+        ? { A: zonePed.A ?? null, B: zonePed.B ?? null, C: null, S: zonePed.S ?? null }
+        : {
+            A: spec.pedSignalInstalled.A ? phase.pedA : null,
+            // B 는 A 와 같은 도로를 가로지른다 — 같은 등화다 (lawRules.ts 의 signalCrosswalk)
+            B: spec.pedSignalInstalled.A ? phase.pedA : null,
+            C: spec.pedSignalInstalled.C ? phase.pedC : null,
+            S: zone?.ped ?? null,
+          };
     const rightArrow = spec.rightArrowInstalled ? phase.rightArrow : null;
 
     /*
       **직진 코스는 지나지 않는 횡단보도의 신호를 적지 않는다** — C(우회전 후)는 이 코스에 없고,
       대신 건너편(B)을 본다. B 의 등화는 A 와 같다 (rules/lawRules.ts 의 signalCrosswalk).
     */
-    const sigLine = `정면 ${word(phase.vehicle)}${rightArrow ? ` · 우회전 ${word(rightArrow)}` : ''} · 보행A ${word(pedSignal.A)} · ${
-      drive === 'straight' ? `보행B ${word(pedSignal.B)}` : `보행C ${word(pedSignal.C)}`
-    }${
-      spec.approachSchoolZone ? ` · 보호구역 ${word(zone?.vehicle ?? null)}` : ''
-    }`;
+    const sigLine =
+      drive === 'zoneOnly'
+        ? (['S', 'A', 'B'] as const)
+            .map((id, i) => `${['첫', '두', '세'][i]}번째 ${zoneLights[id] ? word(zoneLights[id]!) : '신호없음'}`)
+            .join(' · ')
+        : `정면 ${word(phase.vehicle)}${rightArrow ? ` · 우회전 ${word(rightArrow)}` : ''} · 보행A ${word(pedSignal.A)} · ${
+            goesStraight ? `보행B ${word(pedSignal.B)}` : `보행C ${word(pedSignal.C)}`
+          }${spec.approachSchoolZone ? ` · 보호구역 ${word(zone?.vehicle ?? null)}` : ''}`;
     if (sigLine !== lastSig) {
       log(t, 'signal', sigLine);
       lastSig = sigLine;
@@ -333,6 +367,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       rightArrow,
       pedSignal,
       approachZone: spec.approachSchoolZone ? { light: zone?.vehicle ?? null } : null,
+      zoneLights,
       pedestrians: walkers.map((w) => w.sample()),
       exitBlocked,
       lead: lead && !lead.gone ? { gap: lead.gapFrom(front.x, front.z), speedKmh: lead.speedKmh } : null,
@@ -358,6 +393,12 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
             vehicleLight: 'green' as const,
             rightArrow: view.rightArrow === null ? null : ('greenArrow' as const),
             approachZone: null,
+            /*
+              **사거리 없는 도로에서는 세 곳 모두 녹색으로 본다** — 신호도 일시정지 의무도 무시하는 사람이라,
+              신호기가 없는 자리(제27조 제7항의 의무 정지)에서도 서지 않는다. 있는 자리만 녹색으로 바꾸면
+              없는 자리에서는 여전히 서서, 이 운전자가 그 의무를 어기는 모습을 볼 수 없다.
+            */
+            zoneLights: { S: 'green' as const, A: 'green' as const, B: 'green' as const },
             exitBlocked: false,
             isSchoolZone: false,
           }
@@ -465,7 +506,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     else stopHold = 0;
     if (vehicle.speedKmh <= 0.5 && stopStart === null) {
       stopStart = t;
-      log(t, 'car', `섬 — ${whereStopped(f, spec.approachSchoolZone !== undefined, drive === 'straight')}`);
+      log(t, 'car', `섬 — ${whereStopped(f, spec.approachSchoolZone !== undefined, goesStraight, drive === 'zoneOnly')}`);
     } else if (vehicle.speedKmh > 1.5 && stopStart !== null) {
       finishStop(t);
     }
@@ -483,6 +524,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       rightArrow,
       pedSignal,
       approachZone: spec.approachSchoolZone ? { light: zone?.vehicle ?? null } : null,
+      zoneLights,
       pedestrians: peds,
       exitBlocked,
       isSchoolZone: spec.isSchoolZone,
@@ -522,7 +564,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       const onNS = Math.abs(vehicle.x) <= ROAD_HALF_WIDTH + 1.5;
       const onEW = Math.abs(vehicle.z) <= ROAD_HALF_WIDTH + 1.5;
       // 완주선은 코스마다 다르다 — 우회전은 동쪽(x), 직진은 북쪽(z)
-      if (drive === 'straight' ? f.z < FINISH_Z : f.x > FINISH_X) {
+      if (goesStraight ? f.z < FINISH_Z : f.x > FINISH_X) {
         judge.markCompleted();
         ended = true;
       } else if (!onNS && !onEW) {
@@ -548,7 +590,14 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
 /** AutoDriver 가 보는 세계 가운데 **눈으로 알아차리는** 부분 — `human` 은 이것을 늦게 본다 */
 type Perception = Pick<
   AutoDriveState,
-  'vehicleLight' | 'rightArrow' | 'pedSignal' | 'approachZone' | 'pedestrians' | 'exitBlocked' | 'lead'
+  | 'vehicleLight'
+  | 'rightArrow'
+  | 'pedSignal'
+  | 'approachZone'
+  | 'zoneLights'
+  | 'pedestrians'
+  | 'exitBlocked'
+  | 'lead'
 >;
 
 /** 타임라인을 사람이 읽을 글로 */

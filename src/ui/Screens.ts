@@ -1095,11 +1095,11 @@ export class Screens {
       note.classList.toggle('ok', found);
       note.innerHTML =
         n === null
-          ? '번호를 넣으면 여기에 그 맵의 이름이 뜹니다 (50001번부터는 보호구역 직진)'
+          ? '번호를 넣으면 여기에 그 맵의 이름이 뜹니다 (50001번부터는 어린이보호구역 전용 도로)'
           : entry
             ? `<b>${esc(levelLabel(entry.level))}</b> · ${esc(entry.spec.title)}`
             : zone
-              ? `<b>보호구역 직진</b> · ${esc(zone.title)}`
+              ? `<b>어린이보호구역</b> · ${esc(zone.title)}`
               : `${n}번 맵은 없습니다 — 번호가 너무 크거나 점검으로 뺀 자리입니다`;
     };
     input.addEventListener('input', update);

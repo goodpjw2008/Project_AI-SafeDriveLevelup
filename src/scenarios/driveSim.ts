@@ -63,6 +63,11 @@ export interface WorldConfig {
    */
   approachZone?: (LightColor | null) | ((t: number) => LightColor | null);
   /**
+   * **사거리 없는 보호구역 도로**의 횡단보도별 차량신호 (drive: 'zoneOnly').
+   * 자리가 없으면 그 횡단보도에는 신호기가 없다.
+   */
+  zoneLights?: (t: number) => Partial<Record<CrosswalkId, LightColor>>;
+  /**
    * 보행자 상태.
    *
    * **매 스텝 정확히 한 번, 시간 순서대로 불린다.** 그래서 상태기계(PedWalk)를 이 안에서
@@ -205,10 +210,11 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     같은 이유다 — 경로 끝에서 완주를 찍으므로(아래 markCompleted) 선을 지난 직후에 끝나야 한다.
   */
   const drive = driver.drive ?? 'rightTurn';
-  const pts =
-    drive === 'straight'
-      ? buildStraightPath(driver.startZ ?? SPAWN_Z, FINISH_Z - 6)
-      : buildPath(turnStyle, driver.startZ);
+  /** 곧게 가는 코스인가 — 교차로 직진 통과(straight)와 사거리 없는 보호구역 도로(zoneOnly) */
+  const goesStraight = drive !== 'rightTurn';
+  const pts = goesStraight
+    ? buildStraightPath(driver.startZ ?? SPAWN_Z, FINISH_Z - 6)
+    : buildPath(turnStyle, driver.startZ);
   const acc = arcLengths(pts);
   const total = acc[acc.length - 1];
 
@@ -251,10 +257,9 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
   if (stopBeforeExitCrosswalk > 0 || yieldUntilClear) {
     // 교차로를 지나 만나는 횡단보도 직전에서 멈춘다 — 우회전이면 C, 직진이면 B
     stops.push({
-      atDistance:
-        drive === 'straight'
-          ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
-          : distanceWhereFrontX(CROSSWALK_INNER - 1),
+      atDistance: goesStraight
+        ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
+        : distanceWhereFrontX(CROSSWALK_INNER - 1),
       seconds: stopBeforeExitCrosswalk,
     });
   }
@@ -262,8 +267,9 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
 
   // 첫 횡단보도부터 두 번째 횡단보도까지를 '회전 구간'으로 보고 turnKmh 로 달린다.
   const turnStart = distanceWhereFrontZ(CROSSWALK_OUTER);
-  const turnEnd =
-    drive === 'straight' ? distanceWhereFrontZ(CROSSWALK_B_OUTER) : distanceWhereFrontX(CROSSWALK_OUTER);
+  const turnEnd = goesStraight
+    ? distanceWhereFrontZ(CROSSWALK_B_OUTER)
+    : distanceWhereFrontX(CROSSWALK_OUTER);
   /** 진입 전 횡단보도(A) 직전 — 여기서도 보행자를 보내야 한다 */
   const gateA = distanceWhereFrontZ(CROSSWALK_OUTER + 0.5);
   /*
@@ -279,8 +285,9 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     매 스텝 다시 재면 판 하나에 수천 번 돌고, 검증기가 몰기 서른여섯 가지를 돌리는 동안
     판 하나에 4초가 걸렸다.
   */
-  const gateC =
-    drive === 'straight' ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1) : distanceWhereFrontX(CROSSWALK_INNER - 1);
+  const gateC = goesStraight
+    ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
+    : distanceWhereFrontX(CROSSWALK_INNER - 1);
 
   const judge = new RightTurnJudge(world.stopZone, drive);
   const resolve = <T>(v: T | ((t: number) => T), t: number): T =>
@@ -329,10 +336,29 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
       같은 한도를 쓴다 — 끝없이 기다려야 하는 판은 시간 초과로 걸러진다 (validate.ts).
     */
     if (waitForGreen && yielded < maxYieldSeconds) {
-      const atLine = Math.abs(s - distanceWhereFrontZ(STOP_LINE + lineGap)) < 0.6;
-      if (atLine && resolve(world.vehicleLight, t) !== 'green') {
-        holding = true;
-        yielded += DT;
+      if (drive === 'zoneOnly') {
+        /*
+          **사거리 없는 보호구역 도로는 횡단보도마다 자기 신호가 있다.** 신호기가 있는 자리에서만
+          녹색을 기다리고, 없는 자리는 일시정지(고정 초)로 지난다 — 기다릴 신호가 없기 때문이다.
+        */
+        const lights = world.zoneLights?.(t) ?? {};
+        for (const [id, at] of [
+          ['S', gateS],
+          ['A', distanceWhereFrontZ(STOP_LINE + lineGap)],
+          ['B', gateC],
+        ] as const) {
+          const light = lights[id];
+          if (light && light !== 'green' && Math.abs(s - at) < 0.6) {
+            holding = true;
+            yielded += DT;
+          }
+        }
+      } else {
+        const atLine = Math.abs(s - distanceWhereFrontZ(STOP_LINE + lineGap)) < 0.6;
+        if (atLine && resolve(world.vehicleLight, t) !== 'green') {
+          holding = true;
+          yielded += DT;
+        }
       }
     }
     if (!holding && yieldUntilClear && yielded < maxYieldSeconds) {
@@ -341,7 +367,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
       const atGateC = Math.abs(s - gateC) < 0.6;
       const which = atGateS ? 'S' : atGateA ? 'A' : atGateC ? 'C' : null;
       // 직진 코스의 '두 번째 관문' 은 B 다 (위 gateC 가 그 자리를 가리킨다)
-      const id = which === 'C' && drive === 'straight' ? 'B' : which;
+      const id = which === 'C' && goesStraight ? 'B' : which;
       if (id && peds.some((p) => p.crosswalk === id && p.intendsToCross && p.onConflictPath)) {
         holding = true;
         yielded += DT;
@@ -399,6 +425,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
         S: resolve(world.pedSignalS ?? null, t),
       },
       approachZone: world.approachZone ? { light: resolve(world.approachZone, t) } : null,
+      ...(world.zoneLights ? { zoneLights: world.zoneLights(t) } : {}),
       pedestrians: peds,
       exitBlocked: resolve(world.exitBlocked ?? false, t),
       isSchoolZone: world.isSchoolZone ?? false,

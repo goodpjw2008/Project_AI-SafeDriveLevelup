@@ -1155,7 +1155,7 @@ async function startRun(id: number): Promise<void> {
     위/아래로 목표 속도를 고르고(0 · 10 · 20 · 30km/h) 방향지시등은 끈 채로 시작한다 —
     돌지 않으므로 켤 의무가 없다. `reset` 보다 먼저 정해야 리셋이 그 방식대로 돌아간다.
   */
-  controls.setStraight(currentScenario.drive === 'straight');
+  controls.setStraight(currentScenario.drive !== undefined && currentScenario.drive !== 'rightTurn');
   controls.reset();
   /*
     자율 주행 중에는 **사람 입력을 받지 않는다.** 핸들이 두 곳에서 들어오면 AI 가
