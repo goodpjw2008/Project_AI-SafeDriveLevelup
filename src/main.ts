@@ -196,8 +196,16 @@ async function makeAiScenario(): Promise<void> {
     사용자가 "10판 넘게 했는데 한번도 나오지 않았어" 라고 짚었다 — 차례 확률과 고칠 습관 때문에 연달아 빠질 수 있었다.
   */
   const noSignalDue = noSignalZoneDue(saveData.history.map((r) => r.st));
+  /*
+    **무엇을 연습하는 갈래인가** (scenarios/tracks.ts) — 첫 화면에서 고른다. 우회전 전용을 골랐으면
+    보호구역 차례를 아예 굴리지 않는다: 그 갈래에는 보호구역 판이 없어, 차례만 서고 판은 안 나오면
+    "보호구역 차례인데 우회전 판" 이라는 어긋난 설명이 화면에 뜬다.
+  */
+  const track = saveData.settings.track;
+  const zoneDueHere = noSignalDue && track !== 'turn';
   const plan = {
     level: c.level,
+    track,
     target: currentTarget(c),
     badHabits: c.badHabits,
     /*
@@ -206,7 +214,7 @@ async function makeAiScenario(): Promise<void> {
       AI 에게 고르기를 맡기기 **전에** 굴린다 — 비율은 여러 판에 걸쳐 나타나는 성질이라
       판 하나를 고르는 모델이 맞출 수 있는 것이 아니다.
     */
-    schoolZone: zoneTurn || noSignalDue,
+    schoolZone: track === 'turn' ? false : zoneTurn || zoneDueHere,
     /*
       **보호구역이 나올 차례면 신호기 유무도 여기서 굴린다** (scenarios.ts 의 `ZONE_NO_SIGNAL_CHANCE`).
 
@@ -216,8 +224,8 @@ async function makeAiScenario(): Promise<void> {
       **차례가 아닐 때도 굴린다.** 새 개념을 여는 레벨과 종합 레벨에서는 보호구역 차례가 아니어도
       보호구역 판이 섞여 들어오기 때문이다 (recommend.ts 의 `zoneOk` 예외).
     */
-    zoneNoSignal: noSignalDue || rollZoneNoSignalTurn(),
-    noSignalZoneDue: noSignalDue,
+    zoneNoSignal: track === 'turn' ? undefined : zoneDueHere || rollZoneNoSignalTurn(),
+    noSignalZoneDue: zoneDueHere,
     /* **앞차 차례도 여기서 굴린다** (scenarios.ts 의 `rollLeadTurn`) — 보호구역과 같은 이유다 */
     lead: rollLeadTurn(),
     /* 설정의 난이도 1~5 — 같은 레벨 안에서 얼마나 복잡한 코스를 고를지 (scenarios/challenge.ts) */
@@ -625,6 +633,15 @@ function renderMenu(): void {
     // 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 창이다 (renderTrial)
     onTrial: () => nav.go({ name: 'trial', enter: renderTrial }),
     onBadges: () => nav.go({ name: 'badges', enter: renderBadges }),
+    /*
+      **무엇을 연습할지 고른다** (scenarios/tracks.ts). 고른 값은 설정에 저장한다 — 초기화 버튼으로 지워지지
+      않는 자리다(economy/save.ts). 다음 추천부터 반영되므로 지금 화면만 다시 그린다.
+    */
+    onTrack: (track) => {
+      saveData.settings.track = track;
+      persist(saveData);
+      renderMenu();
+    },
   }, aiTraining);
   showSiteStatsOnMenu();
 }

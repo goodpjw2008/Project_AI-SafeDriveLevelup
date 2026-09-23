@@ -43,6 +43,7 @@ import {
   scenarioLibrary,
   type LibraryEntry,
 } from './library';
+import { inTrack } from './tracks';
 import { challengeRule } from './challenge';
 
 /** AI 에게 보여 주는 후보 코스 수 */
@@ -406,7 +407,18 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
     **L1 학습자에게는 야간 판을 주지 않는다** (library.ts 의 L1_EXCLUDES). L1 판에는 야간이 없지만, 난이도 4 · 5 는 한두
     레벨 위의 판을 미리 섞고(reach) 아래 단계들은 레벨을 넘어서라도 습관을 시험하는 판을 찾으므로 여기서 한 번 더 거른다.
   */
-  const lib = plan.level === 1 ? scenarioLibrary().filter((e) => !L1_EXCLUDES(e.tags)) : scenarioLibrary();
+  /*
+    **고른 갈래의 판만 본다** (scenarios/tracks.ts) — 우회전 전용을 고르면 보호구역이 섞인 판은 후보에
+    들지 않는다. 맨 처음에 거르는 이유는, 아래 티어가 하나라도 걸리면 그대로 돌려주기 때문이다 —
+    나중에 거르면 "이 티어에는 있었는데 갈래에 맞는 것이 하나도 없는" 빈손이 나온다.
+
+    **레벨은 그대로 쓴다.** 갈래마다 레벨을 다시 매기지 않는다 (사용자가 레벨 · 경험치를 하나로 쓰기로 했다).
+    다만 우회전 전용은 레벨마다 판 수가 고르지 않다 — L4 는 1판뿐이다(L1 149 · L2 104 · L3 17 · L4 1 ·
+    L5 133 …). 그래도 `fits` 가 **그 레벨 이하**를 모두 받으므로 L4 에서도 271판 중에서 고른다.
+  */
+  const track = plan.track ?? 'both';
+  const all = scenarioLibrary().filter((e) => inTrack(e.tags, track));
+  const lib = plan.level === 1 ? all.filter((e) => !L1_EXCLUDES(e.tags)) : all;
   const recent = new Set(recentIds.slice(-RECENT_EXCLUDE));
 
   // 이 레벨까지 연 개념만 쓰는 판 (library.ts 의 levelOf). 난이도 5 는 한 레벨 위까지 미리 섞는다
@@ -425,7 +437,9 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
   const combined = isCombinedLevel(plan.level);
   const opensZone = combined || opens.includes('zone') || opens.includes('noSignalZone');
   const opensLead = combined || opens.includes('lead') || opens.includes('rolling');
-  const zoneOk = (e: LibraryEntry) => (opensZone && e.level === plan.level) || inZone(e) === plan.schoolZone;
+  // 우회전 전용 갈래에는 보호구역 판이 없다 — 차례를 걸 것이 없으므로 통과시킨다
+  const zoneOk = (e: LibraryEntry) =>
+    track === 'turn' || (opensZone && e.level === plan.level) || inZone(e) === plan.schoolZone;
   const leadOk = (e: LibraryEntry) =>
     (opensLead && e.level === plan.level) || (plan.lead ? e.tags.lead === plan.lead : e.tags.lead === 'none');
   const fresh = (e: LibraryEntry) => !recent.has(e.spec.id);
@@ -470,7 +484,11 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
     습관이 있는 L1 학습자에게는 L2 의 적색 무신호 판(습관과 보호구역을 한 판에서 함께 시험)이 맞다. 그래도 습관을
     시험하는 무신호 판이 없으면 습관과 무관한 무신호 판이라도 준다 — 몇 판에 한 번뿐이고, 사용자가 이 판을 원했다.
   */
-  if (plan.noSignalZoneDue) {
+  /*
+    **우회전 전용 갈래에서는 무신호 보호구역 차례를 걸지 않는다** — 그 갈래에는 보호구역 판이 하나도 없어
+    여기서 걸면 후보가 빈손이 되고, 아래 티어로도 내려가지 못한다. 보호구역은 다른 두 갈래가 맡는다.
+  */
+  if (plan.noSignalZoneDue && track !== 'turn') {
     const upTo = Math.max(plan.level + reach, noSignalZoneLevel());
     const core = (e: LibraryEntry) => isNoSignalZone(e.tags) && e.level <= upTo;
     for (const ok of [

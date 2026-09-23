@@ -67,6 +67,7 @@ import { playerCard } from './playerCard';
 import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
+import { TRACKS, TRACK_BRIEF, TRACK_LABEL, TRACK_READY, type PracticeTrack } from '../scenarios/tracks';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
@@ -692,6 +693,8 @@ export class Screens {
       onTrial(): void;
       /** 뱃지 모음 화면을 연다 (renderBadges) */
       onBadges(): void;
+      /** 무엇을 연습할지 고른다 (scenarios/tracks.ts) — 고르면 다음 추천부터 그 갈래의 코스만 나온다 */
+      onTrack(track: PracticeTrack): void;
     },
     /** AI 맞춤 훈련의 지금 상태 — main.ts 가 들고 있다 */
     ai: AiTrainingState,
@@ -802,6 +805,7 @@ export class Screens {
       void document.getElementById(id)?.addEventListener('click', fn);
 
     on('btn-ai-drive', handlers.onAiDrive);
+    for (const t of TRACKS) on(`track-${t}`, () => handlers.onTrack(t));
     $('btn-shop').addEventListener('click', handlers.onShop);
     $('btn-help').addEventListener('click', handlers.onHelp);
     $('btn-zone-help').addEventListener('click', handlers.onZoneHelp);
@@ -1025,6 +1029,24 @@ export class Screens {
         -->
         <div class="mode-group">
           <p class="mode-label"><b>온라인 가상 연습</b> — 내가 직접 운전합니다</p>
+          <!--
+            **무엇을 연습할지 고른다** (scenarios/tracks.ts · 사용자가 정한 개념).
+
+            우회전과 어린이보호구역을 **고르게** 연습하려면, 둘이 늘 섞여 나오는 것만으로는 모자란다 —
+            한쪽만 붙잡고 여러 판을 달릴 수 있어야 한다. 고르면 다음 추천부터 그 갈래의 코스만 나온다.
+
+            레벨 · 경험치 · 뱃지는 셋이 함께 쓴다 (사용자가 정했다). 갈래는 '어떤 코스를 줄까' 일 뿐이다.
+          -->
+          <div class="track-pick" role="group" aria-label="무엇을 연습할까">
+            ${TRACKS.map((t) => {
+              const ready = TRACK_READY[t];
+              const on = save.settings.track === t;
+              return `<button class="opt ${on ? 'on' : ''}" id="track-${t}"${ready ? '' : ' disabled'} title="${esc(
+                ready ? TRACK_BRIEF[t] : '새 맵을 만드는 중입니다',
+              )}">${esc(TRACK_LABEL[t])}${ready ? '' : ' · 준비 중'}</button>`;
+            }).join('')}
+          </div>
+          <p class="track-brief">${esc(TRACK_BRIEF[save.settings.track])}</p>
           <div class="ai-course-actions">${button}${resetButton}</div>
         </div>
         <div class="mode-group">

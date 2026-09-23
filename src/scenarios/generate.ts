@@ -39,6 +39,7 @@ import {
   type LevelRule,
 } from './curriculum';
 import type { ViolationCode } from '../rules/violations';
+import type { PracticeTrack } from './tracks';
 import { COST_TABLE, freeKitFor, type ConditionKey } from './difficulty';
 import { checkSchema, describeIssues, validateScenario, type Issue } from './validate';
 import { runsToClear, type BadHabit } from '../coach/badHabits';
@@ -451,6 +452,12 @@ function toRequest(
 /** 이번 판을 어떤 단계로, 무엇을 노려 만들 것인가 (커리큘럼이 정한다) */
 export interface Plan {
   level: Difficulty;
+  /**
+   * **무엇을 연습하는 판인가** (scenarios/tracks.ts) — 우회전만 · 보호구역만 · 둘 다. 없으면 '둘 다'.
+   *
+   * 레벨과는 따로다 (사용자가 정했다: 레벨 · 경험치는 셋이 함께 쓴다). 이 값은 **후보의 범위**만 좁힌다.
+   */
+  track?: PracticeTrack;
   /** 가장 많이 저지른 위반 코드 — 없으면 `null` */
   target: string | null;
   /** 나쁜 운전 습관 전부 — 프롬프트가 이것을 근거로 판을 만든다 */

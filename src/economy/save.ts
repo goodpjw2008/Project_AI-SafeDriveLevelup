@@ -10,6 +10,7 @@ import { defaultGraphics, graphicsFromSaved, type GraphicsSettings } from '../ga
 import { DEFAULT_SOUNDS } from '../game/soundAssets';
 import { freshCurriculum, unlockedLevel, type CurriculumState } from '../scenarios/curriculum';
 import { DEFAULT_CHALLENGE, type Challenge } from '../scenarios/challenge';
+import { TRACKS, type PracticeTrack } from '../scenarios/tracks';
 import { habitsTestedBy, libraryEntry } from '../scenarios/library';
 import { badgesFromHistory, freshBadges, normalizeBadges, type BadgeState } from './badges';
 
@@ -169,6 +170,14 @@ export interface SaveData {
      */
     difficulty: Challenge;
     /**
+     * **무엇을 연습할 것인가** (scenarios/tracks.ts) — 우회전만 · 어린이보호구역만 · 둘 다. 기본은 둘 다.
+     *
+     * 난이도와 마찬가지로 **레벨과는 따로다.** 레벨은 하나로 이어지고(사용자가 정했다), 이 값은 그 레벨에서
+     * AI 가 고를 코스의 **범위**만 좁힌다 — 셋으로 나눠 각각 레벨을 올리게 하면, 방금 빠르게 만든 레벨업을
+     * 세 번 되풀이하게 된다.
+     */
+    track: PracticeTrack;
+    /**
      * 고른 소리 (soundAssets.ts 의 각 목록에 있는 id).
      *
      * 후보를 여럿 두고 고르게 하는 이유는, **어떤 소리가 좋은지는 들어 봐야 알기**
@@ -225,6 +234,7 @@ export function defaultSave(): SaveData {
       startView: 'chase',
       autoNextStage: true,
       difficulty: DEFAULT_CHALLENGE,
+      track: 'both',
       graphics: defaultGraphics(),
       sounds: { ...DEFAULT_SOUNDS },
     },
@@ -283,6 +293,13 @@ export function load(): SaveData {
         graphics: graphicsFromSaved(parsed.settings?.graphics, from < 11),
         // 소리도 **항목별로** 합친다 — 통째로 덮으면 새로 생긴 항목이 undefined 로 들어온다
         sounds: { ...base.settings.sounds, ...(parsed.settings?.sounds ?? {}) },
+        /*
+          연습 갈래는 **아는 값인지 확인하고 받는다** — 손으로 고친 저장본이나 예전 이름이 들어오면
+          추천이 후보를 하나도 못 찾는다. 모르면 '둘 다'(지금까지의 동작)로 돌린다.
+        */
+        track: TRACKS.includes(parsed.settings?.track as PracticeTrack)
+          ? (parsed.settings!.track as PracticeTrack)
+          : 'both',
       },
       stats: { ...base.stats, ...(parsed.stats ?? {}) },
       /*

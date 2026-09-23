@@ -26,11 +26,11 @@ import type {
   JudgeResult,
   LeadReport,
   LightColor,
-  PedSignal,
   RightArrowColor,
   WorldSample,
 } from '../rules/lawRules';
 import { RightTurnJudge } from '../rules/lawRules';
+import { pedSignalFor } from './pedSignalFor';
 import { isSignalWait } from './stopReason';
 import {
   JAM_CLEAR_SECONDS,
@@ -1171,15 +1171,24 @@ export class Game {
     // ── 보행자 ──
     const front = this.vehicle.front;
     const carMoving = this.vehicle.speedKmh > 1.5;
+    const zonePhase = this.schoolZonePhase();
     for (const p of this.pedestrians) {
-      const signal: PedSignal | null =
-        p.crosswalk === 'A'
-          ? this.scenario.pedSignalInstalled.A
-            ? phase.pedA
-            : null
-          : this.scenario.pedSignalInstalled.C
-            ? phase.pedC
-            : null;
+      /*
+        **횡단보도마다 자기 신호를 본다.**
+
+        예전에는 'A 냐 아니냐' 둘로만 갈라, **진입로 보호구역 횡단보도(S)의 사람이 교차로의 C
+        보행신호를 보고** 건널지 말지를 정했다. 그 둘은 아예 다른 신호기다 — S 는 교차로 주기와
+        따로 도는 보호구역 신호기이고(SCHOOL_ZONE_PROGRAM), 교차로에서 한참 앞에 있다.
+
+        조용히 어긋나는 종류의 버그였다: 타입은 맞고(셋 다 CrosswalkId), 화면 없이 달려 보는
+        검증기는 **처음부터 제 신호를 보고 있어서**(scenarios/playSim.ts 의 pedSignal) 검증은
+        통과하는데 실제 게임에서만 사람이 엉뚱한 때에 건넜다.
+      */
+      const signal = pedSignalFor(p.crosswalk, {
+        intersection: { pedA: phase.pedA, pedC: phase.pedC },
+        installed: this.scenario.pedSignalInstalled,
+        zonePed: zonePhase?.ped ?? null,
+      });
       /*
         코앞까지 온 교차 통행 차량이 있으면 그 사람은 한 발 기다린다 (TrafficCar 주석 참고).
 
