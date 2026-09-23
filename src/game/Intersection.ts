@@ -8,6 +8,8 @@
 import * as THREE from 'three';
 import {
   CROSSWALK_INNER,
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_OUTER,
   LANE_1_OFFSET,
   LANE_WIDTH,
@@ -272,9 +274,13 @@ function drawCrosswalks(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   const stripe = 0.45;
   const gap = 0.45;
 
-  // 남·북 (남북 도로를 가로지름 — 띠가 z 방향으로 길다)
-  for (const sign of [1, -1]) {
-    const z0 = sign > 0 ? CROSSWALK_INNER : -CROSSWALK_OUTER;
+  /*
+    남·북 (남북 도로를 가로지름 — 띠가 z 방향으로 길다).
+
+    **북쪽 것의 자리는 코스마다 다르다.** 사거리 맵에서는 교차로 건너편(A 와 대칭)이지만, 사거리 없는
+    전용 도로에서는 **세 번째 횡단보도**라 훨씬 멀리 떨어져 있다 (layout.ts 의 CROSSWALK_B_INNER).
+  */
+  for (const z0 of [CROSSWALK_INNER, zoneOnly ? CROSSWALK_B_OUTER : -CROSSWALK_OUTER]) {
     for (let x = -ROAD_HALF_WIDTH + 0.3; x < ROAD_HALF_WIDTH - 0.3; x += stripe + gap) {
       ctx.fillRect(cx(x), cy(z0), toPx(stripe), toPx(CROSSWALK_OUTER - CROSSWALK_INNER));
     }
@@ -303,7 +309,7 @@ function drawStopLines(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   */
   if (zoneOnly) {
     ctx.fillRect(cx(0.15), cy(STOP_LINE), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
-    ctx.fillRect(cx(0.15), cy(-CROSSWALK_INNER + 2), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
+    ctx.fillRect(cx(0.15), cy(CROSSWALK_B_INNER + 2), toPx(ROAD_HALF_WIDTH - 0.4), toPx(w));
     ctx.restore();
     return;
   }
@@ -542,12 +548,14 @@ function drawApproachZone(ctx: CanvasRenderingContext2D): void {
  */
 function drawZoneRoadMarks(ctx: CanvasRenderingContext2D): void {
   const MID_X = PAINT_X0 + PAINT_W / 2;
-  // 첫 횡단보도(70) 뒤 · 두 번째(20.8) 뒤 · 세 번째(-20.8) 뒤 — 횡단보도 사이마다 한 벌
-  for (const top of [40.0, 8.0, -24.0]) {
+  // 횡단보도 사이마다 한 벌 — 첫(70) 뒤 · 두 번째(20.8) 뒤, 그리고 세 번째(-36) 앞
+  for (const top of [40.0, 4.0, -18.0]) {
     drawRoadTextRow(ctx, '어린이', MID_X, top);
     drawRoadTextRow(ctx, '보호구역', MID_X, top - 5.5);
     drawSpeedLimitMark(ctx, 30, MID_X, top - 10.5, 3.0);
   }
+  // 마지막 횡단보도를 지난 뒤에도 구역은 이어진다 — 속도표시 한 번 더
+  drawSpeedLimitMark(ctx, 30, MID_X, CROSSWALK_B_OUTER - 6.0, 3.0);
 }
 
 /** 노면 문자와 속도표시 — 차선 위에 얹는다 */

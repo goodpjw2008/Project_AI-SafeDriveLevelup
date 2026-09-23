@@ -18,6 +18,8 @@ import {
   ROAD_HALF_WIDTH,
   STOP_LINE,
   CROSSWALK_S_INNER,
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_S_OUTER,
   STOP_LINE_S,
   APPROACH_ZONE_FAR_Z,
@@ -817,7 +819,7 @@ export class Game {
     for (const [id, near, far] of [
       ['S', CROSSWALK_S_OUTER, CROSSWALK_S_INNER],
       ['A', CROSSWALK_OUTER, CROSSWALK_INNER],
-      ['B', -CROSSWALK_INNER, -CROSSWALK_OUTER],
+      ['B', CROSSWALK_B_INNER, CROSSWALK_B_OUTER],
     ] as const) {
       if (this.scenario.zoneSignals?.[id] === undefined) continue;
       const mid = (near + far) / 2;

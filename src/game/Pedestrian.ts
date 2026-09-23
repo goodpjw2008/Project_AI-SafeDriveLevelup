@@ -13,6 +13,8 @@
 import * as THREE from 'three';
 import { CROSSWALK_INNER, CROSSWALK_OUTER,
   CROSSWALK_S_INNER,
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_S_OUTER,
 } from '../layout';
 import { PedWalk, type CarFront, type PedWalkContext } from './pedWalk';
@@ -22,6 +24,7 @@ import type { PedSpawn } from '../scenarios/scenarios';
 const CROSSWALK_CENTER = (CROSSWALK_INNER + CROSSWALK_OUTER) / 2;
 /** 진입부 보호구역 횡단보도의 한가운데 (z) */
 const CROSSWALK_S_CENTER = (CROSSWALK_S_INNER + CROSSWALK_S_OUTER) / 2;
+const CROSSWALK_B_CENTER = (CROSSWALK_B_INNER + CROSSWALK_B_OUTER) / 2;
 
 /**
  * 같은 보도에 선 사람들이 서로 겹치지 않도록 **횡단보도 폭 안에서** 자리를 어긋나게 둔다.
@@ -302,14 +305,14 @@ export class Pedestrian {
     const dir = this.walk.dir;
     /*
       **S · B 는 A 와 같은 방향으로 걷는다** — 셋 다 남북 도로를 가로지르므로 x 축으로 간다.
-      다른 것은 자리 하나뿐이다 — S 는 z 48, A 는 16.8, B 는 교차로 건너편이라 -16.8 이다.
+      다른 것은 자리 하나뿐이다 (layout.ts 의 CROSSWALK_* — S 68 · A 16.8 · B -38).
     */
     if (this.crosswalk === 'S' || this.crosswalk === 'A' || this.crosswalk === 'B') {
       const center =
         this.crosswalk === 'S'
           ? CROSSWALK_S_CENTER
           : this.crosswalk === 'B'
-            ? -CROSSWALK_CENTER
+            ? CROSSWALK_B_CENTER
             : CROSSWALK_CENTER;
       const across = center + this.offset;
       // 남북 도로를 가로지름 — x축으로 이동

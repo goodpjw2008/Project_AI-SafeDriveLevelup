@@ -75,6 +75,7 @@ const LEAD_HALF_LENGTH = 2.3;
 /** 횡단보도 한가운데 (Pedestrian.ts 와 같다) */
 const CROSSWALK_CENTER = (CROSSWALK_INNER + CROSSWALK_OUTER) / 2;
 const CROSSWALK_S_CENTER = (CROSSWALK_S_INNER + CROSSWALK_S_OUTER) / 2;
+const CROSSWALK_B_CENTER = (CROSSWALK_B_INNER + CROSSWALK_B_OUTER) / 2;
 /** 막 모는 사람이 핸들을 감는 정도 — 규정대로의 이만큼만 감아 바깥 차로로 크게 돈다 */
 const RECKLESS_STEER = 0.6;
 /** 같은 보도에 선 사람끼리의 자리 (Pedestrian.ts 의 WAIT_SLOTS) */
@@ -543,7 +544,17 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     // ── 충돌 · 끝 ── (Game.checkCollisions · checkEnd)
     walkers.forEach((w, i) => {
       if (ended || w.done) return;
-      const across = (w.crosswalk === 'S' ? CROSSWALK_S_CENTER : CROSSWALK_CENTER) + offsets[i];
+      /*
+        **횡단보도마다 제 자리에 세운다** (game/Pedestrian.ts 의 같은 표). B 를 빠뜨려 두었더니
+        세 번째 횡단보도 사람이 **두 번째 자리에서** 부딪힘 검사를 받고 있었다 — 판정(lawRules)은
+        제 자리로 보는데 충돌만 엉뚱한 곳에서 보는 어긋남이라, 눈에 띄지 않은 채 남아 있었다.
+      */
+      const across =
+        (w.crosswalk === 'S'
+          ? CROSSWALK_S_CENTER
+          : w.crosswalk === 'B'
+            ? CROSSWALK_B_CENTER
+            : CROSSWALK_CENTER) + offsets[i];
       const px = w.crosswalk === 'C' ? across : w.axis;
       const pz = w.crosswalk === 'C' ? w.axis : across;
       if (Math.abs(w.axis) > CURB + 0.5) return;

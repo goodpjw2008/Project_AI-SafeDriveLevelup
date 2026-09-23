@@ -69,7 +69,7 @@ const SIGNAL_SCALE = 3.0;
  * 그렇다고 우회전신호등만큼 줄일 수도 없다. 이 등화는 **보호구역에 들어서는 순간**
  * (50m 밖)부터 읽혀야 설지 판단할 시간이 생긴다. 그 두 거리 사이에서 잡은 값이다.
  */
-export const ZONE_SIGNAL_SCALE = 2.2;
+export const ZONE_SIGNAL_SCALE = 1.9;
 
 /**
  * 보행신호등 확대 배율.
@@ -92,8 +92,25 @@ export const PED_SIGNAL_SCALE_NEAR = 1.2;
 /** 보행신호등 하우징 높이의 절반 — 배율마다 다르다 */
 export const pedSignalHalfHeight = (scale: number = PED_SIGNAL_SCALE): number => (0.86 * scale) / 2;
 
-/** 배면판이 하우징 밖으로 나오는 테두리 폭 (m) — 배율을 따라간다 */
-const backboardMargin = (scale: number): number => 0.22 * scale;
+/**
+ * **하우징(등화 몸통) 높이** — 배율 1 일 때 (m).
+ *
+ * 렌즈 지름이 0.32 라 위아래로 몸통이 조금씩 남는 정도다. 예전 0.46 은 남는 살이 두꺼워
+ * 신호등이 실물보다 세로로 둔해 보였고, 그만큼 앞길을 더 가렸다.
+ */
+const SIGNAL_BODY_H = 0.44;
+
+/**
+ * 배면판이 하우징 밖으로 나오는 테두리 폭 (m) — 배율을 따라간다.
+ *
+ * **가로와 세로를 따로 둔다.** 사방을 같은 폭으로 두르면 신호등의 **세로 덩치**가 그만큼 커지는데,
+ * 이 게임에서 신호등은 운전자의 **눈높이 정면**에 걸리므로 세로로 커진 만큼 그대로 길이 가려진다.
+ * 사용자가 짚었다: "첫 번째 차량신호등의 세로 크기가 너무 길어서 앞의 시야가 가려져."
+ *
+ * 실물 배면판도 좌우가 넓고 위아래는 좁다 — 렌즈 색이 묻히지 않게 하는 것은 **옆면 배경**이기 때문이다.
+ */
+const backboardMarginX = (scale: number): number => 0.22 * scale;
+const backboardMarginY = (scale: number): number => 0.07 * scale;
 
 /**
  * 차량신호등 전체(배면판 포함) 높이의 절반.
@@ -103,7 +120,7 @@ const backboardMargin = (scale: number): number => 0.22 * scale;
  * 상수를 남겨 두면 작은 등화를 큰 등화 기준으로 매달아 팔에서 20cm 씩 떨어진다.
  */
 export const vehicleSignalHalfHeight = (scale: number = SIGNAL_SCALE): number =>
-  (0.46 * scale + backboardMargin(scale)) / 2;
+  (SIGNAL_BODY_H * scale + backboardMarginY(scale)) / 2;
 
 /** 교차로 차량신호등(3.0배) 전체 높이의 절반 */
 export const VEHICLE_SIGNAL_HALF_HEIGHT = vehicleSignalHalfHeight();
@@ -307,13 +324,13 @@ export class VehicleSignal {
   constructor(S: number = SIGNAL_SCALE, withLeftArrow = true) {
     const lamps = withLeftArrow ? 4 : 3;
     const W = 0.4 * lamps * S;
-    const H = 0.46 * S;
-    const margin = backboardMargin(S);
+    const H = SIGNAL_BODY_H * S;
 
     // 배면판 — 실제 신호등에도 달려 있다. 하늘·건물을 배경으로 렌즈 색이
     // 묻히지 않게 해 주는 장치라, 시인성 개선의 절반은 여기서 나온다.
     // 테두리 폭도 배율을 따라간다 — 고정값으로 두면 크게 키웠을 때 테두리만 얇아진다.
-    this.backboardGeo = new THREE.BoxGeometry(W + margin, H + margin, 0.06);
+    // 가로는 넓게, 세로는 좁게 (위 backboardMarginX · backboardMarginY)
+    this.backboardGeo = new THREE.BoxGeometry(W + backboardMarginX(S), H + backboardMarginY(S), 0.06);
     const backboard = new THREE.Mesh(this.backboardGeo, this.backboardMat);
     backboard.position.z = -0.12;
     this.group.add(backboard);
@@ -323,9 +340,9 @@ export class VehicleSignal {
     this.group.add(housing);
 
     // 차양 (실제 신호등의 후드)
-    this.hoodGeo = new THREE.BoxGeometry(W, 0.08 * S, 0.26 * S);
+    this.hoodGeo = new THREE.BoxGeometry(W, 0.05 * S, 0.26 * S);
     const hood = new THREE.Mesh(this.hoodGeo, this.housingMat);
-    hood.position.set(0, H / 2 + 0.02 * S, 0.11 * S);
+    hood.position.set(0, H / 2 + 0.01 * S, 0.11 * S);
     this.group.add(hood);
 
     const radius = 0.16 * S;

@@ -210,22 +210,30 @@ export const SPAWN_SPEED_KMH = 30;
 export const FINISH_X = CROSSWALK_OUTER + 14.0; // 32.8
 
 /**
- * **교차로 건너편(북쪽) 횡단보도 B** — 교차로를 직진으로 통과하면 만나는 횡단보도다.
+ * **세 번째 횡단보도 B** — 사거리 없는 보호구역 전용 도로에서 마지막으로 만나는 횡단보도다
+ * (scenarios/zoneCourse.ts). 내가 남쪽에서 북으로 달리므로 가까운 쪽(먼저 닿는 가장자리)이
+ * `INNER`, 지나고 나면 `OUTER` 다.
  *
- * A 와 같은 남북 도로를 가로지르고 교차로를 사이에 두고 **정확히 대칭**이다 (game/Intersection.ts 가
- * 진작부터 둘 다 그리고 있었다 — 없던 것은 보행자와 판정뿐이다). 내가 남쪽에서 북으로 달리므로
- * 가까운 쪽(먼저 닿는 가장자리)이 `INNER`, 지나고 나면 `OUTER` 다.
+ * ## 왜 교차로 대칭이 아닌가
+ *
+ * 한때는 A 와 교차로를 사이에 두고 **정확히 대칭**(-14.8 / -18.8)이었다. 사거리 맵을 그대로 쓰던
+ * 자취인데, 그러면 두 번째와 세 번째 횡단보도가 **33m** 밖에 떨어지지 않는다 — 앞 횡단보도에서
+ * 떼자마자 다음 정지선이라 사용자가 짚었다: "횡단보도 사이의 간격이 너무 짧아."
+ *
+ * 지금은 **첫↔두 번째와 같은 간격(약 55m)** 으로 떨어뜨린다. 한 번 서고, 다시 속도를 붙이고,
+ * 다음을 알아보고 다시 줄이는 **한 호흡**이 사이마다 들어가야 '판단' 이 세 번인 판이 된다.
+ * 이 값을 쓰는 곳은 전용 도로뿐이라(우회전 코스는 A 와 C 를 쓴다) 기존 판은 흔들리지 않는다.
  */
-export const CROSSWALK_B_INNER = -CROSSWALK_INNER; // -14.8
-export const CROSSWALK_B_OUTER = -CROSSWALK_OUTER; // -18.8
+export const CROSSWALK_B_INNER = -36.0;
+export const CROSSWALK_B_OUTER = CROSSWALK_B_INNER - CROSSWALK_WIDTH; // -40
 
 /**
- * **직진 코스의 완료 판정선** — 건너편 횡단보도를 완전히 벗어난 뒤 (어린이보호구역 직진 연습).
+ * **직진 코스의 완료 판정선** — 마지막 횡단보도를 완전히 벗어난 뒤 (어린이보호구역 직진 연습).
  *
- * 우회전 코스의 `FINISH_X` 와 같은 거리를 북쪽으로 잡는다. 노면은 북쪽 76m 까지 그려지므로
+ * 우회전 코스의 `FINISH_X` 와 같은 거리를 횡단보도 너머로 잡는다. 노면은 북쪽 76m 까지 그려지므로
  * (game/Intersection.ts 의 EXTENT) 이 선은 길 위에 있다.
  */
-export const FINISH_Z = -(CROSSWALK_OUTER + 14.0); // -32.8
+export const FINISH_Z = CROSSWALK_B_OUTER - 14.0; // -54
 
 /**
  * 방향지시등 의무 개시 지점.
