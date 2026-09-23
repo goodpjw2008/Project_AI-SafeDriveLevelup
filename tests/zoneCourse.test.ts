@@ -2,8 +2,9 @@
  * **어린이보호구역 전용 도로** (scenarios/zoneCourse.ts).
  *
  * 사용자가 정한 코스다 — "어린이 보호구역 연습은 사거리가 나오지 말아야 해. 사거리 없는 상황에서만
- * 어린이 보호구역 주행 연습이 되도록 전용맵을 만들어줘. 중간에 신호등 있는 횡단보도와 없는 횡단보도가
- * 섞여 나오게 하고, 보행자들만 변수로." 여기서 확인하는 것은 셋이다.
+ * 어린이 보호구역 주행 연습이 되도록 전용맵을 만들어줘." 길은 **두 가지**이고(무신호·신호·신호 /
+ * 신호·신호·무신호), 가운데 신호 횡단보도에 30km/h 단속 카메라가 함께 선다. 그 위에
+ * **보행자 셋 — 있고 없음 · 오는 쪽 · 사람 수 — 이 변수로 얹힌다.** 여기서 확인하는 것은 셋이다.
  *
  *  1. **판이 성립하는가** — 규정대로 몰면 위반 없이 통과하고, 막 몰면 걸린다 (검증기 전수)
  *  2. **번호가 겹치지 않는가** — 이 코스는 자기 번호(50001~)를 쓴다. 겹치면 한 번호가 두 판을 가리킨다
@@ -47,16 +48,62 @@ describe('어린이보호구역 전용 도로', () => {
     }
   });
 
-  /* 사용자가 정한 핵심 — 한 길에 신호등 있는 횡단보도와 없는 횡단보도가 섞인다 */
-  it('신호등이 하나도 없는 길부터 세 곳 다 있는 길까지 섞여 있다', () => {
-    const counts = new Map<number, number>();
+  /*
+    **사용자가 정한 길은 둘뿐이다.**
+
+      1. 무신호 → 신호(단속 카메라) → 신호
+      2. 신호 → 신호(단속 카메라) → 무신호
+
+    둘 다 **무신호 한 곳 · 신호 두 곳**이라 모든 판이 '규칙 갈아타기' 를 묻고, 서로 뒤집힌 배치라
+    **첫 곳이 어땠는지로 다음을 짐작할 수 없다.** 이 둘이 아닌 길이 한 판이라도 섞이면 그 뜻이 깨진다.
+  */
+  it('길은 두 가지뿐이다 — 무신호·신호·신호 / 신호·신호·무신호', () => {
+    const shapes = new Map<string, number>();
     for (const s of courses) {
-      const n = Object.keys(s.zoneSignals ?? {}).length;
-      counts.set(n, (counts.get(n) ?? 0) + 1);
+      const key = (['S', 'A', 'B'] as const)
+        .map((at) => (s.zoneSignals?.[at] !== undefined ? '신호' : '무신호'))
+        .join('·');
+      shapes.set(key, (shapes.get(key) ?? 0) + 1);
     }
-    for (const n of [0, 1, 2, 3]) expect(counts.get(n) ?? 0, `신호등 ${n}개`).toBeGreaterThan(0);
-    // 한 길 안에서 섞이는 판이 넉넉하다 (하나 또는 둘만 있는 길)
-    expect((counts.get(1) ?? 0) + (counts.get(2) ?? 0)).toBeGreaterThan(50);
+    expect([...shapes.keys()].sort()).toEqual(['무신호·신호·신호', '신호·신호·무신호']);
+    // 두 길이 고르게 나온다 — 한쪽만 잔뜩이면 '섞인 길' 을 겪지 못한다
+    for (const [shape, n] of shapes) expect(n, shape).toBeGreaterThan(courses.length / 3);
+  });
+
+  /*
+    **가운데 횡단보도에는 어느 길에서든 신호등이 있다.** 30km/h 과속 단속 카메라가 그 신호 지주에
+    함께 서기 때문이다 (game/Game.ts 의 buildZoneSpeedCamera) — 사용자가 사진을 주며 정한 자리다.
+    신호가 없으면 카메라가 기댈 지주가 없어 홀로 서게 되고, 사진의 '신호 과속단속장비' 가 아니게 된다.
+  */
+  it('가운데 횡단보도에는 늘 신호등이 있다 — 단속 카메라가 함께 서는 자리다', () => {
+    for (const s of courses) expect(s.zoneSignals?.A, s.title).toBeDefined();
+  });
+
+  /*
+    **보행자 변수 셋** — 사용자가 정했다: "보행자 여부, 보행자 방향, 보행자 명수가 변수로 들어오는 거야."
+    하나라도 한쪽으로 쏠리면 그 변수는 이름만 남는다.
+  */
+  it('보행자는 있고 없음 · 오는 쪽 · 사람 수 셋으로 갈린다', () => {
+    const none = courses.filter((s) => s.pedestrians.length === 0);
+    const right = courses.filter((s) => s.pedestrians.some((p) => p.from === 'right'));
+    const left = courses.filter((s) => s.pedestrians.some((p) => p.from === 'left'));
+    // 한 횡단보도에 둘 — 양쪽에서 하나씩이라야 '한쪽만 보고 출발하면 걸린다' 가 성립한다
+    const pair = courses.filter((s) =>
+      (['S', 'A', 'B'] as const).some((at) => {
+        const here = s.pedestrians.filter((p) => p.crosswalk === at);
+        return here.length === 2 && new Set(here.map((p) => p.from)).size === 2;
+      }),
+    );
+    expect(none.length).toBeGreaterThan(0);
+    expect(right.length).toBeGreaterThan(20);
+    expect(left.length).toBeGreaterThan(20);
+    expect(pair.length).toBeGreaterThan(10);
+    // 한 횡단보도에 셋 이상은 두지 않는다 — 길이 사람으로 막힌다
+    for (const s of courses) {
+      for (const at of ['S', 'A', 'B'] as const) {
+        expect(s.pedestrians.filter((p) => p.crosswalk === at).length, s.title).toBeLessThanOrEqual(2);
+      }
+    }
   });
 
   /*

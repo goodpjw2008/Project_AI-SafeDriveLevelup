@@ -420,7 +420,7 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
   const track = plan.track ?? 'both';
   /*
     **보호구역 전용 갈래는 다른 판 묶음에서 고른다** (scenarios/zoneCourse.ts) — 우회전 없이 보호구역을
-    직진으로 통과하는 362판이다. 기존 라이브러리에는 그런 판이 하나도 없으므로 거르는 것이 아니라 **갈아 끼운다.**
+    직진으로 통과하는 126판이다. 기존 라이브러리에는 그런 판이 하나도 없으므로 거르는 것이 아니라 **갈아 끼운다.**
   */
   const all =
     track === 'zone' ? zoneEntries() : scenarioLibrary().filter((e) => inTrack(e.tags, track));
