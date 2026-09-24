@@ -8,7 +8,19 @@
 
 import { describe, expect, it } from 'vitest';
 import { scenarioLibrary } from '../src/scenarios/library';
-import { inTrack, trackOf, TRACKS, TRACK_READY } from '../src/scenarios/tracks';
+import {
+  inTrack,
+  pickTrack,
+  trackOf,
+  TRACKS,
+  TRACK_READY,
+  ZONE_GAP,
+  type TrackChoice,
+} from '../src/scenarios/tracks';
+import { practiceTrack } from '../src/scenarios/trackPick';
+import { recentTracks, trackOfId } from '../src/scenarios/scenarioCode';
+import { zoneCourses } from '../src/scenarios/zoneCourse';
+import { defaultSave, migrateTrack, type SaveData } from '../src/economy/save';
 import { candidatesFor } from '../src/scenarios/recommend';
 import type { Plan } from '../src/scenarios/generate';
 
@@ -117,5 +129,119 @@ describe('추천이 갈래를 지킨다', () => {
     const cands = candidatesFor(plan({ level: 6, schoolZone: true }), []);
     expect(cands.length).toBeGreaterThan(0);
     expect(cands.some((e) => e.tags.zone === 'yes' || e.tags.approach !== 'none')).toBe(true);
+  });
+});
+
+/*
+  **갈래를 AI 가 고른다** (tracks.ts 의 `pickTrack` · trackPick.ts). 사용자가 정했다:
+  "3개 중 선택을 하게 되어 있어. 자동으로 선택이 되게 해 줘."
+
+  여기서 못 박는 것은 **고른 까닭이 실제로 작동하는가** 다. 자동이 늘 같은 갈래만 주면
+  손으로 고르던 때보다 오히려 좁아지고, 전용 도로(180판)는 영영 안 나온다.
+*/
+describe('자동으로 갈래 고르기', () => {
+  const pick = (over: Partial<Parameters<typeof pickTrack>[0]> = {}) =>
+    pickTrack({ level: 5, habit: null, recent: [], ...over });
+
+  it('보호구역을 배우기 전(L1)에는 우회전부터', () => {
+    expect(pick({ level: 1 }).track).toBe('turn');
+    // 보호구역은 L2 에서 열린다 (library.ts 의 levelGuide) — 그 뒤로는 갈래가 갈린다
+    expect(pick({ level: 2 }).track).not.toBe('turn');
+  });
+
+  it('전용 도로를 다섯 판째 못 만났으면 전용 도로를 준다', () => {
+    const noZone = Array.from({ length: ZONE_GAP }, () => 'both' as const);
+    expect(pick({ recent: noZone }).track).toBe('zone');
+    // 그 안에 한 번이라도 있었으면 차례가 아니다
+    expect(pick({ recent: [...noZone.slice(1), 'zone'] }).track).not.toBe('zone');
+  });
+
+  it('기록이 아직 다섯 판이 안 되면 차례를 세지 않는다 — 처음 온 사람에게 전용 도로부터 주지 않는다', () => {
+    expect(pick({ recent: ['both', 'both'] }).track).toBe('both');
+  });
+
+  it('고칠 습관이 보호구역 것이면 전용 도로 — 한 판에 횡단보도 셋을 묻는다', () => {
+    for (const h of ['SCHOOL_ZONE_NO_STOP', 'SCHOOL_ZONE_RED', 'STRAIGHT_RED']) {
+      expect(pick({ habit: h }).track, h).toBe('zone');
+    }
+  });
+
+  it('고칠 습관이 우회전 것이면 보호구역 없는 교차로', () => {
+    for (const h of ['WIDE_TURN', 'NO_TURN_SIGNAL', 'NO_SLOW_DOWN', 'RIGHT_ARROW_RED', 'BLOCKING_INTERSECTION']) {
+      expect(pick({ habit: h }).track, h).toBe('turn');
+    }
+  });
+
+  /*
+    적색 일시정지 · 보행자 먼저 · 정지선 · 자전거는 **어느 갈래에서나** 나온다. 갈래를 좁혀 봤자
+    얻는 것이 없고 고를 수 있는 판만 줄어든다.
+  */
+  it('어느 갈래에서나 나오는 습관이면 좁히지 않는다', () => {
+    for (const h of ['RED_NO_STOP', 'PEDESTRIAN_BLOCKED', 'OVER_STOP_LINE', 'BIKE_BLOCKED']) {
+      expect(pick({ habit: h }).track, h).toBe('both');
+    }
+  });
+
+  it('고른 까닭을 반드시 말한다 — 말하지 않으면 자동은 깜깜이다', () => {
+    for (const p of [pick(), pick({ level: 1 }), pick({ habit: 'WIDE_TURN' }), pick({ recent: Array(ZONE_GAP).fill('both') })]) {
+      expect(p.why.length).toBeGreaterThan(5);
+    }
+  });
+
+  it('굴림이 섞이지 않는다 — 첫 화면에 적어 둔 것과 실제 판이 같아야 한다', () => {
+    const input = { level: 7, habit: 'PEDESTRIAN_BLOCKED', recent: ['both', 'zone', 'turn'] as const };
+    const first = pickTrack({ ...input, recent: [...input.recent] });
+    for (let i = 0; i < 20; i++) {
+      expect(pickTrack({ ...input, recent: [...input.recent] })).toEqual(first);
+    }
+  });
+});
+
+describe('판 번호로 갈래를 되찾는다', () => {
+  it('C 는 보호구역 전용 · L 은 우회전 전용 · M 은 복합', () => {
+    for (const e of lib) expect(trackOfId(e.spec.id)).toBe(trackOf(e.tags));
+    for (const s of zoneCourses()) expect(trackOfId(s.id)).toBe('zone');
+  });
+
+  it('모르는 번호는 세지 않는다 — 손으로 만든 옛 판이 기록에 남아 있다', () => {
+    expect(trackOfId(999_999_999)).toBeUndefined();
+    expect(recentTracks([999_999_999, lib[0].spec.id])).toEqual([trackOf(lib[0].tags)]);
+  });
+});
+
+describe('손으로 고른 갈래가 AI 보다 앞선다', () => {
+  const saveWith = (track: TrackChoice): SaveData => {
+    const s = defaultSave();
+    s.settings.track = track;
+    return s;
+  };
+
+  it("'자동' 이면 AI 가 고르고, 고른 것임을 알린다", () => {
+    const chosen = practiceTrack(saveWith('auto'));
+    expect(chosen.auto).toBe(true);
+    expect(TRACKS).toContain(chosen.track);
+  });
+
+  it('갈래를 고른 사람에게는 그 갈래 그대로', () => {
+    for (const t of TRACKS) {
+      const chosen = practiceTrack(saveWith(t));
+      expect(chosen.track).toBe(t);
+      expect(chosen.auto).toBe(false);
+    }
+  });
+
+  /*
+    v12 까지의 기본값은 '둘 다' 였다 — **고른 것이 아니라 고르지 않으면 되던 값**이다.
+    자동이 기본이 된 마당에 그것만 남겨 두면 지금까지 쓰던 사람만 자동을 못 만난다.
+  */
+  it("예전 저장본의 '둘 다' 는 자동으로 옮기고, 손으로 고른 것은 그대로 둔다", () => {
+    expect(migrateTrack('both', 12)).toBe('auto');
+    expect(migrateTrack('turn', 12)).toBe('turn');
+    expect(migrateTrack('zone', 12)).toBe('zone');
+    // v13 뒤에 고른 '둘 다' 는 고른 것이므로 지킨다
+    expect(migrateTrack('both', 13)).toBe('both');
+    // 모르는 값 · 없는 값
+    expect(migrateTrack('구버전이름', 13)).toBe('auto');
+    expect(migrateTrack(undefined, 13)).toBe('auto');
   });
 });

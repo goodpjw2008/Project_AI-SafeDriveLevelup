@@ -44,6 +44,7 @@ import {
 } from './scenarios/library';
 import { zoneCourse, zoneDemoCourses } from './scenarios/zoneCourse';
 import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
+import { practiceTrack } from './scenarios/trackPick';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
   masterPick,
@@ -197,11 +198,11 @@ async function makeAiScenario(): Promise<void> {
   */
   const noSignalDue = noSignalZoneDue(saveData.history.map((r) => r.st));
   /*
-    **무엇을 연습하는 갈래인가** (scenarios/tracks.ts) — 첫 화면에서 고른다. 우회전 전용을 골랐으면
-    보호구역 차례를 아예 굴리지 않는다: 그 갈래에는 보호구역 판이 없어, 차례만 서고 판은 안 나오면
-    "보호구역 차례인데 우회전 판" 이라는 어긋난 설명이 화면에 뜬다.
+    **무엇을 연습하는 갈래인가** (scenarios/tracks.ts) — 기본은 **자동**이고, AI 가 고칠 습관과 기록을
+    보고 고른다. 우회전 전용이면 보호구역 차례를 아예 굴리지 않는다: 그 갈래에는 보호구역 판이 없어,
+    차례만 서고 판은 안 나오면 "보호구역 차례인데 우회전 판" 이라는 어긋난 설명이 화면에 뜬다.
   */
-  const track = saveData.settings.track;
+  const track = practiceTrack(saveData).track;
   const zoneDueHere = noSignalDue && track !== 'turn';
   const plan = {
     level: c.level,

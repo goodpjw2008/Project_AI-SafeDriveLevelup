@@ -32,7 +32,7 @@
 
 import type { ScenarioSpec } from './scenarios';
 import { scenarioLibrary } from './library';
-import { trackOf } from './tracks';
+import { trackOf, type PracticeTrack } from './tracks';
 import { zoneCourses } from './zoneCourse';
 
 /** 갈래 한 글자 */
@@ -77,6 +77,24 @@ const load = (): CodeTable => (table ??= build());
 
 /** 이 판의 번호 — 라이브러리 밖의 판(AI 가 그 자리에서 만든 판)이면 `undefined` */
 export const scenarioCode = (id: number): string | undefined => load().byId.get(id);
+
+/** 갈래 글자 ↔ 연습 갈래 (tracks.ts) — 같은 것을 둘로 부르고 있어 한 자리에 적어 둔다 */
+export const CODE_TRACK: Record<CodeLetter, PracticeTrack> = { C: 'zone', L: 'turn', M: 'both' };
+
+/**
+ * **그 판은 어느 갈래였나** — 기록에 남는 것은 판 번호(id)뿐이라 번호로 되찾는다.
+ *
+ * 자동 고르기가 "전용 도로를 몇 판째 못 만났나" 를 세는 데 쓴다 (tracks.ts 의 pickTrack).
+ * 모르는 번호(손으로 만든 옛 판)는 `undefined` — 세지 않는다.
+ */
+export const trackOfId = (id: number): PracticeTrack | undefined => {
+  const code = scenarioCode(id);
+  return code ? CODE_TRACK[code[0] as CodeLetter] : undefined;
+};
+
+/** 기록의 판 번호들을 갈래로 옮긴다 — 차례는 그대로다 (뒤가 최신) */
+export const recentTracks = (ids: readonly number[]): PracticeTrack[] =>
+  ids.map(trackOfId).filter((t): t is PracticeTrack => t !== undefined);
 
 /** 번호로 판 찾기 — 없는 번호면 `undefined` */
 export const scenarioByCode = (code: string): ScenarioSpec | undefined =>

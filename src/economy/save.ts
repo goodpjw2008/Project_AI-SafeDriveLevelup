@@ -10,11 +10,17 @@ import { defaultGraphics, graphicsFromSaved, type GraphicsSettings } from '../ga
 import { DEFAULT_SOUNDS } from '../game/soundAssets';
 import { freshCurriculum, unlockedLevel, type CurriculumState } from '../scenarios/curriculum';
 import { DEFAULT_CHALLENGE, type Challenge } from '../scenarios/challenge';
-import { TRACKS, type PracticeTrack } from '../scenarios/tracks';
+import { TRACK_CHOICES, type TrackChoice } from '../scenarios/tracks';
 import { habitsTestedBy, libraryEntry } from '../scenarios/library';
 import { badgesFromHistory, freshBadges, normalizeBadges, type BadgeState } from './badges';
 
 const KEY = 'turn-right:save:v1';
+
+/** 저장된 연습 갈래를 받아 준다 — 모르는 값과 v13 이전의 '둘 다' 는 '자동' 이 된다 */
+export function migrateTrack(saved: unknown, from: number): TrackChoice {
+  if (!TRACK_CHOICES.includes(saved as TrackChoice)) return 'auto';
+  return from < 13 && saved === 'both' ? 'auto' : (saved as TrackChoice);
+}
 
 /**
  * 저장 스키마 버전.
@@ -45,6 +51,9 @@ const KEY = 'turn-right:save:v1';
  *      그대로지만 `level` 의 뜻이 달라졌다 — 예전에는 올라와서 서 있는 자리였고
  *      지금은 **주어진 자리**다. 아래 `bestLevel` 보정이 그 차이를 안다.
  *
+ * v13 — 연습 갈래가 **자동**(AI 가 고른다)으로 기본이 바뀌었다. v12 까지의 기본값 '둘 다' 는
+ *      고른 것이 아니라 고르지 않으면 되던 값이라 자동으로 옮긴다 — 손으로 고른 '우회전' ·
+ *      '어린이보호구역' 은 그대로 둔다 (migrateTrack).
  * v11 — 화질에 **렌더 해상도** 항목이 생겼다. 없던 항목이라 예전 저장본은 기본값 '자동' 으로 채워지는데,
  *      '낮음' 프리셋은 75% 라 **네 항목이 낮음과 똑같은데도 프리셋이 풀린 채로** 설정이 열렸다. 사용자가
  *      세 번 물었다 — "전체 프리셋에 아무것도 설정되어 있지 않아." 그래서 v11 미만 저장본은 나머지 네
@@ -60,7 +69,7 @@ const KEY = 'turn-right:save:v1';
  * **버전이 올랐다고 전부 버리지는 않는다.** 항목마다 언제부터 뜻이 달라졌는지가 다르므로
  * 저장본의 버전을 보고 해당 항목만 되돌린다 — 상점 때문에 최고 등급 기록까지 날릴 이유가 없다.
  */
-const VERSION = 12;
+const VERSION = 13;
 
 /**
  * 주행 한 판의 기록 — **습관 진단에 쓰는 것만** 남긴다.
@@ -176,7 +185,7 @@ export interface SaveData {
      * AI 가 고를 코스의 **범위**만 좁힌다 — 셋으로 나눠 각각 레벨을 올리게 하면, 방금 빠르게 만든 레벨업을
      * 세 번 되풀이하게 된다.
      */
-    track: PracticeTrack;
+    track: TrackChoice;
     /**
      * 고른 소리 (soundAssets.ts 의 각 목록에 있는 id).
      *
@@ -234,7 +243,7 @@ export function defaultSave(): SaveData {
       startView: 'chase',
       autoNextStage: true,
       difficulty: DEFAULT_CHALLENGE,
-      track: 'both',
+      track: 'auto',
       graphics: defaultGraphics(),
       sounds: { ...DEFAULT_SOUNDS },
     },
@@ -295,11 +304,13 @@ export function load(): SaveData {
         sounds: { ...base.settings.sounds, ...(parsed.settings?.sounds ?? {}) },
         /*
           연습 갈래는 **아는 값인지 확인하고 받는다** — 손으로 고친 저장본이나 예전 이름이 들어오면
-          추천이 후보를 하나도 못 찾는다. 모르면 '둘 다'(지금까지의 동작)로 돌린다.
+          추천이 후보를 하나도 못 찾는다. 모르면 '자동'(기본값)으로 돌린다.
+
+          **v13 이전 저장본의 '둘 다' 는 '자동' 으로 옮긴다.** 그 값은 고른 것이 아니라 **고르지 않으면
+          되던 기본값**이었다 (v12 까지의 defaultSave). 자동이 기본이 된 마당에 예전 기본값만 남겨 두면
+          지금까지 쓰던 사람만 자동을 못 만난다. 손으로 '우회전' · '어린이보호구역' 을 고른 것은 그대로 둔다.
         */
-        track: TRACKS.includes(parsed.settings?.track as PracticeTrack)
-          ? (parsed.settings!.track as PracticeTrack)
-          : 'both',
+        track: migrateTrack(parsed.settings?.track, from),
       },
       stats: { ...base.stats, ...(parsed.stats ?? {}) },
       /*
