@@ -149,9 +149,15 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
     return n;
   };
 
-  it('어려울수록 한 레벨에 더 오래 머문다 — 쉬움 ~ 보통은 사용자가 정한 판 수 그대로', () => {
-    expect(runsToLevelUp(6, 1)).toBe(runsToLevelUp(6, 3));
-    expect(runsToLevelUp(6, 3)).toBeLessThan(runsToLevelUp(6, 5));
+  /*
+    **레벨업은 어느 난이도에서도 무위반 두 판이다** (curriculum.ts 의 XP_MAX). 사용자가 정했다:
+    "각 단계의 레벨을 200점을 맥스로 해 줘 … 레벨이 쉽게 올라야 사용자들이 체감하기 좋을 것 같아."
+
+    그래서 난이도가 **판 수**로 어려워지지 않는다 — 판을 더 많이 달리게 하는 것은 어려움이 아니라
+    시간이 더 드는 것뿐이다. 어려움이 갈리는 자리는 **감점**(아래)과 코스 · 주행 · 도움이다.
+  */
+  it('레벨업은 어느 난이도에서도 무위반 두 판이다', () => {
+    for (const c of [1, 3, 5] as const) expect(runsToLevelUp(6, c), `난이도 ${c}`).toBe(2);
   });
 
   it('어려움(5)은 위반한 판에서 80 을, 쉬움(1)은 20 을 잃는다', () => {
@@ -166,7 +172,7 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
     expect(s.bestLevel).toBe(5);
   });
 
-  it('L10 에서 마스터에 필요한 경험치도 난이도를 따른다', () => {
+  it('L10 에서 마스터도 무위반 두 판이다', () => {
     const until = (c: 1 | 5): number => {
       let s = at(MAX_LEVEL);
       let n = 0;
@@ -176,8 +182,8 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
       }
       return n;
     };
-    // 보통 · 쉬움이 네 판(curriculum.ts 의 XP_TO_NEXT) — 어려움은 한 배 반
-    expect(until(1)).toBe(4);
-    expect(until(5)).toBe(6);
+    // 막대의 최대치가 200 이라 어느 난이도든 두 판이다 (curriculum.ts 의 XP_MAX)
+    expect(until(1)).toBe(2);
+    expect(until(5)).toBe(2);
   });
 });

@@ -12,6 +12,7 @@ import {
   MAX_LEVEL,
   XP_PER_CLEAN_RUN,
   XP_REPLAY,
+  XP_MAX,
   XP_TO_NEXT,
   xpToNext,
   START_LEVEL,
@@ -107,15 +108,16 @@ describe('진급', () => {
   });
 
   /*
-    **경험치 곡선** — 사용자가 "게임처럼 고렙일수록 경험치가 많아야" 라고 했고, 그 뒤 "저랩에서 너무 쉽게 올라간다" 고 했다.
-    그래서 가장 낮은 레벨도 여러 판, 위로 갈수록 오래 머문다.
+    **경험치 곡선은 평평하다** — 모든 레벨이 200, 새 맵 무위반 **두 판**이면 오른다.
+
+    사용자가 정한 값이다: "각 단계의 레벨을 200점을 맥스로 해 줘. 2게임만 성공하면 바로 레벨업이
+    되는 거지. 레벨이 쉽게 올라야 사용자들이 체감하기 좋을 것 같아." 그 전에는 2 · 2 · 3 · 3 ·
+    3 · 3 · 4 · 4 · 4 · 4판(모두 32판)이었고, 그보다 앞서는 55판이었다.
+
+    **두 판이 바닥이다.** 한때 L1~L3 이 한 판이면 올랐는데 사용자가 짚었다 — "1판만 했는데 레벨 2로
+    올라갔어." 한 판은 운일 수 있다(보행자가 마침 안 나왔거나 신호가 마침 맞았다).
   */
-  /*
-    **사용자가 정한 판 수** — "1~3까지는 2판만 깨면 되고 3~7까지는 3판만 깨면 되고 7에서 10은 4판만 깨면 레벨이
-    올라가도록" (L1→L2 · L2→L3 은 2판, L3→L4 … L6→L7 은 3판, L7→L8 … L9→L10 · L10→마스터는 4판). 그 전에는 3 · 3 · 4 ·
-    4 · 5 · 5 · 6 · 7 · 8 · 10판이라 "레벨이 너무 늦게 오르니까 흥미가 떨어진다" 고 했다.
-  */
-  it('낮은 레벨도 두 판이 들고, 높은 레벨일수록 여러 판이 든다', () => {
+  it('어느 레벨이든 새 맵 무위반 두 판이면 오른다', () => {
     const runsToLevelUp = (level: CurriculumState['level']): number => {
       let s = at(level);
       let n = 0;
@@ -125,23 +127,34 @@ describe('진급', () => {
       }
       return n;
     };
-    expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([2, 2, 3, 3, 3, 3, 4, 4, 4]);
-    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 안전운전 마스터').toBe(4);
+    expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([
+      2, 2, 2, 2, 2, 2, 2, 2, 2,
+    ]);
+    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 안전운전 마스터').toBe(2);
     for (let l = 1; l <= MAX_LEVEL; l++) {
-      expect(XP_TO_NEXT[l as 1] / XP_PER_CLEAN_RUN, `L${l} 은 한 판으로 오르지 않는다`).toBeGreaterThanOrEqual(2);
+      expect(XP_TO_NEXT[l as 1], `L${l}`).toBe(XP_MAX);
     }
-    for (let l = 2; l <= MAX_LEVEL; l++) {
-      expect(XP_TO_NEXT[l as 1], `L${l}`).toBeGreaterThanOrEqual(XP_TO_NEXT[(l - 1) as 1]);
-    }
-    expect(Object.values(XP_TO_NEXT).reduce((n, x) => n + x, 0) / XP_PER_CLEAN_RUN, '보통으로 마스터까지 새 맵 무위반 32판').toBe(32);
+    expect(
+      Object.values(XP_TO_NEXT).reduce((n, x) => n + x, 0) / XP_PER_CLEAN_RUN,
+      '마스터까지 새 맵 무위반 20판',
+    ).toBe(20);
   });
 
-  it('난이도가 필요한 경험치를 늘리고 줄인다', () => {
-    expect(xpToNext(5, { xpScale: 0.75, missPenalty: 0 })).toBe(250);
-    expect(xpToNext(5, { xpScale: 1.5, missPenalty: 60 })).toBe(450);
-    // 쉬움(×0.5)이어도 두 판 아래로는 내려가지 않는다 — 한 판은 운일 수 있다
-    for (let l = 1; l <= MAX_LEVEL; l++) {
-      expect(xpToNext(l as 1, { xpScale: 0.5, missPenalty: 0 }), `쉬움 L${l}`).toBeGreaterThan(XP_PER_CLEAN_RUN);
+  /*
+    **난이도는 필요한 경험치를 바꾸지 않는다** — 200 이 막대의 최대치이기 때문이다 (XP_MAX).
+    어려움이 어려운 자리는 **감점**과 코스 · 주행 · 도움이다 (challenge.ts). 판을 더 많이
+    달리게 하는 것은 어려움이 아니라 시간이 더 드는 것뿐이다.
+  */
+  it('난이도를 바꿔도 두 판이다 — 200 이 막대의 최대치다', () => {
+    for (const xpScale of [0.5, 0.75, 1, 1.25, 1.5]) {
+      for (let l = 1; l <= MAX_LEVEL; l++) {
+        const need = xpToNext(l as 1, { xpScale, missPenalty: 0 });
+        // 위로는 200 을 넘지 않고(XP_MAX), 아래로는 한 판으로 오르지 않는다(XP_FLOOR)
+        expect(need, `×${xpScale} L${l}`).toBeLessThanOrEqual(XP_MAX);
+        expect(need, `×${xpScale} L${l}`).toBeGreaterThan(XP_PER_CLEAN_RUN);
+        // 어느 쪽이든 **무위반 두 판**이다 — 경험치는 한 판에 100 씩 들어온다
+        expect(Math.ceil(need / XP_PER_CLEAN_RUN), `×${xpScale} L${l}`).toBe(2);
+      }
     }
   });
 
@@ -301,12 +314,15 @@ describe('마스터', () => {
   });
 
   it('중간에 틀리면 연속은 끊기지만 모은 경험치는 남는다 (감점 없는 난이도)', () => {
+    /*
+      **두 판이면 마스터다** (XP_MAX = 200). 그래서 '아직 마스터가 아닌' 자리를 보려면
+      한 판만 통과한 뒤 틀려야 한다 — 막대가 평평해지며 달라진 것은 판 수뿐이다.
+    */
     let s = toTop();
-    s = step(s, clean());
     s = step(s, clean());
     s = step(s, run(['PEDESTRIAN_BLOCKED']));
     expect(s.cleanStreak).toBe(0);
-    expect(s.xp).toBe(2 * XP_PER_CLEAN_RUN);
+    expect(s.xp).toBe(XP_PER_CLEAN_RUN);
     expect(s.mastered).toBe(false);
   });
 });
