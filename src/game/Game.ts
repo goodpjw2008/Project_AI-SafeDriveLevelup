@@ -23,6 +23,7 @@ import {
   CROSSWALK_S_OUTER,
   STOP_LINE_S,
   APPROACH_ZONE_FAR_Z,
+  SCHOOL_ZONE_FAR_Z,
 } from '../layout';
 import type { CarSpec } from '../economy/cars';
 import type {
@@ -1085,8 +1086,8 @@ export class Game {
     /*
       **표지판은 구간이 시작하는 자리에 선다.**
 
-      교차로가 보호구역이면 교차로 양옆(z ±26)에, 오는 길이 보호구역이면 그 구간이
-      시작하는 자리(APPROACH_ZONE_FAR_Z)에 세운다.
+      교차로가 보호구역이면 구역 경계(SCHOOL_ZONE_FAR_Z)와 우회전해 나가는 길에, 오는 길이
+      보호구역이면 그 구간이 시작하는 자리(APPROACH_ZONE_FAR_Z)에 세운다.
 
       진입부 표지판을 빠뜨렸더니 **구간에 들어선 것을 알 방법이 노면 색뿐**이었다.
       운전석 시점에서 노면 색이 바뀌는 것은 발밑에서 일어나는 일이라, 앞을 보고 달리는
@@ -1104,13 +1105,30 @@ export class Game {
       기둥은 남아 있어서 보행자 신호등과 헷갈려." 기둥의 주인은 신호등이 아니라 이 표지판이었다. 이제 앞면이 운전자를
       보고, 뒤에서 볼 때는 회색 뒷판이 보인다 — 어느 쪽에서도 **빈 기둥**으로 읽히지 않는다.
     */
-    const spots: Array<[number, number]> = [];
+    /*
+      **교차로 보호구역의 표지판도 구역이 시작하는 자리로 옮겼다.**
+
+      교차로 양옆(z ±26)에 세웠을 때는 **구역 안 27m 지점**이었다. 노면은 z 52.8 에서 이미 붉어지는데
+      표지판은 한참 뒤에 나타나, 운전자가 표지를 보고 들어가는 것이 아니라 들어온 뒤에 표지를 만났다.
+      진입부 보호구역이 이미 쓰고 있는 규칙(구간 시작 2m 앞)을 여기에도 그대로 쓴다.
+
+      북쪽(z -26) 표지판은 없앴다. 앞면이 +Z 를 보게 달려 있어 우회전하는 운전자에게도, 그대로 지나가는
+      운전자에게도 **뒷판(회색)만** 보였다 — 서 있을 뿐 아무에게도 읽히지 않았다.
+    */
+    const spots: Array<[number, number, number]> = [];
     if (this.scenario.isSchoolZone) {
-      spots.push([ROAD_HALF_WIDTH + 1.2, 26], [ROAD_HALF_WIDTH + 1.2, -26]);
+      spots.push([ROAD_HALF_WIDTH + 1.2, SCHOOL_ZONE_FAR_Z + 2, 0]);
+      /*
+        **우회전해 나가는 길에도 한 장.** 두 번째 횡단보도(제27조 제1항의 판단 자리)는 코너를 돈 뒤에
+        있는데, 그쪽을 보는 표지판이 하나도 없었다. 동쪽으로 달리는 운전자의 오른쪽 보도에 세우고
+        앞면이 -X(다가오는 운전자)를 보게 돌린다. 횡단보도 너머·끝선(FINISH_X) 앞이라 코너를 돌며
+        횡단보도와 함께 눈에 들어온다.
+      */
+      spots.push([CROSSWALK_OUTER + 7.0, ROAD_HALF_WIDTH + 1.2, -Math.PI / 2]);
     }
     if (this.scenario.approachSchoolZone) {
       // 진입 차로 쪽(오른쪽 보도)에만 — 운전자가 보는 쪽이다
-      spots.push([ROAD_HALF_WIDTH + 1.2, APPROACH_ZONE_FAR_Z + 2]);
+      spots.push([ROAD_HALF_WIDTH + 1.2, APPROACH_ZONE_FAR_Z + 2, 0]);
     }
 
     // 뒷판 — 마름모(텍스처 속 마름모와 같은 크기)를 회색으로. 실물 표지판도 뒤는 무늬 없는 금속판이다
@@ -1131,12 +1149,16 @@ export class Game {
       위로 올려서 기둥을 가려 줘." 실물도 기둥이 표지판 뒤에서 끝난다.
     */
     const SIGN_Y = 3.0;
-    for (const [x, z] of spots) {
+    for (const [x, z, rotY] of spots) {
+      // 표지판을 '운전자 쪽으로 내미는' 방향도 표지판이 보는 방향을 따라간다
+      const ax = Math.sin(rotY) * SIGN_AHEAD;
+      const az = Math.cos(rotY) * SIGN_AHEAD;
       const sign = new THREE.Mesh(geo, mat);
-      sign.position.set(x, SIGN_Y, z + SIGN_AHEAD);
+      sign.position.set(x + ax, SIGN_Y, z + az);
+      sign.rotation.y = rotY;
       const back = new THREE.Mesh(backGeo, backMat);
-      back.position.set(x, SIGN_Y, z + SIGN_AHEAD - 0.02);
-      back.rotation.set(0, Math.PI, Math.PI / 4);
+      back.position.set(x + ax * 0.875, SIGN_Y, z + az * 0.875);
+      back.rotation.set(0, rotY + Math.PI, Math.PI / 4);
       this.world.scene.add(sign, back, this.smallPole(x, z));
     }
   }

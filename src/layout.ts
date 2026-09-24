@@ -84,6 +84,18 @@ export const CROSSWALK_OUTER = CROSSWALK_INNER + CROSSWALK_WIDTH; // 18.8
  */
 export const STOP_LINE = CROSSWALK_OUTER + 2.0; // 20.8
 
+/**
+ * **교차로 보호구역**이 교차로 바깥으로 뻗는 거리 (m).
+ *
+ * 네 진출입로 모두에 같은 거리로 적용한다 — 실제 보호구역도 교차로를 통째로 품고 사방으로 뻗지,
+ * 교차로 안을 가르지 않는다. 노면 칠(Intersection.drawSchoolZonePavement)과 구역
+ * 표지판(Game.buildSchoolZoneSigns)이 **같은 값을 봐야** 표지판을 지나는 순간 노면이 붉어진다.
+ */
+export const SCHOOL_ZONE_REACH = 32.0;
+
+/** 교차로 보호구역의 남쪽 경계 — 운전자가 먼저 만나는 쪽이다 */
+export const SCHOOL_ZONE_FAR_Z = STOP_LINE + SCHOOL_ZONE_REACH; // 52.8
+
 /** 보도 바깥 경계 */
 export const SIDEWALK_OUTER = CROSSWALK_OUTER + 2.5; // 21.3
 

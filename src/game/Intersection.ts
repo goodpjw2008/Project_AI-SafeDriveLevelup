@@ -24,6 +24,7 @@ import {
   CROSSWALK_S_INNER,
   CROSSWALK_WIDTH,
   STOP_LINE_S,
+  SCHOOL_ZONE_FAR_Z,
 } from '../layout';
 
 /**
@@ -427,6 +428,43 @@ function drawRoadTextRow(
   ctx.restore();
 }
 
+/**
+ * 노면 문자 한 줄 — **동서 도로용**. 우회전해 동쪽으로 빠져나가는 운전자가 읽는다.
+ *
+ * 남북용(drawRoadTextRow)과 글자·크기는 같고 방향만 90° 돌아간다. 운전자의 진행 방향이 +X 이므로
+ * 글자 윗변은 +X 를, 글자가 늘어서는 방향은 운전자의 왼쪽(-Z)에서 오른쪽(+Z)을 향한다.
+ * 캔버스를 글자마다 돌려 같은 셈을 다시 쓴다.
+ */
+function drawRoadTextCol(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  centerZ: number,
+  charW = 1.32,
+  charH = 3.2,
+  gap = 0.15,
+): void {
+  const chars = [...text];
+  const total = chars.length * charW + (chars.length - 1) * gap;
+  const first = centerZ - total / 2 + charW / 2;
+
+  ctx.save();
+  ctx.fillStyle = '#f4f4f4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold ${toPx(charW)}px sans-serif`;
+
+  chars.forEach((ch, i) => {
+    ctx.save();
+    ctx.translate(cx(x), cy(first + i * (charW + gap)));
+    ctx.rotate(Math.PI / 2);
+    ctx.scale(1, charH / charW); // 폭 기준 글꼴을 진행 방향으로 늘린다
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
 /** 노면 화살표 — 플레이어 진입 차로(북행 2차로)에 우회전 표시 */
 function drawRoadArrows(ctx: CanvasRenderingContext2D, schoolZone: boolean, zoneOnly = false): void {
   // 사거리가 없으면 돌 곳이 없다 — 우회전 화살표를 그리면 없는 길을 가리킨다
@@ -487,9 +525,12 @@ function drawSpeedLimitMark(
   x: number,
   z: number,
   diameter: number,
+  eastbound = false,
 ): void {
   ctx.save();
   ctx.translate(cx(x), cy(z));
+  // 동서 도로에서는 진행 방향이 x 라, 늘이는 방향도 글자 방향도 90° 돌아간다
+  if (eastbound) ctx.rotate(Math.PI / 2);
   ctx.scale(1, 1.4);
   ctx.strokeStyle = '#f4f4f4';
   ctx.lineWidth = toPx(0.24);
@@ -553,7 +594,7 @@ function drawSchoolZonePavement(
 
   // 남북 차도 **양쪽** — 두 구간의 합집합 (z 가 큰 쪽이 남쪽 = 먼저 만나는 쪽)
   const far = Math.max(
-    schoolZone ? STOP_LINE + 32 : -Infinity,
+    schoolZone ? SCHOOL_ZONE_FAR_Z : -Infinity,
     approachZone ? APPROACH_ZONE_FAR_Z : -Infinity,
   );
   /*
@@ -567,15 +608,34 @@ function drawSchoolZonePavement(
   const near = zoneOnly
     ? EXT.zMin
     : Math.min(schoolZone ? STOP_LINE : Infinity, approachZone ? APPROACH_ZONE_NEAR_Z : Infinity);
+  /*
+    **조각을 모아 한 번에 채운다.** 칠이 반투명(0.58)이라 사각형을 따로 칠하면 **겹치는 자리만 두 번
+    덮여** 거무스름한 이음매가 생긴다. 한 경로에 모아 `fill()` 을 한 번만 부르면 겹쳐도 한 겹이다.
+  */
+  ctx.beginPath();
   if (Number.isFinite(far) && Number.isFinite(near)) {
-    ctx.fillRect(cx(PAINT_ALL_X0), cy(near), toPx(PAINT_ALL_W), toPx(far - near));
+    ctx.rect(cx(PAINT_ALL_X0), cy(near), toPx(PAINT_ALL_W), toPx(far - near));
   }
 
-  // 동서 차도 **양쪽** — 교차로가 보호구역일 때만. 사거리가 없는 길에는 그 도로 자체가 없다
+  /*
+    **교차로가 보호구역이면 교차로 안과 네 진출입로를 한 덩어리로 칠한다.**
+
+    한때는 남행 접근로(정지선 위 32m)와 동쪽 진출 차로만 칠했다. 그래서 **정지선에 서면 노면이 회색으로
+    돌아갔다** — 횡단보도도, 교차로 안도, 돌아 나가는 길도 보호구역 밖처럼 보였다. 정작 보호구역 규칙이
+    걸리는 자리가 거기다(제27조 제7항의 횡단보도, 제12조의 30km/h). 사용자가 짚었다: "우회전 +
+    어린이보호구역 맵이 … 개선을 해야 할 것 같아."
+
+    실제 보호구역도 교차로를 통째로 품는다 — 구역 경계는 교차로 바깥에 있지 그 안을 가르지 않는다.
+    그래서 남북 · 동서 두 띠를 **십자로** 겹쳐 놓는다. 경계는 네 방향 모두 SCHOOL_ZONE_FAR_Z 로
+    같게 둔다 — 표지판이 서는 자리(Game.buildSchoolZoneSigns)와 한 값이라 표지판을 지나는 순간
+    노면이 붉어진다.
+  */
   if (schoolZone && !zoneOnly) {
-    ctx.fillRect(cx(CROSSWALK_OUTER), cy(PAINT_ALL_X0), toPx(32), toPx(PAINT_ALL_W));
-    ctx.fillRect(cx(-CROSSWALK_OUTER - 32), cy(PAINT_ALL_X0), toPx(32), toPx(PAINT_ALL_W));
+    const END = SCHOOL_ZONE_FAR_Z;
+    ctx.rect(cx(PAINT_ALL_X0), cy(-END), toPx(PAINT_ALL_W), toPx(END * 2));
+    ctx.rect(cx(-END), cy(PAINT_ALL_X0), toPx(END * 2), toPx(PAINT_ALL_W));
   }
+  ctx.fill();
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -646,6 +706,22 @@ function drawSchoolZoneMarks(ctx: CanvasRenderingContext2D): void {
   drawRoadTextRow(ctx, '어린이', MID_X, 32.5);
   drawRoadTextRow(ctx, '보호구역', MID_X, 38.0);
   drawSpeedLimitMark(ctx, 30, MID_X, 42.5, 3.0);
+
+  /*
+    **우회전해 나가는 길에도 한 벌 더 찍는다.**
+
+    한 벌뿐이던 때는 정지선 앞에서만 '어린이 보호구역 30' 이 보였다. 코너를 돌면 붉은 노면만 남고
+    글자가 없어, 정작 **두 번째 횡단보도에서 판단할 때**는 여기가 보호구역이라는 말이 화면에서
+    사라진 뒤였다. 사거리 없는 전용 도로(drawZoneRoadMarks)가 길 내내 되풀이하는 것과 같은 까닭이다.
+
+    동쪽으로 달리는 운전자에게는 **먼 쪽이 위**이므로, 화면에서 '어린이 / 보호구역 / 30' 으로 읽히려면
+    x 가 큰 쪽에 '어린이' 가 와야 한다 (남북 도로와 순서가 뒤집힌다). 끝선(FINISH_X = 32.8) 안에
+    들어가도록 촘촘히 둔다.
+  */
+  const EXIT_MID_Z = PAINT_X0 + PAINT_W / 2;
+  drawSpeedLimitMark(ctx, 30, CROSSWALK_OUTER + 3.0, EXIT_MID_Z, 3.0, true);
+  drawRoadTextCol(ctx, '보호구역', CROSSWALK_OUTER + 7.2, EXIT_MID_Z);
+  drawRoadTextCol(ctx, '어린이', CROSSWALK_OUTER + 12.0, EXIT_MID_Z);
 }
 
 function makeRoadTexture(
