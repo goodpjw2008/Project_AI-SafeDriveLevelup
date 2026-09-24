@@ -641,15 +641,6 @@ function renderMenu(): void {
     // 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 창이다 (renderTrial)
     onTrial: () => nav.go({ name: 'trial', enter: renderTrial }),
     onBadges: () => nav.go({ name: 'badges', enter: renderBadges }),
-    /*
-      **무엇을 연습할지 고른다** (scenarios/tracks.ts). 고른 값은 설정에 저장한다 — 초기화 버튼으로 지워지지
-      않는 자리다(economy/save.ts). 다음 추천부터 반영되므로 지금 화면만 다시 그린다.
-    */
-    onTrack: (track) => {
-      saveData.settings.track = track;
-      persist(saveData);
-      renderMenu();
-    },
   }, aiTraining);
   showSiteStatsOnMenu();
 }
@@ -827,6 +818,15 @@ function renderSettings(): void {
   screens.renderSettings(saveData, {
     onStartView: (view) => {
       saveData.settings.startView = view;
+      commit();
+      renderSettings();
+    },
+    /*
+      **무엇을 연습할지 고른다** (scenarios/tracks.ts). 고른 값은 설정에 저장한다 — 초기화 버튼으로
+      지워지지 않는 자리다(economy/save.ts). 기본은 '자동' 이고, 그러면 AI 가 고른다 (trackPick.ts).
+    */
+    onTrack: (track) => {
+      saveData.settings.track = track;
       commit();
       renderSettings();
     },

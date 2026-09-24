@@ -76,14 +76,7 @@ import { playerCard } from './playerCard';
 import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
-import {
-  TRACK_CHOICES,
-  TRACK_BRIEF,
-  TRACK_READY,
-  CHOICE_LABEL,
-  type TrackChoice,
-} from '../scenarios/tracks';
-import { practiceTrack } from '../scenarios/trackPick';
+import { TRACK_CHOICES, CHOICE_LABEL, type TrackChoice } from '../scenarios/tracks';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
@@ -710,8 +703,6 @@ export class Screens {
       onTrial(): void;
       /** 뱃지 모음 화면을 연다 (renderBadges) */
       onBadges(): void;
-      /** 무엇을 연습할지 고른다 (scenarios/tracks.ts) — 고르면 다음 추천부터 그 갈래의 코스만 나온다 */
-      onTrack(track: TrackChoice): void;
     },
     /** AI 맞춤 훈련의 지금 상태 — main.ts 가 들고 있다 */
     ai: AiTrainingState,
@@ -822,7 +813,6 @@ export class Screens {
       void document.getElementById(id)?.addEventListener('click', fn);
 
     on('btn-ai-drive', handlers.onAiDrive);
-    for (const t of TRACK_CHOICES) on(`track-${t}`, () => handlers.onTrack(t));
     $('btn-shop').addEventListener('click', handlers.onShop);
     $('btn-help').addEventListener('click', handlers.onHelp);
     $('btn-zone-help').addEventListener('click', handlers.onZoneHelp);
@@ -913,11 +903,6 @@ export class Screens {
     const c = ai.curriculum;
     // 오르는 데 몇 판을 이어야 하는가 — 난이도 설정이 정한다 (challenge.ts)
     const rule = challengeRule(save.settings.difficulty);
-    /*
-      **이번 판의 갈래** (scenarios/trackPick.ts). 여기서 적는 값과 판을 만드는 자리(main.ts)가
-      **같은 함수**를 부른다 — 따로 셈하면 "이번 판은 어린이보호구역" 이라고 적어 놓고 우회전 판이 나온다.
-    */
-    const chosen = practiceTrack(save);
 
     /*
       **레벨 길** — 이 과정이 어디서 시작해 어디로 가는지를 한 줄로 보여 준다.
@@ -1052,31 +1037,11 @@ export class Screens {
         <div class="mode-group">
           <p class="mode-label"><b>온라인 가상 연습</b> — 내가 직접 운전합니다</p>
           <!--
-            **무엇을 연습할지 고른다** (scenarios/tracks.ts · 사용자가 정한 개념).
-
-            우회전과 어린이보호구역을 **고르게** 연습하려면, 둘이 늘 섞여 나오는 것만으로는 모자란다 —
-            한쪽만 붙잡고 여러 판을 달릴 수 있어야 한다. 고르면 다음 추천부터 그 갈래의 코스만 나온다.
-
-            **기본은 '자동' 이다** (사용자가 정했다: "자동으로 선택이 되게 해 줘"). 셋 중 무엇을 할지는
-            처음 온 사람이 알기 어려운 질문이고, 고칠 습관과 기록을 보는 AI 는 이미 답을 갖고 있다.
-            자동일 때는 **무엇을 골랐고 왜 골랐는지**를 아래 줄에 그대로 적는다 — 적지 않으면 자동은 깜깜이다.
-
-            레벨 · 경험치 · 뱃지는 셋이 함께 쓴다 (사용자가 정했다). 갈래는 '어떤 코스를 줄까' 일 뿐이다.
+            **첫 화면에는 누를 것 하나만 둔다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
+            사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만
+            누르면 알아서 판이 나오는 거야." 고르는 것은 AI 가 한다 (scenarios/trackPick.ts) —
+            한 갈래만 붙잡고 파고 싶은 사람을 위한 자리는 **설정**으로 옮겼다 (renderSettings).
           -->
-          <div class="track-pick" role="group" aria-label="무엇을 연습할까">
-            ${TRACK_CHOICES.map((t) => {
-              const ready = t === 'auto' || TRACK_READY[t];
-              const on = save.settings.track === t;
-              return `<button class="opt ${on ? 'on' : ''}" id="track-${t}"${ready ? '' : ' disabled'} title="${esc(
-                ready ? (t === 'auto' ? 'AI 가 고칠 습관과 기록을 보고 고릅니다' : TRACK_BRIEF[t]) : '새 맵을 만드는 중입니다',
-              )}">${esc(CHOICE_LABEL[t])}${ready ? '' : ' · 준비 중'}</button>`;
-            }).join('')}
-          </div>
-          <p class="track-brief">${
-            chosen.auto
-              ? `이번 판은 <b>${esc(CHOICE_LABEL[chosen.track])}</b> — ${esc(chosen.why)}`
-              : esc(chosen.why)
-          }</p>
           <div class="ai-course-actions">${button}${resetButton}</div>
         </div>
         <div class="mode-group">
@@ -1302,6 +1267,8 @@ export class Screens {
       onStartView(view: ViewMode): void;
       /** 난이도 설정 1~5 (scenarios/challenge.ts) */
       onDifficulty(c: Challenge): void;
+      /** 무엇을 연습할지 (scenarios/tracks.ts) — '자동' 이면 AI 가 고른다 */
+      onTrack(track: TrackChoice): void;
       /** 화질 항목 하나를 바꾼다 */
       onGraphics(patch: Partial<GraphicsSettings>): void;
       /** 프리셋 — 네 항목을 한 번에 맞춘다 */
@@ -1344,6 +1311,23 @@ export class Screens {
               ).join('')}
             </div>
           </div>
+          <!--
+            **무엇을 연습할까** (scenarios/tracks.ts · 사용자가 정한 개념).
+
+            기본은 **자동**이다 — 고칠 습관과 지금까지의 기록을 보고 AI 가 고른다 (trackPick.ts).
+            첫 화면에는 내놓지 않는다: 셋 중 무엇을 할지는 처음 온 사람이 알기 어려운 질문이고,
+            첫 화면에서 할 일은 **출발을 누르는 것** 하나다. 여기 남겨 두는 것은 한쪽만 붙잡고
+            여러 판을 달리고 싶을 때를 위해서다 — 그것이 이 고르기를 만든 까닭이다.
+
+            레벨 · 경험치 · 뱃지는 넷이 함께 쓴다 (사용자가 정했다). 갈래는 '어떤 코스를 줄까' 일 뿐이다.
+          -->
+          ${this.optionRow(
+            'track',
+            '연습 갈래',
+            TRACK_CHOICES.map((t) => [t, CHOICE_LABEL[t] + (t === 'auto' ? ' ·기본' : '')]),
+            save.settings.track,
+            { note: '자동은 고칠 습관과 기록을 보고 AI 가 고릅니다 · 다음 추천부터 반영' },
+          )}
           <div class="opt-row">
             <div class="opt-label">
               초기 화면
@@ -1441,6 +1425,7 @@ export class Screens {
     for (const v of START_VIEWS) {
       $(`view-${v.id}`).addEventListener('click', () => handlers.onStartView(v.id));
     }
+    this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
 
     for (const t of ['ultra', 'high', 'medium', 'low'] as const) {
       $(`gq-preset-${t}`).addEventListener('click', () => handlers.onGraphicsPreset(t));
