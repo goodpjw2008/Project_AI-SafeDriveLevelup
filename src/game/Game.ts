@@ -1125,11 +1125,17 @@ export class Game {
       빈 기둥으로 보이지 않게 한다.
     */
     const SIGN_AHEAD = 0.16;
+    /*
+      **표지판 윗변이 기둥 꼭대기를 덮는 높이.** 2.8m 에 달았더니 마름모 꼭짓점이 3.46m 라 기둥
+      (PED_SIGNAL_POLE_HEIGHT = 3.6m)이 그 위로 삐죽 나왔다 — 사용자가 짚었다: "표지판을 조금만
+      위로 올려서 기둥을 가려 줘." 실물도 기둥이 표지판 뒤에서 끝난다.
+    */
+    const SIGN_Y = 3.0;
     for (const [x, z] of spots) {
       const sign = new THREE.Mesh(geo, mat);
-      sign.position.set(x, 2.8, z + SIGN_AHEAD);
+      sign.position.set(x, SIGN_Y, z + SIGN_AHEAD);
       const back = new THREE.Mesh(backGeo, backMat);
-      back.position.set(x, 2.8, z + SIGN_AHEAD - 0.02);
+      back.position.set(x, SIGN_Y, z + SIGN_AHEAD - 0.02);
       back.rotation.set(0, Math.PI, Math.PI / 4);
       this.world.scene.add(sign, back, this.smallPole(x, z));
     }

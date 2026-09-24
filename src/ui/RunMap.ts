@@ -9,14 +9,21 @@
  */
 
 import {
+  CROSSWALK_B_INNER,
+  CROSSWALK_B_OUTER,
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
+  CROSSWALK_S_INNER,
+  CROSSWALK_S_OUTER,
   FINISH_X,
+  FINISH_Z,
   INTERSECTION_HALF,
   LANE_WIDTH,
   ROAD_HALF_WIDTH,
   SIDEWALK_OUTER,
+  SPAWN_Z_STRAIGHT,
   STOP_LINE,
+  STOP_LINE_S,
 } from '../layout';
 import type { Crumb, PedestrianTrack } from '../rules/lawRules';
 import type { ViolationEvent } from '../rules/violations';
@@ -35,11 +42,23 @@ export interface RunMapData {
   path: Crumb[];
   pedestrianPaths: PedestrianTrack[];
   violations: ViolationEvent[];
+  /**
+   * **사거리 없는 보호구역 전용 도로인가** (scenarios.ts 의 `drive: 'zoneOnly'`).
+   *
+   * 그 코스에는 교차로가 없고 횡단보도 셋이 한 줄로 늘어선다. 사거리 지도를 그대로 쓰면 지나지도
+   * 않은 동서 도로와 '횡단보도 C' 가 그려져, 결과 화면이 **달리지 않은 길**을 보여 준다 —
+   * 사용자가 짚었다: "어린이보호구역 결과 분석인데 지도가 4거리 지도로 되어 있어."
+   */
+  zoneRoad?: boolean;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function drawRunMap(canvas: HTMLCanvasElement, data: RunMapData): void {
+  if (data.zoneRoad) {
+    drawZoneRoadMap(canvas, data);
+    return;
+  }
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cssW = canvas.clientWidth || 420;
   const cssH = cssW; // 담는 범위가 정사각이라 화면도 정사각
@@ -193,6 +212,181 @@ export function drawRunMap(canvas: HTMLCanvasElement, data: RunMapData): void {
   label(ctx, px(-ROAD_HALF_WIDTH) + 4, pz(CROSSWALK_INNER) - 6, '횡단보도 A', '#8b96a8');
   label(ctx, px(CROSSWALK_INNER) - 2, pz(-ROAD_HALF_WIDTH) - 6, '횡단보도 C', '#8b96a8');
   label(ctx, px(0.6), pz(STOP_LINE) + 14, '정지선', '#8b96a8');
+}
+
+/**
+ * **사거리 없는 보호구역 전용 도로의 주행 지도** (scenarios/zoneCourse.ts).
+ *
+ * 곧게 뻗은 길에 횡단보도가 셋 늘어서 있다. 사거리 지도를 그대로 쓰면 지나지도 않은 동서 도로와
+ * '횡단보도 C' 가 함께 그려져, **달리지 않은 길**을 결과로 보여 주게 된다.
+ *
+ * ## 가로세로 배율을 따로 쓴다
+ *
+ * 이 길은 세로 134m · 가로 42m 라, 같은 배율로 담으면 **가로가 손톱만 해져** 어느 차로였는지도,
+ * 사람이 어느 쪽에서 왔는지도 보이지 않는다. 그래서 가로만 늘여 그린다 — 지도가 답하는 질문은
+ * "**길의 어디에서** 무슨 일이 있었나" 이고, 그 답은 세로 위치가 말한다. 궤적이 직선이라
+ * 가로를 늘여도 잘못 읽힐 여지가 없다.
+ */
+function drawZoneRoadMap(canvas: HTMLCanvasElement, data: RunMapData): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth || 420;
+  const cssH = Math.round(cssW * 1.5);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.height = `${cssH}px`;
+
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const X0 = -SIDEWALK_OUTER;
+  const X1 = SIDEWALK_OUTER;
+  // 출발 자리부터 완주선 조금 너머까지 — 달린 구간이 모두 들어온다
+  const Z0 = FINISH_Z - 6;
+  const Z1 = SPAWN_Z_STRAIGHT + 4;
+  const kx = cssW / (X1 - X0);
+  const kz = cssH / (Z1 - Z0);
+  const px = (x: number) => (x - X0) * kx;
+  /*
+    **사거리 지도와 같은 방향으로 둔다** — 그쪽은 z 가 클수록 화면 아래다(VIEW 그대로). 뒤집어
+    그렸더니 한 결과 화면 안에서 어떤 판은 위에서 아래로, 어떤 판은 아래에서 위로 달린 것이 되어
+    같은 그림을 두 가지로 읽게 됐다. 출발이 아래, 도착이 위다.
+  */
+  const pz = (z: number) => (z - Z0) * kz;
+  const mx = (v: number) => v * kx;
+  const mz = (v: number) => v * kz;
+
+  ctx.fillStyle = '#0b0f16';
+  ctx.fillRect(0, 0, cssW, cssH);
+
+  // ── 보도 · 차도 ──
+  ctx.fillStyle = '#161b25';
+  ctx.fillRect(0, 0, mx(SIDEWALK_OUTER - ROAD_HALF_WIDTH), cssH);
+  ctx.fillRect(px(ROAD_HALF_WIDTH), 0, mx(SIDEWALK_OUTER - ROAD_HALF_WIDTH), cssH);
+  ctx.fillStyle = '#232935';
+  ctx.fillRect(px(-ROAD_HALF_WIDTH), 0, mx(ROAD_HALF_WIDTH * 2), cssH);
+
+  // 어린이보호구역 — 길 전체가 구역이다 (game/Intersection.ts 의 drawSchoolZonePavement)
+  ctx.fillStyle = 'rgba(168,50,44,0.35)';
+  ctx.fillRect(px(0.2), 0, mx(ROAD_HALF_WIDTH - 0.5), cssH);
+
+  // 중앙선 · 차로 구분선
+  ctx.strokeStyle = 'rgba(240,196,25,0.55)';
+  ctx.lineWidth = 1.5;
+  line(ctx, px(0), 0, px(0), cssH);
+  ctx.strokeStyle = 'rgba(233,233,233,0.22)';
+  ctx.setLineDash([mz(2.5), mz(3)]);
+  for (const off of [-LANE_WIDTH, LANE_WIDTH]) line(ctx, px(off), 0, px(off), cssH);
+  ctx.setLineDash([]);
+
+  // ── 횡단보도 셋과 그 정지선 ──
+  const marks = [
+    { name: '첫 번째 횡단보도', near: CROSSWALK_S_OUTER, far: CROSSWALK_S_INNER, stop: STOP_LINE_S },
+    { name: '두 번째 횡단보도', near: CROSSWALK_OUTER, far: CROSSWALK_INNER, stop: STOP_LINE },
+    { name: '세 번째 횡단보도', near: CROSSWALK_B_INNER, far: CROSSWALK_B_OUTER, stop: CROSSWALK_B_INNER + 2 },
+  ];
+  for (const c of marks) {
+    ctx.fillStyle = 'rgba(236,240,247,0.5)';
+    drawZebra(
+      ctx,
+      px(-ROAD_HALF_WIDTH),
+      pz(c.near),
+      mx(ROAD_HALF_WIDTH * 2),
+      mz(c.near - c.far),
+      'vertical',
+      kx,
+    );
+    ctx.fillStyle = '#f2f2f2';
+    ctx.fillRect(px(0.2), pz(c.stop), mx(ROAD_HALF_WIDTH - 0.4), Math.max(2, mz(0.6)));
+  }
+
+  drawTracks(ctx, data, px, pz, cssW, cssH);
+
+  for (const c of marks) label(ctx, px(-ROAD_HALF_WIDTH) + 4, pz(c.near) - 6, c.name, '#8b96a8');
+}
+
+/**
+ * **궤적 · 보행자 · 위반 지점** — 두 지도가 나눠 쓴다.
+ *
+ * 그리는 것이 같은데 배율만 다르므로, 좌표 변환만 받아 한 벌로 둔다. 따로 적어 두면 한쪽만
+ * 고쳐져 **같은 주행이 두 지도에서 다르게 보이는** 일이 생긴다.
+ */
+function drawTracks(
+  ctx: CanvasRenderingContext2D,
+  data: RunMapData,
+  px: (x: number) => number,
+  pz: (z: number) => number,
+  cssW: number,
+  cssH: number,
+): void {
+  for (const track of data.pedestrianPaths) {
+    const pts = track.points;
+    if (pts.length < 2) continue;
+    ctx.strokeStyle = 'rgba(255,176,32,0.65)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(px(p.x), pz(p.z)) : ctx.moveTo(px(p.x), pz(p.z))));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const mid = Math.floor(pts.length / 2);
+    if (mid + 1 < pts.length) {
+      pedArrow(ctx, px(pts[mid].x), pz(pts[mid].z), px(pts[mid + 1].x), pz(pts[mid + 1].z));
+    }
+    dot(ctx, px(pts[0].x), pz(pts[0].z), 3.5, 'rgba(255,176,32,0.75)');
+  }
+
+  for (const v of data.violations) {
+    for (const track of data.pedestrianPaths) {
+      const at = nearestPoint(track.points, v.atTime);
+      if (!at) continue;
+      ctx.beginPath();
+      ctx.arc(px(at.x), pz(at.z), 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffb020';
+      ctx.fill();
+      ctx.strokeStyle = '#0b0f16';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  const path = data.path;
+  if (path.length > 1) {
+    ctx.strokeStyle = 'rgba(46,224,106,0.9)';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    path.forEach((p, i) => (i ? ctx.lineTo(px(p.x), pz(p.z)) : ctx.moveTo(px(p.x), pz(p.z))));
+    ctx.stroke();
+    for (const at of [0.35, 0.75]) {
+      const i = Math.min(path.length - 2, Math.floor(path.length * at));
+      arrowHead(ctx, px(path[i].x), pz(path[i].z), px(path[i + 1].x), pz(path[i + 1].z));
+    }
+    const sx = clamp(px(path[0].x), 10, cssW - 10);
+    const sz = clamp(pz(path[0].z), 10, cssH - 10);
+    dot(ctx, sx, sz, 5, '#2ee06a');
+    label(ctx, sx + 9, sz - 4, '진입', '#8bd6a4');
+    const last = path[path.length - 1];
+    const ex = clamp(px(last.x), 10, cssW - 10);
+    const ez = clamp(pz(last.z), 10, cssH - 10);
+    dot(ctx, ex, ez, 5, '#4c8dff');
+    label(ctx, ex - 34, ez - 10, '도착', '#9ec2ff');
+  }
+
+  data.violations.forEach((v, i) => {
+    const x = clamp(px(v.atPosition.x), 16, cssW - 16);
+    const z = clamp(pz(v.atPosition.z), 16, cssH - 16);
+    ctx.beginPath();
+    ctx.arc(x, z, 13, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,69,58,0.22)';
+    ctx.fill();
+    dot(ctx, x, z, 9, '#ff453a');
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 12px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), x, z + 0.5);
+  });
 }
 
 function line(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number): void {

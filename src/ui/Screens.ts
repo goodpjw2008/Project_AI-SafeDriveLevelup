@@ -1899,6 +1899,8 @@ export class Screens {
         path: result.path,
         pedestrianPaths: result.pedestrianPaths,
         violations: result.violations,
+        // 사거리 없는 보호구역 전용 도로는 한 줄로 뻗은 지도로 그린다 (ui/RunMap.ts)
+        zoneRoad: sc.drive === 'zoneOnly',
       });
     }
 
