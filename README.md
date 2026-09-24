@@ -11,10 +11,10 @@
 
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.
 
-* 서비스 주소 : https://safelevelup.vercel.app
-* 포트폴리오 : https://safelevelup.vercel.app/AI_safelevelup_portfolio.html
+* 서비스 주소 : https://safedrive.ai.kr
+* 포트폴리오 : https://safedrive.ai.kr/AI_safelevelup_portfolio.html
 
-<a href="https://safelevelup.vercel.app/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
+<a href="https://safedrive.ai.kr/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
 
 ---
 
@@ -22,6 +22,6 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소�
 
 사용을 원하시는 분은 이메일(goodpjw2008@gmail.com)로 요청해 주세요. 대부분 흔쾌히 허락해 드립니다. 무분별한 사용을 예방하려는 것이니 이해 부탁드립니다.
 
-읽어 보시는 것과 [서비스 주소](https://safelevelup.vercel.app)에서 직접 연습해 보시는 것은 자유입니다. 자세한 조건은 [LICENSE](LICENSE) 를 봐 주세요.
+읽어 보시는 것과 [서비스 주소](https://safedrive.ai.kr)에서 직접 연습해 보시는 것은 자유입니다. 자세한 조건은 [LICENSE](LICENSE) 를 봐 주세요.
 
 가져다 쓴 3D 자동차 모델 · 효과음 · 환경광 · 글꼴 · 아이콘 · 오픈소스 라이브러리는 각 원작자의 라이선스를 그대로 따릅니다. 목록과 출처는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 정리해 두었습니다. 그중 3D 자동차 모델 일부가 비영리(NC) 조건이라, 배포 사이트는 비영리로만 운영합니다.
