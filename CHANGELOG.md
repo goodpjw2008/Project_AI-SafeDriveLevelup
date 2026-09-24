@@ -69,6 +69,7 @@
 ### 변경
 
 - **서비스 주소가 바뀌었습니다 — `safeturn.vercel.app` → `safedrive.vercel.app`** (사용자가 정했습니다). 작품 이름이 '우회전' 에서 '안전운전' 으로 바뀐 것을 주소도 따라갑니다. README · LICENSE · 포트폴리오 넘겨 보기 페이지 · 장표 그림(표지 · 들어가며 · 온라인 활용 · 마무리)의 주소를 모두 바꿨고, **마무리 장표의 QR 코드도 새 주소로 다시 만들었습니다.**
+  - **깃허브 저장소 이름도 `Project_AI-TurnRight` → `Project_AI-SafeDrive` 로 바뀌었습니다.** 저장소 안에 적혀 있던 옛 주소(포트폴리오 링크 · CHANGELOG 의 비교 링크 · 마무리 장표의 GitHub 줄)를 새 이름으로 맞췄습니다. 깃허브가 옛 주소를 넘겨 주기는 하지만, 적어 둔 곳은 새 이름이라야 합니다.
   - 포트폴리오 파일 이름(`AI_safeturn_portfolio.html`)은 그대로 둡니다 — 이미 알려진 주소라 바꾸면 지금까지 건네 둔 링크가 끊어집니다.
   - 0.5.0 절에 적힌 예전 주소는 **그때의 기록**이라 그대로 둡니다.
 
@@ -175,5 +176,5 @@
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-TurnRight/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/goodpjw2008/Project_AI-TurnRight/releases/tag/v0.5.0
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDrive/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/goodpjw2008/Project_AI-SafeDrive/releases/tag/v0.5.0
