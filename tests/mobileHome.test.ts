@@ -135,6 +135,23 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).toMatch(/#screen-menu \.brand,\s*#screen-menu \.brand-sub \{\s*text-align: center;/);
   });
 
+  /*
+    **저작권 줄까지 한 화면에 들어온다.** 휴대폰 브라우저는 주소창과 내비게이션 바가 화면을 먹어
+    보이는 높이가 770px 안팎이다 — 접고 나서도 마지막 줄이 잘렸다 (사용자가 사진으로 짚었다).
+
+    **줄이는 것은 여백뿐이다.** 손가락으로 누르는 화면에서 버튼을 줄이면 못 누르고 글자를 줄이면
+    못 읽는다. 그래서 글자 크기(`font-size`)와 버튼 크기는 이 덩어리에서 건드리지 않는다.
+  */
+  it('여백만 줄인다 — 글자 · 버튼 크기는 건드리지 않는다', () => {
+    const block = rulesOnly();
+    for (const sel of ['#screen-menu .screen-inner', '#screen-menu .hero', '#screen-menu .site-footer']) {
+      expect(block).toContain(sel);
+    }
+    // 여백을 줄이려고 글자나 버튼을 깎지 않았는가
+    expect(block).not.toContain('font-size');
+    expect(block).not.toContain('transform: scale');
+  });
+
   /* 좁은 폭에서 오른쪽에 붙으면 한쪽만 차 보인다 — 가운데로 모은다 */
   it('사이트 전체 성공 · 실패는 가운데로 모은다', () => {
     expect(mobileBlock()).toMatch(/\.site-stats\s*\{\s*justify-content:\s*center;/);

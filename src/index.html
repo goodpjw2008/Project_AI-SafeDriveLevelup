@@ -5262,6 +5262,46 @@
         #screen-menu .mode-label {
           justify-content: center;
         }
+
+        /*
+          ── 저작권 줄까지 한 화면에 ──
+
+          접고 나서도 **마지막 줄(저작권)이 잘렸다** — 휴대폰 브라우저는 주소창과 내비게이션 바가
+          화면을 먹어, 보이는 높이가 770px 안팎이다. 사용자가 정했다: 여기까지 다 보이게.
+
+          **줄이는 것은 여백뿐이다.** 글자 크기와 버튼 크기는 그대로 둔다 — 손가락으로 누르는
+          화면에서 버튼을 줄이면 못 누르고, 글자를 줄이면 못 읽는다. 아래 여백(60px)이 가장 컸다:
+          그 자리는 원래 **스크롤할 때 손이 쉬는 자리**인데, 스크롤이 없어진 화면에서는 빈 칸일 뿐이다.
+        */
+        #screen-menu .screen-inner {
+          padding-top: 16px;
+          padding-bottom: 14px;
+        }
+        #screen-menu .site-stats {
+          margin-bottom: 6px;
+        }
+        #screen-menu .hero {
+          padding-top: 10px;
+          padding-bottom: 10px;
+          margin-bottom: 8px;
+        }
+        #screen-menu .menu-links {
+          margin-bottom: 8px;
+        }
+        #screen-menu .ai-split {
+          margin-top: 8px;
+          padding-top: 8px;
+        }
+        #screen-menu .mode-split {
+          margin-top: 12px;
+        }
+        #screen-menu .mode-label {
+          min-height: 0;
+          margin-bottom: 8px;
+        }
+        #screen-menu .site-footer {
+          margin: 10px 0 0;
+        }
       }
 
     </style>
