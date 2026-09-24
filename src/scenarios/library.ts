@@ -784,10 +784,19 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
   if (t.c === 'crowd') {
     const from = side(18);
     const obeys = t.sigC === 'no' || !pedCGreen(t) ? { obeysSignal: false } : {};
+    /*
+      **셋이 다 건너야 한다.** 늦어지는 판은 시각으로 나서는데(cSelfStart), 둘이 나서던 자리(cAt · cAt+1.5)를
+      셋에 그대로 쓰니 마지막 사람이 **C 보행녹색이 끝나는 순간**(14초)에 걸려 뜻을 접었다 — 제목은 "세 사람이
+      차례로 건넌다" 인데 둘만 건너는 판이 180개였다 (플레이테스트가 잡았다).
+
+      **한 사람 몫만큼 앞당기고 간격을 1초로 좁힌다** (cAt−1 · cAt · cAt+1). 셋 다 녹색 안에서 발을 떼고,
+      가장 먼저 뗀 사람도 22.8m 를 건너는 데 6.3초가 걸려 내가 닿을 때 아직 차도 위에 있다. 간격을 좁혀도
+      한 걸음이 3.6m 라 '차례로' 는 그대로 보인다.
+    */
     for (const [i, within] of [24, 18, 12].entries()) {
       out.push(
         cSelfStart
-          ? { crosswalk: 'C', at: cAt + i * 1.5, from, kind: i === 0 ? kind : 'adult' }
+          ? { crosswalk: 'C', at: cAt - 1 + i, from, kind: i === 0 ? kind : 'adult' }
           : { crosswalk: 'C', at: 0, startWithin: within, from, kind: i === 0 ? kind : 'adult', ...obeys },
       );
     }
