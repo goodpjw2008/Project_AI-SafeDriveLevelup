@@ -40,11 +40,10 @@ import {
   demoCourses,
   habitsTestedBy,
   libraryEntry,
-  libraryEntryByNumber,
-  libraryNumber,
   scenarioLibrary,
 } from './scenarios/library';
-import { zoneCourse, zoneCourseByNumber, zoneCourseNumber, zoneDemoCourses } from './scenarios/zoneCourse';
+import { zoneCourse, zoneDemoCourses } from './scenarios/zoneCourse';
+import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
   masterPick,
@@ -314,7 +313,7 @@ async function makeAiScenario(): Promise<void> {
     console.info(`[recommend] ${rec.source}:`, rec.scenario.title);
     aiPick.showResult({
       title: rec.scenario.title,
-      number: libraryNumber(rec.scenario.id),
+      code: scenarioCode(rec.scenario.id),
       why: rec.scenario.why,
       focus: rec.scenario.focus,
       // 어느 AI 의 어느 모델이 골랐는지 카드가 그대로 말한다 (ui/AiPick.ts · 무료 여러 곳을 돌아가며 쓴다)
@@ -785,9 +784,9 @@ function renderTrial(): void {
   screens.show('trial');
   screens.renderTrial(
     () => nav.back(),
-    (no) => {
-      // 50001 번부터는 보호구역 직진 코스다 (scenarios/zoneCourse.ts)
-      const spec = zoneCourseByNumber(no) ?? libraryEntryByNumber(no)?.spec;
+    (code) => {
+      // 번호는 갈래 한 글자 + 다섯 자리다 — C 보호구역 전용 · L 우회전 전용 · M 복합 (scenarios/scenarioCode.ts)
+      const spec = scenarioByCode(code);
       if (!spec) return;
       aiCourse = false;
       mapTrial = true;
@@ -1160,14 +1159,14 @@ async function startRun(id: number): Promise<void> {
     (목록의 짧은 이름표 'AI 맞춤' 과 달리, 달리는 동안에는 무엇이 만들어 준 판인지가 한눈에 읽혀야 한다).
   */
   /*
-    라이브러리 판은 **결과 화면과 같은 이름**으로 부른다 — `AI 추천 시나리오 3700 - 제목`
-    (library.ts 의 libraryNumber). 달리는 동안과 끝난 뒤의 이름이 같아야 "그 판" 이 이어진다.
+    라이브러리 판은 **결과 화면과 같은 이름**으로 부른다 — `AI 추천 시나리오 M03700 - 제목`
+    (scenarios/scenarioCode.ts). 달리는 동안과 끝난 뒤의 이름이 같아야 "그 판" 이 이어진다.
   */
-  // 보호구역 직진 코스는 자기 번호를 쓴다 (scenarios/zoneCourse.ts) — 맵 체험 · 결과 화면이 같은 이름으로 부른다
-  const libNo = zoneCourseNumber(currentScenario.id) ?? libraryNumber(currentScenario.id);
+  // 번호는 갈래 한 글자 + 다섯 자리 (scenarios/scenarioCode.ts) — 맵 체험 · 결과 화면이 같은 이름으로 부른다
+  const libNo = scenarioCode(currentScenario.id);
   hud.show(
     /*
-      **자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 1363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
+      **자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 M01363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
       시나리오 내용 이렇게 나왔잖아. 자율주행도 자율주행 - 시나리오 ??? 시나리오 상황 이렇게 나오게 해 줘" 라고 했다.
       번호가 있으면 맵 체험으로 같은 판을 직접 달려 볼 수 있다.
     */
@@ -1219,7 +1218,7 @@ async function startRun(id: number): Promise<void> {
     if (!aiPick.showingResult) {
       aiPick.showResult({
         title: currentScenario.title,
-        number: libNo,
+        code: libNo,
         why: rec.why ?? '',
         focus: rec.focus,
         picker: rec.picker as Picker | undefined,
@@ -1411,7 +1410,7 @@ function finishRun(result: JudgeResult): void {
     이번 접속에서 통과한 것만 센다.
   */
   const clearedBefore =
-    libraryNumber(sc.id) !== undefined
+    scenarioCode(sc.id) !== undefined
       ? saveData.bestGrades[key] === 'PERFECT' || saveData.bestGrades[key] === 'PASS'
       : clearedThisSession.has(sc.id);
   if (result.violations.length === 0 && !result.failReason) clearedThisSession.add(sc.id);

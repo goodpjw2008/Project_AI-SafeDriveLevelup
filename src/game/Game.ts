@@ -398,8 +398,12 @@ export class Game {
       /*
         **사거리 없는 보호구역 도로**는 구간 표시를 진입로 방식으로 그린다 — 그 길 전체가 보호구역이고,
         첫 번째 횡단보도가 진입로의 그 자리다 (scenarios/zoneCourse.ts).
+
+        **`drive` 를 적지 않은 판은 우회전 코스다.** 한때 `drive !== 'rightTurn'` 으로만 보았는데,
+        라이브러리 판은 이 값을 적지 않아(undefined) **보호구역이 아닌 판까지 붉게 칠해지고 진입로
+        횡단보도가 그려졌다.** 규칙은 그대로라 판정은 멀쩡했고, 화면만 거짓말을 했다.
       */
-      approachZone: scenario.drive !== 'rightTurn' || Boolean(scenario.approachSchoolZone),
+      approachZone: this.straight || Boolean(scenario.approachSchoolZone),
       zoneOnly: scenario.drive === 'zoneOnly',
       night: scenario.timeOfDay === 'night',
     });

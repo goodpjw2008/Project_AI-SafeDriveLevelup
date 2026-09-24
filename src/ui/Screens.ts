@@ -47,7 +47,16 @@ import {
   type QualityTier,
 } from '../game/quality';
 import { SCENARIOS, stageLabel, type ScenarioSpec } from '../scenarios/scenarios';
-import { libraryEntryByNumber, libraryNumber } from '../scenarios/library';
+import { libraryEntry } from '../scenarios/library';
+import {
+  CODE_DIGITS,
+  CODE_LETTERS,
+  CODE_NAME,
+  normalizeCode,
+  scenarioByCode,
+  scenarioCode,
+  scenarioCounts,
+} from '../scenarios/scenarioCode';
 import { CHALLENGES, DEFAULT_CHALLENGE, challengeRule, type Challenge } from '../scenarios/challenge';
 import type { GeneratedScenario } from '../scenarios/generate';
 import {
@@ -68,7 +77,6 @@ import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
 import { TRACKS, TRACK_BRIEF, TRACK_LABEL, TRACK_READY, type PracticeTrack } from '../scenarios/tracks';
-import { zoneCourseByNumber, zoneCourseNumber } from '../scenarios/zoneCourse';
 import type { SiteStats } from '../siteStats';
 import { advisedBy } from './pickedBy';
 import type { Picker } from '../scenarios/recommend';
@@ -386,9 +394,9 @@ function debriefTitle(sc: ScenarioSpec): { stage: string; title: string } {
   const demo = document.body.classList.contains('ai-drive');
   // 첫 화면에서 번호로 고른 판 — AI 가 고른 것이 아니므로 'AI 추천' 이라 부르지 않는다 (main.ts 의 mapTrial)
   const trial = document.body.classList.contains('map-trial');
-  // 보호구역 직진 코스는 자기 번호(50001~)를 쓴다 (scenarios/zoneCourse.ts)
-  const n = zoneCourseNumber(sc.id) ?? libraryNumber(sc.id);
-  // 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 1363` (main.ts 의 hud.show)
+  // 번호는 갈래 한 글자 + 다섯 자리다 — `M08400` (scenarios/scenarioCode.ts)
+  const n = scenarioCode(sc.id);
+  // 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 M01363` (main.ts 의 hud.show)
   const stage = demo
     ? n !== undefined
       ? `오프라인 교육 - 시나리오 ${n}`
@@ -1067,47 +1075,42 @@ export class Screens {
   /**
    * 맵 체험하기 칸 — 넣는 대로 **그 판의 이름**을 보여 주고, 판이 있을 때만 '체험' 을 누를 수 있게 한다.
    *
-   * 번호는 결과 화면 · 주행 화면의 "AI 추천 시나리오 57" 그 번호다 (library.ts 의 `libraryNumber`).
+   * 번호는 결과 화면 · 주행 화면의 "AI 추천 시나리오 L00057" 그 번호다 (scenarios/scenarioCode.ts).
    * 비어 있는 번호도 있다 — 플레이테스트로 뺀 판은 **번호 자리를 비워 두고** 싣지 않는다(뒤 번호가 밀리지
    * 않게). 그런 번호는 없다고 분명히 말한다 — 아무 반응이 없으면 눌러도 되는지 알 수 없다.
    */
-  private bindMapTrial(onTry: (no: number) => void): void {
+  private bindMapTrial(onTry: (code: string) => void): void {
     const form = document.getElementById('map-trial') as HTMLFormElement | null;
     if (!form) return;
     const input = $('map-trial-no') as HTMLInputElement;
     const button = $('btn-map-trial') as HTMLButtonElement;
     const note = $('map-trial-note');
-    const read = (): number | null => {
-      const n = Number(input.value);
-      return input.value.trim() && Number.isInteger(n) && n > 0 ? n : null;
-    };
+    const counts = scenarioCounts();
+    /** 갈래마다 몇 판까지 있는지 한 줄로 — 포트폴리오에 적는 수와 같은 수다 */
+    const ranges = CODE_LETTERS.map(
+      (c) => `${c}00001~${c}${String(counts[c]).padStart(CODE_DIGITS, '0')} ${CODE_NAME[c]}`,
+    ).join(' · ');
+    const read = (): string | null => normalizeCode(input.value);
     const update = (): void => {
-      const n = read();
-      /*
-        **번호는 두 갈래다** — 1~8,958 은 우회전 라이브러리, 50001~ 은 보호구역 직진 코스
-        (scenarios/zoneCourse.ts). 직진 코스에는 레벨이 없으므로 이름표도 다르게 붙인다.
-      */
-      const zone = n === null ? undefined : zoneCourseByNumber(n);
-      const entry = n === null ? undefined : libraryEntryByNumber(n);
-      const found = Boolean(entry ?? zone);
-      button.disabled = !found;
-      note.classList.toggle('bad', n !== null && !found);
-      note.classList.toggle('ok', found);
-      note.innerHTML =
-        n === null
-          ? '번호를 넣으면 여기에 그 맵의 이름이 뜹니다 (50001번부터는 어린이보호구역 전용 도로)'
-          : entry
-            ? `<b>${esc(levelLabel(entry.level))}</b> · ${esc(entry.spec.title)}`
-            : zone
-              ? `<b>어린이보호구역</b> · ${esc(zone.title)}`
-              : `${n}번 맵은 없습니다 — 번호가 너무 크거나 점검으로 뺀 자리입니다`;
+      const code = read();
+      const spec = code === null ? undefined : scenarioByCode(code);
+      const entry = spec ? libraryEntry(spec.id) : undefined;
+      button.disabled = !spec;
+      note.classList.toggle('bad', input.value.trim() !== '' && !spec);
+      note.classList.toggle('ok', Boolean(spec));
+      note.innerHTML = !input.value.trim()
+        ? esc(ranges)
+        : spec
+          ? `<b>${esc(code!)}</b> · ${entry ? `${esc(levelLabel(entry.level))} · ` : ''}${esc(spec.title)}`
+          : code === null
+            ? `번호는 <b>갈래 글자 + 숫자</b> 입니다 — ${esc(ranges)}`
+            : `${esc(code)} 맵은 없습니다 — 번호가 너무 크거나 점검으로 뺀 자리입니다`;
     };
     input.addEventListener('input', update);
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
-      const n = read();
-      // 보호구역 직진 코스(50001~)도 같은 창에서 연다 (scenarios/zoneCourse.ts)
-      if (n !== null && (libraryEntryByNumber(n) ?? zoneCourseByNumber(n))) onTry(n);
+      const code = read();
+      if (code !== null && scenarioByCode(code)) onTry(code);
     });
     update();
   }
@@ -2495,27 +2498,29 @@ export class Screens {
    * 환경에서 테스트할 수 있을 것 같아." 처음에는 첫 화면 본문에 칸을 두었는데, **시험용이라 따로
    * 떼어 달라**고 했다 — 학습자가 보는 본문에 섞이면 어느 것을 눌러야 할지 흐려진다.
    */
-  renderTrial(onBack: () => void, onTry: (no: number) => void): void {
+  renderTrial(onBack: () => void, onTry: (code: string) => void): void {
     $('trial-body').innerHTML = `
       ${this.head({
         id: 'trial',
         title: '맵 체험하기',
         backLabel: '닫기',
-        sub: '시나리오 번호를 넣으면 그 맵을 바로 달립니다 — 고친 판을 실제 화면에서 시험해 보는 자리입니다.',
+        sub: '시나리오 번호를 넣으면 그 맵을 바로 달립니다 — 번호는 갈래 한 글자(C · L · M)에 숫자를 붙인 것입니다.',
       })}
       <!--
         **넣는 대로 그 판의 이름을 보여 준다.** 번호만 보고 출발하면 엉뚱한 판을 달린 뒤에야 알게 된다 —
-        없는 번호나 뺀 번호도 여기서 말한다. 결과 화면 · 주행 화면의 "AI 추천 시나리오 57" 그 번호다.
+        없는 번호나 뺀 번호도 여기서 말한다. 결과 화면 · 주행 화면의 "AI 추천 시나리오 L00057" 그 번호다.
+        빈칸일 때는 갈래마다 몇 번까지 있는지 적어 둔다 — 마지막 번호가 곧 그 갈래의 판 수다.
       -->
       <form class="map-trial" id="map-trial" autocomplete="off">
         <label for="map-trial-no">시나리오 번호</label>
-        <input id="map-trial-no" type="number" inputmode="numeric" min="1" placeholder="예: 57" />
+        <input id="map-trial-no" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="예: L00057" />
         <button class="btn primary" id="btn-map-trial" type="submit" disabled>${icon('play')}체험</button>
         <p class="map-trial-note" id="map-trial-note" aria-live="polite"></p>
       </form>
       <ul class="map-trial-rules">
         <li><b>기록이 남지 않습니다</b> — 레벨 · 경험치 · 나쁜 운전 습관 · 주행 기록이 그대로입니다. 몇 번이든 되풀이해도 됩니다.</li>
-        <li>화면에는 <b>맵 체험 57</b> 처럼 적힙니다 — AI 가 고른 판이 아니라서 'AI 추천' 이라 부르지 않습니다.</li>
+        <li>화면에는 <b>맵 체험 L00057</b> 처럼 적힙니다 — AI 가 고른 판이 아니라서 'AI 추천' 이라 부르지 않습니다.</li>
+        <li>번호의 앞 글자가 갈래입니다 — <b>C</b> 어린이보호구역 전용 · <b>L</b> 우회전 전용 · <b>M</b> 우회전 + 어린이보호구역.</li>
         <li>끝나면 다음 판으로 넘어가지 않고 <b>다시 운행</b>만 둡니다. 다른 번호는 이 창에서 다시 넣습니다.</li>
       </ul>
     `;

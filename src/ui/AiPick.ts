@@ -34,8 +34,8 @@ export const RESULT_MIN_MS = 4500;
 
 export interface PickResult {
   title: string;
-  /** 시나리오 번호 (library.ts 의 libraryNumber) — 없으면 번호 없이 적는다 */
-  number?: number;
+  /** 시나리오 번호 — 갈래 한 글자 + 다섯 자리 (scenarios/scenarioCode.ts). 없으면 번호 없이 적는다 */
+  code?: string;
   why: string;
   focus?: string;
   /** 누가 골랐는가 (scenarios/recommend.ts 의 Picker) — 생략하면 그 줄을 비운다 */
@@ -155,9 +155,9 @@ export class AiPickOverlay {
     // 누가 골랐는지 먼저 말한다 — 주행 화면 첫 줄과 같은 규칙이다 (ui/pickedBy.ts)
     $('ai-pick-picked').innerHTML = pickedByCard(r.picker, r.model);
     $('ai-pick-name').innerHTML =
-      `「${esc(r.title)}」${r.number !== undefined ? ` - ${r.number}번` : ''}`;
+      `「${esc(r.title)}」${r.code !== undefined ? ` - ${esc(r.code)}` : ''}`;
     // "… 3131번을" — 번호가 없으면 제목이 」 로 끝나 받침을 알 수 없다
-    $('ai-pick-josa').textContent = r.number !== undefined ? '을' : '을(를)';
+    $('ai-pick-josa').textContent = r.code !== undefined ? '을' : '을(를)';
     /*
       **먼저 고칠 습관** — AI 가 정한 것만 "AI 판단" 이라고 적는다. 습관이 하나뿐이면 고를 것이 없었으므로
       그냥 "고칠 습관" 이다. 코드가 정한 것을 AI 가 정했다고 말하면 거짓말이다.
