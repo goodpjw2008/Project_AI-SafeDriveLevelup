@@ -18,12 +18,14 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소�
 
 ---
 
-※ 라이선스 — © 2026 goodpjw2008
+※ 라이선스 — © 2026 goodpjw2008 · **모든 권리 보유**
+
+읽어 보시는 것과 [서비스 주소](https://safeturn.vercel.app)에서 직접 연습해 보시는 것은 자유입니다. 그 밖의 사용(복사 · 수정 · 재배포 · 다른 곳에 싣기)은 영리 · 비영리를 가리지 않고 **먼저 허락**을 받아 주세요 — 대개 흔쾌히 드립니다. 무엇에 쓰실지만 알려 주시면 됩니다. (goodpjw2008@gmail.com · 자세한 조건은 [LICENSE](LICENSE))
 
 | 자산 | 라이선스 |
 |---|---|
-| 자체 작성 코드 | [**MIT License**](LICENSE) |
-| 로봇 캐릭터 '안전이' 그림(Google Gemini로 생성) · README 글과 그림 | [**CC BY 4.0**](LICENSE-ASSETS) |
+| 자체 작성 코드 | [**모든 권리 보유 — 사용 시 허락**](LICENSE) |
+| 로봇 캐릭터 '안전이' 그림(Google Gemini로 생성) · README 글과 그림 | [**모든 권리 보유 — 사용 시 허락**](LICENSE) |
 | 3D 자동차 모델 9종 · 전시관 차 사진 | 원작자 라이선스 — CC BY 4.0 · CC BY-NC 4.0 · CC BY-NC-SA 4.0 |
 | 효과음 · 환경광(HDRI) | CC0 1.0 |
 | 글꼴 Pretendard · 아이콘 Lucide · three.js | SIL OFL 1.1 · ISC · MIT |
