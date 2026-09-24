@@ -190,31 +190,6 @@
   .cap { font-size: 13px; line-height: 1.4; color: var(--muted); }
   .cap b { margin-right: 6px; color: var(--text); font-variant-numeric: tabular-nums; }
 
-  /*
-    ── 글로 된 장표 (만든 사람) ──
-    그림 장표와 같은 1920×1080 판에 같은 모양으로 짠다. 크기는 모두 `판 픽셀 × --u` 로 적는다 —
-    --u 는 장표 너비의 1/1920 이라, 틀이 얼마나 작아지든 그림 장표와 같은 비율로 줄어든다.
-    글로 둔 까닭: 라이선스 파일 링크를 누를 수 있어야 한다.
-  */
-  .doc { --u: calc(100cqw / 1920); background: #F4F2EC; color: #171C23; }
-  .doc-in {
-    position: absolute; inset: 0; display: flex; flex-direction: column; gap: calc(40 * var(--u));
-    padding: calc(112 * var(--u)) calc(128 * var(--u)) calc(128 * var(--u));
-  }
-  .doc-head { display: flex; flex-direction: column; gap: calc(12 * var(--u)); }
-  .doc .kicker { margin: 0; font-size: calc(24 * var(--u)); font-weight: 700; letter-spacing: calc(2 * var(--u)); color: #5B45E0; }
-  .doc h2 { margin: 0; font-size: calc(64 * var(--u)); font-weight: 900; line-height: 1.15; letter-spacing: calc(-1 * var(--u)); }
-  .doc-body { flex: 1; min-height: 0; display: flex; gap: calc(56 * var(--u)); }
-  .doc-left { width: calc(760 * var(--u)); display: flex; flex-direction: column; gap: calc(28 * var(--u)); }
-  .shot { padding: calc(20 * var(--u)); border-radius: calc(24 * var(--u)); background: #1C222B; }
-  .shot img { display: block; width: 100%; height: auto; }
-  .doc p.note { margin: 0; font-size: calc(24 * var(--u)); line-height: 1.55; color: #4B5461; }
-  .doc-right { flex: 1; display: flex; flex-direction: column; gap: calc(20 * var(--u)); }
-  .doc .copy { margin: 0; font-size: calc(28 * var(--u)); font-weight: 900; }
-  .doc table { width: 100%; border-collapse: collapse; font-size: calc(24 * var(--u)); line-height: 1.45; }
-  .doc th, .doc td { padding: calc(14 * var(--u)) calc(18 * var(--u)); border: 1px solid #D6D1C5; text-align: left; vertical-align: top; }
-  .doc th { background: #E9E5DA; font-weight: 700; }
-  .doc a { color: #5B45E0; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -315,34 +290,9 @@
       <img src="docs/slides/24-effect.png" alt="기대효과" loading="lazy" decoding="async">
     </section>
 
-    <section class="slide doc" data-chapter="마무리" data-title="만든 사람">
-      <div class="doc-in">
-        <div class="doc-head">
-          <p class="kicker">About</p>
-          <h2>만든 사람</h2>
-        </div>
-        <div class="doc-body">
-          <div class="doc-left">
-            <div class="shot"><img src="screenshot/09_about.png" alt="About 화면 — 만든 사람 goodpjw2008, 비영리 목적으로만 사용합니다" loading="lazy" decoding="async"></div>
-            <p class="note">다만 3D 자동차 모델 중 4종(아반떼 N · M8 · M5 · SL63)이 비영리(NC) 조건이라, 이 모델이 들어 있는 배포 사이트는 비영리로만 운영합니다. 모델별 출처와 수정 사항은 <a href="https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">THIRD_PARTY_NOTICES.md</a>를 참고하시기 바랍니다.</p>
-          </div>
-          <div class="doc-right">
-            <p class="copy">© 2026 goodpjw2008 · 모든 권리 보유</p>
-            <p class="note" style="margin:0 0 14px"><b>사용을 원하시는 분은 이메일로 요청해 주세요. 대부분 흔쾌히 허락해 드립니다.</b> 무분별한 사용을 예방하려는 것이니 이해 부탁드립니다. 읽어 보시는 것과 서비스 주소에서 직접 연습해 보시는 것은 자유이고, 자세한 조건은 LICENSE 에 있습니다.</p>
-            <table>
-              <tr><th>자산</th><th>라이선스</th></tr>
-              <tr><td><b>직접 만든 것 전부</b> — 코드 · 그림 · 글</td><td><a href="https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/blob/main/LICENSE" target="_blank" rel="noopener">모든 권리 보유 — 사용 시 허락</a></td></tr>
-              <tr><td>3D 자동차 모델 9종 · 전시관 차 사진</td><td>원작자 라이선스 — CC BY 4.0 · CC BY-NC 4.0 · CC BY-NC-SA 4.0</td></tr>
-              <tr><td>효과음 · 환경광(HDRI)</td><td>CC0 1.0</td></tr>
-              <tr><td>글꼴 Pretendard · 아이콘 Lucide · three.js</td><td>SIL OFL 1.1 · ISC · MIT</td></tr>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <section class="slide" data-chapter="마무리" data-title="감사합니다">
-      <img src="docs/slides/25-closing.png" alt="감사합니다 — 사이트 safedrive.ai.kr, GitHub github.com/goodpjw2008/Project_AI-SafeDriveLevelup" loading="lazy" decoding="async">
+      <img src="docs/slides/25-closing.png" alt="감사합니다 — 만든이 goodpjw2008@gmail.com, 사이트 https://safedrive.ai.kr/, GitHub https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup" loading="lazy" decoding="async">
     </section>
   </div>
 
