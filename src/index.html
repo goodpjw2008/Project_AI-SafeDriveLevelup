@@ -2592,48 +2592,40 @@
         **배우는 두 길을 좌우로 갈라 세운다** (사용자가 정했다: "화면의 반을 나누고 구분된 것으로 보이게").
 
         위아래로 쌓여 있을 때는 같은 길의 1단계 · 2단계처럼 읽혔다. 실제로는 **서로 다른 두 길**이고
-        한 번에 하나만 고르는 것이라, 반씩 나눠 놓고 **가운데 선**으로 가르면 그 관계가 자리로 드러난다.
-        `1fr 1fr` 로 정확히 반씩 준다 — 글자 길이에 따라 칸이 달라지면 '반으로 나눴다' 가 흐려진다.
+        한 번에 하나만 고르는 것이라, 반씩 나눠 놓으면 그 관계가 자리로 드러난다. `1fr 1fr` 로 정확히
+        반씩 준다 — 글자 길이에 따라 칸이 달라지면 '반으로 나눴다' 가 흐려진다.
+
+        **가는 세로선 하나로는 모자랐다.** 선만 그었을 때는 두 칸이 나뉜 것이 아니라 왼쪽이 길고
+        오른쪽이 비어 보였다 (사용자가 짚었다: "두 가지 나눠진 부분과 버튼 구성 디자인이 마음에 들지
+        않아"). **상자 둘**로 세우면 같은 크기의 판 두 개가 나란히 놓여, 비어 있는 자리도 '덜 채운 것'
+        이 아니라 **그 판의 여백**으로 읽힌다. `align-items` 기본값(stretch)이 키까지 맞춰 준다.
+      */
+      /*
+        **위쪽 구분선은 긋지 않는다.** 상자 둘이 이미 저마다 테두리를 두르고 있어, 그 위에 가로선까지
+        그으면 선 아래에 또 선이 있는 꼴이 된다. 블록을 가르는 일은 상자와 여백이 맡는다.
       */
       .mode-split {
-        margin-top: 16px;
-        padding-top: 14px;
-        border-top: 1px solid var(--line);
+        margin-top: 20px;
         display: grid;
         grid-template-columns: 1fr 1fr;
+        gap: 14px;
       }
       .mode-split > .mode-group {
         min-width: 0;
-        padding-right: 22px;
+        padding: 15px 16px 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.035);
       }
-      /* 가운데 선 하나가 두 길을 가른다 — 두 칸 모두에 테두리를 두르면 상자 둘이 되어 시끄럽다 */
-      .mode-split > .mode-group + .mode-group {
-        margin-top: 0;
-        padding: 0 0 0 22px;
-        border-top: 0;
-        border-left: 1px solid var(--line);
-      }
-      /*
-        좁아지면 위아래로 되돌린다 — 반씩 나눈 칸에 큰 버튼 둘을 우겨 넣으면 글자가 줄바꿈으로 쪼개진다.
-        이때는 가운데 세로선 대신 가로선이 둘을 가른다 (.ai-split 과 같은 규칙이다).
-      */
+      /* 좁아지면 위아래로 — 반씩 나눈 칸에 큰 버튼을 우겨 넣으면 글자가 줄바꿈으로 쪼개진다 */
       @media (max-width: 860px) {
         .mode-split {
           grid-template-columns: minmax(0, 1fr);
         }
-        .mode-split > .mode-group {
-          padding-right: 0;
-        }
-        .mode-split > .mode-group + .mode-group {
-          margin-top: 16px;
-          padding: 14px 0 0;
-          border-left: 0;
-          border-top: 1px solid var(--line);
-        }
       }
       /* 이름 앞의 아이콘 — 어느 길인지를 글보다 먼저 말한다 (ui/icons.ts 의 monitor · users) */
       .mode-label {
-        margin: 14px 0 0;
+        margin: 0 0 12px;
         font-size: 15px;
         line-height: 1.4;
         color: var(--muted);
@@ -2651,48 +2643,68 @@
         color: var(--text);
         font-weight: 800;
       }
+      /*
+        **상자 안의 버튼은 칸 폭을 꽉 채운다.**
+
+        글자 길이대로 두었더니 '이어서 안전운전 연습'(249px)과 '자율 안전운전 시범운행'(265px)이
+        서로 어긋난 폭으로 서서, 두 길이 대등하다는 것이 생김새에서 무너졌다. 폭을 칸에 맞추면
+        **두 버튼이 같은 크기**가 되고 그 자체가 "둘 중 하나를 고른다" 는 말이 된다.
+
+        마스터 운행처럼 한 칸에 버튼이 둘인 경우도 있으므로 세로로 쌓는다.
+      */
+      .mode-split .ai-course-actions {
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .mode-split .ai-course-actions button {
+        width: 100%;
+        justify-content: center;
+      }
+      /*
+        **처음부터 다시 시작은 두 칸 아래 한 줄이다.**
+
+        지우는 것은 온라인 연습만 지우는 것이 아니라 레벨 · 습관 · 뱃지를 통째로 되돌리는 일이라,
+        한쪽 칸 안에 있으면 자리가 거짓말을 한다. 훈련 버튼 바로 아래라는 것은 그대로 지키되
+        (다음 운전자가 찾지 못하면 앞 사람 기록 위에 앉는다), **크기는 한 단계 낮춘다** — 되돌릴 수
+        없는 동작이 출발보다 커 보이면 실수로 누르는 쪽이 더 무섭다.
+      */
+      .mode-reset {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+      }
+      .mode-reset button {
+        min-height: 46px;
+        font-size: 15px;
+        padding: 0 20px;
+      }
+      .mode-reset button svg {
+        width: 18px;
+        height: 18px;
+      }
       /* 이름표 바로 아래에 버튼이 붙는다 — 이름표가 이미 간격을 냈으므로 버튼 줄은 좁게 띄운다 */
       .mode-group .ai-course-actions {
         margin-top: 8px;
       }
       /*
-        **무엇을 연습할까** (scenarios/tracks.ts) — 우회전 · 어린이보호구역 · 둘 다.
-
-        설정 화면의 난이도 고르개와 **같은 모양(.opt)** 을 쓴다. 고르는 일이 같은 종류라 모양도 같아야 한다
-        (사용자가 "같은 정보는 같은 모양" 이라고 했다). 다만 여기는 첫 화면이라 손가락으로 짚을 크기로 키운다.
-        아직 못 만든 갈래는 지우지 않고 **눌리지 않게** 둔다 — 셋으로 나뉜다는 것 자체가 안내다.
+        버튼 줄. **폭과 줄 세우기는 .mode-split 이 정한다** — 상자 안에서 칸 폭을 꽉 채워 세로로 쌓는다.
+        한때는 여기서 가로로 늘어놓고 좁은 화면에서만 가운데 한 줄씩으로 접었는데, 버튼이 글자 길이대로
+        제각각인 폭이 되어 두 길이 대등하다는 것이 생김새에서 무너졌다.
       */
       .ai-course-actions {
-        margin-top: 14px;
         display: flex;
         gap: 10px;
-        flex-wrap: wrap;
         align-items: center;
       }
       /*
-        **휴대폰에서는 가운데로 한 줄씩** (사용자 요청). 좁은 화면에서는 세 버튼이 저마다 다른 폭으로 한 줄씩 떨어져
-        왼쪽에 붙어 들쭉날쭉했다. 가운데 한 줄로 세우고, 폭은 **가장 긴 버튼에 맞춰 셋을 같게** 한다 — 화면보다
-        넓어지지는 않는다(`fit-content(100%)`). PC 에서는 한 줄에 셋이 나란히 서므로 그대로 둔다.
-      */
-      @media (max-width: 640px) {
-        .ai-course-actions {
-          display: grid;
-          grid-template-columns: fit-content(100%);
-          justify-content: center;
-        }
-        .ai-course-actions button {
-          justify-content: center;
-        }
-      }
-      /*
-        **이 두 버튼만 키가 두 배다** (42px → 84px).
+        **이 버튼들만 키가 두 배다** (42px → 84px).
 
-        이 상자에서 실제로 눌러야 하는 것은 둘뿐이다 — 훈련을 잇거나, 새 운전자로
-        시작하거나. 부스처럼 서서 쓰는 자리에서는 손가락으로 정확히 짚을 수 있는 크기가
+        이 상자에서 실제로 눌러야 하는 것은 둘뿐이다 — 온라인으로 직접 몰거나, 오프라인에서
+        시범을 함께 보거나. 부스처럼 서서 쓰는 자리에서는 손가락으로 정확히 짚을 수 있는 크기가
         곧 눌리는 크기라, 위에서 읽는 것(레벨·습관)과 아래에서 누르는 것을 키로 갈라 둔다.
-
-        **가로는 그대로다.** 폭까지 늘리면 글자 옆 여백만 벌어져 버튼이 텅 비어 보인다.
-        높이는 짚을 자리를 넓히지만 폭은 글자 길이가 정하게 두는 편이 낫다.
 
         `padding` 이 아니라 `min-height` 로 잡는 이유: 버튼이 이미
         `display:inline-flex; align-items:center` 라 글자와 아이콘이 저절로 가운데 선다.

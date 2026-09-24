@@ -1039,6 +1039,15 @@ export class Screens {
 
           **이름 뒤의 설명 한 줄은 뺐다.** 아이콘과 이름, 그리고 버튼 이름이 이미 같은 말을 한다 —
           좌우로 갈라 칸이 좁아진 자리에서 세 번 말하면 글자만 빽빽해진다. 설명은 버튼의 title 로 남긴다.
+
+          **두 칸의 생김새가 똑같아야 '둘 중 하나' 로 읽힌다.** 처음에는 가는 세로선 하나로만 갈라 두고
+          왼쪽에 버튼 둘 · 오른쪽에 하나를 두었는데, 버튼 폭이 글자 길이대로 제각각이고 오른쪽 아래가
+          휑하게 비어 **나눈 것이 아니라 한쪽이 덜 채워진 것**처럼 보였다 (사용자가 짚었다: "두 가지
+          나눠진 부분과 버튼 구성 디자인이 마음에 들지 않아").
+
+          지금은 **칸마다 상자 하나 · 버튼 하나**다. 버튼은 칸 폭을 꽉 채워 둘이 같은 크기가 되고,
+          두 상자는 키까지 같다. '처음부터 다시 시작' 은 아래 줄로 내렸다 — 지우는 것은 **온라인 연습만**
+          지우는 것이 아니라 레벨 · 습관 · 뱃지를 통째로 되돌리는 일이라, 한쪽 칸 안에 있으면 자리가 거짓말을 한다.
         -->
         <div class="mode-split">
           <div class="mode-group">
@@ -1049,7 +1058,7 @@ export class Screens {
               누르면 알아서 판이 나오는 거야." 고르는 것은 AI 가 한다 (scenarios/trackPick.ts) —
               한 갈래만 붙잡고 파고 싶은 사람을 위한 자리는 **설정**으로 옮겼다 (renderSettings).
             -->
-            <div class="ai-course-actions">${button}${resetButton}</div>
+            <div class="ai-course-actions">${button}</div>
           </div>
           <div class="mode-group">
             <p class="mode-label">${icon('users')}<b>오프라인 교육 활용</b></p>
@@ -1060,6 +1069,14 @@ export class Screens {
             </div>
           </div>
         </div>
+        <!--
+          **처음부터 다시 시작은 두 칸 아래에 한 줄로 둔다.**
+
+          여전히 **훈련 버튼 바로 아래**다 — 설정 깊숙이 넣으면 다음 운전자가 찾지 못하고, 찾지 못하면
+          그냥 앞 운전자의 기록 위에 앉는다 (resetCourseButton 의 주석). 다만 **크기로는 한 단계 낮다**:
+          되돌릴 수 없는 동작이 출발보다 커 보이면 실수로 누르는 쪽이 더 무섭다.
+        -->
+        ${resetButton ? `<div class="mode-reset">${resetButton}</div>` : ''}
         ${ai.error ? `<p class="ai-note" style="color:var(--amber)">${esc(ai.error)}</p>` : ''}
 
       </div>
