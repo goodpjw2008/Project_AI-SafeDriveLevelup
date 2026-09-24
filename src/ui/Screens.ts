@@ -6,7 +6,6 @@
  */
 
 import {
-  APP_AUTHOR,
   APP_CONTACT,
   APP_COPYRIGHT_YEAR,
   APP_NAME_PARTS,
@@ -322,7 +321,7 @@ const OSS_LIBRARIES: Array<{ name: string; role: string; license: string; url: s
 function siteFooter(): string {
   return `
     <footer class="site-footer">
-      <span>Copyright © ${APP_COPYRIGHT_YEAR} ${esc(APP_AUTHOR)}</span>
+      <span>Copyright © ${APP_COPYRIGHT_YEAR}</span>
       <span class="dot" aria-hidden="true">·</span>
       <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a>
       <span class="dot" aria-hidden="true">·</span>
@@ -768,8 +767,8 @@ export class Screens {
           **우회전이 먼저다** — 부제 '우회전과 어린이보호구역' 의 차례와 같게, 사용자가 이 순서로 바꿔 달라고 했다.
           부제를 읽은 눈이 그 차례대로 버튼을 만난다. (예전 이름 시절에는 그 부제의 차례를 따라 보호구역이 먼저였다.)
         -->
-        <button id="btn-help">${icon('guide')}우회전 방법</button>
-        <button id="btn-zone-help">${icon('guide')}어린이보호구역 운전 방법</button>
+        <button id="btn-help">${icon('guide')}우회전</button>
+        <button id="btn-zone-help">${icon('guide')}어린이보호구역</button>
         <!--
           **판이 쌓여야 나온다.** 세 판 돌고 "당신의 습관은" 이라고 말할 수는 없다.
           그 전에 버튼을 띄워 두면 눌렀을 때 "아직 모자랍니다" 만 뜨고, 그런 버튼은
@@ -2556,10 +2555,9 @@ export class Screens {
         <p class="map-trial-note" id="map-trial-note" aria-live="polite"></p>
       </form>
       <ul class="map-trial-rules">
-        <li><b>기록이 남지 않습니다</b> — 레벨 · 경험치 · 나쁜 운전 습관 · 주행 기록이 그대로입니다. 몇 번이든 되풀이해도 됩니다.</li>
-        <li>화면에는 <b>맵 체험 L00057</b> 처럼 적힙니다 — AI 가 고른 판이 아니라서 'AI 추천' 이라 부르지 않습니다.</li>
-        <li>번호의 앞 글자가 갈래입니다 — <b>C</b> 어린이보호구역 전용 · <b>L</b> 우회전 전용 · <b>M</b> 우회전 + 어린이보호구역.</li>
-        <li>끝나면 다음 판으로 넘어가지 않고 <b>다시 운행</b>만 둡니다. 다른 번호는 이 창에서 다시 넣습니다.</li>
+        <li><b>기록이 남지 않습니다</b> : 레벨 · 경험치 · 나쁜 운전 습관 · 주행 기록이 그대로입니다.</li>
+        <li>화면에는 <b>맵 체험 L00057</b> 처럼 적힙니다 : AI 가 고른 판이 아니라서 'AI 추천' 이라 부르지 않습니다.</li>
+        <li>번호의 앞 글자로 어떤 유형의 맵인지 알 수 있습니다 : <b>C</b> 어린이보호구역 전용 · <b>L</b> 우회전 전용 · <b>M</b> 우회전 + 어린이보호구역.</li>
       </ul>
     `;
     this.bindBack('trial', onBack);
@@ -2587,8 +2585,7 @@ export class Screens {
         </div>
       </div>
       <div class="about-maker">
-        <span>만든 사람 <b>${esc(APP_AUTHOR)}</b></span>
-        <span class="dot" aria-hidden="true">·</span>
+        <span>만든 사람 :</span>
         <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a>
         <span class="dot" aria-hidden="true">·</span>
         <span>${esc(APP_USAGE)}</span>

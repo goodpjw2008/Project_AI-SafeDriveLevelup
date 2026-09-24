@@ -152,10 +152,13 @@ export const APP_TAGLINE_PARTS: readonly NamePart[] = [
 export const APP_TAGLINE = APP_TAGLINE_PARTS.map((p) => p.text).join('');
 
 /**
- * **만든 사람** — 첫 화면 맨 아래의 저작권 줄과 About 창이 같이 쓴다 (Screens.ts 의 siteFooter · renderAbout).
+ * **연락처** — 첫 화면 맨 아래의 저작권 줄과 About 창이 같이 쓴다 (Screens.ts 의 siteFooter · renderAbout).
  * 한 곳에 두어야 연락처를 바꿀 때 두 자리가 어긋나지 않는다.
+ *
+ * 한때 이름(`APP_AUTHOR = 'goodpjw2008'`)도 나란히 적었는데 사용자가 뺐다 — 저작권 줄은
+ * `Copyright © 2026`, About 은 `만든 사람 :` 으로 시작하고 **누구인지는 이메일이 말한다.**
+ * 이름과 메일 앞부분이 같은 글자라 두 번 읽히던 것을 한 번으로 줄였다.
  */
-export const APP_AUTHOR = 'goodpjw2008';
 export const APP_CONTACT = 'goodpjw2008@gmail.com';
 /** 저작권 표기의 해 — 처음 만든 해다 (해마다 올리는 값이 아니다) */
 export const APP_COPYRIGHT_YEAR = 2026;
