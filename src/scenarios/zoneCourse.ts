@@ -84,21 +84,28 @@ const PEDS = ['none', 'waiting', 'crossing', 'jaywalk'] as const;
 const KINDS = ['child', 'adult', 'elder'] as const;
 
 /**
- * **보행자가 오는 쪽** — `right` 는 내가 달리는 쪽 보도(차량쪽), `left` 는 건너편 보도다.
+ * **사람이 어느 쪽에서 어느 쪽으로 건너는가** — 사용자가 정한 난이도 축이다.
  *
- * 건너편에서 오는 사람은 **반대 차로를 먼저 건너**므로 내 차로에 닿기까지 3~5초가 더 걸린다 —
- * 일찍 보이지만 늦게 닿는다. 차량쪽에서 오는 사람은 발을 떼는 순간 이미 내 차로다.
- * 같은 장면이라도 **어디를 먼저 볼 것인가**가 달라진다.
+ *  - `l2r` **건너편 → 차량쪽** : 반대 차로를 **먼저** 건너므로 내 차로에 닿기까지 3~5초가 더 있다.
+ *    일찍 보이고 늦게 닿는다 — 보고 판단할 여유가 가장 크다.
+ *  - `r2l` **차량쪽 → 건너편** : 발을 떼는 순간 이미 내 차로다. 여유가 없다.
+ *  - `both` **양방향** : 양쪽에서 동시에 나온다. 한쪽만 보고 출발하면 걸린다 —
+ *    "왼쪽을 봤으니 됐다" 가 통하지 않는 유일한 배치다.
+ *
+ * 이름은 **걷는 방향**으로 적는다 (`from` 은 출발한 연석이라 반대로 읽힌다).
  */
-const FROMS = ['right', 'left'] as const;
+const DIRS = ['l2r', 'r2l', 'both'] as const;
 
 /**
- * **몇 사람인가** — 둘이면 **반대쪽에서 한 사람 더** 나온다. 한쪽만 보고 출발하면 걸린다.
+ * **한 횡단보도에 몇 사람인가** (1~3).
  *
- * 여러 횡단보도에 사람이 있는 판까지 둘씩 두면 한 길에 여섯 명이 되어 길이 사람으로 막힌다.
- * 그래서 **한 곳에만 사람이 있는 판**에서만 가른다 (나이를 가르는 규칙과 같은 까닭).
+ * 한 방향이면 그 쪽 연석에 나란히 서고, `both` 면 양쪽으로 나눈다 (둘이면 1+1, 셋이면 **차량쪽 2** + 건너편 1 —
+ * 늘어나는 쪽을 내가 먼저 만나는 쪽에 둬야 사람이 는 것이 실제로 어려워진다).
+ *
+ * 사람 수를 방향과 **따로** 둔다. 한때 '둘 = 양쪽에서 하나씩' 으로 묶어 두었더니, 둘인 판에서는 방향 축이
+ * 뜻을 잃어 **같은 장면이 두 판씩 실렸다** (48판이 그랬다). 축이 겹치면 판 수만 늘고 배우는 것은 늘지 않는다.
  */
-const COUNTS = [1, 2] as const;
+const COUNTS = [1, 2, 3] as const;
 
 export interface ZoneTags {
   /** 어느 길인가 (ROADS 의 몇 번째) */
@@ -107,7 +114,7 @@ export interface ZoneTags {
   aPed: (typeof PEDS)[number];
   bPed: (typeof PEDS)[number];
   kind: (typeof KINDS)[number];
-  from: (typeof FROMS)[number];
+  dir: (typeof DIRS)[number];
   count: (typeof COUNTS)[number];
 }
 
@@ -127,7 +134,8 @@ export const plainAt = (t: ZoneTags): 'S' | 'A' | 'B' =>
   (['S', 'A', 'B'] as const).find((at) => !hasSignal(t, at))!;
 
 /**
- * 성립하는 조합인가 — **판의 글이 거짓말이 되는 조합**을 여기서 뺀다 (library.ts 의 combinationAllowed 와 같은 자리).
+ * 성립하는 조합인가 — **판의 글이 거짓말이 되는 조합**과 **같은 장면이 두 번 실리는 조합**을 여기서 뺀다
+ * (library.ts 의 combinationAllowed 와 같은 자리).
  */
 export function zoneCombinationAllowed(t: ZoneTags): boolean {
   for (const at of ['S', 'A', 'B'] as const) {
@@ -142,22 +150,31 @@ export function zoneCombinationAllowed(t: ZoneTags): boolean {
       **신호기가 있는 자리에는 무단횡단자만 둔다.**
 
       보행신호와 차량신호는 번갈아 켜진다 — 신호를 지키는 사람은 **내가 서 있는 동안** 건너고,
-      내 신호가 녹색이 될 즈음에는 이미 다 건넌 뒤다. 보행 녹색이 끝나는 순간에 나서게 해 봐도
-      내 녹색까지 0.1초가 남아, 보행자를 보지 않는 운전자조차 걸리지 않았다 (플레이테스트가 잡았다).
-      **아무 일도 일어나지 않는 판**이므로 조합에서 뺀다 — 신호기 없는 자리에서는 언제든 건너므로 역할이 있다.
+      내 신호가 녹색이 될 즈음에는 이미 다 건넌 뒤다. 아무 일도 일어나지 않는 판이므로 뺀다
+      (플레이테스트가 잡았다).
     */
     if (ped !== 'jaywalk' && hasSignal(t, at)) return false;
   }
-  const places = peopleAt(t).length;
-  /* 아무도 없으면 오는 쪽도 사람 수도 뜻이 없다 — 같은 판이 네 벌로 불어난다 */
-  if (places === 0 && (t.from !== 'right' || t.count !== 1)) return false;
-  /*
-    **나이와 사람 수는 한 곳에만 사람이 있는 판에서만 가른다.**
 
-    여럿이 나오는 판에서 셋을 다 돌리면 같은 장면이 여러 벌씩 생겨 판이 몇 배가 되고 전수 검증도
-    그만큼 걸린다. 어른 · 노인을 따로 겪는 것도, 양쪽에서 오는 둘을 겪는 것도 **한 곳 판으로 충분하다.**
+  /* **양방향은 둘 이상이라야 성립한다** — 한 사람은 한 방향으로만 건넌다 */
+  if (t.dir === 'both' && t.count < 2) return false;
+
+  const places = peopleAt(t).length;
+  /* 아무도 없으면 방향도 사람 수도 나이도 뜻이 없다 — 같은 판이 여러 벌로 불어난다 */
+  if (places === 0) return t.dir === 'r2l' && t.count === 1 && t.kind === 'child';
+
+  /*
+    **나이는 한 곳에 한 사람인 판에서만 가른다.** 어른 · 노인을 따로 겪는 것은 그 판으로 충분하고,
+    여럿이 걷는 판까지 셋을 돌리면 같은 장면이 세 벌씩 생긴다.
   */
-  if (places !== 1 && (t.kind !== 'child' || t.count !== 1)) return false;
+  if ((places !== 1 || t.count !== 1) && t.kind !== 'child') return false;
+
+  /*
+    **사람이 여러 횡단보도에 있으면 수를 줄인다.** 세 곳에 셋씩이면 한 길에 아홉 명이라 길이
+    사람으로 막힌다 — 두 곳이면 둘까지, 세 곳이면 하나씩이다.
+  */
+  if (places === 2 && t.count > 2) return false;
+  if (places === 3 && t.count > 1) return false;
   return true;
 }
 
@@ -168,9 +185,9 @@ const allCombinations = (): ZoneTags[] => {
       for (const aPed of PEDS)
         for (const bPed of PEDS)
           for (const kind of KINDS)
-            for (const from of FROMS)
+            for (const dir of DIRS)
               for (const count of COUNTS) {
-                const t = { road, sPed, aPed, bPed, kind, from, count };
+                const t = { road, sPed, aPed, bPed, kind, dir, count };
                 if (zoneCombinationAllowed(t)) out.push(t);
               }
   return out;
@@ -211,14 +228,15 @@ const pedOf = (
   how: (typeof PEDS)[number],
   kind: ZoneTags['kind'],
   signalled: boolean,
-  from: ZoneTags['from'],
+  dir: ZoneTags['dir'],
   count: ZoneTags['count'],
 ): PedSpawn[] => {
   if (how === 'none') return [];
   const at = signalled ? PED_AT[crosswalk].signal : PED_AT[crosswalk].plain;
-  const one = (side: ZoneTags['from']): PedSpawn => ({
+  /** 걷는 방향 → 출발한 연석 (PedSpawn.from 은 **출발한 쪽**이라 이름이 반대로 읽힌다) */
+  const one = (walk: 'l2r' | 'r2l'): PedSpawn => ({
     crosswalk,
-    from: side,
+    from: walk === 'l2r' ? 'left' : 'right',
     kind,
     at,
     // '건너는 중' 은 조금 더 멀리서 발을 뗀다 — 내가 닿을 때 이미 차도 위에 있어야 한다
@@ -226,11 +244,17 @@ const pedOf = (
     // 무단횡단 — 지킬 신호가 있는데 지키지 않는다
     ...(how === 'jaywalk' ? { obeysSignal: false } : null),
   });
+  if (dir !== 'both') return Array.from({ length: count }, () => one(dir));
   /*
-    **둘이면 반대쪽에서 한 사람 더.** 한 보도에 둘을 세우면 앞사람만 보고도 다 보인 셈이 된다 —
-    양쪽에서 오면 **한쪽만 보고 출발한 운전자가 걸린다.** `from` 은 그때 '차량쪽에 누가 서는가' 를 가른다.
+    **양방향은 차량쪽을 더 채운다.** 셋이면 차량쪽 2 · 건너편 1 이다 — 늘어나는 쪽이 내가 **먼저
+    만나는 쪽**이라야 사람이 는 것이 실제로 어려워진다. 건너편만 늘리면 내 차로에 닿기 전에
+    이미 다 지나가 버려 수가 늘어도 판이 달라지지 않는다.
   */
-  return count === 2 ? [one(from), one(from === 'right' ? 'left' : 'right')] : [one(from)];
+  const near = Math.ceil(count / 2);
+  return [
+    ...Array.from({ length: near }, () => one('r2l')),
+    ...Array.from({ length: count - near }, () => one('l2r')),
+  ];
 };
 
 const WHERE: Record<'S' | 'A' | 'B', string> = { S: '첫 번째', A: '두 번째', B: '세 번째' };
@@ -238,15 +262,23 @@ const WHERE: Record<'S' | 'A' | 'B', string> = { S: '첫 번째', A: '두 번째
 /** 길의 생김새 한 마디 — 제목에 그대로 들어간다 */
 const ROAD_LABEL = ['무신호·신호·신호', '신호·신호·무신호'] as const;
 const KIND_TEXT = { child: '어린이', adult: '어른', elder: '노인' } as const;
-/** 보행자가 오는 쪽 — 운전석에서 본 말로 적는다 */
-const SIDE_TEXT = { right: '차량쪽', left: '건너편' } as const;
+/** 건너는 방향 — 운전석에서 본 말로 적는다 */
+const DIR_TEXT = { l2r: '건너편에서', r2l: '차량쪽에서', both: '양쪽에서' } as const;
+/** 사람 수 */
+const COUNT_TEXT = { 1: '', 2: ' 둘', 3: ' 셋' } as const;
+/** 그 횡단보도에서 사람이 무엇을 하고 있는가 */
+const PED_TEXT = { none: '', waiting: '건너려는', crossing: '건너는', jaywalk: '무단횡단' } as const;
 
 const titleOf = (t: ZoneTags): string => {
-  const where = peopleAt(t).map((at) => WHERE[at]);
-  if (!where.length) return `어린이보호구역 - ${ROAD_LABEL[t.road]} - 보행자 없음`;
-  const who = KIND_TEXT[t.kind];
-  const how = t.count === 2 ? `${who} 둘 (양쪽에서)` : `${who} (${SIDE_TEXT[t.from]}에서)`;
-  return `어린이보호구역 - ${ROAD_LABEL[t.road]} - ${where.join('·')} 횡단보도 ${how}`;
+  const places = peopleAt(t);
+  if (!places.length) return `어린이보호구역 - ${ROAD_LABEL[t.road]} - 보행자 없음`;
+  /*
+    **횡단보도마다 무엇을 하고 있는지 적는다.** 예전에는 자리만 적어(“첫 번째 횡단보도 어린이”)
+    기다리는 사람과 건너는 사람과 무단횡단자가 **같은 제목**으로 보였다 — 제목만 보고는 다른 판인지
+    알 수 없었다. 방향과 사람 수는 온 판에 같이 걸리므로 끝에 한 번만 적는다.
+  */
+  const where = places.map((at) => `${WHERE[at]} ${PED_TEXT[pedAt(t, at)]}`).join(' · ');
+  return `어린이보호구역 - ${ROAD_LABEL[t.road]} - ${where} ${KIND_TEXT[t.kind]}${COUNT_TEXT[t.count]} (${DIR_TEXT[t.dir]})`;
 };
 
 const briefOf = (t: ZoneTags): string =>
@@ -261,10 +293,10 @@ const teachesOf = (t: ZoneTags): string => {
     '신호기가 있는 횡단보도의 적색은 서서 기다리는 것입니다 — 서고 나서 가는 것이 아닙니다.',
     '한 길 안에서도 횡단보도마다 규칙이 다릅니다 — 앞의 횡단보도가 어땠는지가 아니라 지금 이곳을 보세요.',
   ];
-  if (t.count === 2) lines.push('한쪽만 보고 출발하지 마세요 — 반대쪽에서도 사람이 옵니다.');
-  if (t.from === 'left' && t.count === 1) {
-    lines.push('건너편에서 오는 사람은 늦게 닿습니다 — 먼저 보인다고 먼저 지나간 것이 아닙니다.');
-  }
+  if (t.dir === 'both') lines.push('한쪽만 보고 출발하지 마세요 — 반대쪽에서도 사람이 옵니다.');
+  if (t.dir === 'l2r') lines.push('건너편에서 오는 사람은 늦게 닿습니다 — 먼저 보인다고 먼저 지나간 것이 아닙니다.');
+  if (t.dir === 'r2l') lines.push('차량쪽 연석의 사람은 발을 떼는 순간 이미 내 차로입니다.');
+  if (t.count > 1) lines.push('한 사람이 지나갔다고 끝이 아닙니다 — 뒤따르는 사람까지 보내고 출발하세요.');
   if (pedAt(t, 'B') !== 'none') lines.push('마지막 횡단보도까지가 보호구역입니다 — 다 왔다고 끝이 아닙니다.');
   return lines.join(' ');
 };
@@ -288,9 +320,9 @@ export function buildZoneSpec(t: ZoneTags, id: number): ScenarioSpec {
     pedSignalInstalled: { A: false, C: false },
     zoneSignals,
     pedestrians: [
-      ...pedOf('S', t.sPed, t.kind, hasSignal(t, 'S'), t.from, t.count),
-      ...pedOf('A', t.aPed, t.kind, hasSignal(t, 'A'), t.from, t.count),
-      ...pedOf('B', t.bPed, t.kind, hasSignal(t, 'B'), t.from, t.count),
+      ...pedOf('S', t.sPed, t.kind, hasSignal(t, 'S'), t.dir, t.count),
+      ...pedOf('A', t.aPed, t.kind, hasSignal(t, 'A'), t.dir, t.count),
+      ...pedOf('B', t.bPed, t.kind, hasSignal(t, 'B'), t.dir, t.count),
     ],
     crossTraffic: 0,
     exitBlocked: false,
@@ -344,7 +376,30 @@ export function zoneTargets(t: ZoneTags): ViolationCode[] {
 }
 
 /**
- * **이 판이 얼마나 복잡한가** — 레벨을 매기는 기준. 겹친 조건의 수다 (difficulty.ts 의 costOf 와 같은 생각).
+ * **이 판이 얼마나 어려운가** — 레벨을 매기는 기준 (difficulty.ts 의 costOf 와 같은 생각).
+ *
+ * ## 무엇으로 어려워지는가
+ *
+ * 이 코스는 길이 **두 가지뿐**이고 사실상 보행자만 변수다. 그래서 난이도는 사용자가 정한 두 축 —
+ * **건너는 방향**과 **사람 수** — 에서 나온다. 둘 다 "내 차로에 사람이 들어오기까지 내게 얼마나 시간이
+ * 있는가" 와 "몇 번을 다시 확인해야 하는가" 를 바꾼다.
+ *
+ * | | 점수 | 까닭 |
+ * |---|---|---|
+ * | 건너편 → 차량쪽 | +0 | 반대 차로를 먼저 건넌다 — 보고 판단할 여유가 가장 크다 |
+ * | 차량쪽 → 건너편 | +1 | 발을 떼는 순간 이미 내 차로다 |
+ * | 양방향 | +2 | 한쪽만 보고 출발하면 걸린다 — 두 번 확인해야 한다 |
+ * | 한 사람 · 둘 · 셋 | +0 · +1 · +2 | 앞사람이 지나가도 끝이 아니다 |
+ *
+ * 여기에 **어디에** 있는가(신호 없는 곳이면 일시정지 의무, 있는 곳이면 무단횡단)와 **누구**인가(어린이 ·
+ * 노인은 걸음이 다르다), **몇 곳에** 있는가가 더해진다.
+ *
+ * ## 왜 방향과 사람 수를 따로 세는가
+ *
+ * 한때 '둘 = 양쪽에서 하나씩' 으로 묶고 방향에는 점수를 주지 않았다. 그랬더니 (1) 둘인 판에서 방향 축이
+ * 뜻을 잃어 **같은 장면이 두 판씩** 실렸고, (2) 점수 단계가 2~9 의 여덟 칸뿐이라 **L3 · L4 · L5 가 전부
+ * 같은 4점** 이 됐다 — 레벨이 두 칸 올라도 실제로는 어려워지지 않았다. 두 축을 갈라 점수를 주면 계단이
+ * 그만큼 촘촘해진다.
  */
 function zoneCost(t: ZoneTags): number {
   // 무신호 한 곳 + 신호 두 곳 — 두 길이 같다
@@ -354,13 +409,17 @@ function zoneCost(t: ZoneTags): number {
     굳어져, 마지막에서 사람이 없으면 그냥 지나가게 된다 (teachesOf 의 '다 왔다고 끝이 아닙니다').
   */
   if (plainAt(t) === 'B') n += 1;
-  for (const at of ['S', 'A', 'B'] as const) {
-    const p = pedAt(t, at);
-    if (p === 'none') continue;
-    n += p === 'jaywalk' ? 2 : 1; // 무단횡단은 신호만 보고 가면 걸린다
-  }
-  if (t.count === 2) n += 1; // 양쪽을 다 봐야 한다
-  if (peopleAt(t).length && t.kind !== 'adult') n += 1; // 어린이 · 노인은 걸음이 다르다
+
+  const places = peopleAt(t);
+  for (const at of places) n += pedAt(t, at) === 'jaywalk' ? 2 : 1; // 무단횡단은 신호만 보고 가면 걸린다
+  if (!places.length) return n;
+
+  // ── 사용자가 정한 두 축
+  n += { l2r: 0, r2l: 1, both: 2 }[t.dir];
+  n += t.count - 1;
+
+  if (places.length > 1) n += 1; // 한 곳을 보내고 나서도 긴장을 이어야 한다
+  if (t.kind !== 'adult') n += 1; // 어린이 · 노인은 걸음이 다르다
   return n;
 }
 
@@ -433,8 +492,8 @@ export function zoneDemoCourses(): LibraryEntry[] {
     { road: 0, sPed: 'none', aPed: 'none', bPed: 'none' },
     // 2번 길 — 신호 둘을 지킨 뒤 **마지막 무신호**에서 다시 스스로 선다
     { road: 1, sPed: 'none', aPed: 'none', bPed: 'none' },
-    // 사람이 있는 길 — 마지막 무신호 횡단보도에 양쪽에서 아이 둘이 나선다
-    { road: 1, sPed: 'none', aPed: 'none', bPed: 'waiting', kind: 'child', from: 'right', count: 2 },
+    // 사람이 있는 길 — 마지막 무신호 횡단보도에 **양쪽에서** 아이 둘이 나선다
+    { road: 1, sPed: 'none', aPed: 'none', bPed: 'waiting', kind: 'child', dir: 'both', count: 2 },
   ];
   const tags = allCombinations();
   const entries = zoneEntries();

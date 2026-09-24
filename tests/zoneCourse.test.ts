@@ -80,36 +80,77 @@ describe('어린이보호구역 전용 도로', () => {
   });
 
   /*
-    **보행자 변수 셋** — 사용자가 정했다: "보행자 여부, 보행자 방향, 보행자 명수가 변수로 들어오는 거야."
-    하나라도 한쪽으로 쏠리면 그 변수는 이름만 남는다.
+    **난이도는 보행자 두 축에서 나온다** — 사용자가 정했다: "사람의 서 있는 곳 왼쪽→오른쪽 보행,
+    오른쪽→왼쪽 보행, 양방향 보행 / 사람의 숫자. 이 변수들로 난이도를 재설계해 줘."
+    길은 두 가지뿐이므로, 이 둘이 한쪽으로 쏠리면 난이도 자체가 이름만 남는다.
   */
-  it('보행자는 있고 없음 · 오는 쪽 · 사람 수 셋으로 갈린다', () => {
-    const none = courses.filter((s) => s.pedestrians.length === 0);
-    const right = courses.filter((s) => s.pedestrians.some((p) => p.from === 'right'));
-    const left = courses.filter((s) => s.pedestrians.some((p) => p.from === 'left'));
-    // 한 횡단보도에 둘 — 양쪽에서 하나씩이라야 '한쪽만 보고 출발하면 걸린다' 가 성립한다
-    const pair = courses.filter((s) =>
-      (['S', 'A', 'B'] as const).some((at) => {
-        const here = s.pedestrians.filter((p) => p.crosswalk === at);
-        return here.length === 2 && new Set(here.map((p) => p.from)).size === 2;
-      }),
-    );
-    expect(none.length).toBeGreaterThan(0);
-    expect(right.length).toBeGreaterThan(20);
-    expect(left.length).toBeGreaterThan(20);
-    expect(pair.length).toBeGreaterThan(10);
-    // 한 횡단보도에 셋 이상은 두지 않는다 — 길이 사람으로 막힌다
+  it('건너는 방향 셋이 모두 나온다 — 건너편에서 · 차량쪽에서 · 양방향', () => {
+    const side = (s: (typeof courses)[number], at: 'S' | 'A' | 'B') =>
+      new Set(s.pedestrians.filter((p) => p.crosswalk === at).map((p) => p.from));
+    const shapes = { l2r: 0, r2l: 0, both: 0 };
     for (const s of courses) {
       for (const at of ['S', 'A', 'B'] as const) {
-        expect(s.pedestrians.filter((p) => p.crosswalk === at).length, s.title).toBeLessThanOrEqual(2);
+        const sides = side(s, at);
+        if (!sides.size) continue;
+        if (sides.size === 2) shapes.both++;
+        else if (sides.has('left')) shapes.l2r++;
+        else shapes.r2l++;
       }
+    }
+    for (const [k, n] of Object.entries(shapes)) expect(n, k).toBeGreaterThan(20);
+  });
+
+  it('사람 수가 하나 · 둘 · 셋으로 갈린다', () => {
+    const counts = new Map<number, number>();
+    for (const s of courses) {
+      for (const at of ['S', 'A', 'B'] as const) {
+        const n = s.pedestrians.filter((p) => p.crosswalk === at).length;
+        if (n) counts.set(n, (counts.get(n) ?? 0) + 1);
+      }
+    }
+    for (const n of [1, 2, 3]) expect(counts.get(n) ?? 0, `${n}명`).toBeGreaterThan(10);
+    // 넷 이상은 두지 않는다 — 길이 사람으로 막힌다
+    expect([...counts.keys()].every((n) => n <= 3)).toBe(true);
+    expect(courses.some((s) => s.pedestrians.length === 0)).toBe(true);
+  });
+
+  /*
+    **같은 장면이 두 판으로 실리지 않는다.**
+
+    한때 '둘 = 양쪽에서 하나씩' 으로 묶어 방향 축과 겹쳐 두었더니, 둘인 판에서 방향이 뜻을 잃어
+    **48판(24쌍)이 완전히 같은 장면**이었다. 축이 겹치면 판 수만 늘고 배우는 것은 늘지 않는다.
+  */
+  it('완전히 같은 장면이 두 번 실리지 않는다', () => {
+    const seen = new Map<string, string>();
+    for (const s of courses) {
+      const key = JSON.stringify([
+        s.zoneSignals,
+        s.pedestrians
+          .map((p) => `${p.crosswalk}/${p.from}/${p.kind}/${p.at}/${p.startWithin}/${p.obeysSignal ?? true}`)
+          .sort(),
+      ]);
+      expect(seen.get(key), `${seen.get(key)} 와 같은 장면`).toBeUndefined();
+      seen.set(key, s.title);
     }
   });
 
   /*
-    **번호가 라이브러리와 겹치지 않는다.** 사용자는 판을 번호로 부른다("4927번 맵") — 한 번호가
-    두 판을 가리키면 그 방식 자체가 깨진다. 라이브러리가 늘어도 닿지 않을 만큼 띄워 두었다.
+    **난이도가 레벨을 따라 실제로 올라간다.** 조건 점수가 촘촘하지 않으면 레벨이 두 칸 올라도
+    같은 판이 나온다 — 예전에는 L3 · L4 · L5 가 전부 같은 4점이었다.
   */
+  it('레벨이 오르면 어려워진다 — 레벨별 평균 조건 점수가 뒤로 가지 않는다', () => {
+    const avg = (L: number) => {
+      const g = zoneEntries().filter((e) => e.level === L);
+      return g.reduce((n, e) => n + e.cost, 0) / g.length;
+    };
+    for (const L of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      expect(avg(L), `L${L - 1} → L${L}`).toBeGreaterThanOrEqual(avg(L - 1));
+    }
+    // 가장 쉬운 판과 가장 어려운 판이 충분히 벌어져 있다
+    const costs = zoneEntries().map((e) => e.cost);
+    expect(Math.max(...costs) - Math.min(...costs)).toBeGreaterThanOrEqual(9);
+  });
+
   it('번호가 우회전 라이브러리와 겹치지 않는다', () => {
     const maxLibrary = Math.max(...scenarioLibrary().map((e) => libraryNumber(e.spec.id) ?? 0));
     expect(maxLibrary).toBeLessThan(ZONE_NUMBER_BASE);

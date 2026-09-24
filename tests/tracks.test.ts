@@ -41,7 +41,7 @@ describe('갈래 가르기', () => {
   */
   it("우회전 라이브러리에는 보호구역 전용 판이 없다 — 그 갈래는 직진 코스가 맡는다", () => {
     expect(lib.filter((e) => trackOf(e.tags) === 'zone')).toHaveLength(0);
-    // 셋 다 달릴 수 있다 (사거리 없는 전용 도로 126판이 생기며 열렸다)
+    // 셋 다 달릴 수 있다 (사거리 없는 전용 도로 156판이 생기며 열렸다)
     expect(TRACK_READY).toEqual({ turn: true, zone: true, both: true });
   });
 
