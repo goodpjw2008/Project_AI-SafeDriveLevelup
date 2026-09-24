@@ -71,6 +71,10 @@
 - **포트폴리오에서 '만든 사람' 장표를 뺐습니다** (사용자가 정했습니다). 장표가 **22장 → 21장**이 되었고, 넘겨 보기 페이지의 쪽수 · 목록 · 장 이동은 장표 칸을 그대로 읽어 만들기 때문에 저절로 맞춰집니다. 그 장에만 쓰던 글 장표용 CSS 도 함께 지웠습니다. 라이선스 내용은 [LICENSE](LICENSE) 와 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 그대로 있습니다.
   - 그 장에서만 쓰던 `screenshot/09_about.png` 는 저장소에 그대로 두었습니다 — 배포본은 페이지가 부르는 그림만 실어 나르므로 이제 올라가지 않습니다.
 
+- **온라인 활용 장표(18쪽)의 QR 아래 주소도 `https://safedrive.ai.kr` 로 온전히 적었습니다** (사용자가 정했습니다).
+
+- **GitHub 저장소 소개도 고쳤습니다** — 소개 글을 **AI 가 무엇을 해 주는지**로 다시 쓰고(개정 연도 대신), 홈페이지 주소를 `safelevelup.vercel.app` 에서 **`https://safedrive.ai.kr`** 로 바꿨습니다.
+
 - **마지막 장표(감사합니다)에 만든이를 적고, 주소를 온전히 적었습니다** (사용자가 정했습니다) — 만든이 `goodpjw2008@gmail.com` · 사이트 `https://safedrive.ai.kr/` · GitHub `https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup`.
   - 이 장표에 **옛 이름이 남아 있던 것도 함께 고쳤습니다** — 제목이 `AI 안전운전 교실` 이었습니다.
   - README 의 저절로 넘어가는 장표도 21칸으로 다시 만들고, 판 번호를 `NN / 22` 에서 `NN / 21` 로 맞췄습니다.
