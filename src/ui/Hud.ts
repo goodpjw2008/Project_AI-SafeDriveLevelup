@@ -145,7 +145,9 @@ export class Hud {
     const short = hudTitle(title);
     // 판 이름의 'AI' 도 이름표와 같은 배지로 (ui/brandName.ts) — 결과 화면과 같은 얼굴이어야 한다
     this.scenarioTitle.innerHTML =
-      `<span class="stage">${withAiBadge(esc(stage))}</span><span class="sep">${esc(sep)}</span>${esc(short)}`;
+      `<span class="stage">${withAiBadge(esc(stage))}</span><span class="sep">${esc(sep)}</span>` +
+      // 제목을 span 으로 감싼다 — 세로 휴대폰에서 '판 번호까지만' 두려면 감출 손잡이가 있어야 한다
+      `<span class="scn-title">${esc(short)}</span>`;
     /*
       **긴 제목은 글씨를 줄여 한 줄에 담는다.** 라이브러리 판은 조건이 여럿이라
       "적색 - 보호구역 무신호 횡단보도 · 첫 횡단보도 보행자 · 야간" 처럼 길어, 원래 크기로는

@@ -5194,6 +5194,36 @@
         .mode-split > .mode-group:nth-child(2) {
           display: none;
         }
+
+        /*
+          부제의 '연습편' — 무엇을 연습하는지는 앞의 세 낱말이 이미 말한다.
+          좁은 폭에서 부제가 두 줄로 접히던 것이 한 줄로 선다.
+        */
+        #screen-menu .brand-keep {
+          display: none;
+        }
+        /*
+          레벨 칸 아래 안내("Level7까지 100 XP · 새 맵 무위반 +100") — 얼마나 남았는지는
+          바로 위의 막대와 숫자(100 / 200 XP)가 이미 보여 준다. 레벨 길(1~10 · M)은 남긴다.
+        */
+        #screen-menu .player-foot-text {
+          display: none;
+        }
+        /* AI 가 맵을 고르는 창의 '추천 사유' — 좁은 화면에서 카드가 두 배로 길어지던 줄이다 */
+        .ai-pick-why {
+          display: none;
+        }
+        /*
+          주행 중 상단과 결과 화면의 판 이름 — **번호까지만** 둔다.
+          "AI 추천 시나리오 L01311 - 적색 - 우회전 후 무단횡단하려는 보행자 · 앞차 직진 대기 · 빗길" 에서
+          뒤의 조건 나열이 세로 화면에서 두세 줄로 접혀 하늘과 전방 신호등을 가렸다.
+          무엇을 시험하는 판인지는 달리며 로봇이 말해 주고, 번호가 있으면 맵 체험으로 다시 찾을 수 있다.
+        */
+        #hud-scenario .sep,
+        #hud-scenario .scn-title,
+        #screen-debrief .screen-head h1 .head-title {
+          display: none;
+        }
       }
 
     </style>

@@ -77,6 +77,42 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).not.toContain('nth-child(1)');
   });
 
+  /*
+    **첫 화면에서 더 걷어낸 둘** — 부제의 '연습편' 과 레벨 칸 아래 안내 줄.
+    둘 다 바로 옆이 같은 말을 하고 있다: 무엇을 연습하는지는 앞의 세 낱말이, 얼마나 남았는지는
+    바로 위의 막대와 숫자가. 레벨 길(1~10 · M)은 남긴다 — 그건 어디까지 왔는지를 말하는 유일한 줄이다.
+  */
+  it("부제의 '연습편' 과 레벨 칸 아래 안내 줄을 접는다 — 첫 화면에서만", () => {
+    const block = rulesOnly();
+    expect(block).toContain('#screen-menu .brand-keep');
+    expect(block).toContain('#screen-menu .player-foot-text');
+  });
+
+  /* AI 가 맵을 고르는 창 — 좁은 화면에서 카드가 두 배로 길어지던 줄 */
+  it("AI 고르는 창의 '추천 사유' 를 접는다", () => {
+    expect(rulesOnly()).toContain('.ai-pick-why');
+  });
+
+  /*
+    **판 이름은 번호까지만.** "AI 추천 시나리오 L01311 - 적색 - 우회전 후 무단횡단하려는 보행자 · …" 에서
+    뒤의 조건 나열이 세로 화면에서 두세 줄로 접혀 하늘과 전방 신호등을 가렸다. 감추려면 글자 마디가 아니라
+    **span 으로 감싸져 있어야 한다** — 그래서 Hud.ts 와 Screens.ts 에 `.scn-title` · `.head-title` 을 두었다.
+  */
+  it('주행 중과 결과 화면의 판 이름을 번호까지만 둔다', () => {
+    const block = rulesOnly();
+    expect(block).toContain('#hud-scenario .sep');
+    expect(block).toContain('#hud-scenario .scn-title');
+    expect(block).toContain('#screen-debrief .screen-head h1 .head-title');
+  });
+
+  /* 감출 손잡이가 실제로 붙어 있는가 — 마디로 두면 CSS 가 잡지 못한다 */
+  it('감출 제목이 span 으로 감싸져 있다', () => {
+    const hud = readFileSync(fileURLToPath(new URL('../src/ui/Hud.ts', import.meta.url)), 'utf8');
+    const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
+    expect(hud).toContain('class="scn-title"');
+    expect(screens).toContain('class="head-title"');
+  });
+
   /* 좁은 폭에서 오른쪽에 붙으면 한쪽만 차 보인다 — 가운데로 모은다 */
   it('사이트 전체 성공 · 실패는 가운데로 모은다', () => {
     expect(mobileBlock()).toMatch(/\.site-stats\s*\{\s*justify-content:\s*center;/);

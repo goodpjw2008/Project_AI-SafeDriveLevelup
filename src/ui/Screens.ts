@@ -491,7 +491,9 @@ export class Screens {
           o.backLabel ?? '뒤로',
         )}</span></button>
         <div>
-          <h1>${o.stage ? `<span class="stage">${withAiBadge(esc(o.stage))}</span>` : ''}${esc(o.title)}</h1>
+          <h1>${o.stage ? `<span class="stage">${withAiBadge(esc(o.stage))}</span>` : ''}<span class="head-title">${esc(
+            o.title,
+          )}</span></h1>
           ${o.sub ? `<p class="lede">${o.sub}</p>` : ''}
         </div>
         <div class="screen-head-right">${o.right ?? ''}</div>
