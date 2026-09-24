@@ -537,6 +537,20 @@ function behindLead(alone: PedSpawn[], t: LibraryTags): PedSpawn[] {
 }
 
 /** 앞차가 없는 판의 보행자 */
+/**
+ * **곁에 선 사람의 나이.**
+ *
+ * 판이 정하는 나이(`t.kind`)는 **주인공 한 사람**의 것이고, 함께 나오는 사람은 그동안 늘 어른이었다
+ * (`group` 의 둘째 · `mixed` 의 기다리는 사람 · `crowd` 의 뒷사람 · `bothWays` 의 반대쪽). 그래서
+ * 어린이보호구역 판에서도 **사람 넷 중 하나만 아이**였다 (25%).
+ *
+ * 보호구역에서는 곁에 선 사람도 아이로 둔다 — 학교 앞에서 여럿이 함께 건너면 대개 아이들이고,
+ * 사용자가 정했다: "어린이보호구역에는 어린이들이 많이 출현해야 해." 보호구역이 아닌 판은 그대로
+ * 어른이다 (거기까지 아이로 채우면 '보호구역이라 아이가 많다' 가 흐려진다).
+ */
+const companion = (t: LibraryTags): PedSpawn['kind'] =>
+  t.zone === 'yes' || t.approach !== 'none' ? 'child' : 'adult';
+
 function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
   const out: PedSpawn[] = [];
   /*
@@ -607,7 +621,7 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     */
     // 둘은 **서로 다른 쪽**에서 온다 — 어느 쪽이 나설지 모르니 양쪽을 다 봐야 한다 (위 side · other)
     const waits = side(9);
-    out.push({ crosswalk: 'A', at: 0, from: waits, kind: 'adult', letsCarPass: true });
+    out.push({ crosswalk: 'A', at: 0, from: waits, kind: companion(t), letsCarPass: true });
     out.push({
       crosswalk: 'A',
       at: jaywalkAtA,
@@ -687,7 +701,7 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
       // 둘은 서로 다른 쪽에서 온다 — 한 사람이 끝나도 다른 쪽에 아직 남아 있다 (위 side · other)
       const first = side(10);
       out.push({ crosswalk: 'C', at: arrowAt - 3, startWithin: 24, from: first, kind, ...late });
-      out.push({ crosswalk: 'C', at: arrowAt + 1, startWithin: 16, from: other(first), kind: 'adult', ...late });
+      out.push({ crosswalk: 'C', at: arrowAt + 1, startWithin: 16, from: other(first), kind: companion(t), ...late });
     }
     // 셋이 한쪽에서 차례로 — 화살표 앞뒤로 벌려, 화살표를 받고 돌 때도 아직 건너는 사람이 있다
     if (t.c === 'crowd') {
@@ -701,7 +715,7 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     if (t.c === 'mixed') {
       // 신호를 지키는 사람은 기다리는 동안의 녹색에 건너가고, 무단횡단자는 녹색 화살표에 맞춰 적색에 나선다
       const obeysSide = side(12);
-      out.push({ crosswalk: 'C', at: 0, startWithin: 24, from: obeysSide, kind: 'adult' });
+      out.push({ crosswalk: 'C', at: 0, startWithin: 24, from: obeysSide, kind: companion(t) });
       out.push({ crosswalk: 'C', at: arrowAt + 1, startWithin: 24, from: other(obeysSide), kind, ...late });
     }
     return out;
@@ -759,8 +773,8 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     // 둘째 사람도 늦어지는 판에서는 시각으로 나선다 (위 cSelfStart)
     out.push(
       cSelfStart
-        ? { crosswalk: 'C', at: cAt + 1.5, from: other(first), kind: 'adult' }
-        : { crosswalk: 'C', at: 0, startWithin: 16, from: other(first), kind: 'adult', ...obeys },
+        ? { crosswalk: 'C', at: cAt + 1.5, from: other(first), kind: companion(t) }
+        : { crosswalk: 'C', at: 0, startWithin: 16, from: other(first), kind: companion(t), ...obeys },
     );
   }
   /*
@@ -795,7 +809,7 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
   if (t.c === 'mixed') {
     // 내 차를 보내는 사람과 무단횡단자는 서로 다른 쪽에서 온다 (위 side · other)
     const waits = side(15);
-    out.push({ crosswalk: 'C', at: 0, from: waits, kind: 'adult', letsCarPass: true });
+    out.push({ crosswalk: 'C', at: 0, from: waits, kind: companion(t), letsCarPass: true });
     out.push({ crosswalk: 'C', at: 0, startWithin: 10, from: other(waits), obeysSignal: false, kind });
   }
   return out;

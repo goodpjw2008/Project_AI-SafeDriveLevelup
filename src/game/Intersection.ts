@@ -673,6 +673,45 @@ function makeRoadTexture(
 }
 
 /** 창문 패턴이 있는 건물 텍스처 — 야간에 불이 켜진 느낌을 낸다 */
+/**
+ * **초등학교가 서는 자리** (왼쪽 보도 건너편).
+ *
+ * 내가 달리는 차로는 오른쪽(x+)이므로, 학교를 **왼쪽**에 두면 달리는 내내 창밖으로 보인다.
+ * 앞쪽(z 큰 쪽)에서부터 눈에 들어와, 보호구역 표지를 지나 학교를 보고 횡단보도를 만나는
+ * 차례가 한 장면으로 이어진다.
+ */
+const SCHOOL_LOT = { x0: -78, x1: -(SIDEWALK_OUTER + 1), z0: 2, z1: 62 };
+const insideSchoolLot = (x: number, z: number): boolean =>
+  x > SCHOOL_LOT.x0 - 12 && x < SCHOOL_LOT.x1 + 12 && z > SCHOOL_LOT.z0 - 12 && z < SCHOOL_LOT.z1 + 12;
+
+/** 교사(校舍) 겉면 — 창이 크고 층이 낮은 학교 건물이다. 회색 빌딩과 한눈에 갈리게 색부터 다르다 */
+function makeSchoolTexture(night: boolean): THREE.CanvasTexture {
+  const W = 512;
+  const H = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = night ? '#3a3228' : '#e8ddc8';
+  ctx.fillRect(0, 0, W, H);
+  // 층마다 큰 창이 줄지어 난다 — 학교 건물의 가장 큰 특징이다
+  const rows = 3;
+  const cols = 16;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const lit = night && Math.random() < 0.25;
+      ctx.fillStyle = night ? (lit ? '#ffe9b0' : '#14161d') : '#7fa8c9';
+      ctx.fillRect(c * (W / cols) + 6, r * (H / rows) + 8, W / cols - 12, H / rows - 18);
+    }
+  }
+  // 층 사이 띠
+  ctx.fillStyle = night ? '#2a241c' : '#cdbfa4';
+  for (let r = 1; r < rows; r++) ctx.fillRect(0, r * (H / rows) - 4, W, 6);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function makeBuildingTexture(night: boolean): THREE.CanvasTexture {
   const W = 256;
   const H = 512;
@@ -735,7 +774,14 @@ export class Intersection {
     setRoadExtent(opts.approachZone ?? false);
     this.buildRoad(opts.schoolZone, opts.approachZone ?? false, opts.zoneOnly ?? false, opts.bikeLane);
     this.buildSidewalks(opts.zoneOnly ?? false);
-    this.buildBuildings(opts.night);
+    /*
+      **어린이보호구역에는 초등학교가 있다.** 사용자가 정했다: "어린이보호구역 맵에는 건물을
+      초등학교로 해 줘." 보호구역은 **학교가 있어서** 보호구역인데(제12조 제1항), 화면에는 똑같은
+      회색 빌딩만 서 있어 *왜 여기서 서야 하는지*가 그림에 없었다.
+    */
+    const school = opts.schoolZone || (opts.approachZone ?? false);
+    this.buildBuildings(opts.night, school);
+    if (school) this.buildSchool(opts.night);
     this.buildStreetFurniture();
   }
 
@@ -881,7 +927,7 @@ export class Intersection {
   }
 
   /** 배경 건물 — 운전 시점에서 거리감과 도심 느낌을 준다 */
-  private buildBuildings(night: boolean): void {
+  private buildBuildings(night: boolean, school = false): void {
     const tex = this.track(makeBuildingTexture(night));
     const geo = this.track(new THREE.BoxGeometry(1, 1, 1));
     const mat = this.track(
@@ -911,6 +957,8 @@ export class Intersection {
           // 반폭을 더하지 않으면 큰 건물이 도로 위까지 밀고 들어온다.
           const x = sx * (SIDEWALK_OUTER + 3 + w / 2 + rand() * 44);
           const z = sz * (SIDEWALK_OUTER + 3 + d / 2 + rand() * 44);
+          // 학교가 설 자리는 비워 둔다 (buildSchool 이 그 자리를 쓴다)
+          if (school && insideSchoolLot(x, z)) continue;
           const mesh = new THREE.Mesh(geo, mat);
           mesh.scale.set(w, h, d);
           mesh.position.set(x, h / 2, z);
@@ -920,6 +968,146 @@ export class Intersection {
         }
       }
     }
+  }
+
+  /**
+   * **초등학교** — 운동장 · 교사 · 담장 · 정문, 그리고 아이들.
+   *
+   * 어린이보호구역은 **학교가 있어서** 보호구역이다 (제12조 제1항). 그런데 화면에는 여느 교차로와
+   * 똑같은 회색 빌딩만 서 있어, *왜 여기서 30km/h 로 줄이고 횡단보도마다 서는지*가 그림에 없었다.
+   * 학교가 보이면 그 까닭이 한눈에 읽힌다 — 사용자가 정했다: "어린이보호구역 맵에는 건물을
+   * 초등학교로 해 줘. 어린이보호구역에는 어린이들이 많이 출현해야 해."
+   *
+   * 아이들은 **판정 대상이 아니다.** 운동장과 정문 안쪽에 서 있을 뿐 차도로 나오지 않는다 —
+   * 차도로 나오는 사람은 판이 정한다(scenarios 의 `pedestrians`). 여기 아이들은 "여기는 학교
+   * 앞이다" 를 말하는 배경이고, 그 말이 운전자의 속도를 늦춘다.
+   */
+  private buildSchool(night: boolean): void {
+    const g = new THREE.Group();
+    const lot = SCHOOL_LOT;
+    const midX = (lot.x0 + lot.x1) / 2;
+    const midZ = (lot.z0 + lot.z1) / 2;
+    const depth = lot.x1 - lot.x0;
+    const width = lot.z1 - lot.z0;
+
+    // ── 운동장 — 흙빛 바닥. 도로에서 학교가 한눈에 보이도록 앞을 비워 둔다
+    const yard = new THREE.Mesh(
+      this.track(new THREE.PlaneGeometry(depth, width)),
+      this.track(new THREE.MeshStandardMaterial({ color: night ? 0x3a3128 : 0xb4936a, roughness: 1 })),
+    );
+    yard.rotation.x = -Math.PI / 2;
+    yard.position.set(midX, 0.02, midZ);
+    yard.receiveShadow = true;
+    g.add(yard);
+
+    // ── 교사 — 부지 안쪽(도로에서 먼 쪽)에 길게 선다. 3층이라 주변 빌딩보다 낮다
+    const H = 13;
+    const body = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(14, H, width * 0.8)),
+      this.track(
+        new THREE.MeshStandardMaterial({
+          map: this.track(makeSchoolTexture(night)),
+          roughness: 0.9,
+          emissive: night ? 0x1b1a14 : 0x000000,
+          emissiveIntensity: night ? 1.0 : 0,
+        }),
+      ),
+    );
+    body.position.set(lot.x0 + 9, H / 2, midZ);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    g.add(body);
+    // 옥상 난간 — 평지붕 학교의 모습
+    const parapet = new THREE.Mesh(
+      this.track(new THREE.BoxGeometry(14.6, 0.8, width * 0.8 + 0.6)),
+      this.track(new THREE.MeshStandardMaterial({ color: night ? 0x2a241c : 0xd8cdb6, roughness: 0.9 })),
+    );
+    parapet.position.set(lot.x0 + 9, H + 0.4, midZ);
+    g.add(parapet);
+
+    // ── 담장 — 보도를 따라 길게. 가운데는 정문이라 비운다
+    const wallMat = this.track(
+      new THREE.MeshStandardMaterial({ color: night ? 0x2e2a24 : 0xcfc4ae, roughness: 0.95 }),
+    );
+    const GATE = 9;
+    for (const [z0, z1] of [
+      [lot.z0, midZ - GATE / 2],
+      [midZ + GATE / 2, lot.z1],
+    ] as const) {
+      const len = z1 - z0;
+      const wall = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.5, 2.0, len)), wallMat);
+      wall.position.set(lot.x1, 1.0, (z0 + z1) / 2);
+      wall.castShadow = true;
+      g.add(wall);
+    }
+    // ── 정문 기둥 둘과 그 사이의 간판
+    const pillarGeo = this.track(new THREE.BoxGeometry(1.1, 3.4, 1.1));
+    for (const dz of [-GATE / 2, GATE / 2]) {
+      const p = new THREE.Mesh(pillarGeo, wallMat);
+      p.position.set(lot.x1, 1.7, midZ + dz);
+      p.castShadow = true;
+      g.add(p);
+    }
+    const sign = document.createElement('canvas');
+    sign.width = 512;
+    sign.height = 128;
+    const sc = sign.getContext('2d')!;
+    sc.fillStyle = night ? '#1d2a1d' : '#2f6b3a';
+    sc.fillRect(0, 0, 512, 128);
+    sc.strokeStyle = '#f2f2f2';
+    sc.lineWidth = 8;
+    sc.strokeRect(6, 6, 500, 116);
+    sc.fillStyle = '#ffffff';
+    sc.font = 'bold 66px sans-serif';
+    sc.textAlign = 'center';
+    sc.textBaseline = 'middle';
+    sc.fillText('안전 초등학교', 256, 70);
+    const signTex = this.track(new THREE.CanvasTexture(sign));
+    signTex.colorSpace = THREE.SRGBColorSpace;
+    const plate = new THREE.Mesh(
+      this.track(new THREE.PlaneGeometry(GATE - 0.6, 1.5)),
+      this.track(new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.8, side: THREE.DoubleSide })),
+    );
+    plate.position.set(lot.x1 + 0.1, 4.0, midZ);
+    plate.rotation.y = Math.PI / 2;
+    g.add(plate);
+
+    // ── 아이들 — 운동장과 정문 안쪽. 배경이고 차도로 나오지 않는다
+    const CLOTHES = [0xe94f5a, 0x3f86e0, 0xf5c518, 0x4fbf6a, 0xb96fe0, 0xf08a3c];
+    const skin = this.track(new THREE.MeshStandardMaterial({ color: 0xf0c9a0, roughness: 0.9 }));
+    const headGeo = this.track(new THREE.SphereGeometry(0.34, 10, 8));
+    const bodyGeo = this.track(new THREE.CapsuleGeometry(0.26, 0.6, 4, 8));
+    const legGeo = this.track(new THREE.CapsuleGeometry(0.12, 0.5, 4, 6));
+    let seed = 90210;
+    const rnd = (): number => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
+    for (let i = 0; i < 18; i++) {
+      const kid = new THREE.Group();
+      const clothes = this.track(
+        new THREE.MeshStandardMaterial({ color: CLOTHES[i % CLOTHES.length], roughness: 0.9 }),
+      );
+      const torso = new THREE.Mesh(bodyGeo, clothes);
+      torso.position.y = 1.25;
+      torso.castShadow = true;
+      const head = new THREE.Mesh(headGeo, skin);
+      head.position.y = 1.95;
+      kid.add(torso, head);
+      for (const dx of [-0.16, 0.16]) {
+        const leg = new THREE.Mesh(legGeo, this.track(new THREE.MeshStandardMaterial({ color: 0x2b3038, roughness: 0.9 })));
+        leg.position.set(dx, 0.5, 0);
+        kid.add(leg);
+      }
+      // 배율 2.0 — 보행자와 같은 크기 기준이라 멀리서도 '아이' 로 보인다 (Pedestrian.ts 의 SIZE_SCALE)
+      kid.scale.setScalar(1.35);
+      kid.position.set(
+        lot.x0 + 18 + rnd() * (depth - 24),
+        0,
+        lot.z0 + 4 + rnd() * (width - 8),
+      );
+      kid.rotation.y = rnd() * Math.PI * 2;
+      g.add(kid);
+    }
+
+    this.group.add(g);
   }
 
   /** 가로등·가로수 — 야간 조명과 스케일감 */
