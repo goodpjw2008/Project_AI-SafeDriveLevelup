@@ -79,7 +79,7 @@ const IMAGE_TYPES: Record<string, string> = {
  *
  * 페이지는 **저장소 맨 위**에 둔다 — GitHub 에서 README 옆에 바로 보이고, 저장소를 내려받아 두 번 누르면
  * 그림(docs/slides/…)을 상대 경로로 찾아 그대로 열린다. 그런데 GitHub 는 HTML 을 그려 주지 않고 소스만
- * 보여 주므로, 누르면 바로 넘겨 볼 수 있게 safeturn.vercel.app/AI_safeturn_portfolio.html 에도 올린다.
+ * 보여 주므로, 누르면 바로 넘겨 볼 수 있게 safedrive.vercel.app/AI_safeturn_portfolio.html 에도 올린다.
  *
  * public/ 으로 옮기지 않는 이유: 저장소 맨 위에서 사라지고, 그림도 public/ 에 한 벌 더 두어야 한다.
  * 그래서 빌드 때 **페이지가 부르는 그림만** 골라 같은 경로로 dist 에 내보낸다 — 그림 목록은 페이지 한 곳에만 있어,
