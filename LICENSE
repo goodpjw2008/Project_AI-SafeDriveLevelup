@@ -1,30 +1,24 @@
-AI 안전운전 레벨업 — 사용 허가 조건
-Copyright (c) 2026 goodpjw2008. 모든 권리 보유 (All rights reserved).
+AI 안전운전 레벨업 Copyright (c) 2026 goodpjw2008. All rights reserved.
+
+**쓰고 싶으시면 이메일로 알려 주세요 — 대부분 흔쾌히 허락해 드립니다.**
+막으려고 두는 조건이 아니라, 무분별한 복사를 막으려는 것입니다.
+수업 · 연구 · 발표에 쓰시겠다면 더욱 반갑습니다.
+
+    goodpjw2008@gmail.com
 
 
-1. 이 조건이 적용되는 것
+1. 무엇에 적용되나
 ───────────────────────────────────────────────────────────────────────
 
-이 조건은 본 저장소에서 **저작권자가 직접 만든 것**에 적용됩니다.
+**가져다 쓴 것을 뺀 나머지 전부** — 이 저장소에서 저작권자가 만든 코드 · 그림 · 글입니다.
 
-  - 자체 작성 소스 코드 전부 (src/, server/, tests/, 빌드 설정 등)
-  - 로봇 캐릭터 '안전이' 그림 (src/assets/airobot/)
-  - docs/ 의 제목 그림과 포트폴리오 장표
-  - README.md 를 비롯한 본 저장소의 글
-  - 자체 제작한 화면 캡처
-
-
-2. 이 조건이 적용되지 않는 것 — 제3자 자산
-───────────────────────────────────────────────────────────────────────
-
-3D 자동차 모델 · 효과음 · 환경광(HDRI) · 글꼴 · 아이콘 · 오픈소스 라이브러리는
-**각 원작자의 라이선스를 그대로 따릅니다.** 이 문서가 무엇을 정하든 그 자산들은
-원작자가 정한 조건대로 써야 하고, 저작권자도 그 조건을 바꿀 수 없습니다.
-
-자세한 목록과 각각의 라이선스는 THIRD_PARTY_NOTICES.md 에 있습니다.
+가져다 쓴 것(3D 자동차 모델 · 효과음 · 환경광 · 글꼴 · 아이콘 · 오픈소스 라이브러리)은
+**각 원작자의 라이선스를 그대로 따릅니다.** 이 문서가 무엇을 정하든 그것들은 원작자가
+정한 조건대로 써야 하고, 저작권자도 그 조건을 바꿀 수 없습니다.
+목록과 각각의 라이선스는 THIRD_PARTY_NOTICES.md 에 있습니다.
 
 
-3. 허락 없이 해도 되는 것
+2. 허락 없이 해도 되는 것
 ───────────────────────────────────────────────────────────────────────
 
   - 이 저장소를 열람하고 코드를 읽는 것
@@ -33,34 +27,27 @@ Copyright (c) 2026 goodpjw2008. 모든 권리 보유 (All rights reserved).
     (저작권법 제28조 — 공표된 저작물의 인용)
 
 
-4. 허락을 받아야 하는 것
+3. 허락을 받아야 하는 것
 ───────────────────────────────────────────────────────────────────────
 
-아래는 **저작권자의 사전 서면 허락**이 있어야 합니다.
-영리 · 비영리를 가리지 않습니다.
+그 밖의 사용 — **복사 · 수정 · 재배포, 다른 곳에 가져다 싣거나 그 위에서 운영하는 것** —
+은 미리 허락을 받아 주세요. 이메일 한 통이면 되고, 영리든 비영리든 같습니다.
 
-  - 복제 · 배포 · 전송 · 공중송신 (저장소 전체든 일부든)
-  - 수정 · 번역 · 2차적저작물 작성
-  - 다른 서비스 · 제품 · 저장소에 포함하거나 그 위에서 운영하는 것
-  - 수업 · 발표 · 전시에서 이 작품의 코드나 그림을 가져다 쓰는 것
+**허락이 필요하다는 뜻이지, 안 된다는 뜻이 아닙니다.**
 
     문의 : goodpjw2008@gmail.com
 
 
-5. 왜 허락을 받게 하는지
+4. 왜 허락을 받게 하는지
 ───────────────────────────────────────────────────────────────────────
 
-막으려고 두는 조건이 아닙니다.
+무분별한 복사가 흔한 일이 되어, 형식적이더라도 **허락을 구하는 절차**는 필요하다고
+생각합니다. 혼자 만든 작품이라 어디에 어떻게 쓰이는지 정도는 알고 있고 싶습니다.
 
-다만 무분별한 복제가 흔한 일이 되어, 형식적이더라도 **허락을 구하는 절차**는
-필요하다고 생각합니다. 이 작품은 고등학생이 혼자 만든 것이고, 어디에 어떻게
-쓰이는지 정도는 알고 있고 싶습니다.
-
-**사용은 대부분 흔쾌히 허락 드립니다 — 무엇에 쓰실지만 알려 주세요.**
-수업이나 연구에 쓰시겠다면 더욱 반갑습니다.
+그뿐입니다. 물어봐 주시면 대부분 그 자리에서 됩니다.
 
 
-6. 이 조건 이전에 공개된 판에 대하여
+5. 이 조건 이전에 공개된 판에 대하여
 ───────────────────────────────────────────────────────────────────────
 
 이 조건 이전의 판은 MIT License(코드)와 CC BY 4.0(그림 · 글)으로 공개되어
@@ -69,7 +56,7 @@ Copyright (c) 2026 goodpjw2008. 모든 권리 보유 (All rights reserved).
 적용됩니다.
 
 
-7. 보증하지 않음
+6. 보증하지 않음
 ───────────────────────────────────────────────────────────────────────
 
 이 소프트웨어는 있는 그대로 제공되며 어떠한 보증도 하지 않습니다.
@@ -83,23 +70,28 @@ Copyright (c) 2026 goodpjw2008. 모든 권리 보유 (All rights reserved).
 English summary (the Korean text above governs)
 ───────────────────────────────────────────────────────────────────────
 
-All rights reserved. You may read this repository and use the hosted
-service at https://safelevelup.vercel.app. Any other use of the author's own
-code, artwork and writing — copying, modifying, translating, redistributing,
-or including this work in another product, service or repository, whether
-commercial or not — requires prior written permission from the copyright
-holder.
+**Want to use this? Just email and ask — permission is granted gladly in
+almost every case.** This is not here to keep anyone out; it is here to
+discourage thoughtless copying. Classroom, research and presentation use
+is especially welcome. goodpjw2008@gmail.com
+
+All rights reserved. This covers everything in the repository that the
+author made — everything except the third-party assets below.
+
+You may read this repository and use the hosted service at
+https://safelevelup.vercel.app. For anything else — copying, modifying,
+redistributing, or putting this work somewhere else — please ask first.
+An email is enough, commercial or not. Needing permission is not the same
+as being refused.
 
 Third-party assets (3D car models, sound effects, HDRI, fonts, icons and
-open-source libraries) are not covered by this file and keep their own
-licenses; see THIRD_PARTY_NOTICES.md.
+open-source libraries) keep their own licenses and are not covered here;
+see THIRD_PARTY_NOTICES.md.
 
-This is not meant to keep anyone out. Unchecked copying is common enough
-that asking first, even as a formality, seems worth keeping; this project
-was built single-handedly by a high-school student, and knowing where it
-ends up matters to the author. Permission is granted gladly in almost
-every case — just say what you would like to use it for. Classroom and
-research use is especially welcome.
+Thoughtless copying is common enough that asking first, even as a
+formality, seems worth keeping; this project was built single-handedly,
+and knowing where it ends up matters to the author. That is all it is —
+ask, and it is almost always yes.
 
 Versions published before this file were released under the MIT License
 (code) and CC BY 4.0 (artwork and writing). Those grants are irrevocable
