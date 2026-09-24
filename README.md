@@ -14,7 +14,7 @@ AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소�
 * 서비스 주소 : https://safedrive.ai.kr
 * 포트폴리오 : https://safedrive.ai.kr/AI_safelevelup_portfolio.html
 
-<a href="https://safedrive.ai.kr/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 21장이 저절로 넘어갑니다" width="880"></a>
+<a href="https://safedrive.ai.kr/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 20장이 저절로 넘어갑니다" width="880"></a>
 
 ---
 
