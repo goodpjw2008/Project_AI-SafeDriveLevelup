@@ -97,6 +97,13 @@ export interface PedestrianSample {
    * 보행자 앞으로 지나가도 위반이 아니게 된다 (Pedestrian.ts 의 같은 이름 주석 참고).
    */
   onConflictPath: boolean;
+  /**
+   * **자전거를 가진 사람인가** (scenarios.ts 의 `PedSpawn.bike`).
+   *
+   *  - `push` 끌고 건넌다 — **보행자다** (제2조 제17호). 판정도 보행자 그대로다
+   *  - `ride` 타고 건넌다 — 보행자가 아니다. `BIKE_BLOCKED` 로 따로 적는다
+   */
+  bike?: 'ride' | 'push';
   /** 아래 값들은 판정에 쓰지 않는다 — 주행 기록과 결과 지도를 위한 것이다. */
   state?: 'waiting' | 'crossing' | 'done';
   signal?: PedSignal | null;
@@ -112,6 +119,8 @@ export interface PedestrianSample {
 export interface WorldSample {
   /** 시나리오 시작 이후 경과 시간(초) */
   t: number;
+  /** 자전거횡단도가 설치된 횡단보도 (scenarios.ts 의 `ScenarioSpec.bikeLane`) — 없으면 생략 */
+  bikeLane?: CrosswalkId;
   /** 차량 앞범퍼 중앙의 좌표 — 정지선/횡단보도 통과 판정 기준점 */
   frontX: number;
   frontZ: number;
@@ -882,11 +891,30 @@ export class RightTurnJudge {
     }
     this.pedConflictTimer[id] += dt;
     if (this.pedConflictTimer[id] >= PEDESTRIAN_TOLERANCE_SECONDS) {
+      const blocked = this.conflictingPedestrians(s, id);
+      /*
+        **타고 건너는 자전거는 보행자가 아니다.**
+
+        끌고 건너는 사람은 보행자이므로(제2조 제17호) 여기서는 보행자 그대로 적는다. 타고 건너는
+        사람은 제27조 제1항의 대상이 아니라 **조문이 달라진다** — 자전거횡단도면 제15조의2 제3항의
+        일시정지 의무이고, 아니면 안전운전의무(제48조)다. 운전자가 그 자리에서 해야 할 일은 같지만
+        (선다), 무엇을 어겼는지를 틀리게 적으면 배우는 것도 틀어진다.
+
+        한 횡단보도에 사람과 탄 자전거가 함께 있으면 **보행자 쪽을 적는다** — 둘 다 어겼고,
+        제27조 제1항이 더 무겁다 (이 게임의 조합 규칙상 실제로 겹치지는 않는다).
+      */
+      const onlyRiders = blocked.length > 0 && blocked.every((p) => p.bike === 'ride');
+      const where = onlyRiders && s.bikeLane === id ? '자전거횡단도' : `횡단보도 ${id}`;
       this.record(
-        'PEDESTRIAN_BLOCKED',
+        onlyRiders ? 'BIKE_BLOCKED' : 'PEDESTRIAN_BLOCKED',
         s,
-        `횡단보도 ${id} · ${this.describePedestrians(this.conflictingPedestrians(s, id))}` +
-          ` 앞을 ${this.pedConflictTimer[id].toFixed(1)}초간 ${s.speedKmh.toFixed(0)}km/h 로 진행`,
+        `${where}${onlyRiders && s.bikeLane !== id ? ` ${id}` : ''} · ${this.describePedestrians(blocked)}` +
+          ` 앞을 ${this.pedConflictTimer[id].toFixed(1)}초간 ${s.speedKmh.toFixed(0)}km/h 로 진행` +
+          (onlyRiders
+            ? s.bikeLane === id
+              ? ' — 자전거횡단도를 통행 중인 자전거 (제15조의2 제3항)'
+              : ' — 자전거횡단도가 아닌 곳을 타고 건너는 자전거 (보행자는 아니지만 안전운전의무, 제48조)'
+            : ''),
       );
     }
   }
@@ -1188,15 +1216,19 @@ export class RightTurnJudge {
     if (list.length === 0) return '보행자 없음';
     const one = (p: PedestrianSample) => {
       const where = p.state === 'waiting' ? '통행하려 함(보도에서 대기)' : '통행 중';
+      // 자전거는 무엇을 하고 있는지가 곧 조문을 가른다 — 기록에 그대로 적는다
+      const bike = p.bike === 'ride' ? '자전거 타고 ' : p.bike === 'push' ? '자전거 끌고 ' : '';
       const sig =
         p.signal === undefined
           ? ''
           : p.signal === null
             ? ' · 보행신호 없음'
             : ` · 보행신호 ${PED_SIGNAL_TEXT[p.signal]}`;
-      return `${where}${sig}`;
+      return `${bike}${where}${sig}`;
     };
-    return `보행자 ${list.length}명 (${list.map(one).join(' / ')})`;
+    // 전부 타고 건너는 자전거면 '보행자' 라고 부르지 않는다 (제2조 제17호 — 끌고 가는 사람만 보행자다)
+    const noun = list.every((p) => p.bike === 'ride') ? '자전거' : '보행자';
+    return `${noun} ${list.length}명 (${list.map(one).join(' / ')})`;
   }
 
   /** 같은 위반이 여러 프레임에 걸쳐 중복 기록되지 않도록 코드별로 1회만 남긴다. */

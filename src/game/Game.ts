@@ -405,6 +405,8 @@ export class Game {
       */
       approachZone: this.straight || Boolean(scenario.approachSchoolZone),
       zoneOnly: scenario.drive === 'zoneOnly',
+      // 자전거횡단도 — 노면에 붉은 띠와 자전거 표시로 그린다 (Intersection.ts 의 drawBikeLane)
+      bikeLane: scenario.bikeLane,
       night: scenario.timeOfDay === 'night',
     });
     this.world.scene.add(this.intersection.group);
@@ -1725,6 +1727,8 @@ export class Game {
       pedestrians: this.pedestrians.map((p, i) => ({ ...p.sample(), id: i })),
       exitBlocked,
       isSchoolZone: this.scenario.isSchoolZone,
+      // 자전거횡단도가 있는 횡단보도 — 판정이 조문을 가르는 데 쓴다 (rules/lawRules.ts)
+      bikeLane: this.scenario.bikeLane,
       // 어린이보호구역 가중은 낮(08~20시)에만 붙는다 — 밤 시나리오는 일반도로와 같다
       isDaytime: this.scenario.timeOfDay !== 'night',
       // 앞차 뒤에 줄 서서 선 것은 정지선 일시정지로 치지 않는다 (lawRules.ts)

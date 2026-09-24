@@ -66,7 +66,31 @@ export const SIG_CS = ['yes', 'no'] as const;
     C 는 지키는 사람이 녹색에 먼저 건너고, 무단횡단자는 녹색 화살표에 맞춰 적색에 나선다)
   **값은 끝에 붙인다** — id 의 자리 값이 곧 배열 순서라, 앞에 끼우면 이미 있던 판의 id 가 바뀐다.
 */
-export const A_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'jaywalkWait', 'mixed', 'bothWays', 'crowd'] as const;
+/*
+  **자전거는 첫 횡단보도에 세운다.** 사용자가 실제 도로 사진을 주며 넣자고 했다 — "횡단보도 끝에 저렇게
+  나와 있는 곳은 자전거를 타고 통행이 가능해. 반대로 하얀색 선에서는 자전거를 끌고 가야 해."
+
+   - `bikeRide` — 옆에 **자전거횡단도**(붉은 띠 + 자전거 표시)가 있어 **타고** 건넌다. 걸음의 두 배 넘게
+     빨라 멀리 있다고 먼저 지나가면 닿는다. 제15조의2 제3항의 **일시정지 대상**이다
+   - `bikePush` — 자전거횡단도가 없어 **내려서 끌고** 건넌다 (제13조의2 제6항). 끌고 가는 사람은
+     **보행자**이므로(제2조 제17호) 판정도 보행자 그대로다
+
+  **우회전 후 횡단보도(C)가 아니라 첫 횡단보도(A)에 둔다.** id 는 축마다 한 자리를 쓰는데
+  (`libraryId`) C 축은 이미 값이 열 개라 더 넣을 자리가 없다. A 축은 이 둘로 **정확히 열 개**가 된다 —
+  여기에 더 붙이려면 id 체계부터 손봐야 한다 (tests/library.test.ts 가 울타리다).
+*/
+export const A_PEDS = [
+  'none',
+  'waiting',
+  'crossing',
+  'jaywalk',
+  'jaywalkWait',
+  'mixed',
+  'bothWays',
+  'crowd',
+  'bikeRide',
+  'bikePush',
+] as const;
 export const C_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'group', 'late', 'maybe', 'jaywalkWait', 'mixed', 'crowd'] as const;
 
 /*
@@ -97,6 +121,8 @@ const ADDED_LATER: ReadonlyArray<{ [K in keyof LibraryTags]?: ReadonlySet<string
   { a: new Set(['jaywalkWait', 'mixed']), c: new Set(['jaywalkWait', 'mixed']) },
   // 2세대 — 양방향 둘 · 한쪽에서 셋 (건너는 방향과 사람 수)
   { a: new Set(['bothWays', 'crowd']), c: new Set(['crowd']) },
+  // 3세대 — 자전거 (타고 건넘 · 끌고 건넘)
+  { a: new Set(['bikeRide', 'bikePush']) },
 ];
 export const KINDS = ['adult', 'child', 'elder'] as const;
 export const APPROACHES = ['none', 'signal', 'noSignal'] as const;
@@ -202,6 +228,18 @@ export function combinationAllowed(t: LibraryTags): boolean {
     레벨 뼈대와도 맞물린다 — 여럿 판을 너무 많이 더하면 '보행자 여럿' 이 L7 이 아니라 L6 에서 열려
     개념이 차례로 열리는 뼈대가 한 칸 당겨진다 (levelGuide 의 OPENS_SHARE 주석).
   */
+  /*
+    **자전거는 신호를 지키고 건넌다** — 규칙은 '건너려고 대기' · '건너는 중' 과 같다. 이 판이 묻는 것은
+    *자전거횡단도를 알아보는가* 와 *자전거는 걸음보다 빠르다* 이지 신호 위반이 아니다.
+  */
+  const bikeA = t.a === 'bikeRide' || t.a === 'bikePush';
+  if (bikeA && t.sigA === 'yes' && !pedAGreen(t)) return false;
+  /*
+    **자전거 판은 첫 횡단보도 하나로 끝낸다.** 우회전 후에도 사람을 두면 한 판이 자전거와 보행자를
+    함께 묻게 되어, 무엇을 배우는 판인지 흐려진다 (여럿 판에 이미 같은 규칙이 있다).
+  */
+  if (bikeA && t.c !== 'none') return false;
+
   const manyA = t.a === 'bothWays' || t.a === 'crowd';
   if (manyA && t.c !== 'none') return false;
   if (t.c === 'crowd' && (t.a === 'mixed' || manyA)) return false;
@@ -474,6 +512,13 @@ function behindLead(alone: PedSpawn[], t: LibraryTags): PedSpawn[] {
     */
     if (p.crosswalk === 'C' && t.c === 'late') return { ...p, at: 0, afterLead: true, obeysSignal: false };
     /*
+      **타고 건너는 자전거도 제 방아쇠(6m)를 지킨다.** 걸음보다 빨라서(pedWalk.ts) 앞차 뒤 사람의
+      방아쇠(12m)로 나서면 **내가 닿기 전에 다 건너** 버린다 — 앞차가 일시정지를 건너뛰는 판 넷이
+      그렇게 역할을 잃었다 (전수 검증이 잡았다). 이 자전거의 장면은 "아직 서 있으니 먼저 가도
+      되겠다" 를 하지 않는 것이라, 앞차가 지나간 뒤에도 **내가 가까이 와야** 나선다.
+    */
+    if (p.bike === 'ride') return { ...p, at: 0, afterLead: true, obeysSignal: false };
+    /*
       - **모두 앞차 뒤로 나선다.** 한때 여럿이면 첫 사람은 앞차가 서서 보내 주게 두었는데, 그러면 앞차가 횡단보도 앞에
         서고 나는 그 바로 뒤에 줄을 서서, 앞차가 떠날 때 내가 곧장 따라 들어가 둘째 사람이 나설 틈(내가 설 수 있는
         거리)이 없었다. 여럿은 차례로 나선다 — 둘째 사람은 내가 더 다가와야(12m) 나선다.
@@ -590,6 +635,19 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     **셋** — 한쪽에서 차례로 건넌다. 방아쇠 거리를 벌려 **한 사람이 지나간 뒤 다음 사람이** 나서므로,
     앞사람만 보내고 출발하면 걸린다. 첫 사람이 가장 멀리서 나서고(20m) 뒤로 갈수록 가까워진다.
   */
+  /*
+    **자전거.** 연석의 자전거는 **처음부터 보인다** — 건너려는 뜻(노란 느낌표)도 함께 띄운다. 다만
+    발을 떼는 것은 **늦다**(6m). 의무 정지로 잠깐 섰다가 다시 출발할 때 아직 건너는 중이라야 이 판이 성립한다 —
+    10m 에서 나서게 했더니 그 정지 동안 다 건너 버렸다 (전수 검증이 잡았다). 멀리서 나서게 두면 걸음보다 빠른 만큼 내가 닿기 전에 다 건너 버려
+    아무 일도 일어나지 않는 판이 된다 (전수 검증이 잡았다). 이 판이 묻는 것은 "자전거가 아직 서 있으니
+    먼저 가도 되겠다" 를 하지 않는 것이다.
+  */
+  if (t.a === 'bikeRide') {
+    out.push({ crosswalk: 'A', at: 0, startWithin: 6, from: side(19), kind, bike: 'ride', ...freeA });
+  }
+  if (t.a === 'bikePush') {
+    out.push({ crosswalk: 'A', at: 0, startWithin: 12, from: side(20), kind, bike: 'push', ...freeA });
+  }
   if (t.a === 'crowd') {
     const from = side(17);
     /*
@@ -780,6 +838,14 @@ function titleOf(t: LibraryTags): string {
   // 건너는 방향과 사람 수를 제목에 적는다 — 무엇을 봐야 하는 판인지가 제목에서 갈린다
   if (t.a === 'bothWays') parts.push(`첫 횡단보도 양방향 ${who} 둘`);
   if (t.a === 'crowd') parts.push(`첫 횡단보도 한쪽에서 ${who} 셋`);
+  // 자전거 — 자전거횡단도가 있으면 타고, 없으면 끌고 건넌다 (사용자가 정한 장면)
+  /*
+    **타고 건너는 사람을 '보행자' 라고 부르지 않는다** (KIND_WORD 의 adult 는 '보행자' 다) —
+    제2조 제17호상 보행자가 아니기 때문이다. 끌고 가는 사람은 보행자이므로 그대로 부른다.
+  */
+  const rider = { adult: '어른', child: '어린이', elder: '노인' }[t.kind];
+  if (t.a === 'bikeRide') parts.push(`첫 횡단보도 자전거횡단도 · 타고 건너는 ${rider} 자전거`);
+  if (t.a === 'bikePush') parts.push(`첫 횡단보도 자전거 끌고 건너는 ${who}`);
   // 사람이 한쪽에만 있으면 종류를 그쪽에 붙인다 (양쪽이면 첫 횡단보도에 이미 붙었다)
   const cWho = t.a === 'none' ? who : '보행자';
   if (t.c === 'waiting') parts.push(`우회전 후 건너려는 ${cWho}`);
@@ -830,6 +896,11 @@ function briefOf(t: LibraryTags): string {
   else if (t.a === 'mixed') s.push(`첫 횡단보도에 신호를 지키는 사람과, 신호를 무시하려는 ${who}이(가) 함께 있습니다.`);
   else if (t.a === 'bothWays') s.push(`첫 횡단보도를 ${who}이(가) 양쪽에서 한 사람씩 건너려 합니다.`);
   else if (t.a === 'crowd') s.push(`첫 횡단보도를 ${who}을(를) 포함해 세 사람이 차례로 건너려 합니다.`);
+  else if (t.a === 'bikeRide')
+    s.push(
+      `첫 횡단보도 옆에 자전거횡단도(붉은 띠에 자전거 표시)가 있고, ${{ adult: '어른', child: '어린이', elder: '노인' }[t.kind]}이(가) 자전거를 타고 건너려 합니다.`,
+    );
+  else if (t.a === 'bikePush') s.push('첫 횡단보도를 자전거에서 내려 끌고 건너려는 사람이 있습니다.');
   else if (t.a !== 'none') s.push(`정지선 앞 첫 횡단보도에 ${who}이(가) 있습니다.`);
   if (t.c === 'waiting') s.push('우회전해서 나가는 횡단보도 앞에 건너려는 사람이 서 있습니다.');
   else if (t.c === 'group') s.push('우회전해서 나가는 횡단보도를 양쪽에서 한 사람씩 건넙니다.');
@@ -852,6 +923,22 @@ function briefOf(t: LibraryTags): string {
 
 function teachesOf(t: LibraryTags): string {
   const s: string[] = [];
+  /*
+    **자전거는 두 얼굴이다.** 운전자가 알아봐야 하는 것은 노면의 붉은 띠다 — 있으면 타고 건너는
+    자전거가 오고(제15조의2 제3항 일시정지), 없으면 내려서 끌고 건너는 사람이 오며 그 사람은 보행자다
+    (제13조의2 제6항 · 제2조 제17호).
+  */
+  if (t.a === 'bikeRide') {
+    s.push(
+      '횡단보도 옆의 붉은 띠에 자전거 표시가 있으면 자전거횡단도입니다 — 자전거가 타고 건널 수 있는 곳이고, 그 앞에서 일시정지해야 합니다(제15조의2 제3항).',
+    );
+    s.push('타고 건너는 자전거는 걸어오는 사람보다 두 배 넘게 빠릅니다 — 멀리 있다고 먼저 지나가지 마세요.');
+  }
+  if (t.a === 'bikePush') {
+    s.push(
+      '자전거횡단도가 없는 횡단보도에서는 자전거에서 내려 끌고 건너야 합니다(제13조의2 제6항). 그렇게 끌고 가는 사람은 보행자입니다(제2조 제17호) — 보행자 보호 의무가 그대로 걸립니다.',
+    );
+  }
   if (t.signal === 'red') {
     s.push('정면 차량신호등이 적색이면 보행자가 없어도 정지선 앞에서 반드시 일시정지한 뒤 우회전합니다.');
   }
@@ -878,6 +965,8 @@ function teachesOf(t: LibraryTags): string {
   }
   if (t.a === 'waiting' || t.c === 'waiting') {
     s.push('보행자가 건너려고 서 있기만 해도 "통행하려고 하는 때" 입니다 — 횡단보도 앞에서 정지합니다(제27조 제1항).');
+  } else if (t.a === 'bikeRide') {
+    // 타고 건너는 자전거는 보행자가 아니다 — 제27조 제1항을 여기에 적으면 틀린 것을 가르친다
   } else if (hasPeds(t)) {
     s.push('보행자가 통행하거나 통행하려 하면, 보행신호와 관계없이 통행이 끝날 때까지 횡단보도 앞에서 정지합니다(제27조 제1항).');
   }
@@ -919,7 +1008,12 @@ function targetsOf(t: LibraryTags): ViolationCode[] {
     사람이 있어야 보행자 위반이 난다. 예전에는 앞차가 규정대로 도는 판에도 붙였는데, 사람이 없는 판에서는 일어날 수
     없는 위반이라 그 판을 몇 번 무사히 지나도 "보행자 습관을 고쳤다" 로 셌다 (플레이테스트가 잡았다).
   */
-  if (hasPeds(t) || hasApproachPed(t)) out.add('PEDESTRIAN_BLOCKED');
+  /*
+    **타고 건너는 자전거는 보행자가 아니다** — 그 판이 시험하는 것은 `BIKE_BLOCKED` 다 (제15조의2 제3항).
+    끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다 (제2조 제17호).
+  */
+  if (t.a === 'bikeRide') out.add('BIKE_BLOCKED');
+  else if (hasPeds(t) || hasApproachPed(t)) out.add('PEDESTRIAN_BLOCKED');
   if ((t.zone === 'yes' && (t.sigA === 'no' || t.sigC === 'no')) || t.approach === 'noSignal') out.add('SCHOOL_ZONE_NO_STOP');
   if (t.approach === 'signal' && t.lead === 'none') out.add('SCHOOL_ZONE_RED');
   if (t.lead === 'rolling') out.add('RED_NO_STOP');
@@ -941,6 +1035,11 @@ export function buildLibrarySpec(t: LibraryTags): ScenarioSpec {
     teaches: teachesOf(t),
     ...startOf(t),
     pedSignalInstalled: { A: t.sigA === 'yes', C: t.sigC === 'yes' },
+    /*
+      **자전거횡단도는 타고 건너는 판에만 그린다.** 끌고 건너는 판에 그려 두면 판의 글이 거짓말이 된다 —
+      거기서는 타고 건너도 되는데 굳이 내려서 끄는 셈이 되기 때문이다 (제13조의2 제6항).
+    */
+    ...(t.a === 'bikeRide' ? { bikeLane: 'A' as const } : {}),
     ...(hasArrow(t) ? { rightArrowInstalled: true } : {}),
     ...(t.approach === 'signal'
       ? {

@@ -15,6 +15,7 @@ const VIOLATION_TEXT = {
   RED_NO_STOP: '정면 적색인데 일시정지 없이 우회전',
   RIGHT_ARROW_RED: '우회전 신호등 적색인데 우회전',
   PEDESTRIAN_BLOCKED: '보행자가 건너거나 건너려는데 정지하지 않음',
+  BIKE_BLOCKED: '횡단보도를 타고 건너는 자전거 앞을 지나감',
   SCHOOL_ZONE_NO_STOP: '보호구역 신호기 없는 횡단보도 앞 일시정지 안 함',
   NO_SLOW_DOWN: '교차로에서 서행하지 않음',
   WIDE_TURN: '우측 가장자리를 벗어난 대회전',

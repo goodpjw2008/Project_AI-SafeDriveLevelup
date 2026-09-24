@@ -126,7 +126,10 @@ describe('어린이보호구역 전용 도로', () => {
       const key = JSON.stringify([
         s.zoneSignals,
         s.pedestrians
-          .map((p) => `${p.crosswalk}/${p.from}/${p.kind}/${p.at}/${p.startWithin}/${p.obeysSignal ?? true}`)
+          .map(
+            (p) =>
+              `${p.crosswalk}/${p.from}/${p.kind}/${p.at}/${p.startWithin}/${p.obeysSignal ?? true}/${p.bike ?? ''}`,
+          )
           .sort(),
       ]);
       expect(seen.get(key), `${seen.get(key)} 와 같은 장면`).toBeUndefined();
@@ -269,7 +272,11 @@ describe('어린이보호구역 전용 도로 전수 검증', () => {
     for (const spec of courses) {
       if (!spec.pedestrians.length) continue;
       const codes = playScenario(spec, { persona: 'pedBlind' }).result.violations.map((v) => v.code);
-      if (!codes.includes('PEDESTRIAN_BLOCKED')) bad.push(spec.title);
+      /*
+        **타고 건너는 자전거는 보행자가 아니다** — 그 판에서 걸리는 코드는 `BIKE_BLOCKED` 다
+        (제15조의2 제3항). 끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다.
+      */
+      if (!codes.includes('PEDESTRIAN_BLOCKED') && !codes.includes('BIKE_BLOCKED')) bad.push(spec.title);
     }
     expect(bad.slice(0, 5)).toEqual([]);
   }, 180_000);

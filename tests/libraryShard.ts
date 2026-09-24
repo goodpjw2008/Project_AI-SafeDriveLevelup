@@ -63,7 +63,17 @@ export function validateShard(shard: number): void {
           if (codes(human).length || !human.result.completed) bad.push(`${name} — 사람(난이도3): ${codes(human).join(',') || '미완주'}`);
           if (e.spec.pedestrians.some((p) => p.chance === undefined)) {
             const blind = playScenario(e.spec, { persona: 'pedBlind', pace: easy.pace, stopZone: easy.stopZone, trace: false });
-            if (!codes(blind).some((c) => c === 'PEDESTRIAN_BLOCKED' || c === 'PEDESTRIAN_HIT')) bad.push(`${name} — 보행자 역할 없음`);
+            /*
+              **타고 건너는 자전거는 보행자가 아니다** — 그 판에서 걸리는 코드는 `BIKE_BLOCKED` 다
+              (제15조의2 제3항). 끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다.
+            */
+            if (
+              !codes(blind).some(
+                (c) => c === 'PEDESTRIAN_BLOCKED' || c === 'PEDESTRIAN_HIT' || c === 'BIKE_BLOCKED',
+              )
+            ) {
+              bad.push(`${name} — 보행자 역할 없음`);
+            }
           }
         });
         expect(bad, bad.slice(0, 5).join('\n')).toEqual([]);

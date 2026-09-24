@@ -536,6 +536,8 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       pedestrians: peds,
       exitBlocked,
       isSchoolZone: spec.isSchoolZone,
+      // 자전거횡단도가 있는 횡단보도 — 판정이 조문을 가르는 데 쓴다 (rules/lawRules.ts)
+      bikeLane: spec.bikeLane,
       isDaytime: spec.timeOfDay !== 'night',
       queuedBehind: lead?.queuesAhead(f.x, f.z) ?? false,
     };

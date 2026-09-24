@@ -186,6 +186,8 @@ const CLOTHES = [0x2f4f8f, 0xb3453a, 0x2e6b4f, 0x6b4a8f, 0x333940, 0xc9752b];
 export class Pedestrian {
   readonly group = new THREE.Group();
   readonly crosswalk: CrosswalkId;
+  /** 자전거를 가진 사람인가 (scenarios.ts 의 `PedSpawn.bike`) — 그리는 모습과 다리 흔들림이 달라진다 */
+  private readonly bike?: 'ride' | 'push';
 
   /** 상태기계 — 화면과 검증기가 나눠 쓰는 한 벌 */
   private readonly walk: PedWalk;
@@ -216,6 +218,7 @@ export class Pedestrian {
     this.offset = WAIT_SLOTS[slot % WAIT_SLOTS.length];
     this.crosswalk = spawn.crosswalk;
 
+    this.bike = spawn.bike;
     const kind = spawn.kind ?? 'adult';
     this.scale = (kind === 'child' ? 0.66 : kind === 'elder' ? 0.92 : 1) * SIZE_SCALE;
 
@@ -291,6 +294,74 @@ export class Pedestrian {
       this.body.add(armPivot);
       this.arms.push(armPivot);
     }
+
+    if (this.bike) this.buildBike();
+  }
+
+  /**
+   * **자전거** — 타고 건너는 사람(`ride`)과 끌고 건너는 사람(`push`) 모두 자전거를 가졌다.
+   *
+   * 운전자가 **한눈에 자전거인지 알아봐야** 이 판이 성립한다 — 타고 건너는 자전거는 걸음의 두 배 넘게
+   * 빠르고(pedWalk.ts), 끌고 가는 사람은 보행자라 판정이 다르다. 그래서 크게, 그리고 **몸과 다른
+   * 색**으로 그린다.
+   *
+   * 자리도 둘이 다르다. 타고 있으면 자전거가 **몸 아래**에 있고, 끌고 있으면 **옆에** 있다 —
+   * 멀리서도 그 차이가 보이도록 옆으로 뺀 거리를 넉넉히 준다.
+   */
+  private buildBike(): void {
+    const s = this.scale;
+    const metal = this.track(
+      new THREE.MeshStandardMaterial({ color: 0x1f6fb5, roughness: 0.45, metalness: 0.5 }),
+    );
+    const tyre = this.track(new THREE.MeshStandardMaterial({ color: 0x1b1d21, roughness: 0.85 }));
+    const g = new THREE.Group();
+    const R = 0.34 * s;
+
+    // 바퀴 둘 — 진행 방향(x축)으로 굴러가므로 원판을 세워 z축을 축으로 둔다
+    const wheelGeo = this.track(new THREE.TorusGeometry(R, 0.05 * s, 8, 20));
+    for (const dx of [-0.52 * s, 0.52 * s]) {
+      const w = new THREE.Mesh(wheelGeo, tyre);
+      w.position.set(dx, R, 0);
+      g.add(w);
+    }
+    // 프레임 — 두 바퀴를 잇는 대각선 둘과 안장 기둥
+    const barGeo = this.track(new THREE.CylinderGeometry(0.035 * s, 0.035 * s, 1.0 * s, 6));
+    for (const [y, rot] of [
+      [0.62 * s, Math.PI / 2 - 0.35],
+      [0.42 * s, Math.PI / 2 + 0.2],
+    ] as const) {
+      const bar = new THREE.Mesh(barGeo, metal);
+      bar.position.set(0, y, 0);
+      bar.rotation.z = rot;
+      g.add(bar);
+    }
+    const post = new THREE.Mesh(
+      this.track(new THREE.CylinderGeometry(0.04 * s, 0.04 * s, 0.5 * s, 6)),
+      metal,
+    );
+    post.position.set(-0.3 * s, 0.72 * s, 0);
+    g.add(post);
+    // 핸들 — 앞바퀴 위로 가로지른다
+    const bar = new THREE.Mesh(
+      this.track(new THREE.CylinderGeometry(0.035 * s, 0.035 * s, 0.46 * s, 6)),
+      metal,
+    );
+    bar.position.set(0.52 * s, 0.92 * s, 0);
+    bar.rotation.x = Math.PI / 2;
+    g.add(bar);
+
+    if (this.bike === 'ride') {
+      /*
+        **타고 있으면 자전거가 몸 아래에 있다.** 몸통을 안장 높이까지 올리고 다리는 흔들지 않는다
+        (update 의 `legs` — 탄 사람은 걷지 않는다). 몸을 앞으로 조금 숙여 '달리는 중' 으로 보이게 한다.
+      */
+      this.body.position.y = 0.52 * s;
+      this.body.rotation.z = -0.12;
+    } else {
+      // 끌고 있으면 옆에 세워 잡고 간다 — 몸 바깥쪽으로 뺀다
+      g.position.z = 0.42 * s;
+    }
+    this.group.add(g);
   }
 
   /** 상태기계의 축 좌표를 실제 3D 위치로 반영 */
@@ -472,6 +543,17 @@ export class Pedestrian {
 
   /** 팔다리를 한 자세로 맞춘다 — 걷기·한 걸음·발 바꿔 딛기가 모두 이 한 곳을 지난다 */
   private poseLimbs(swing: number): void {
+    /*
+      **타고 있는 사람은 걷지 않는다** — 페달을 밟는 다리는 앞뒤가 아니라 위아래로 움직이므로,
+      걷는 자세를 그대로 쓰면 안장 위에서 다리가 허공을 젓는다. 발을 페달에 얹은 한 자세로 둔다.
+    */
+    if (this.bike === 'ride') {
+      this.legs[0].rotation.x = 0.5;
+      this.legs[1].rotation.x = -0.2;
+      this.arms[0].rotation.x = -0.7;
+      this.arms[1].rotation.x = -0.7;
+      return;
+    }
     this.legs[0].rotation.x = swing;
     this.legs[1].rotation.x = -swing;
     this.arms[0].rotation.x = -swing * 0.7;
@@ -497,6 +579,7 @@ export class Pedestrian {
     const s = this.walk.sample();
     return {
       crosswalk: s.crosswalk,
+      bike: s.bike,
       intendsToCross: s.intendsToCross,
       onConflictPath: s.onConflictPath,
       state: s.state,

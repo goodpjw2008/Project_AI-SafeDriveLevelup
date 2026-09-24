@@ -13,8 +13,11 @@ import {
   CITATION_ART5,
   CITATION_ART25_1,
   CITATION_ART25_5,
+  CITATION_ART13_2_6,
+  CITATION_ART15_2_3,
   CITATION_ART27_1,
   CITATION_ART27_7,
+  CITATION_ART48_1,
   CITATION_ART38_1,
   CITATION_RED_LIGHT,
   CITATION_RIGHT_TURN_SIGNAL_PRIORITY,
@@ -43,7 +46,9 @@ export type ViolationCode =
   /** 진입부 어린이보호구역의 신호기 있는 횡단보도를 적색에 통과 */
   | 'SCHOOL_ZONE_RED'
   /** 직진으로 교차로를 통과하는데 정면 신호가 적색(또는 황색)이었다 — 어린이보호구역 연습편 */
-  | 'STRAIGHT_RED';
+  | 'STRAIGHT_RED'
+  /** 횡단보도를 **타고** 건너는 자전거의 통행을 방해 — 자전거횡단도면 제15조의2 제3항, 아니면 제48조 */
+  | 'BIKE_BLOCKED';
 
 export interface ViolationSpec {
   code: ViolationCode;
@@ -111,6 +116,37 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     schoolZoneFine: 120_000,
     schoolZonePenaltyPoints: 20,
     citations: [CITATION_ART27_1],
+  },
+  /**
+   * **자전거 횡단 방해.**
+   *
+   * 사용자가 실제 도로 사진을 주며 넣자고 했다 — "횡단보도 끝에 저렇게 나와 있는 곳은 자전거를 타고
+   * 통행이 가능해. 반대로 하얀색 선에서는 자전거를 끌고 가야 해."
+   *
+   * 운전자 쪽에서 보면 **자전거는 두 얼굴**이다.
+   *
+   *  - **자전거횡단도**(붉은 띠 + 자전거 표시)를 타고 건너는 자전거 — 제15조의2 제3항의 **일시정지 대상**이다
+   *  - **끌고** 건너는 사람 — 그 사람은 **보행자**다 (제2조 제17호). 그쪽은 `PEDESTRIAN_BLOCKED` 이 잡는다
+   *  - 자전거횡단도가 **아닌** 횡단보도를 타고 건너는 자전거 — 보행자가 **아니다.** 제27조 제1항의 대상이
+   *    아니지만, 그 앞을 지나가도 된다는 뜻은 아니다 (제48조 안전운전의무)
+   *
+   * 셋을 한 코드로 잡고, **어느 쪽인지는 주행 기록이 적는다** — 조문이 다르면 범칙금도 다르지만,
+   * 운전자가 그 자리에서 해야 할 일(선다)은 같다.
+   */
+  BIKE_BLOCKED: {
+    code: 'BIKE_BLOCKED',
+    title: '자전거 횡단 방해',
+    reason:
+      '자전거횡단도를 통행하는 자전거가 있을 때에는 그 앞에서 일시정지해야 합니다(제15조의2 제3항). ' +
+      '자전거횡단도가 아닌 횡단보도를 타고 건너는 사람은 보행자가 아니지만, 그 앞을 지나가도 된다는 뜻은 ' +
+      '아닙니다 — 안전운전의무는 그대로입니다(제48조).',
+    fix:
+      '횡단보도 옆의 붉은 띠에 자전거 표시가 있으면 자전거횡단도입니다 — 자전거가 타고 건너므로 걸어오는 사람보다 훨씬 빠릅니다. 멀리 있다고 먼저 지나가지 말고, 다 건널 때까지 서세요.',
+    fine: 60_000,
+    penaltyPoints: 10,
+    schoolZoneFine: 120_000,
+    schoolZonePenaltyPoints: 20,
+    citations: [CITATION_ART15_2_3, CITATION_ART13_2_6, CITATION_ART48_1],
   },
   SCHOOL_ZONE_NO_STOP: {
     code: 'SCHOOL_ZONE_NO_STOP',

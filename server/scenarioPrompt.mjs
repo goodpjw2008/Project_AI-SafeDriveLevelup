@@ -39,6 +39,7 @@ export const CODE_BRIEF = {
   RED_NO_STOP: '적색에 정지선 앞에서 서지 않음',
   RIGHT_ARROW_RED: '우회전 신호등이 적색인데 우회전',
   PEDESTRIAN_BLOCKED: '횡단보도 보행자의 통행을 방해',
+  BIKE_BLOCKED: '횡단보도를 타고 건너는 자전거의 통행을 방해',
   SCHOOL_ZONE_NO_STOP: '어린이보호구역 신호기 없는 횡단보도에서 일시정지 안 함',
   NO_SLOW_DOWN: '교차로에서 서행하지 않음',
   WIDE_TURN: '우측 가장자리를 따르지 않고 크게 돎',

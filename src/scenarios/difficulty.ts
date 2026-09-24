@@ -496,6 +496,8 @@ export const TARGET_KIT: Readonly<Record<ViolationCode, readonly ConditionKey[]>
   RIGHT_ARROW_RED: ['rightArrow'],
   BLOCKING_INTERSECTION: ['exitBlocked'],
   PEDESTRIAN_BLOCKED: ['lateStart'],
+  // 자전거는 사람과 같은 자리에 선다 — 늦게 나서는 사람이 있어야 '다 건널 때까지' 를 물을 수 있다
+  BIKE_BLOCKED: ['lateStart'],
   SCHOOL_ZONE_RED: ['approachZone'],
   /*
     **직진 적색은 라이브러리가 만드는 조건으로 낼 수 없다** — 지금 라이브러리의 판은 모두

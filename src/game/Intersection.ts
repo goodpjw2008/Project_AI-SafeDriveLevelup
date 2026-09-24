@@ -6,9 +6,11 @@
  */
 
 import * as THREE from 'three';
+import type { CrosswalkId } from '../rules/lawRules';
 import {
   CROSSWALK_INNER,
   CROSSWALK_B_INNER,
+  CROSSWALK_S_OUTER,
   CROSSWALK_B_OUTER,
   CROSSWALK_OUTER,
   LANE_1_OFFSET,
@@ -297,6 +299,63 @@ function drawCrosswalks(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   ctx.restore();
 }
 
+/**
+ * **자전거횡단도** — 횡단보도 **옆에 붙는** 붉은 포장 띠에 자전거 표시를 그린다.
+ *
+ * 사용자가 실제 도로 사진을 주며 정했다: "횡단보도 끝에 저렇게 나와 있는 곳은 자전거를 타고 통행이
+ * 가능해. 반대로 하얀색 선에서는 자전거를 끌고 가야 해." 운전자에게 이 띠는 **판단의 근거**다 —
+ * 있으면 자전거가 타고 건너니 걸음보다 훨씬 빠른 것이 온다(제15조의2 제3항 일시정지), 없으면
+ * 자전거는 내려서 끌고 건너야 하고 그 사람은 보행자다(제13조의2 제6항 · 제2조 제17호).
+ *
+ * 그래서 **한눈에 다르게** 그린다 — 흰 줄무늬가 아니라 붉은 바탕에 흰 자전거 그림이다.
+ * 자리는 횡단보도의 **교차로 바깥쪽**(내가 먼저 만나는 쪽)이다. 실물도 대개 그 자리에 붙는다.
+ */
+function drawBikeLane(ctx: CanvasRenderingContext2D, at: CrosswalkId): void {
+  /** 띠의 폭 (m) — 실제 자전거횡단도는 2m 안팎이다 */
+  const W = 2.0;
+  ctx.save();
+
+  /** 붉은 바탕 + 흰 테두리 한 줄 — 사진의 그 모습이다 */
+  const band = (x: number, z: number, w: number, d: number, acrossX: boolean): void => {
+    ctx.fillStyle = '#9d4a43';
+    ctx.fillRect(cx(x), cy(z), toPx(w), toPx(d));
+    ctx.strokeStyle = '#f2f2f2';
+    ctx.lineWidth = toPx(0.15);
+    ctx.strokeRect(cx(x), cy(z), toPx(w), toPx(d));
+    // 자전거 그림 — 바퀴 둘과 프레임. 건너는 방향으로 누인다
+    ctx.strokeStyle = '#f2f2f2';
+    ctx.lineWidth = toPx(0.16);
+    const midX = x + w / 2;
+    const midZ = z + d / 2;
+    const r = 0.42;
+    const gap = 0.72;
+    for (const k of [-1, 1]) {
+      const wx = acrossX ? midX + k * gap : midX;
+      const wz = acrossX ? midZ : midZ + k * gap;
+      ctx.beginPath();
+      ctx.arc(cx(wx), cy(wz), toPx(r), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(cx(acrossX ? midX - gap : midX), cy(acrossX ? midZ : midZ - gap));
+    ctx.lineTo(cx(acrossX ? midX + gap : midX), cy(acrossX ? midZ : midZ + gap));
+    ctx.stroke();
+  };
+
+  /*
+    S · A · B 는 남북 도로를 가로지르므로 띠가 **x 방향으로 길다**. C 는 동서 도로를 가로지르므로 반대다.
+    붙이는 쪽은 내가 **먼저 만나는 가장자리**다 — 횡단보도에 닿기 전에 보여야 판단에 쓸 수 있다.
+  */
+  if (at === 'C') {
+    band(CROSSWALK_INNER - W, -ROAD_HALF_WIDTH + 0.3, W, ROAD_HALF_WIDTH * 2 - 0.6, false);
+  } else {
+    const near =
+      at === 'S' ? CROSSWALK_S_OUTER : at === 'A' ? CROSSWALK_OUTER : CROSSWALK_B_INNER + W;
+    band(-ROAD_HALF_WIDTH + 0.3, near, ROAD_HALF_WIDTH * 2 - 0.6, W, true);
+  }
+  ctx.restore();
+}
+
 /** 정지선 — 진행 방향 차로 쪽에만 그린다 (폭 40cm) */
 function drawStopLines(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
   ctx.save();
@@ -573,7 +632,12 @@ function drawSchoolZoneMarks(ctx: CanvasRenderingContext2D): void {
   drawSpeedLimitMark(ctx, 30, MID_X, 42.5, 3.0);
 }
 
-function makeRoadTexture(schoolZone: boolean, approachZone: boolean, zoneOnly = false): THREE.CanvasTexture {
+function makeRoadTexture(
+  schoolZone: boolean,
+  approachZone: boolean,
+  zoneOnly = false,
+  bikeLane?: CrosswalkId,
+): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = TEX_W;
   canvas.height = TEX_H;
@@ -598,6 +662,8 @@ function makeRoadTexture(schoolZone: boolean, approachZone: boolean, zoneOnly = 
   if (approachZone) drawApproachZone(ctx);
   drawRoadArrows(ctx, schoolZone, zoneOnly);
   drawCrosswalks(ctx, zoneOnly);
+  // 자전거횡단도는 횡단보도 **위에** 얹는다 — 줄무늬와 겹치는 자리 없이 옆에 붙는다
+  if (bikeLane) drawBikeLane(ctx, bikeLane);
   drawStopLines(ctx, zoneOnly);
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -652,6 +718,8 @@ export interface IntersectionOptions {
   zoneOnly?: boolean;
   /** 교차로에 닿기 전 지나는 어린이보호구역 구간이 있는가 */
   approachZone?: boolean;
+  /** 자전거횡단도가 붙은 횡단보도 (scenarios.ts 의 `ScenarioSpec.bikeLane`) — 없으면 그리지 않는다 */
+  bikeLane?: CrosswalkId;
   night: boolean;
 }
 
@@ -665,7 +733,7 @@ export class Intersection {
       있는 판은 출발 지점이 112m 라 훨씬 넓게 덮어야 하고, 없는 판은 좁게 덮어 또렷하게 둔다.
     */
     setRoadExtent(opts.approachZone ?? false);
-    this.buildRoad(opts.schoolZone, opts.approachZone ?? false, opts.zoneOnly ?? false);
+    this.buildRoad(opts.schoolZone, opts.approachZone ?? false, opts.zoneOnly ?? false, opts.bikeLane);
     this.buildSidewalks(opts.zoneOnly ?? false);
     this.buildBuildings(opts.night);
     this.buildStreetFurniture();
@@ -676,8 +744,8 @@ export class Intersection {
     return o;
   }
 
-  private buildRoad(schoolZone: boolean, approachZone: boolean, zoneOnly: boolean): void {
-    const tex = this.track(makeRoadTexture(schoolZone, approachZone, zoneOnly));
+  private buildRoad(schoolZone: boolean, approachZone: boolean, zoneOnly: boolean, bikeLane?: CrosswalkId): void {
+    const tex = this.track(makeRoadTexture(schoolZone, approachZone, zoneOnly, bikeLane));
     /*
       **판이 정사각형이 아니다.** 텍스처가 덮는 세계 범위를 그대로 따른다 —
       남쪽(플레이어가 오는 쪽)이 길고 북쪽은 배경으로 보이는 만큼뿐이다.

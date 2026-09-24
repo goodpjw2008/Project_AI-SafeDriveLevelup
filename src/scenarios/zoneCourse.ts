@@ -80,7 +80,22 @@ const ROADS: ReadonlyArray<readonly ('S' | 'A' | 'B')[]> = [
  *  - `crossing` — 이미 건너고 있다
  *  - `jaywalk` — 보행 적색인데 건넌다 (신호기가 있는 곳에서만 '무단횡단' 이라는 말이 성립한다)
  */
-const PEDS = ['none', 'waiting', 'crossing', 'jaywalk'] as const;
+const PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'bikeRide', 'bikePush'] as const;
+
+/**
+ * **자전거** — 사용자가 실제 도로 사진을 주며 넣자고 했다: "횡단보도 끝에 저렇게 나와 있는 곳은 자전거를
+ * 타고 통행이 가능해. 반대로 하얀색 선에서는 자전거를 끌고 가야 해."
+ *
+ *  - `bikeRide` 옆에 **자전거횡단도**가 있어 타고 건넌다 — 걸음의 두 배 넘게 빠르고, 제15조의2 제3항의
+ *    **일시정지 대상**이다
+ *  - `bikePush` 자전거횡단도가 없어 **내려서 끌고** 건넌다 (제13조의2 제6항) — 그 사람은 보행자다
+ *
+ * **신호기 없는 횡단보도에만 둔다.** 그 자리가 이 코스의 핵심(제27조 제7항 — 사람이 없어도 선다)이고,
+ * 자전거횡단도의 일시정지 의무와 한 장면에서 만난다. 신호 있는 자리에 두면 "신호를 보면 되는 판" 이
+ * 되어 자전거를 알아보는 일이 묻힌다.
+ */
+const BIKES: ReadonlySet<string> = new Set(['bikeRide', 'bikePush']);
+const isBike = (p: string): boolean => BIKES.has(p);
 const KINDS = ['child', 'adult', 'elder'] as const;
 
 /**
@@ -142,6 +157,11 @@ export function zoneCombinationAllowed(t: ZoneTags): boolean {
     const ped = pedAt(t, at);
     if (ped === 'none') continue;
     /*
+      **자전거는 신호기 없는 횡단보도에만 둔다** (위 BIKES). 그 자리가 이 코스의 핵심이고,
+      자전거횡단도의 일시정지 의무와 한 장면에서 만난다.
+    */
+    if (isBike(ped) && hasSignal(t, at)) return false;
+    /*
       **'무단횡단' 은 지킬 신호가 있을 때만 성립한다.** 신호기가 없는 횡단보도에서는 언제 건너도
       규정을 어기는 것이 아니다 — 그런 사람을 '무단횡단' 이라 적으면 판의 글이 거짓말이 된다.
     */
@@ -154,6 +174,16 @@ export function zoneCombinationAllowed(t: ZoneTags): boolean {
       (플레이테스트가 잡았다).
     */
     if (ped !== 'jaywalk' && hasSignal(t, at)) return false;
+  }
+
+  /*
+    **자전거는 한 대뿐이고, 그 횡단보도 하나로 끝낸다.** 여럿이 몰려 건너는 장면은 보행자가 이미
+    맡고 있고(양방향 · 셋), 이 판이 묻는 것은 *노면의 붉은 띠를 알아보는가* 하나다.
+  */
+  const bikes = (['S', 'A', 'B'] as const).filter((at) => isBike(pedAt(t, at)));
+  if (bikes.length) {
+    if (t.count !== 1 || t.dir === 'both') return false;
+    if (peopleAt(t).length !== 1) return false;
   }
 
   /* **양방향은 둘 이상이라야 성립한다** — 한 사람은 한 방향으로만 건넌다 */
@@ -178,6 +208,13 @@ export function zoneCombinationAllowed(t: ZoneTags): boolean {
   return true;
 }
 
+/**
+ * **나중에 붙인 값은 맨 뒤에 선다** — 이미 있던 판의 번호(C00001~)가 밀리지 않게.
+ * 우회전 라이브러리의 `ADDED_LATER` 와 같은 장치다 (library.ts).
+ */
+const zoneGenerationOf = (t: ZoneTags): number =>
+  (['S', 'A', 'B'] as const).some((at) => isBike(pedAt(t, at))) ? 1 : 0;
+
 const allCombinations = (): ZoneTags[] => {
   const out: ZoneTags[] = [];
   for (let road = 0; road < ROADS.length; road++)
@@ -190,7 +227,10 @@ const allCombinations = (): ZoneTags[] => {
                 const t = { road, sPed, aPed, bPed, kind, dir, count };
                 if (zoneCombinationAllowed(t)) out.push(t);
               }
-  return out;
+  return out
+    .map((t, i) => ({ t, i, gen: zoneGenerationOf(t) }))
+    .sort((p, q) => p.gen - q.gen || p.i - q.i)
+    .map((x) => x.t);
 };
 
 export const zoneId = (i: number): number => ZONE_ID_BASE + i;
@@ -239,10 +279,17 @@ const pedOf = (
     from: walk === 'l2r' ? 'left' : 'right',
     kind,
     at,
-    // '건너는 중' 은 조금 더 멀리서 발을 뗀다 — 내가 닿을 때 이미 차도 위에 있어야 한다
-    startWithin: how === 'crossing' ? 18 : 12,
+    /*
+      '건너는 중' 은 조금 더 멀리서 발을 뗀다 — 내가 닿을 때 이미 차도 위에 있어야 한다.
+      **타고 건너는 자전거는 늦게**(6m) 발을 뗀다 — 걸음보다 빨라(pedWalk.ts) 멀리서 나서면 내가
+      닿기 전에 다 건너 버린다. 연석에 서 있는 모습과 건너려는 뜻은 처음부터 보이므로, 묻는 것은
+      "자전거가 아직 서 있으니 먼저 가도 되겠다" 를 하지 않는 것이다.
+    */
+    startWithin: how === 'bikeRide' ? 6 : how === 'crossing' ? 18 : 12,
     // 무단횡단 — 지킬 신호가 있는데 지키지 않는다
     ...(how === 'jaywalk' ? { obeysSignal: false } : null),
+    ...(how === 'bikeRide' ? { bike: 'ride' as const } : null),
+    ...(how === 'bikePush' ? { bike: 'push' as const } : null),
   });
   if (dir !== 'both') return Array.from({ length: count }, () => one(dir));
   /*
@@ -267,7 +314,14 @@ const DIR_TEXT = { l2r: '건너편에서', r2l: '차량쪽에서', both: '양쪽
 /** 사람 수 */
 const COUNT_TEXT = { 1: '', 2: ' 둘', 3: ' 셋' } as const;
 /** 그 횡단보도에서 사람이 무엇을 하고 있는가 */
-const PED_TEXT = { none: '', waiting: '건너려는', crossing: '건너는', jaywalk: '무단횡단' } as const;
+const PED_TEXT = {
+  none: '',
+  waiting: '건너려는',
+  crossing: '건너는',
+  jaywalk: '무단횡단',
+  bikeRide: '자전거횡단도를 타고 건너는',
+  bikePush: '자전거를 끌고 건너는',
+} as const;
 
 const titleOf = (t: ZoneTags): string => {
   const places = peopleAt(t);
@@ -293,6 +347,17 @@ const teachesOf = (t: ZoneTags): string => {
     '신호기가 있는 횡단보도의 적색은 서서 기다리는 것입니다 — 서고 나서 가는 것이 아닙니다.',
     '한 길 안에서도 횡단보도마다 규칙이 다릅니다 — 앞의 횡단보도가 어땠는지가 아니라 지금 이곳을 보세요.',
   ];
+  const bikeAt = peopleAt(t).find((at) => isBike(pedAt(t, at)));
+  if (bikeAt && pedAt(t, bikeAt) === 'bikeRide') {
+    lines.push(
+      '횡단보도 옆의 붉은 띠에 자전거 표시가 있으면 자전거횡단도입니다 — 자전거가 타고 건널 수 있는 곳이고, 그 앞에서 일시정지해야 합니다(제15조의2 제3항). 타고 오는 자전거는 걸어오는 사람보다 두 배 넘게 빠릅니다.',
+    );
+  }
+  if (bikeAt && pedAt(t, bikeAt) === 'bikePush') {
+    lines.push(
+      '자전거횡단도가 없는 횡단보도에서는 자전거에서 내려 끌고 건너야 합니다(제13조의2 제6항). 끌고 가는 사람은 보행자입니다(제2조 제17호).',
+    );
+  }
   if (t.dir === 'both') lines.push('한쪽만 보고 출발하지 마세요 — 반대쪽에서도 사람이 옵니다.');
   if (t.dir === 'l2r') lines.push('건너편에서 오는 사람은 늦게 닿습니다 — 먼저 보인다고 먼저 지나간 것이 아닙니다.');
   if (t.dir === 'r2l') lines.push('차량쪽 연석의 사람은 발을 떼는 순간 이미 내 차로입니다.');
@@ -318,6 +383,11 @@ export function buildZoneSpec(t: ZoneTags, id: number): ScenarioSpec {
     startPhase: 0,
     startPhaseElapsed: 0,
     pedSignalInstalled: { A: false, C: false },
+    /*
+      **자전거횡단도는 타고 건너는 판에만 그린다.** 끌고 건너는 판에 그려 두면 판의 글이 거짓말이 된다 —
+      거기서는 타고 건너도 되는데 굳이 내려서 끄는 셈이 되기 때문이다 (제13조의2 제6항).
+    */
+    ...(pedAt(t, plainAt(t)) === 'bikeRide' ? { bikeLane: plainAt(t) } : {}),
     zoneSignals,
     pedestrians: [
       ...pedOf('S', t.sPed, t.kind, hasSignal(t, 'S'), t.dir, t.count),
@@ -371,7 +441,13 @@ export function zoneTargets(t: ZoneTags): ViolationCode[] {
   out.add('SCHOOL_ZONE_NO_STOP');
   // 그리고 **신호 횡단보도가 두 곳** — 그 적색은 서서 기다리는 것이다
   out.add('SCHOOL_ZONE_RED');
-  if (peopleAt(t).length) out.add('PEDESTRIAN_BLOCKED');
+  /*
+    **타고 건너는 자전거는 보행자가 아니다** — 그 판이 시험하는 것은 `BIKE_BLOCKED` 다 (제15조의2 제3항).
+    끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다 (제2조 제17호).
+  */
+  const rides = peopleAt(t).some((at) => pedAt(t, at) === 'bikeRide');
+  if (rides) out.add('BIKE_BLOCKED');
+  else if (peopleAt(t).length) out.add('PEDESTRIAN_BLOCKED');
   return [...out];
 }
 
@@ -411,7 +487,11 @@ function zoneCost(t: ZoneTags): number {
   if (plainAt(t) === 'B') n += 1;
 
   const places = peopleAt(t);
-  for (const at of places) n += pedAt(t, at) === 'jaywalk' ? 2 : 1; // 무단횡단은 신호만 보고 가면 걸린다
+  for (const at of places) {
+    const p = pedAt(t, at);
+    // 무단횡단은 신호만 보고 가면 걸리고, 타고 건너는 자전거는 걸음의 두 배 넘게 빨라 판단할 틈이 짧다
+    n += p === 'jaywalk' || p === 'bikeRide' ? 2 : 1;
+  }
   if (!places.length) return n;
 
   // ── 사용자가 정한 두 축
@@ -434,6 +514,10 @@ function zoneCost(t: ZoneTags): number {
  * 보행자는 태그에 자리가 없다 — 이 값들은 추천이 "비슷한 판이 이어지지 않게" 고르는 데만 쓰이므로,
  * 하나가 빠져도 판 자체는 정확하다.
  */
+/** 자전거를 태그 어휘(LibraryTags)의 가장 가까운 값으로 옮긴다 — 추천이 모양을 가르는 데만 쓴다 */
+const libPed = (p: (typeof PEDS)[number]): 'none' | 'waiting' | 'crossing' | 'jaywalk' =>
+  p === 'bikeRide' ? 'crossing' : p === 'bikePush' ? 'waiting' : p;
+
 export function zoneEntries(): LibraryEntry[] {
   return (entries ??= (() => {
     const tags = allCombinations();
@@ -445,8 +529,12 @@ export function zoneEntries(): LibraryEntry[] {
         zone: 'yes',
         sigA: hasSignal(t, 'A') ? 'yes' : 'no',
         sigC: hasSignal(t, 'B') ? 'yes' : 'no',
-        a: t.sPed === 'jaywalk' ? 'jaywalk' : t.sPed,
-        c: t.bPed === 'jaywalk' ? 'jaywalk' : t.bPed,
+        /*
+          태그 어휘에는 자전거가 없다 — 추천이 "비슷한 판이 이어지지 않게" 고르는 데만 쓰는 값이라,
+          타고 건너는 자전거는 '건너는 중', 끌고 건너는 사람은 '건너려는' 으로 옮겨 적는다.
+        */
+        a: libPed(t.sPed),
+        c: libPed(t.bPed),
         kind: t.kind,
         approach: hasSignal(t, 'S') ? 'signal' : 'noSignal',
         lead: 'none',

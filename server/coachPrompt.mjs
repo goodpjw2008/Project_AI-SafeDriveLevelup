@@ -29,6 +29,7 @@ export const VIOLATION_BRIEF = {
   RED_NO_STOP: { title: '신호·지시 위반', law: '시행규칙 [별표 2] 적색의 등화 제2호' },
   RIGHT_ARROW_RED: { title: '우회전 신호등 위반', law: '시행규칙 [별표 2] 적색의 등화 제3호' },
   PEDESTRIAN_BLOCKED: { title: '횡단보도 보행자 횡단 방해', law: '도로교통법 제27조 제1항' },
+  BIKE_BLOCKED: { title: '자전거 횡단 방해', law: '도로교통법 제15조의2 제3항 · 제48조' },
   SCHOOL_ZONE_NO_STOP: {
     title: '어린이보호구역 횡단보도 일시정지 위반',
     law: '도로교통법 제27조 제7항',

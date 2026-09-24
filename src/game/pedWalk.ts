@@ -61,6 +61,9 @@ export const CURB = ROAD_HALF_WIDTH + 1.4;
  */
 export const WALK_SPEED_SCALE = 3.0;
 
+/** 타고 건너는 자전거의 기준 속도 (m/s) — 어른 걸음(1.2)의 약 1.7배 (위 배율이 함께 걸린다) */
+const BIKE_RIDE_SPEED = 2.0;
+
 /**
  * **라이브러리가 맞춰져 있던 걸음 배율.**
  *
@@ -238,6 +241,8 @@ export const IMMINENT_DISTANCE = 6;
 /** 상태기계가 밖으로 내보내는 것 — 화면도 검증기도 이것만 본다 */
 export interface PedWalkSample {
   crosswalk: CrosswalkId;
+  /** 자전거를 가진 사람인가 (PedSpawn.bike) — 판정이 보행자와 자전거를 가려 적는다 */
+  bike?: 'ride' | 'push';
   intendsToCross: boolean;
   onConflictPath: boolean;
   /** 등장 시각이 지나 '상황에 참여한' 뒤인가 (결과 지도가 발자국을 그릴 구간) */
@@ -267,6 +272,8 @@ export interface CarFront {
  */
 export class PedWalk {
   readonly crosswalk: CrosswalkId;
+  /** 자전거를 가진 사람인가 — 타고 건너면 `ride`, 끌고 건너면 `push` (PedSpawn.bike) */
+  readonly bike?: 'ride' | 'push';
   readonly dir: 1 | -1;
   readonly speed: number;
 
@@ -313,6 +320,7 @@ export class PedWalk {
 
   constructor(spawn: PedSpawn) {
     this.crosswalk = spawn.crosswalk;
+    this.bike = spawn.bike;
     this.dir = spawn.from === 'left' ? 1 : -1;
     this.axisPos = this.dir === 1 ? -CURB : CURB;
     this.spawnAt = spawn.at;
@@ -325,7 +333,23 @@ export class PedWalk {
     const kind = spawn.kind ?? 'adult';
     // 시나리오가 속도를 지정한 경우에도 배율은 함께 적용한다 —
     // 한 화면에 선 사람들의 걸음이 서로 다른 기준으로 움직이면 어색하다.
-    const base = spawn.speed ?? (kind === 'child' ? 1.35 : kind === 'elder' ? 0.85 : 1.2);
+    /*
+      **타고 건너는 자전거는 걸음보다 빠르다** — 실측으로는 15km/h 쯤이라 어른 걸음의 3.5배지만,
+      여기서는 **1.7배**로 둔다. 실제 비율로 두었더니 22.8m 를 2.4초에 건너, 내가 닿기 한참 전에
+      다 지나가 버렸다 — 보행자를 아예 보지 않는 운전자조차 걸리지 않는 **아무 일도 일어나지 않는
+      판**이 됐다 (전수 검증이 잡았다). 1.7배면 3.7초가 걸려, 내가 닿을 때 아직 건너는 중이다.
+      그래도 걸음보다 확실히 빨라 "저 자전거는 아직 멀었다" 가 통하지 않는다.
+
+      끌고 가는 사람(`push`)은 보행자이므로 걸음 그대로다 (제2조 제17호).
+    */
+    /*
+      **탄 자전거의 속도는 나이를 따르지 않는다.** 걸음은 아이가 빠르고 노인이 느리지만, 페달을 밟는
+      속도는 그렇게 갈리지 않는다 — 나이를 곱했더니 **아이가 어른보다 빨라져** 아이 자전거 판만
+      내가 닿기 전에 다 건너 버렸다 (전수 검증이 잡았다). 어른 걸음의 약 1.7배로 고정한다.
+    */
+    const rides = spawn.bike === 'ride';
+    const walk = kind === 'child' ? 1.35 : kind === 'elder' ? 0.85 : 1.2;
+    const base = spawn.speed ?? (rides ? BIKE_RIDE_SPEED : walk);
     this.speed = base * WALK_SPEED_SCALE;
     // 빨라져서 줄어든 시간만큼 연석에서 더 기다린다 (위 CURB_HOLD_SHARE) — 사람마다 제 걸음으로 잰다
     // 박자(RED_BEAT)는 대기의 끝에 붙으므로 미리 빼 둔다 — 다 건너는 시각이 그대로다
@@ -536,6 +560,7 @@ export class PedWalk {
         crosswalk: this.crosswalk,
         intendsToCross: false,
         onConflictPath: false,
+        bike: this.bike,
         active: false,
         imminent: false,
         state: this.state,
@@ -568,6 +593,7 @@ export class PedWalk {
       // 보도에서 대기 중이어도 지금 건널 수 있으면 '통행하려 할 때'에 해당한다
       intendsToCross: this.state === 'crossing' || this.isVisiblyWaiting(),
       onConflictPath,
+      bike: this.bike,
       active: this.arrived,
       imminent: this.state === 'waiting' && this.imminent,
       state: this.state,
