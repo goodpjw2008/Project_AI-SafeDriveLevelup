@@ -2642,6 +2642,7 @@
           grid-template-columns: minmax(0, 1fr);
         }
       }
+
       /*
         이름 앞의 아이콘 — 어느 길인지를 글보다 먼저 말한다 (ui/icons.ts 의 monitor · users).
 
@@ -5157,6 +5158,44 @@
           padding: 28px 16px 60px;
         }
       }
+      /*
+        ── 손에 든 세로 화면의 첫 화면 ──────────────────────────────
+
+        PC 에서는 한 화면에 다 들어오지만 세로 휴대폰에서는 **연습 버튼까지 내려가야** 했다.
+        사용자가 정했다 — 세로 휴대폰에서는 *지금 할 것*(레벨 · 차 · 연습 버튼)만 남기고
+        둘러보는 것들은 접는다. 접는 것이지 없애는 것이 아니다: 감춘 메뉴는 가로로 돌리거나
+        PC 에서 그대로 나온다.
+
+        **PC 는 건드리지 않는다.** 세 가지가 모두 맞을 때만 걸린다 —
+        세로(`orientation: portrait`) · 손가락(`pointer: coarse`) · 좁은 화면(720px).
+        창을 좁힌 PC 는 마우스라서 `pointer: coarse` 에 걸리지 않는다.
+      */
+      @media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+        /* 사이트 전체 성공 · 실패 — 오른쪽에 붙으면 좁은 폭에서 한쪽만 차 보인다 */
+        .site-stats {
+          justify-content: center;
+        }
+        /* 둘러보는 메뉴는 접는다. 남는 것은 배우는 글 둘(우회전 방법 · 어린이보호구역 운전 방법)과 설정이다 */
+        .menu-links #btn-shop,
+        .menu-links #btn-about,
+        .menu-links #btn-credits,
+        .menu-links #btn-trial {
+          display: none;
+        }
+        /* 뱃지 요약 — 모아 보는 재미는 큰 화면의 몫이다 */
+        .badge-summary {
+          display: none;
+        }
+        /* 나쁜 운전 습관 — **차 그림(.ai-car)은 남긴다.** 차가 레벨의 얼굴이라 이것까지 접으면 왜 오르는지가 사라진다 */
+        .ai-habits {
+          display: none;
+        }
+        /* 오프라인 교육 활용 — 강의실에서 화면을 띄워 놓고 함께 보는 길이라, 손안 화면에서 누를 일이 없다 */
+        .mode-split > .mode-group:nth-child(2) {
+          display: none;
+        }
+      }
+
     </style>
   </head>
   <body>
