@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AXES,
+  allCombinations,
   LIBRARY_ID_BASE,
   combinationAllowed,
   inLibrary,
@@ -355,6 +356,52 @@ describe('보행자가 오는 쪽', () => {
     const lead = lib.filter((e) => e.tags.lead !== 'none' && e.spec.pedestrians.length);
     const left = lead.filter((e) => e.spec.pedestrians.some((p) => p.from === 'left')).length;
     expect(left / lead.length, '앞차 판 중 반대편 사람이 있는 판').toBeGreaterThan(0.3);
+  });
+
+  /*
+    **넷 다 실제로 나온다** — 사용자가 정한 보행자 변수다: "보행자 좌→우, 보행자 우→좌, 보행자 양방향,
+    보행자 명수". 하나라도 몇 판뿐이면 그 변수는 이름만 남는다.
+  */
+  it('건너는 방향 셋과 사람 수가 모두 넉넉히 나온다', () => {
+    const shape = (id: 'A' | 'C') => {
+      const n = { l2r: 0, r2l: 0, both: 0 };
+      const count = new Map<number, number>();
+      for (const e of lib) {
+        const ps = e.spec.pedestrians.filter((p) => p.crosswalk === id);
+        if (!ps.length) continue;
+        count.set(ps.length, (count.get(ps.length) ?? 0) + 1);
+        const sides = new Set(ps.map((p) => p.from));
+        if (sides.size === 2) n.both++;
+        else if (sides.has('left')) n.l2r++;
+        else n.r2l++;
+      }
+      return { n, count };
+    };
+    for (const id of ['A', 'C'] as const) {
+      const { n, count } = shape(id);
+      for (const [k, v] of Object.entries(n)) expect(v, `${id} ${k}`).toBeGreaterThan(500);
+      // 한 횡단보도에 하나 · 둘 · 셋이 모두 있다 (넷 이상은 두지 않는다 — 길이 사람으로 막힌다)
+      for (const c of [1, 2, 3]) expect(count.get(c) ?? 0, `${id} ${c}명`).toBeGreaterThan(300);
+      expect([...count.keys()].every((c) => c <= 3), `${id} 인원`).toBe(true);
+    }
+  });
+});
+
+/*
+  **id 는 축마다 한 자리(10진수)를 쓴다** (library.ts 의 libraryId). 그래서 한 축의 값이 **열 개를 넘으면**
+  자리올림이 나 **서로 다른 조합이 같은 id** 를 갖게 된다 — 기록도 번호도 그 id 로 묶이므로 조용히 어긋난다.
+  '우회전 후 보행자' 축은 값을 더해 지금 딱 열 개라, 다음에 하나만 더 붙여도 무너진다.
+*/
+describe('id 자리 수', () => {
+  it('축마다 값이 열 개를 넘지 않는다', () => {
+    for (const [name, values] of Object.entries(AXES)) {
+      expect(values.length, `${name} 축의 값 ${values.length}개`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('서로 다른 조합은 서로 다른 id 를 갖는다', () => {
+    const ids = new Set(allCombinations().map(libraryId));
+    expect(ids.size).toBe(allCombinations().length);
   });
 });
 

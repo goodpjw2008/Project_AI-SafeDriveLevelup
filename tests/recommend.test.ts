@@ -552,7 +552,7 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
   */
   it('보호구역 판 중 신호기 없는 판의 비율이 L2 ~ L10 에서 고르다', () => {
     const ratios = ([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((level) => {
-      const zone = run(level, 160).filter((e) => zoneKindOf(e.tags) !== 'none');
+      const zone = run(level, 400).filter((e) => zoneKindOf(e.tags) !== 'none');
       return zone.filter((e) => zoneKindOf(e.tags) === 'noSignal').length / zone.length;
     });
     const shown = ratios.map((r, i) => `L${i + 2} ${(r * 100).toFixed(0)}%`).join(' · ');
@@ -561,8 +561,10 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
       expect(r, shown).toBeLessThanOrEqual(0.8);
     }
     /*
-      표본이 레벨마다 160판이라 ±7%p 쯤 흔들린다. 보통을 한 칸 올린 뒤(한 레벨 위까지 섞음) 레벨마다 1,000판으로 재면
-      L2 ~ L10 이 58 ~ 71% 로 고르다 — 이 표본에서 벌어지는 폭은 그보다 크게 나올 수 있어 여유를 둔다.
+      **표본을 160 → 400판으로 늘렸다.** 160판이면 한 레벨에서 보호구역 판이 35판 남짓뿐이라 비율이 ±10%p 씩
+      튀었다 — 실제로 라이브러리에 판을 더하자 같은 L5 가 한 번은 85%, 한 번은 46% 로 나와 위아래 문턱을
+      번갈아 넘었다. 레벨마다 1,000판으로 재면 L2 ~ L10 이 **61 ~ 69%** 로 고르다(고른 것은 추천이지 표본이
+      아니다). 400판이면 그 흔들림이 문턱 안에 든다.
     */
     expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.25);
   });

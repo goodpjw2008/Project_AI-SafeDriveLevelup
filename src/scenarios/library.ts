@@ -66,14 +66,38 @@ export const SIG_CS = ['yes', 'no'] as const;
     C 는 지키는 사람이 녹색에 먼저 건너고, 무단횡단자는 녹색 화살표에 맞춰 적색에 나선다)
   **값은 끝에 붙인다** — id 의 자리 값이 곧 배열 순서라, 앞에 끼우면 이미 있던 판의 id 가 바뀐다.
 */
-export const A_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'jaywalkWait', 'mixed'] as const;
-export const C_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'group', 'late', 'maybe', 'jaywalkWait', 'mixed'] as const;
+export const A_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'jaywalkWait', 'mixed', 'bothWays', 'crowd'] as const;
+export const C_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'group', 'late', 'maybe', 'jaywalkWait', 'mixed', 'crowd'] as const;
 
-/** 나중에 붙인 값 — 이 값을 쓰는 판은 **라이브러리 뒤쪽**에 둔다 (이미 있던 판의 번호가 밀리지 않게, scenarioLibrary) */
-const ADDED_LATER: { [K in keyof LibraryTags]?: ReadonlySet<string> } = {
-  a: new Set(['jaywalkWait', 'mixed']),
-  c: new Set(['jaywalkWait', 'mixed']),
-};
+/*
+  **건너는 방향과 사람 수도 판을 가른다** (사용자가 정했다: "우회전 맵에서도 아래 상황을 반영해 줘 —
+  보행자 좌→우, 보행자 우→좌, 보행자 양방향, 보행자 명수").
+
+  방향은 이미 판마다 갈린다 — `pedestriansAlone` 의 `side(k)` 가 판 번호로 좌우를 뒤집는다(첫 횡단보도는
+  좌 39% · 우 40%). 없던 것은 **양방향**과 **셋 이상**이다. 첫 횡단보도에는 둘이 같이 건너는 장면 자체가
+  없었고(`mixed` 는 한 사람이 서 있기만 한다), 어느 횡단보도에도 셋은 없었다.
+
+   - `bothWays` (첫 횡단보도) — **양쪽 연석에서 한 사람씩 동시에** 건넌다. 한쪽을 보내고 출발하면 걸린다
+   - `crowd` (양쪽 횡단보도) — **한쪽에서 셋**이 차례로 건넌다. 앞사람이 지나갔다고 끝이 아니다
+
+  우회전 후 횡단보도의 `group` 이 이미 양방향 둘이라, 그쪽에는 `bothWays` 를 두지 않는다 — 같은 장면이
+  두 값으로 갈리면 판만 늘고 배우는 것은 늘지 않는다 (보호구역 전용 도로에서 겪은 일이다).
+*/
+
+/**
+ * **나중에 붙인 값 — 붙인 차례(세대)대로 쌓는다.** 이 값을 쓰는 판은 라이브러리 뒤쪽에 서서, 이미 있던 판의
+ * 번호가 밀리지 않는다 (numberedTags).
+ *
+ * **세대를 나누는 까닭.** 한때 하나의 집합이었다. 그런데 거기에 값을 더 붙이자 새 판이 **먼저 붙인 값의 판들
+ * 사이사이에** 끼어들어(조합을 세는 순서대로 서므로) 3,084판의 번호가 밀렸다 — 사용자가 부르던 번호가 다른
+ * 판을 가리키게 된다. 세대로 쌓으면 새 판은 **언제나 맨 뒤**에 서고, 앞 세대끼리의 차례는 그대로다.
+ */
+const ADDED_LATER: ReadonlyArray<{ [K in keyof LibraryTags]?: ReadonlySet<string> }> = [
+  // 1세대 — 무단횡단하려는 사람 · 신호 지키는 사람과 함께 선 무단횡단자
+  { a: new Set(['jaywalkWait', 'mixed']), c: new Set(['jaywalkWait', 'mixed']) },
+  // 2세대 — 양방향 둘 · 한쪽에서 셋 (건너는 방향과 사람 수)
+  { a: new Set(['bothWays', 'crowd']), c: new Set(['crowd']) },
+];
 export const KINDS = ['adult', 'child', 'elder'] as const;
 export const APPROACHES = ['none', 'signal', 'noSignal'] as const;
 export const LEADS = ['none', 'lawful', 'rolling', 'straight'] as const;
@@ -162,6 +186,25 @@ export function combinationAllowed(t: LibraryTags): boolean {
     적색일 때만 있다. 신호기가 없으면 언제든 건너므로 '무단횡단' 이라는 말이 없다.
   */
   if ((t.a === 'waiting' || t.a === 'crossing') && t.sigA === 'yes' && !pedAGreen(t)) return false;
+  /*
+    **양방향 · 셋은 신호를 지키고 건넌다** — 규칙은 '건너려고 대기' · '건너는 중' 과 같다. 무단횡단으로 두면
+    한 판에 여럿이 동시에 신호를 어겨, 무단횡단을 가르치는 판(`jaywalk` · `jaywalkWait`)과 장면이 겹친다.
+  */
+  if ((t.a === 'bothWays' || t.a === 'crowd') && t.sigA === 'yes' && !pedAGreen(t)) return false;
+  if (t.c === 'crowd' && t.sigC === 'yes' && !pedCGreen(t)) return false;
+  /*
+    **한 횡단보도가 붐비는 판은 그 횡단보도 하나로 끝낸다.**
+
+    첫 횡단보도에 양방향 둘 · 한쪽 셋을 세워 두고 우회전 후에도 사람을 두면, 규정대로 몰아도 두 번 길게
+    서서 제한시간에 닿고 무엇을 배우는 판인지도 흐려진다 (앞차 판에 이미 같은 규칙이 있다). 그리고 이 판이
+    묻는 것은 **한 횡단보도를 끝까지 보는 일**이라, 다른 곳에 사람을 더 두어도 배우는 것이 늘지 않는다.
+
+    레벨 뼈대와도 맞물린다 — 여럿 판을 너무 많이 더하면 '보행자 여럿' 이 L7 이 아니라 L6 에서 열려
+    개념이 차례로 열리는 뼈대가 한 칸 당겨진다 (levelGuide 의 OPENS_SHARE 주석).
+  */
+  const manyA = t.a === 'bothWays' || t.a === 'crowd';
+  if (manyA && t.c !== 'none') return false;
+  if (t.c === 'crowd' && (t.a === 'mixed' || manyA)) return false;
   if (t.a === 'jaywalk' && (t.sigA === 'no' || pedAGreen(t))) return false;
   /*
     무단횡단하려는 사람 · 기다리는 사람과 함께 선 무단횡단자도 **보행신호가 적색일 때만** 있다. 우회전신호 적색 판의
@@ -530,6 +573,36 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     });
   }
 
+  /*
+    **양방향** — 양쪽 연석에서 한 사람씩 **둘 다** 건넌다. 한쪽을 보내고 출발하면 반대쪽 사람 앞을 지나가게 된다.
+
+    건너편에서 오는 사람은 반대 차로를 먼저 건너 내 차로까지 시간이 더 걸리므로 **조금 일찍 나선다** —
+    둘이 같은 거리에서 나서면 차량쪽 사람이 다 건넌 뒤에야 건너편 사람이 내 차로에 닿아, 두 번 서게 된다.
+    어린이 · 노인이 어느 쪽에 서는지는 판마다 다르다 (위 side).
+  */
+  if (t.a === 'bothWays') {
+    const special = side(16);
+    // 건너편 사람이 먼저(12m) 나서고 차량쪽 사람이 뒤따른다(9m) — 건너편을 보고 "이제 가도 되겠다" 할 때 발밑에서 나온다
+    out.push({ crosswalk: 'A', at: 0, startWithin: 12, from: 'left', kind: special === 'left' ? kind : 'adult', ...freeA });
+    out.push({ crosswalk: 'A', at: 0, startWithin: 9, from: 'right', kind: special === 'right' ? kind : 'adult', ...freeA });
+  }
+  /*
+    **셋** — 한쪽에서 차례로 건넌다. 방아쇠 거리를 벌려 **한 사람이 지나간 뒤 다음 사람이** 나서므로,
+    앞사람만 보내고 출발하면 걸린다. 첫 사람이 가장 멀리서 나서고(20m) 뒤로 갈수록 가까워진다.
+  */
+  if (t.a === 'crowd') {
+    const from = side(17);
+    /*
+      **12 · 9 · 6m** — 12m 보다 먼 값은 뜻이 없다. 연석에서 기다리는 사람은 차가 12m 안까지 오면 그 값과
+      상관없이 나서기 때문이다 (pedWalk.ts 의 `STEP_OFF_LATEST`). 20 · 15 · 10 으로 두었더니 앞의 둘이 같은
+      순간에 나서 "차례로" 가 사라졌다 (직접 달려 보고 고쳤다). 첫 사람은 다른 판과 같은 12m 라 보고 설 수
+      있고, 뒤의 둘은 내가 이미 선 뒤에 나선다.
+    */
+    for (const [i, within] of [12, 9, 6].entries()) {
+      out.push({ crosswalk: 'A', at: 0, startWithin: within, from, kind: i === 0 ? kind : 'adult', ...freeA });
+    }
+  }
+
   // ── 우회전 후 횡단보도(C) ──
   /*
     **우회전신호 적색 판은 C 의 사람을 화살표에 맞춘다.**
@@ -557,6 +630,13 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
       const first = side(10);
       out.push({ crosswalk: 'C', at: arrowAt - 3, startWithin: 24, from: first, kind, ...late });
       out.push({ crosswalk: 'C', at: arrowAt + 1, startWithin: 16, from: other(first), kind: 'adult', ...late });
+    }
+    // 셋이 한쪽에서 차례로 — 화살표 앞뒤로 벌려, 화살표를 받고 돌 때도 아직 건너는 사람이 있다
+    if (t.c === 'crowd') {
+      const from = side(18);
+      for (const [i, at] of [arrowAt - 3, arrowAt + 1, arrowAt + 4].entries()) {
+        out.push({ crosswalk: 'C', at, startWithin: 24, from, kind: i === 0 ? kind : 'adult', ...late });
+      }
     }
     // 뛰어드는 사람은 가까운 쪽에서만 뜻이 있다 (아래 t.c === 'late' 주석)
     if (t.c === 'late') out.push({ crosswalk: 'C', at: arrowAt, startWithin: 9, from: 'right', speed: 1.8, kind, ...late });
@@ -625,6 +705,21 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
         : { crosswalk: 'C', at: 0, startWithin: 16, from: other(first), kind: 'adult', ...obeys },
     );
   }
+  /*
+    **셋** — 한쪽에서 차례로 건넌다. `group`(양방향 둘)과 달리 **같은 쪽**이라, 다 건넌 줄 알고 출발하면
+    뒤따르는 사람 앞을 지나가게 된다. 늦어지는 판에서는 시각으로 나선다 (위 cSelfStart).
+  */
+  if (t.c === 'crowd') {
+    const from = side(18);
+    const obeys = t.sigC === 'no' || !pedCGreen(t) ? { obeysSignal: false } : {};
+    for (const [i, within] of [24, 18, 12].entries()) {
+      out.push(
+        cSelfStart
+          ? { crosswalk: 'C', at: cAt + i * 1.5, from, kind: i === 0 ? kind : 'adult' }
+          : { crosswalk: 'C', at: 0, startWithin: within, from, kind: i === 0 ? kind : 'adult', ...obeys },
+      );
+    }
+  }
   if (t.c === 'late') {
     /*
       코너를 돌고 있을 때 **가까운 쪽에서** 뛰어든다 — 돌면서도 횡단보도를 보고 있었는가.
@@ -682,12 +777,17 @@ function titleOf(t: LibraryTags): string {
   if (t.a === 'jaywalk') parts.push(`첫 횡단보도 무단횡단 ${who}`);
   if (t.a === 'jaywalkWait') parts.push(`첫 횡단보도 무단횡단하려는 ${who}`);
   if (t.a === 'mixed') parts.push(`첫 횡단보도 신호 지키는 사람 · 무단횡단 ${who}`);
+  // 건너는 방향과 사람 수를 제목에 적는다 — 무엇을 봐야 하는 판인지가 제목에서 갈린다
+  if (t.a === 'bothWays') parts.push(`첫 횡단보도 양방향 ${who} 둘`);
+  if (t.a === 'crowd') parts.push(`첫 횡단보도 한쪽에서 ${who} 셋`);
   // 사람이 한쪽에만 있으면 종류를 그쪽에 붙인다 (양쪽이면 첫 횡단보도에 이미 붙었다)
   const cWho = t.a === 'none' ? who : '보행자';
   if (t.c === 'waiting') parts.push(`우회전 후 건너려는 ${cWho}`);
   if (t.c === 'crossing') parts.push(`우회전 후 ${cWho}`);
   if (t.c === 'jaywalk') parts.push(`우회전 후 무단횡단 ${cWho}`);
-  if (t.c === 'group') parts.push(t.a !== 'none' || t.kind === 'adult' ? '우회전 후 보행자 여럿' : `우회전 후 ${who} 포함 보행자 여럿`);
+  // `group` 은 양쪽에서 한 사람씩이다 (pedestriansAlone) — 제목에도 그렇게 적는다
+  if (t.c === 'group') parts.push(t.a !== 'none' || t.kind === 'adult' ? '우회전 후 양방향 보행자 둘' : `우회전 후 양방향 ${who} 포함 둘`);
+  if (t.c === 'crowd') parts.push(t.a !== 'none' || t.kind === 'adult' ? '우회전 후 한쪽에서 보행자 셋' : `우회전 후 한쪽에서 ${who} 포함 셋`);
   if (t.c === 'late') parts.push(`우회전 중 뛰어드는 ${cWho}`);
   if (t.c === 'maybe') parts.push('아이가 나올 수도 있음');
   if (t.c === 'jaywalkWait') parts.push(`우회전 후 무단횡단하려는 ${cWho}`);
@@ -728,9 +828,12 @@ function briefOf(t: LibraryTags): string {
   if (t.a === 'waiting') s.push(`첫 횡단보도 앞에 ${who}이(가) 건너려고 서 있습니다.`);
   else if (t.a === 'jaywalkWait') s.push(`첫 횡단보도 앞에 ${who}이(가) 보행신호가 적색인데도 건너려고 서 있습니다.`);
   else if (t.a === 'mixed') s.push(`첫 횡단보도에 신호를 지키는 사람과, 신호를 무시하려는 ${who}이(가) 함께 있습니다.`);
+  else if (t.a === 'bothWays') s.push(`첫 횡단보도를 ${who}이(가) 양쪽에서 한 사람씩 건너려 합니다.`);
+  else if (t.a === 'crowd') s.push(`첫 횡단보도를 ${who}을(를) 포함해 세 사람이 차례로 건너려 합니다.`);
   else if (t.a !== 'none') s.push(`정지선 앞 첫 횡단보도에 ${who}이(가) 있습니다.`);
   if (t.c === 'waiting') s.push('우회전해서 나가는 횡단보도 앞에 건너려는 사람이 서 있습니다.');
-  else if (t.c === 'group') s.push('우회전해서 나가는 횡단보도에 여러 사람이 있습니다.');
+  else if (t.c === 'group') s.push('우회전해서 나가는 횡단보도를 양쪽에서 한 사람씩 건넙니다.');
+  else if (t.c === 'crowd') s.push('우회전해서 나가는 횡단보도를 한쪽에서 세 사람이 차례로 건넙니다.');
   else if (t.c === 'late') s.push('우회전하는 동안 횡단보도를 계속 보세요.');
   else if (t.c === 'maybe') s.push('아이가 나올 때도, 나오지 않을 때도 있습니다.');
   else if (t.c === 'jaywalkWait') s.push('우회전해서 나가는 횡단보도 앞에 보행신호가 적색인데도 건너려는 사람이 서 있습니다.');
@@ -902,12 +1005,27 @@ export function conceptStage(t: LibraryTags): number {
   if (t.lead === 'lawful' || t.lead === 'straight' || t.jam === 'jam') up(4);
   if (t.lead === 'rolling') up(5);
   if (severalPeople(t)) up(6);
+  /*
+    **한 횡단보도에 둘 이상**은 '보행자 여럿' 의 맨 끝이다 — 양쪽에서 동시에, 또는 한쪽에서 셋이 차례로.
+    여럿을 이미 겪은 뒤에 만나야 하므로 그 위의 단계에 둔다. (이 단계에는 `LEVEL_CONCEPTS` 의 열쇠가 없다 —
+    새로 여는 개념이 아니라 **같은 개념의 가장 어려운 모습**이라, 레벨 안내에 한 줄 더 적을 것이 없다.)
+  */
+  if (manyAtOneCrosswalk(t)) up(7);
   return s;
 }
 
 /** 보행자 여럿 — 한 판에서 누가 나설지 가려 봐야 하는 판 (여럿 · 돌 때 뛰어듦 · 양쪽 · 신호 지키는 사람 + 무단횡단) */
 const severalPeople = (t: LibraryTags): boolean =>
-  t.c === 'group' || t.c === 'late' || t.a === 'mixed' || t.c === 'mixed' || (t.a !== 'none' && t.c !== 'none');
+  t.c === 'group' ||
+  t.c === 'late' ||
+  t.a === 'mixed' ||
+  t.c === 'mixed' ||
+  manyAtOneCrosswalk(t) ||
+  (t.a !== 'none' && t.c !== 'none');
+
+/** 한 횡단보도에 **둘 이상** — 양쪽에서 동시에(`bothWays`) 또는 한쪽에서 셋(`crowd`) */
+const manyAtOneCrosswalk = (t: LibraryTags): boolean =>
+  t.a === 'bothWays' || t.a === 'crowd' || t.c === 'crowd';
 
 /** **겹친 조건의 수** (0~7) — 신호 · 보행자 · 보호구역 · 앞차 · 여럿 · 밤비 · 재촉. 레벨을 매길 때 줄을 세우는 둘째 기준이다 */
 export function layersOf(t: LibraryTags): number {
@@ -981,8 +1099,16 @@ function assignLevels(entries: LibraryEntry[]): void {
     낮 판이 모자라 어린이보호구역 판이 끌려 들어와, 보호구역이 L2 가 아니라 L1 에서 열렸다. 그래서 L1 은 정원(218)보다
     적은 153판이다. L1 은 머무는 판(난이도 5 로도 다섯 판)보다 서른 배 넘게 많아 모자라지 않는다 (tests/library.test.ts).
   */
+  /*
+    **L1 은 기본 개념 판만 받는다** (conceptStage 0 · 1 — 정면 신호와 우회전 신호등). 정원만으로 자르면
+    라이브러리가 커질 때 L1 의 몫도 함께 커져 줄 뒤쪽의 **어린이보호구역 판이 끌려 들어온다** — 실제로
+    보행자 축에 값을 더해 판이 8,958 → 11,154 로 늘자 보호구역이 L2 가 아니라 L1 에서 열렸다.
+    개념으로 막아 두면 판 수가 얼마가 되든 여는 차례가 흔들리지 않는다.
+  */
   const l1Count = Math.round(share(1));
-  const l1 = new Set(sorted.slice(0, l1Count).filter((e) => !L1_EXCLUDES(e.tags)));
+  const l1 = new Set(
+    sorted.slice(0, l1Count).filter((e) => !L1_EXCLUDES(e.tags) && conceptStage(e.tags) <= 1),
+  );
   for (const e of l1) e.level = 1;
 
   /*
@@ -1089,11 +1215,24 @@ export const LEVEL_CONCEPTS: readonly { key: string; name: string; has: (t: Libr
   { key: 'several', name: '보행자 여럿', has: severalPeople },
 ];
 
+/**
+ * **그 개념이 레벨 판의 이만큼을 차지하면 "열었다"** 고 본다.
+ *
+ * 한때 10% 였다. 그 값은 **라이브러리 크기에 흔들린다** — 보행자 축에 값을 더해 판이 8,958 → 11,154 로 늘자
+ * 레벨의 몫도 함께 커져, '보행자 여럿' 이 L6 에서 10.8% 로 문턱을 살짝 넘어 **여는 레벨이 L7 에서 L6 으로 당겨졌다.**
+ * 정작 L7 은 79.6% 라, 개념이 실제로 열리는 자리는 누가 봐도 L7 이다 (L6 10.8% → L7 79.6%).
+ *
+ * 문턱을 15% 로 올리면 그 잡음이 걸러지고, 판 수가 얼마가 되든 **개념이 실제로 자리 잡는 레벨**을 가리킨다.
+ * 이 값이 흔들리면 AI 추천의 '새 개념 먼저' 와 '보호구역 · 앞차 차례' 가 함께 흔들린다 (recommend.ts).
+ */
+const OPENS_SHARE = 0.15;
+
 let guide: Map<number, string[]> | null = null;
 
 /**
- * **이 레벨에서 새로 여는 개념** — 라이브러리에서 읽는다. 그 개념이 레벨 판의 10% 이상을 처음 차지하는 레벨이 그
- * 개념을 여는 레벨이다 (한두 판 섞여 든 것으로는 "열었다" 고 하지 않는다). 없으면 빈 목록 — 앞서 연 것을 더 겹쳐 보는 레벨이다.
+ * **이 레벨에서 새로 여는 개념** — 라이브러리에서 읽는다. 그 개념이 레벨 판의 `OPENS_SHARE` 이상을 처음 차지하는
+ * 레벨이 그 개념을 여는 레벨이다 (몇 판 섞여 든 것으로는 "열었다" 고 하지 않는다). 없으면 빈 목록 — 앞서 연 것을
+ * 더 겹쳐 보는 레벨이다.
  *
  * AI 추천(recommend.ts)이 "이 레벨의 새 개념을 먼저" 에 쓰고, 화면과 설명서가 레벨 안내에 쓴다.
  */
@@ -1106,7 +1245,7 @@ export function levelGuide(level: number): readonly string[] {
     for (const c of LEVEL_CONCEPTS) {
       for (let l = 1; l <= 10; l++) {
         const es = perLevel.get(l) ?? [];
-        if (es.length && es.filter((e) => c.has(e.tags)).length >= es.length * 0.1) {
+        if (es.length && es.filter((e) => c.has(e.tags)).length >= es.length * OPENS_SHARE) {
           guide.set(l, [...(guide.get(l) ?? []), c.key]);
           break;
         }
@@ -1178,13 +1317,19 @@ let numbered: LibraryTags[] | null = null;
  */
 function numberedTags(): LibraryTags[] {
   return (numbered ??= allCombinations()
-    .map((t, i) => ({ t, i, later: isAddedLater(t) }))
-    .sort((p, q) => Number(p.later) - Number(q.later) || p.i - q.i)
+    .map((t, i) => ({ t, i, gen: generationOf(t) }))
+    .sort((p, q) => p.gen - q.gen || p.i - q.i)
     .map((x) => x.t));
 }
 
-const isAddedLater = (t: LibraryTags): boolean =>
-  (Object.keys(ADDED_LATER) as (keyof LibraryTags)[]).some((k) => ADDED_LATER[k]?.has(t[k]) ?? false);
+/** 이 판이 **몇 세대**인가 — 쓰는 값 중 가장 나중에 붙은 것을 따른다 (0 = 처음부터 있던 값만 쓴다) */
+const generationOf = (t: LibraryTags): number => {
+  for (let g = ADDED_LATER.length - 1; g >= 0; g--) {
+    const set = ADDED_LATER[g];
+    if ((Object.keys(set) as (keyof LibraryTags)[]).some((k) => set[k]?.has(t[k]) ?? false)) return g + 1;
+  }
+  return 0;
+};
 
 let numberById: Map<number, number> | null = null;
 
