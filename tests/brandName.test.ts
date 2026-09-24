@@ -11,7 +11,7 @@ import { courseTitle } from '../src/scenarios/curriculum';
   먼저 알려져 이름을 바꿨는데(사용자 요청), **신호등 세 색은 제목의 녹색 하나와 부제의 노랑 둘 · 빨강 하나로 이어진다.**
 */
 describe('이름', () => {
-  it("제목은 'AI' 배지 + 녹색 '안전운전' + 칠하지 않은 '교실'", () => {
+  it("제목은 'AI' 배지 + 녹색 '안전운전' + 칠하지 않은 '레벨업'", () => {
     expect(APP_NAME).toBe('AI 안전운전 레벨업');
     expect(APP_NAME_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
       'AI:ai',
