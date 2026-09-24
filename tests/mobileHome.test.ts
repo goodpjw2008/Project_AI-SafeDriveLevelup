@@ -126,10 +126,12 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).not.toMatch(/\.menu-links button svg\s*\{/);
   });
 
-  it('이름 · 부제 · 온라인 연습 줄을 가운데로 모은다', () => {
+  it('이름 · 부제 · 메뉴 · 온라인 연습 줄을 같은 가운데 축에 놓는다', () => {
     const block = rulesOnly();
     expect(block).toContain('#screen-menu .brand-wrap');
     expect(block).toContain('#screen-menu .mode-label');
+    // 메뉴 줄도 같은 축이다 (사용자가 정했다) — 한 줄로 만든 규칙 안에 가운데 맞춤이 들어 있다
+    expect(block).toMatch(/#screen-menu \.menu-links \{[^}]*justify-content: center;/);
     expect(block).toMatch(/#screen-menu \.brand,\s*#screen-menu \.brand-sub \{\s*text-align: center;/);
   });
 
