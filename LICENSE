@@ -1,62 +1,42 @@
 AI 안전운전 레벨업 Copyright (c) 2026 goodpjw2008. All rights reserved.
 
-**쓰고 싶으시면 이메일로 알려 주세요 — 대부분 흔쾌히 허락해 드립니다.**
-막으려고 두는 조건이 아니라, 무분별한 복사를 막으려는 것입니다.
-수업 · 연구 · 발표에 쓰시겠다면 더욱 반갑습니다.
+사용을 원하시는 분은 이메일로 요청해 주세요. 대부분 흔쾌히
+허락해 드립니다. 무분별한 사용을 예방하려는 것이니 이해 부탁드립니다.
 
     goodpjw2008@gmail.com
 
 
-1. 무엇에 적용되나
+1. 적용되는 부분
 ───────────────────────────────────────────────────────────────────────
 
-**가져다 쓴 것을 뺀 나머지 전부** — 이 저장소에서 저작권자가 만든 코드 · 그림 · 글입니다.
+THIRD_PARTY_NOTICES.md 에 기록한 사항들 이외의 저의 창작물에
+대해서 적용이 됩니다.
 
-가져다 쓴 것(3D 자동차 모델 · 효과음 · 환경광 · 글꼴 · 아이콘 · 오픈소스 라이브러리)은
-**각 원작자의 라이선스를 그대로 따릅니다.** 이 문서가 무엇을 정하든 그것들은 원작자가
-정한 조건대로 써야 하고, 저작권자도 그 조건을 바꿀 수 없습니다.
-목록과 각각의 라이선스는 THIRD_PARTY_NOTICES.md 에 있습니다.
+THIRD_PARTY_NOTICES.md 에 기록한 사항들(3D 자동차 모델 · 효과음 ·
+환경광 · 글꼴 · 아이콘 · 오픈소스 라이브러리)은 각 원작자의 라이선스를
+그대로 따릅니다. 그것들은 원작자가 정한 조건대로 써야 하고, 저작권자도
+그 조건을 바꿀 수 없습니다.
 
 
-2. 허락 없이 해도 되는 것
+2. 자유롭게 사용해도 되는 부분
 ───────────────────────────────────────────────────────────────────────
 
   - 이 저장소를 열람하고 코드를 읽는 것
   - 서비스 주소(https://safelevelup.vercel.app)에서 직접 연습해 보는 것
   - 출처를 밝히고 이 작품을 소개 · 인용 · 비평하는 것
-    (저작권법 제28조 — 공표된 저작물의 인용)
+    (저작권법 제28조 - 공표된 저작물의 인용)
 
 
-3. 허락을 받아야 하는 것
+3. 사용 허락을 요청해야 하는 부분
 ───────────────────────────────────────────────────────────────────────
 
-그 밖의 사용 — **복사 · 수정 · 재배포, 다른 곳에 가져다 싣거나 그 위에서 운영하는 것** —
-은 미리 허락을 받아 주세요. 이메일 한 통이면 되고, 영리든 비영리든 같습니다.
+그 밖의 사용(복사 · 수정 · 재배포, 다른 곳에 가져다 싣거나 그 위에서
+운영하는 것)은 미리 이메일로 문의를 부탁드립니다.
 
-**허락이 필요하다는 뜻이지, 안 된다는 뜻이 아닙니다.**
-
-    문의 : goodpjw2008@gmail.com
+    문의: goodpjw2008@gmail.com
 
 
-4. 왜 허락을 받게 하는지
-───────────────────────────────────────────────────────────────────────
-
-무분별한 복사가 흔한 일이 되어, 형식적이더라도 **허락을 구하는 절차**는 필요하다고
-생각합니다. 혼자 만든 작품이라 어디에 어떻게 쓰이는지 정도는 알고 있고 싶습니다.
-
-그뿐입니다. 물어봐 주시면 대부분 그 자리에서 됩니다.
-
-
-5. 이 조건 이전에 공개된 판에 대하여
-───────────────────────────────────────────────────────────────────────
-
-이 조건 이전의 판은 MIT License(코드)와 CC BY 4.0(그림 · 글)으로 공개되어
-있었습니다. 한 번 준 허락은 되돌릴 수 없으므로 **그때 받아 간 판에 한해서는**
-그 라이선스가 그대로 유효합니다. 이 문서는 **이 문서가 들어간 판부터**
-적용됩니다.
-
-
-6. 보증하지 않음
+4. 보증하지 않는 부분
 ───────────────────────────────────────────────────────────────────────
 
 이 소프트웨어는 있는 그대로 제공되며 어떠한 보증도 하지 않습니다.
@@ -70,35 +50,46 @@ AI 안전운전 레벨업 Copyright (c) 2026 goodpjw2008. All rights reserved.
 English summary (the Korean text above governs)
 ───────────────────────────────────────────────────────────────────────
 
-**Want to use this? Just email and ask — permission is granted gladly in
-almost every case.** This is not here to keep anyone out; it is here to
-discourage thoughtless copying. Classroom, research and presentation use
-is especially welcome. goodpjw2008@gmail.com
+If you would like to use this, please ask by email. Permission is
+given gladly in almost every case. Asking is only there to discourage
+thoughtless copying — thank you for understanding.
 
-All rights reserved. This covers everything in the repository that the
-author made — everything except the third-party assets below.
+    goodpjw2008@gmail.com
 
-You may read this repository and use the hosted service at
-https://safelevelup.vercel.app. For anything else — copying, modifying,
-redistributing, or putting this work somewhere else — please ask first.
-An email is enough, commercial or not. Needing permission is not the same
-as being refused.
 
-Third-party assets (3D car models, sound effects, HDRI, fonts, icons and
-open-source libraries) keep their own licenses and are not covered here;
-see THIRD_PARTY_NOTICES.md.
+1. What this covers
+───────────────────────────────────────────────────────────────────────
 
-Thoughtless copying is common enough that asking first, even as a
-formality, seems worth keeping; this project was built single-handedly,
-and knowing where it ends up matters to the author. That is all it is —
-ask, and it is almost always yes.
+The author's own work — everything except what is listed in
+THIRD_PARTY_NOTICES.md.
 
-Versions published before this file were released under the MIT License
-(code) and CC BY 4.0 (artwork and writing). Those grants are irrevocable
-and remain valid for those versions.
+Those assets (3D car models, sound effects, HDRI, fonts, icons and
+open-source libraries) keep their own licenses. They must be used on
+their authors' terms, which the author of this work cannot change.
 
-Provided "as is", without warranty of any kind. This is a practice tool for
-safe-driving habits, not a statement of real road conditions or of current
-law.
 
-Contact: goodpjw2008@gmail.com
+2. Free to do without asking
+───────────────────────────────────────────────────────────────────────
+
+  - Read this repository and its code
+  - Practise on the service at https://safelevelup.vercel.app
+  - Introduce, quote or review this work with credit
+
+
+3. Please ask first
+───────────────────────────────────────────────────────────────────────
+
+Anything else (copying, modifying, redistributing, or putting this work
+into another site, product or repository) — please ask by email.
+
+    goodpjw2008@gmail.com
+
+
+4. No warranty
+───────────────────────────────────────────────────────────────────────
+
+Provided "as is", without warranty of any kind. This is a practice tool
+for safe-driving habits; it does not guarantee real road conditions or
+any reading of current law. When actually driving, follow the road in
+front of you and the law as it stands. The author is not liable for any
+damage arising from its use.
