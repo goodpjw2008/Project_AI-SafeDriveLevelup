@@ -5224,6 +5224,42 @@
         #screen-debrief .screen-head h1 .head-title {
           display: none;
         }
+
+        /*
+          **메뉴 넷이 한 줄에 선다** (사용자가 정했다). 접고 남은 넷이 두 줄로 갈라져 톱니만
+          아랫줄에 홀로 서 있었다. 글자 앞 아이콘을 빼고 여백을 좁히면 한 줄에 들어간다 —
+          남은 버튼이 넷뿐이라 아이콘 없이도 무엇인지 읽힌다. **설정의 톱니는 남긴다**:
+          그 버튼에는 글자가 없어 아이콘이 이름이다.
+        */
+        #screen-menu .menu-links {
+          flex-wrap: nowrap;
+          gap: 6px;
+        }
+        #screen-menu .menu-links button {
+          padding-left: 10px;
+          padding-right: 10px;
+          white-space: nowrap;
+        }
+        #screen-menu .menu-links button:not(.icon) svg {
+          display: none;
+        }
+
+        /* 이름과 부제를 가운데로 — 좁은 폭에서 왼쪽에 붙으면 오른쪽이 휑하다 */
+        #screen-menu .hero {
+          justify-items: center;
+        }
+        #screen-menu .brand-wrap {
+          justify-content: center;
+        }
+        #screen-menu .brand,
+        #screen-menu .brand-sub {
+          text-align: center;
+        }
+
+        /* '온라인 연습 · 처음부터 다시 시작' 줄도 같은 가운데 축에 놓는다 */
+        #screen-menu .mode-label {
+          justify-content: center;
+        }
       }
 
     </style>

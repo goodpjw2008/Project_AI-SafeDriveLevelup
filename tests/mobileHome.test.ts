@@ -113,6 +113,26 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(screens).toContain('class="head-title"');
   });
 
+  /*
+    **남은 메뉴 넷은 한 줄에 선다** (사용자가 정했다). 접고 남은 넷이 두 줄로 갈라져 톱니만
+    아랫줄에 홀로 있었다. 글자 앞 아이콘을 빼면 360px 폭에서도 한 줄에 들어간다.
+    **톱니는 예외다** — 그 버튼에는 글자가 없어 아이콘이 이름이다.
+  */
+  it('메뉴는 한 줄에 서고, 글자 버튼의 아이콘만 뺀다', () => {
+    const block = rulesOnly();
+    expect(block).toContain('flex-wrap: nowrap');
+    expect(block).toContain('#screen-menu .menu-links button:not(.icon) svg');
+    // 톱니(.icon)까지 함께 지우는 선택자가 아니어야 한다
+    expect(block).not.toMatch(/\.menu-links button svg\s*\{/);
+  });
+
+  it('이름 · 부제 · 온라인 연습 줄을 가운데로 모은다', () => {
+    const block = rulesOnly();
+    expect(block).toContain('#screen-menu .brand-wrap');
+    expect(block).toContain('#screen-menu .mode-label');
+    expect(block).toMatch(/#screen-menu \.brand,\s*#screen-menu \.brand-sub \{\s*text-align: center;/);
+  });
+
   /* 좁은 폭에서 오른쪽에 붙으면 한쪽만 차 보인다 — 가운데로 모은다 */
   it('사이트 전체 성공 · 실패는 가운데로 모은다', () => {
     expect(mobileBlock()).toMatch(/\.site-stats\s*\{\s*justify-content:\s*center;/);
