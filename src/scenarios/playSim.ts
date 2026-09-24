@@ -41,6 +41,8 @@ import {
   ROAD_HALF_WIDTH,
   STOP_LINE,
   STOP_LINE_S,
+  bikeLaneCenter,
+  BIKE_SLOT_SHRINK,
 } from '../layout';
 import {
   RightTurnJudge,
@@ -551,12 +553,18 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
         세 번째 횡단보도 사람이 **두 번째 자리에서** 부딪힘 검사를 받고 있었다 — 판정(lawRules)은
         제 자리로 보는데 충돌만 엉뚱한 곳에서 보는 어긋남이라, 눈에 띄지 않은 채 남아 있었다.
       */
+      /*
+        **타고 건너는 자전거는 자전거횡단도 위**에 있다 (game/Pedestrian.ts 의 across 와 같은 셈).
+        한쪽만 옮기면 화면에서는 띠 위를 건너는데 부딪힘은 줄무늬 한가운데에서 재게 된다.
+      */
       const across =
-        (w.crosswalk === 'S'
-          ? CROSSWALK_S_CENTER
-          : w.crosswalk === 'B'
-            ? CROSSWALK_B_CENTER
-            : CROSSWALK_CENTER) + offsets[i];
+        w.bike === 'ride'
+          ? bikeLaneCenter(w.crosswalk) + offsets[i] * BIKE_SLOT_SHRINK
+          : (w.crosswalk === 'S'
+              ? CROSSWALK_S_CENTER
+              : w.crosswalk === 'B'
+                ? CROSSWALK_B_CENTER
+                : CROSSWALK_CENTER) + offsets[i];
       const px = w.crosswalk === 'C' ? across : w.axis;
       const pz = w.crosswalk === 'C' ? w.axis : across;
       if (Math.abs(w.axis) > CURB + 0.5) return;

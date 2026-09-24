@@ -10,7 +10,6 @@ import type { CrosswalkId } from '../rules/lawRules';
 import {
   CROSSWALK_INNER,
   CROSSWALK_B_INNER,
-  CROSSWALK_S_OUTER,
   CROSSWALK_B_OUTER,
   CROSSWALK_OUTER,
   LANE_1_OFFSET,
@@ -25,6 +24,8 @@ import {
   CROSSWALK_WIDTH,
   STOP_LINE_S,
   SCHOOL_ZONE_FAR_Z,
+  BIKE_LANE_WIDTH,
+  bikeLaneCenter,
 } from '../layout';
 
 /**
@@ -312,8 +313,7 @@ function drawCrosswalks(ctx: CanvasRenderingContext2D, zoneOnly = false): void {
  * 자리는 횡단보도의 **교차로 바깥쪽**(내가 먼저 만나는 쪽)이다. 실물도 대개 그 자리에 붙는다.
  */
 function drawBikeLane(ctx: CanvasRenderingContext2D, at: CrosswalkId): void {
-  /** 띠의 폭 (m) — 실제 자전거횡단도는 2m 안팎이다 */
-  const W = 2.0;
+  const W = BIKE_LANE_WIDTH;
   ctx.save();
 
   /** 붉은 바탕 + 흰 테두리 한 줄 — 사진의 그 모습이다 */
@@ -347,12 +347,16 @@ function drawBikeLane(ctx: CanvasRenderingContext2D, at: CrosswalkId): void {
     S · A · B 는 남북 도로를 가로지르므로 띠가 **x 방향으로 길다**. C 는 동서 도로를 가로지르므로 반대다.
     붙이는 쪽은 내가 **먼저 만나는 가장자리**다 — 횡단보도에 닿기 전에 보여야 판단에 쓸 수 있다.
   */
+  /*
+    **띠의 자리는 layout 의 bikeLaneCenter 하나에서 온다** — 그 위를 타고 건너는 사람도 같은 값을
+    본다. 세 번째 횡단보도(B)는 한때 2m 더 물려 있어 **정지선 뒤**에 띠가 깔렸다 (A · S 는 정지선과
+    횡단보도 사이인데 B 만 어긋났다). 한 값에서 뽑으니 그 어긋남이 사라진다.
+  */
+  const half = W / 2;
   if (at === 'C') {
-    band(CROSSWALK_INNER - W, -ROAD_HALF_WIDTH + 0.3, W, ROAD_HALF_WIDTH * 2 - 0.6, false);
+    band(bikeLaneCenter(at) - half, -ROAD_HALF_WIDTH + 0.3, W, ROAD_HALF_WIDTH * 2 - 0.6, false);
   } else {
-    const near =
-      at === 'S' ? CROSSWALK_S_OUTER : at === 'A' ? CROSSWALK_OUTER : CROSSWALK_B_INNER + W;
-    band(-ROAD_HALF_WIDTH + 0.3, near, ROAD_HALF_WIDTH * 2 - 0.6, W, true);
+    band(-ROAD_HALF_WIDTH + 0.3, bikeLaneCenter(at) - half, ROAD_HALF_WIDTH * 2 - 0.6, W, true);
   }
   ctx.restore();
 }

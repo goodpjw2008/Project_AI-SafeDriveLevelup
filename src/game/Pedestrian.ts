@@ -16,6 +16,8 @@ import { CROSSWALK_INNER, CROSSWALK_OUTER,
   CROSSWALK_B_INNER,
   CROSSWALK_B_OUTER,
   CROSSWALK_S_OUTER,
+  bikeLaneCenter,
+  BIKE_SLOT_SHRINK,
 } from '../layout';
 import { PedWalk, type CarFront, type PedWalkContext } from './pedWalk';
 import type { CrosswalkId, PedSignal, PedestrianSample } from '../rules/lawRules';
@@ -389,23 +391,39 @@ export class Pedestrian {
       **S · B 는 A 와 같은 방향으로 걷는다** — 셋 다 남북 도로를 가로지르므로 x 축으로 간다.
       다른 것은 자리 하나뿐이다 (layout.ts 의 CROSSWALK_* — S 68 · A 16.8 · B -38).
     */
+    const across = this.across();
     if (this.crosswalk === 'S' || this.crosswalk === 'A' || this.crosswalk === 'B') {
-      const center =
-        this.crosswalk === 'S'
-          ? CROSSWALK_S_CENTER
-          : this.crosswalk === 'B'
-            ? CROSSWALK_B_CENTER
-            : CROSSWALK_CENTER;
-      const across = center + this.offset;
       // 남북 도로를 가로지름 — x축으로 이동
       this.group.position.set(axis, 0, across);
       this.group.rotation.y = dir === 1 ? -Math.PI / 2 : Math.PI / 2;
     } else {
-      const across = CROSSWALK_CENTER + this.offset;
       // 동서 도로를 가로지름 — z축으로 이동
       this.group.position.set(across, 0, axis);
       this.group.rotation.y = dir === 1 ? Math.PI : 0;
     }
+  }
+
+  /**
+   * **건너는 자리** (건너는 축과 직각인 좌표) — 보통은 횡단보도 줄무늬 한가운데다.
+   *
+   * **타고 건너는 자전거만 자전거횡단도 위**로 간다 (제15조의2 제3항). 내려서 끌고 가는 사람은
+   * 보행자이므로(제2조 제17호) 줄무늬 위로 건넌다 — 두 사람이 **다른 자리로 건너는 것**이 곧
+   * 이 판이 가르치는 규칙이라, 그림에서 갈라져야 말이 된다.
+   *
+   * 자리를 여기 한 곳에서 내는 까닭은 **부딪힘 검사도 같은 값을 봐야** 하기 때문이다
+   * (scenarios/playSim.ts 에 같은 셈이 있다 — 한쪽만 옮기면 보이는 자리와 부딪히는 자리가 갈린다).
+   */
+  private across(): number {
+    if (this.bike === 'ride') {
+      return bikeLaneCenter(this.crosswalk) + this.offset * BIKE_SLOT_SHRINK;
+    }
+    const center =
+      this.crosswalk === 'S'
+        ? CROSSWALK_S_CENTER
+        : this.crosswalk === 'B'
+          ? CROSSWALK_B_CENTER
+          : CROSSWALK_CENTER;
+    return center + this.offset;
   }
 
   /**

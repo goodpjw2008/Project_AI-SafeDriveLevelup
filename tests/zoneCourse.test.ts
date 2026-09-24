@@ -271,12 +271,26 @@ describe('어린이보호구역 전용 도로 전수 검증', () => {
     const bad: string[] = [];
     for (const spec of courses) {
       if (!spec.pedestrians.length) continue;
-      const codes = playScenario(spec, { persona: 'pedBlind' }).result.violations.map((v) => v.code);
+      const r = playScenario(spec, { persona: 'pedBlind' }).result;
+      const codes = r.violations.map((v) => v.code);
       /*
         **타고 건너는 자전거는 보행자가 아니다** — 그 판에서 걸리는 코드는 `BIKE_BLOCKED` 다
         (제15조의2 제3항). 끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다.
+
+        **부딪히는 것도 '걸린 것'이다.** 자전거횡단도는 줄무늬 **앞**(정지선과 횡단보도 사이)에 있고
+        타고 건너는 자전거는 그 띠 위로 지나간다 (layout 의 bikeLaneCenter). 그래서 이 길에서는
+        자전거가 **정지선 바로 앞**을 지나간다 — 보지 않고 출발한 차는 줄무늬에 닿기도 전에 친다.
+        전용 도로의 방해 판정은 줄무늬 위에서만 재기 때문이다(lawRules 의 zone-road withinBand —
+        정지선부터 재면 서려고 속도를 줄이는 차가 걸린다). 교차로의 A 는 판정 구간이 정지선까지라
+        `BIKE_BLOCKED` 와 충돌이 함께 난다.
+
+        어느 쪽이든 **보지 않으면 대가를 치른다** — 서 있는 그림이 아니라는 것이 이 검사의 뜻이다.
       */
-      if (!codes.includes('PEDESTRIAN_BLOCKED') && !codes.includes('BIKE_BLOCKED')) bad.push(spec.title);
+      const caught =
+        codes.includes('PEDESTRIAN_BLOCKED') ||
+        codes.includes('BIKE_BLOCKED') ||
+        r.failReason === 'PEDESTRIAN_HIT';
+      if (!caught) bad.push(spec.title);
     }
     expect(bad.slice(0, 5)).toEqual([]);
   }, 180_000);

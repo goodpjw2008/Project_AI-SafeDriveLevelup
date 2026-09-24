@@ -239,6 +239,36 @@ export const FINISH_X = CROSSWALK_OUTER + 14.0; // 32.8
 export const CROSSWALK_B_INNER = -36.0;
 export const CROSSWALK_B_OUTER = CROSSWALK_B_INNER - CROSSWALK_WIDTH; // -40
 
+/** 자전거횡단도 띠의 폭 (m) — 실물도 2m 안팎이다 */
+export const BIKE_LANE_WIDTH = 2.0;
+
+/**
+ * **자전거횡단도의 한가운데** — 횡단보도 줄무늬 **밖**, 내가 먼저 만나는 가장자리에 붙는다
+ * (정지선과 횡단보도 사이). 건너는 축의 좌표다: S · A · B 는 z, C 는 x.
+ *
+ * 노면에 띠를 그리는 곳(game/Intersection.ts 의 drawBikeLane)과 그 위를 **타고 건너는 사람**
+ * (game/Pedestrian.ts · scenarios/playSim.ts)이 같은 값을 봐야 한다. 따로 두었더니 자전거가
+ * 띠를 벗어나 **횡단보도 줄무늬 위로** 건넜다 — 사용자가 짚었다: "조금 아래로 지나가면
+ * 자전거 통행 부분으로 지나갈 것 같아."
+ */
+export const bikeLaneCenter = (at: 'S' | 'A' | 'B' | 'C'): number => {
+  const h = BIKE_LANE_WIDTH / 2;
+  // S · A 는 z 가 큰 쪽에서, B 는 z 가 큰 쪽에서(INNER 가 가깝다), C 는 x 가 작은 쪽에서 만난다
+  if (at === 'S') return CROSSWALK_S_OUTER + h;
+  if (at === 'A') return CROSSWALK_OUTER + h;
+  if (at === 'B') return CROSSWALK_B_INNER + h;
+  return CROSSWALK_INNER - h;
+};
+
+/**
+ * **자전거횡단도 위에서는 자리 어긋냄을 줄인다.**
+ *
+ * 같은 연석에 여럿이 서면 겹치지 않게 자리를 어긋내는데(game/Pedestrian.ts 의 WAIT_SLOTS,
+ * 최대 1.8m), 띠는 2m 뿐이라 그대로 쓰면 자전거가 띠 밖으로 나간다 — 타고 건너는 자리가
+ * 띠라는 것이 이 판이 가르치는 것인데 그림이 그것을 지우면 안 된다.
+ */
+export const BIKE_SLOT_SHRINK = 0.4;
+
 /**
  * **직진 코스의 완료 판정선** — 마지막 횡단보도를 완전히 벗어난 뒤 (어린이보호구역 직진 연습).
  *
