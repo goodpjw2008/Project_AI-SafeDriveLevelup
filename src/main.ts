@@ -591,7 +591,7 @@ function disposeMenuScene(): void {
 function renderMenu(): void {
   stopAutoNext();
   stopAiDriving();
-  // 첫 화면으로 돌아오면 맵 체험도 끝난다 — 다음에 누르는 '이어서 안전운전 연습' 이 체험으로 이어지지 않게
+  // 첫 화면으로 돌아오면 맵 체험도 끝난다 — 다음에 누르는 'AI 안전운전 연습' 이 체험으로 이어지지 않게
   mapTrial = false;
   document.body.classList.remove('map-trial');
   disposeGame();

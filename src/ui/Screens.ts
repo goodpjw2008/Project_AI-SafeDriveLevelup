@@ -787,7 +787,7 @@ export class Screens {
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
-          (이어서 안전운전 연습 · 자율 주행 시범 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
+          (AI 안전운전 연습 · 안전운전 자율주행 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
         -->
         <button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>
         <button class="icon ghost" id="btn-settings" title="설정" aria-label="설정">${icon(
@@ -945,7 +945,15 @@ export class Screens {
           */
           `<button class="btn primary" id="btn-generate">${icon('play')}마스터 운행</button>` +
           `<button class="btn" id="btn-ending">엔딩 다시 보기</button>`
-        : `<button class="btn primary" id="btn-generate">${icon('play')}${c.runs ? '이어서 안전운전 연습' : '안전운전 연습 시작'}</button>`;
+        : /*
+            **이름은 하나다 — 'AI 안전운전 연습'** (사용자가 정했다).
+
+            한때 처음인가 이어서인가로 '안전운전 연습 시작' · '이어서 안전운전 연습' 을 갈랐다. 지금은
+            무엇을 연습할지까지 AI 가 고르므로(scenarios/trackPick.ts) 이 버튼이 하는 일은 늘 같고,
+            같은 일에 두 이름을 붙이면 **처음 온 사람만 다른 버튼을 누르는 것처럼** 읽힌다.
+            '몇 판째인가' 는 바로 위의 레벨 · 경험치 막대가 이미 말한다.
+          */
+          `<button class="btn primary" id="btn-generate">${icon('play')}AI 안전운전 연습</button>`;
 
     const resetButton = this.resetCourseButton(save);
 
@@ -1069,7 +1077,7 @@ export class Screens {
             <div class="ai-course-actions">
               <button class="btn" id="btn-ai-drive" title="AI 가 규정대로 모는 것을 함께 봅니다">${icon(
                 'auto',
-              )}자율 안전운전 시범운행</button>
+              )}안전운전 자율주행</button>
             </div>
           </div>
         </div>
