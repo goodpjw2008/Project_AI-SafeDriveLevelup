@@ -1027,27 +1027,37 @@ export class Screens {
         <!--
           **이 교실에는 배우는 길이 둘이다** (사용자가 정한 개념).
 
-           - **온라인 가상 연습** — 내가 직접 몬다. 혼자서, 아무 때나. 이 교실의 본래 자리다.
-           - **오프라인 교육 (자율 주행)** — AI 가 규정대로 모는 것을 **보여 준다.** 교실에서 화면을
+           - **온라인 연습** — 내가 직접 몬다. 혼자서, 아무 때나. 이 교실의 본래 자리다.
+           - **오프라인 교육 활용** — AI 가 규정대로 모는 것을 **보여 준다.** 교실에서 화면을
              띄워 놓고 함께 보는 쓰임이라(포트폴리오 '활용 · 오프라인 교육'), 배우는 사람은 운전대를 잡지 않는다.
 
-          예전에는 세 버튼이 한 줄에 나란했다 — 무엇이 '내가 하는 것' 이고 무엇이 '보는 것' 인지 버튼 이름
-          말고는 알 수 없었다. **묶음마다 한 줄짜리 이름표**를 달아 두면 누르기 전에 어느 길인지 읽힌다.
+          **둘을 좌우로 갈라 세운다** (사용자가 정했다: "화면의 반을 나누고 구분된 것으로 보이게").
+          위아래로 쌓았을 때는 같은 길의 1단계 · 2단계처럼 읽혔다 — 실제로는 **서로 다른 두 길**이고
+          한 번에 하나만 고르는 것이라, 나란히 놓고 가운데 선으로 가르는 편이 그 관계를 그대로 보여 준다.
+
+          이름 앞의 아이콘이 어느 길인지를 글보다 먼저 말한다 — 혼자 앉는 화면(monitor)과 여럿이 함께(users)다.
+
+          **이름 뒤의 설명 한 줄은 뺐다.** 아이콘과 이름, 그리고 버튼 이름이 이미 같은 말을 한다 —
+          좌우로 갈라 칸이 좁아진 자리에서 세 번 말하면 글자만 빽빽해진다. 설명은 버튼의 title 로 남긴다.
         -->
-        <div class="mode-group">
-          <p class="mode-label"><b>온라인 가상 연습</b> — 내가 직접 운전합니다</p>
-          <!--
-            **첫 화면에는 누를 것 하나만 둔다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
-            사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만
-            누르면 알아서 판이 나오는 거야." 고르는 것은 AI 가 한다 (scenarios/trackPick.ts) —
-            한 갈래만 붙잡고 파고 싶은 사람을 위한 자리는 **설정**으로 옮겼다 (renderSettings).
-          -->
-          <div class="ai-course-actions">${button}${resetButton}</div>
-        </div>
-        <div class="mode-group">
-          <p class="mode-label"><b>오프라인 교육</b> — AI 가 규정대로 모는 것을 함께 봅니다</p>
-          <div class="ai-course-actions">
-            <button class="btn" id="btn-ai-drive">${icon('auto')}자율 주행 시범 보기</button>
+        <div class="mode-split">
+          <div class="mode-group">
+            <p class="mode-label">${icon('monitor')}<b>온라인 연습</b></p>
+            <!--
+              **여기서 누를 것은 하나뿐이다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
+              사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만
+              누르면 알아서 판이 나오는 거야." 고르는 것은 AI 가 한다 (scenarios/trackPick.ts) —
+              한 갈래만 붙잡고 파고 싶은 사람을 위한 자리는 **설정**으로 옮겼다 (renderSettings).
+            -->
+            <div class="ai-course-actions">${button}${resetButton}</div>
+          </div>
+          <div class="mode-group">
+            <p class="mode-label">${icon('users')}<b>오프라인 교육 활용</b></p>
+            <div class="ai-course-actions">
+              <button class="btn" id="btn-ai-drive" title="AI 가 규정대로 모는 것을 함께 봅니다">${icon(
+                'auto',
+              )}자율 안전운전 시범운행</button>
+            </div>
           </div>
         </div>
         ${ai.error ? `<p class="ai-note" style="color:var(--amber)">${esc(ai.error)}</p>` : ''}
