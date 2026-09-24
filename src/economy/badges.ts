@@ -7,10 +7,9 @@
  *
  * ## 세 가지
  *
- *  - **법규 지킴** (5개 · 동 3번 · 은 10번 · 금 25번) — 그 법규를 **시험한 판**에서 지켜 낸 횟수로 준다(library.ts 의
+ *  - **법규 지킴** (5개 · 지킨 판 3번) — 그 법규를 **시험한 판**에서 지켜 낸 횟수로 준다(library.ts 의
  *    `habitsTestedBy` — 나쁜 습관을 '고쳤다' 고 셀 때와 같은 기준). 보행자가 없는 판을 "보행자 먼저" 로 세지 않는다.
- *    **그 법규를 어기면 한 단계 내려가고** 그 단계의 처음부터 다시 센다 (금 → 은 10번, 동 → 없음). 보행자와 부딪히면
- *    "보행자 먼저" 는 단계와 상관없이 다 잃는다 — 가장 무거운 사고다.
+ *    **그 법규를 어기면 잃고** 처음부터 다시 센다.
  *  - **무위반 연속** (5 · 10 · 20판) — 지금 이어 가는 연속 기록이다. 위반하거나 사고가 나면 잃는다.
  *  - **성장** (6개) — 한 번 해낸 일이라 **뺏지 않는다.** 뺏는 것은 "지금 이 사람이 그 법규를 지키는가" 를 뜻하는
  *    뱃지뿐이다 — 과거에 해낸 일까지 뺏으면 뱃지가 무엇을 뜻하는지 흐려진다.
@@ -38,8 +37,17 @@ export type StreakBadgeId = 'streak5' | 'streak10' | 'streak20';
 export type OnceBadgeId = 'firstClean' | 'schoolZoneFirst' | 'leadJudge' | 'master';
 export type BadgeId = KeepBadgeId | StreakBadgeId | OnceBadgeId | 'habitFixer' | 'explorer';
 
-/** 0 = 없음 · 1 = 동 · 2 = 은 · 3 = 금. 단계가 없는 뱃지는 0 · 1 뿐이다 */
-export type Tier = 0 | 1 | 2 | 3;
+/**
+ * **뱃지는 있거나 없거나다** — 0 = 없음 · 1 = 가짐.
+ *
+ * 한때 동(3번) · 은(10번) · 금(25번) 세 단계였다. 사용자가 짚었다: "뱃지 시스템에서 금은동은 빼 줘.
+ * 너무 어려워." 금까지 25번은 한 법규만 스물다섯 판을 지켜야 하는 것이고, 그 사이에 한 번 어기면
+ * 열 번 전으로 돌아갔다 — 손에 잡히는 보상이 되라고 만든 것이 오히려 멀어지는 목표가 됐다.
+ *
+ * 이름을 `Tier` 로 남겨 둔다 — 화면과 저장본이 이 타입을 쓰고 있고, '가졌는가' 를 0 · 1 로 적는
+ * 것은 그대로 맞다.
+ */
+export type Tier = 0 | 1;
 
 /** 상황 탐험가가 세는 상황 — 모두 겪으면 뱃지다 */
 export type Situation = 'night' | 'rain' | 'child' | 'elder' | 'lead' | 'honk';
@@ -64,10 +72,10 @@ export interface BadgeDef {
   steps: readonly number[];
 }
 
-/** 법규 지킴 뱃지의 단계 — 동 3번 · 은 10번 · 금 25번 */
-export const KEEP_STEPS = [3, 10, 25] as const;
-/** 습관 교정가의 단계 — 고친 나쁜 습관 1개 · 5개 · 10개 */
-export const FIXER_STEPS = [1, 5, 10] as const;
+/** 법규 지킴 뱃지 — 그 법규를 시험한 판에서 **세 번** 지키면 받는다 (예전 '동' 과 같은 값) */
+export const KEEP_STEPS = [3] as const;
+/** 습관 교정가 — 나쁜 습관을 **하나** 고치면 받는다 */
+export const FIXER_STEPS = [1] as const;
 
 /**
  * 법규 지킴 뱃지가 **무엇으로 시험되고 무엇으로 잃는가.**
@@ -104,7 +112,7 @@ export const BADGES: readonly BadgeDef[] = [
   { id: 'streak10', group: 'streak', name: '안전운전 10연속', how: '위반 없이 10판 연속 — 위반하면 잃습니다', steps: [10] },
   { id: 'streak20', group: 'streak', name: '안전운전 20연속', how: '위반 없이 20판 연속 — 위반하면 잃습니다', steps: [20] },
   { id: 'firstClean', group: 'growth', name: '첫 걸음', how: '처음으로 위반 없이 통과', steps: [1] },
-  { id: 'habitFixer', group: 'growth', name: '습관 교정가', how: 'AI 가 찾아낸 나쁜 운전 습관을 고침 (1개 · 5개 · 10개)', steps: FIXER_STEPS },
+  { id: 'habitFixer', group: 'growth', name: '습관 교정가', how: 'AI 가 찾아낸 나쁜 운전 습관을 하나 고침', steps: FIXER_STEPS },
   { id: 'schoolZoneFirst', group: 'growth', name: '스쿨존 첫 완주', how: '어린이보호구역 신호 없는 횡단보도 코스를 처음으로 위반 없이 통과', steps: [1] },
   { id: 'explorer', group: 'growth', name: '상황 탐험가', how: '밤 · 비 · 어린이 · 노인 · 앞차 · 뒤차 경적을 모두 겪음', steps: [SITUATIONS.length] },
   { id: 'leadJudge', group: 'growth', name: '앞차 판단가', how: '앞차가 일시정지를 무시하고 가도 따라가지 않고 규정대로 통과', steps: [1] },
@@ -117,7 +125,7 @@ export const badgeDef = (id: BadgeId): BadgeDef => BADGES.find((b) => b.id === i
 export interface BadgeState {
   /** 법규 지킴 — 지킨 횟수 (어기면 한 단계 아래의 시작으로 되돌아간다) */
   keep: Record<KeepBadgeId, number>;
-  /** 법규 지킴 — 한 번이라도 닿은 가장 높은 단계 (모음 화면이 "최고 금" 처럼 적는다) */
+  /** 법규 지킴 — 한 번이라도 받은 적이 있는가 (모음 화면이 "받은 적 있음" 으로 적는다) */
   keepBest: Record<KeepBadgeId, Tier>;
   /** 지금 이어 가는 무위반 연속 (직접 몬 판만) */
   streak: number;
@@ -165,12 +173,15 @@ export const tierOf = (n: number, steps: readonly number[]): Tier =>
   (steps.filter((s) => n >= s).length as Tier);
 
 /**
- * **어기면 한 단계 내려가고 그 단계의 처음부터 다시 센다** — 금(25번 이상)에서 어기면 은의 시작(10번), 은에서는 동의
- * 시작(3번), 동에서는 0(뱃지 없음). 아직 동에 못 닿았으면 0 부터 다시 센다.
+ * **어기면 잃고 처음부터 다시 센다.**
+ *
+ * 단계가 있던 시절에는 한 단계만 내려갔다(금 → 은의 시작). 단계를 없앤 뒤로는 내려갈 곳이 0 뿐이다 —
+ * 뱃지가 뜻하는 것이 "**지금** 이 사람이 그 법규를 지키는가" 이기 때문이다.
  */
 export function dropOneTier(n: number, steps: readonly number[] = KEEP_STEPS): number {
-  const t = tierOf(n, steps);
-  return t >= 2 ? steps[t - 2] : 0;
+  void n;
+  void steps;
+  return 0;
 }
 
 /** 지금 갖고 있는 단계 — 뱃지마다 */

@@ -2,7 +2,7 @@
  * **뱃지** (economy/badges.ts) — 안전운전 습관을 해낼 때마다 주고, 교통법규를 어기면 빼앗는다.
  *
  * 사용자가 캐글을 보고 제안했고, 설계를 보고 정했다: 방향지시등 · 서행 · 작은 회전 · 꼬리물기는 빼고, 위반하면 그 법규의
- * 뱃지만 **한 단계** 떨어지며, 성장 뱃지는 뺏지 않고, 지금까지의 기록으로 채워 준다.
+ * 뱃지만 잃으며, 성장 뱃지는 뺏지 않고, 지금까지의 기록으로 채워 준다. **단계(금 · 은 · 동)는 없다** — 너무 어려웠다.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -65,16 +65,25 @@ describe('뱃지 목록', () => {
   });
 });
 
-describe('법규 지킴 — 동 3 · 은 10 · 금 25, 어기면 한 단계', () => {
-  it('그 법규를 시험한 판에서 지킨 횟수로 오른다', () => {
+/*
+  **단계(금 · 은 · 동)는 없앴다.** 사용자가 짚었다: "뱃지 시스템에서 금은동은 빼 줘. 너무 어려워."
+  금까지 25번은 한 법규만 스물다섯 판을 지켜야 하는 것이고, 그 사이에 한 번 어기면 열 번 전으로
+  돌아갔다 — 손에 잡히는 보상이 되라고 만든 것이 오히려 멀어지는 목표가 됐다.
+  지금은 **세 번 지키면 받고, 어기면 잃는다.**
+*/
+describe('법규 지킴 — 세 번 지키면 받고, 어기면 잃는다', () => {
+  it('그 법규를 시험한 판에서 지킨 횟수로 센다', () => {
     let s = freshBadges();
     const r = updateBadges(s, run(redWithPed.spec));
     expect(r.next.keep.redStop).toBe(1);
     expect(r.next.keep.pedestrianFirst).toBe(1);
+    expect(tiersOf(r.next).redStop, '한 번으로는 아직').toBe(0);
     s = play(s, run(redWithPed.spec), 3);
-    expect(tiersOf(s).redStop, '세 번이면 동').toBe(1);
-    const up = updateBadges({ ...s, keep: { ...s.keep, redStop: 9 } }, run(redWithPed.spec));
-    expect(up.events.find((e) => e.id === 'redStop')).toMatchObject({ kind: 'up', from: 1, to: 2 });
+    expect(tiersOf(s).redStop, '세 번이면 받는다').toBe(1);
+    // 더 지켜도 올라갈 단계가 없다 — 새로 나오는 뱃지 소식도 없다
+    const more = updateBadges(s, run(redWithPed.spec));
+    expect(more.events.some((e) => e.id === 'redStop')).toBe(false);
+    expect(tiersOf(more.next).redStop).toBe(1);
   });
 
   it('시험하지 않은 판은 세지 않는다 — 보행자 없는 녹색 판은 보행자 먼저도 적색도 아니다', () => {
@@ -83,22 +92,20 @@ describe('법규 지킴 — 동 3 · 은 10 · 금 25, 어기면 한 단계', ()
     expect(s.keep.pedestrianFirst).toBe(0);
   });
 
-  it('어기면 그 뱃지만 한 단계 내려가고, 까닭을 말한다', () => {
+  it('어기면 그 뱃지만 잃고, 까닭을 말한다', () => {
     const s: BadgeState = { ...freshBadges(), keep: { ...freshBadges().keep, redStop: 27, pedestrianFirst: 12 } };
     const r = updateBadges(s, run(redWithPed.spec, ['RED_NO_STOP']));
-    expect(r.next.keep.redStop, '금 → 은의 시작').toBe(10);
+    expect(r.next.keep.redStop, '어기면 처음부터').toBe(0);
     expect(r.next.keep.pedestrianFirst, '보행자는 지켰다 — 그대로 오른다').toBe(13);
     const ev = r.events.find((e) => e.id === 'redStop')!;
-    expect(ev).toMatchObject({ kind: 'down', from: 3, to: 2 });
+    expect(ev).toMatchObject({ kind: 'lost' });
     expect(ev.reason).toContain('신호·지시 위반');
     expect(r.events.some((e) => e.id === 'pedestrianFirst' && e.to < e.from)).toBe(false);
   });
 
-  it('동에서 어기면 잃는다 · 아직 동이 아니면 처음부터', () => {
-    expect(dropOneTier(25)).toBe(10);
-    expect(dropOneTier(12)).toBe(KEEP_STEPS[0]);
-    expect(dropOneTier(4)).toBe(0);
-    expect(dropOneTier(2)).toBe(0);
+  it('어기면 얼마를 모았든 처음부터 다시 센다', () => {
+    for (const n of [25, 12, 4, 2]) expect(dropOneTier(n), `${n}번`).toBe(0);
+    expect(KEEP_STEPS).toEqual([3]);
     const s: BadgeState = { ...freshBadges(), keep: { ...freshBadges().keep, redStop: 4 } };
     expect(updateBadges(s, run(redWithPed.spec, ['OVER_STOP_LINE'])).events.find((e) => e.id === 'redStop')).toMatchObject({
       kind: 'lost',
@@ -106,7 +113,7 @@ describe('법규 지킴 — 동 3 · 은 10 · 금 25, 어기면 한 단계', ()
     });
   });
 
-  it('보행자와 부딪히면 보행자 먼저는 단계와 상관없이 다 잃는다', () => {
+  it('보행자와 부딪히면 보행자 먼저는 얼마를 모았든 다 잃는다', () => {
     const s: BadgeState = { ...freshBadges(), keep: { ...freshBadges().keep, pedestrianFirst: 30 } };
     const r = updateBadges(s, run(redWithPed.spec, [], { result: { violations: [], failReason: 'PEDESTRIAN_HIT' } as never }));
     expect(r.next.keep.pedestrianFirst).toBe(0);
@@ -141,10 +148,11 @@ describe('성장 — 뺏지 않는다', () => {
     expect(tiersOf(s).schoolZoneFirst).toBe(1);
   });
 
-  it('습관 교정가는 고친 습관 수로 오른다', () => {
+  it('습관 교정가는 하나만 고쳐도 받는다', () => {
     const s = play(freshBadges(), run(plainGreen.spec, [], { habitsFixed: 1 }));
     expect(tiersOf(s).habitFixer).toBe(1);
-    expect(progressOf(s, 'habitFixer')).toEqual({ now: 1, next: 5 });
+    // 단계가 없으므로 '다음 단계' 도 없다 (economy/badges.ts 의 Tier)
+    expect(progressOf(s, 'habitFixer')).toEqual({ now: 1, next: null });
   });
 
   it('앞차 판단가 — 앞차가 실제로 일시정지를 건너뛰었는데 위반 없이 통과', () => {
@@ -170,7 +178,7 @@ describe('지금까지의 기록으로 채운다', () => {
     ];
     const s = badgesFromHistory(history, (id) => libraryEntry(id)?.spec, habitsTestedBy, true);
     expect(s.keep.redStop, '마지막 판은 보행자만 어겼다 — 적색 정지는 지켰다').toBe(5);
-    expect(s.keep.pedestrianFirst, '동(4)에서 어겨 잃었다').toBe(0);
+    expect(s.keep.pedestrianFirst, '어겨서 처음부터').toBe(0);
     expect(s.streak).toBe(0);
     expect(s.earned).toContain('firstClean');
     expect(s.earned).toContain('master');

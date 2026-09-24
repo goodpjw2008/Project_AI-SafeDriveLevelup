@@ -511,9 +511,24 @@ function drawSpeedLimitMark(
  * 흰 원 안의 속도제한 '30'. 세 표시를 진행 방향으로 나란히 놓고, 각 줄은 차도 폭에
  * 가로로 채운다. 운전자가 먼저 만나는 것이 첫 줄이다.
  */
-/** 적색 포장이 덮는 북행 차도 (x: PAINT_X0 ~ PAINT_X0+PAINT_W) */
+/**
+ * 적색 포장이 덮는 **북행 차도** (x: PAINT_X0 ~ PAINT_X0+PAINT_W).
+ *
+ * 노면 문자(`어린이 보호구역 30`)는 내가 달리는 차도 한가운데에 찍으므로 이 값으로 자리를 잡는다.
+ */
 const PAINT_X0 = 0.2;
 const PAINT_W = ROAD_HALF_WIDTH - 0.5;
+
+/**
+ * 적색 포장이 덮는 **차도 전체** — 중앙선을 건너 반대 차로까지.
+ *
+ * **보호구역은 길 전체에 걸린다** (제12조 제1항). 그런데 내가 달리는 쪽만 칠해 두어, 마주 오는
+ * 차선은 회색 아스팔트 그대로였다 — 사용자가 짚었다: "반대편 차선은 바닥이 어린이보호구역 표시가
+ * 없어." 실제 도로도 양쪽을 같이 칠한다. 중앙선과 차로선은 이 위에 다시 그리므로 묻히지 않는다
+ * (makeRoadTexture 의 차례).
+ */
+const PAINT_ALL_X0 = -(ROAD_HALF_WIDTH - 0.5);
+const PAINT_ALL_W = (ROAD_HALF_WIDTH - 0.5) * 2;
 
 /** 적색 노면 포장 — 차선보다 먼저 깔아야 차선이 그 위에 보인다 */
 /**
@@ -536,7 +551,7 @@ function drawSchoolZonePavement(
   ctx.globalAlpha = 0.58;
   ctx.fillStyle = '#a8322c';
 
-  // 북행 차도 — 두 구간의 합집합 (z 가 큰 쪽이 남쪽 = 먼저 만나는 쪽)
+  // 남북 차도 **양쪽** — 두 구간의 합집합 (z 가 큰 쪽이 남쪽 = 먼저 만나는 쪽)
   const far = Math.max(
     schoolZone ? STOP_LINE + 32 : -Infinity,
     approachZone ? APPROACH_ZONE_FAR_Z : -Infinity,
@@ -553,12 +568,13 @@ function drawSchoolZonePavement(
     ? EXT.zMin
     : Math.min(schoolZone ? STOP_LINE : Infinity, approachZone ? APPROACH_ZONE_NEAR_Z : Infinity);
   if (Number.isFinite(far) && Number.isFinite(near)) {
-    ctx.fillRect(cx(PAINT_X0), cy(near), toPx(PAINT_W), toPx(far - near));
+    ctx.fillRect(cx(PAINT_ALL_X0), cy(near), toPx(PAINT_ALL_W), toPx(far - near));
   }
 
-  // 진출 차도 — 교차로가 보호구역일 때만. 사거리가 없는 길에는 진출 차도 자체가 없다
+  // 동서 차도 **양쪽** — 교차로가 보호구역일 때만. 사거리가 없는 길에는 그 도로 자체가 없다
   if (schoolZone && !zoneOnly) {
-    ctx.fillRect(cx(CROSSWALK_OUTER), cy(PAINT_X0), toPx(32), toPx(PAINT_W));
+    ctx.fillRect(cx(CROSSWALK_OUTER), cy(PAINT_ALL_X0), toPx(32), toPx(PAINT_ALL_W));
+    ctx.fillRect(cx(-CROSSWALK_OUTER - 32), cy(PAINT_ALL_X0), toPx(32), toPx(PAINT_ALL_W));
   }
   ctx.globalAlpha = 1;
   ctx.restore();

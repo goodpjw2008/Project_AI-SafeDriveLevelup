@@ -60,23 +60,24 @@ const GLYPH: Record<BadgeId, string> = {
   master: '<path d="m3 18-1-11 5.5 4.5L12 4l4.5 7.5L22 7l-1 11z"/><path d="M4 21h16"/>',
 };
 
-const BRONZE = '#c98a4b';
-const SILVER = '#c3ccd6';
-const GOLD = '#f2b01e';
+/** 법규 지킴 — 예전 '금' 의 색을 그대로 쓴다 (다섯 개뿐이고 이 작품의 핵심이라 가장 눈에 띄는 색이다) */
+const KEEP = '#f2b01e';
 const FLAME = '#ff7a45';
 const GROWTH = '#9d8cff';
 const LOCKED = '#4a5361';
 
-/** 이 뱃지 · 이 단계의 색 */
+/**
+ * 이 뱃지의 색 — **무리마다 다르다** (법규 지킴 · 무위반 연속 · 성장).
+ *
+ * 한때는 동 · 은 · 금 세 색이었다. 단계를 없애면서(economy/badges.ts 의 `Tier`) 색도 무리를
+ * 가리키는 뜻으로 돌린다 — 같은 무리의 뱃지가 같은 색이라 모음 화면에서 무리가 한눈에 갈린다.
+ */
 function colorOf(def: BadgeDef, tier: Tier): string {
   if (tier === 0) return LOCKED;
-  if (def.steps.length === 3) return [BRONZE, SILVER, GOLD][tier - 1];
-  return def.group === 'streak' ? FLAME : GROWTH;
+  return def.group === 'streak' ? FLAME : def.group === 'keep' ? KEEP : GROWTH;
 }
 
-/** 동 · 은 · 금 — 단계가 없는 뱃지는 빈 글자 */
-export const tierName = (def: BadgeDef, tier: Tier): string =>
-  def.steps.length === 3 && tier > 0 ? ['동', '은', '금'][tier - 1] : '';
+
 
 /** 뱃지 하나의 그림 — 둥근 메달에 단계 색 테두리 */
 export function badgeMedal(id: BadgeId, tier: Tier, size = 48): string {
@@ -91,24 +92,19 @@ export function badgeMedal(id: BadgeId, tier: Tier, size = 48): string {
   </svg>`;
 }
 
-/** 뱃지 이름 + 단계 (예: "적색 일시정지 지킴이 은") */
-const titled = (def: BadgeDef, tier: Tier): string => {
-  const t = tierName(def, tier);
-  return `${esc(def.name)}${t ? ` <span class="badge-tier t${tier}">${t}</span>` : ''}`;
-};
-
-/** 결과 화면의 한 줄 — 얻거나 잃은 뱃지 하나 */
+/**
+ * 결과 화면의 한 줄 — 얻거나 잃은 뱃지 하나.
+ *
+ * **'단계 올라감 · 내려감' 은 더 이상 나오지 않는다** — 단계를 없앴으므로(economy/badges.ts 의 `Tier`)
+ * 뱃지는 받거나 잃거나 둘뿐이다. 가지는 남겨 둔다: 저장본에 남은 예전 기록이 그 꼴로 올라올 수 있다.
+ */
 function eventLine(ev: BadgeEvent): string {
   const def = badgeDef(ev.id);
   const shown: Tier = ev.to > 0 ? ev.to : ev.from;
   const text =
-    ev.kind === 'gain'
-      ? `<b>새 뱃지</b> ${titled(def, ev.to)}`
-      : ev.kind === 'up'
-        ? `<b>단계 올라감</b> ${esc(def.name)} ${tierName(def, ev.from)} → ${tierName(def, ev.to)}`
-        : ev.kind === 'down'
-          ? `<b>단계 내려감</b> ${esc(def.name)} ${tierName(def, ev.from)} → ${tierName(def, ev.to)}`
-          : `<b>뱃지를 잃었습니다</b> ${titled(def, ev.from)}`;
+    ev.kind === 'gain' || ev.kind === 'up'
+      ? `<b>새 뱃지</b> ${esc(def.name)}`
+      : `<b>뱃지를 잃었습니다</b> ${esc(def.name)}`;
   return `<li class="badge-ev ${ev.kind}">
     ${badgeMedal(ev.id, ev.kind === 'lost' ? 0 : shown, 40)}
     <span class="badge-ev-text">${text}${ev.reason ? `<small>${esc(ev.reason)}</small>` : ''}</span>
@@ -147,18 +143,17 @@ export function badgeSummary(s: BadgeState): string {
 function progressText(s: BadgeState, def: BadgeDef, tier: Tier): string {
   const { now, next } = progressOf(s, def.id);
   if (def.group === 'keep') {
-    const best = s.keepBest[def.id as KeepBadgeId];
-    const bestNote = best > tier ? ` · 최고 ${['동', '은', '금'][best - 1]}` : '';
-    if (next === null) return `금 달성 · 지킨 횟수 ${now}번${bestNote}`;
-    const nextName = ['동', '은', '금'][def.steps.indexOf(next)];
-    return `지킨 횟수 ${now}번 · ${nextName}까지 ${next - now}번${bestNote}`;
+    // 잃은 적이 있으면 그 사실을 적는다 — 다시 받을 수 있다는 뜻이다
+    const bestNote = s.keepBest[def.id as KeepBadgeId] > tier ? ' · 받은 적 있음' : '';
+    if (next === null) return `지킨 횟수 ${now}번${bestNote}`;
+    return `지킨 횟수 ${now}번 · ${next - now}번 더${bestNote}`;
   }
   if (def.group === 'streak') {
     const need = STREAKS[def.id as keyof typeof STREAKS];
     return tier > 0 ? `지금 ${s.streak}연속 — 이어 가는 중` : `지금 ${s.streak}연속 · ${need - s.streak}판 더`;
   }
   if (def.id === 'habitFixer') {
-    return next === null ? `고친 습관 ${now}개 · 금 달성` : `고친 습관 ${now}개 · ${['동', '은', '금'][def.steps.indexOf(next)]}까지 ${next - now}개`;
+    return next === null ? `고친 습관 ${now}개` : `고친 습관 ${now}개 · ${next - now}개 더`;
   }
   if (def.id === 'explorer') {
     const left = SITUATIONS.filter((x) => !s.seen.includes(x.key)).map((x) => x.name);
@@ -170,7 +165,7 @@ function progressText(s: BadgeState, def: BadgeDef, tier: Tier): string {
 const GROUP_TEXT: Record<BadgeGroup, { title: string; note: string }> = {
   keep: {
     title: '법규 지킴',
-    note: '그 법규를 시험한 판에서 지킨 횟수로 받습니다 — 동 3번 · 은 10번 · 금 25번. 어기면 한 단계 내려가고 그 단계의 처음부터 다시 셉니다.',
+    note: '그 법규를 시험한 판에서 세 번 지키면 받습니다. 어기면 잃고 처음부터 다시 셉니다.',
   },
   streak: { title: '무위반 연속', note: '위반 없이 이어 가는 동안 갖습니다. 위반하거나 사고가 나면 잃습니다.' },
   growth: { title: '성장', note: '한 번 해낸 일이라 위반해도 잃지 않습니다.' },
@@ -186,7 +181,7 @@ export function badgeCollection(s: BadgeState): string {
         return `<li class="badge-card${tier ? ' held' : ''}">
           ${badgeMedal(def.id, tier, 56)}
           <div class="badge-card-text">
-            <h3>${titled(def, tier)}</h3>
+            <h3>${esc(def.name)}</h3>
             <p class="badge-how">${esc(def.how)}</p>
             <p class="badge-progress">${esc(progressText(s, def, tier))}</p>
           </div>
