@@ -12,7 +12,7 @@ import { courseTitle } from '../src/scenarios/curriculum';
 */
 describe('이름', () => {
   it("제목은 'AI' 배지 + 녹색 '안전운전' + 칠하지 않은 '교실'", () => {
-    expect(APP_NAME).toBe('AI 안전운전 교실');
+    expect(APP_NAME).toBe('AI 안전운전 레벨업');
     expect(APP_NAME_PARTS.filter((p) => p.tone).map((p) => `${p.text}:${p.tone}`)).toEqual([
       'AI:ai',
       '안전운전:green',
@@ -20,7 +20,7 @@ describe('이름', () => {
   });
 
   /*
-    **제목과 화면의 호칭이 같은 낱말이다** — 'AI 안전운전 교실' 과 '안전운전 Level6'(curriculum.ts 의 courseTitle).
+    **제목과 화면의 호칭이 같은 낱말이다** — 'AI 안전운전 레벨업' 과 '안전운전 Level6'(curriculum.ts 의 courseTitle).
     이름을 바꿀 때 호칭을 따라 바꾸지 않으면, 레벨이 무엇의 레벨인지부터 다시 알아봐야 한다.
   */
   it('제목의 낱말이 학습자 호칭과 같다', () => {
@@ -48,7 +48,7 @@ describe('이름', () => {
 
   /* About 창이 이름을 통째로 적는다 — 제목과 같은 딱지를 쓴다 (ui/Screens.ts 의 renderAbout) */
   it('이름 한 줄은 조각에서 만든다 — 두 벌로 적어 두지 않는다', () => {
-    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-green">안전운전</span> 교실`);
+    expect(BRAND_NAME_HTML).toBe(`${AI_BADGE_HTML} <span class="brand-green">안전운전</span> 레벨업`);
   });
 });
 
