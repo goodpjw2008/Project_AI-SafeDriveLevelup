@@ -1577,8 +1577,14 @@
         grid-template-columns: 1fr auto;
         align-items: center;
         gap: 22px;
-        padding: 26px 28px;
-        margin-bottom: 30px;
+        /*
+          **안쪽 위아래 여백은 좁게** (사용자가 정했다: "타이틀 안쪽 위아래 여백도 조금 줄여 줘").
+          이 상자에 든 것은 이름 한 줄뿐이라 26px 은 글자 높이만큼을 위아래로 더 쓴 셈이었다 —
+          첫 화면에서 정작 눌러야 하는 것이 그만큼 아래로 밀렸다. 좌우는 그대로 둔다: 긴 이름이
+          테두리에 붙으면 답답해지고, 가로 여백은 아래를 밀지 않는다.
+        */
+        padding: 16px 28px;
+        margin-bottom: 18px;
         border: 1px solid rgba(76, 141, 255, 0.28);
         border-radius: 20px;
         background: linear-gradient(
@@ -1826,11 +1832,18 @@
         ('우회전 하는 방법' → '우회전 방법', '내 운전 습관' → '내 습관') 버튼 안팎 여백을 조금 좁혔다.
         좁은 화면(폰)에서는 여전히 접힌다 — 가로로 넘치게 두는 것보다 낫다.
       */
+      /*
+        **위아래 여백을 줄인다** (사용자가 정했다: "메뉴의 위아래 여백을 줄여 줘").
+
+        이 줄은 **읽는 줄이 아니라 지나가는 줄**이다 — 첫 화면에서 할 일은 아래의 출발을 누르는 것이고,
+        여기 버튼들은 필요할 때 찾아가는 문이다. 위(.hero 의 margin-bottom)와 아래를 30·34px 씩
+        벌려 두었더니 그 문들이 화면의 가운데를 차지했다.
+      */
       .menu-links {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
-        margin-bottom: 34px;
+        margin-bottom: 20px;
       }
       /* 12px — 1024px 화면(칸 976px)에서도 한 줄에 선다. 더 좁히면 글자가 테두리에 붙어 답답해진다 */
       .menu-links button {
@@ -2623,15 +2636,41 @@
           grid-template-columns: minmax(0, 1fr);
         }
       }
-      /* 이름 앞의 아이콘 — 어느 길인지를 글보다 먼저 말한다 (ui/icons.ts 의 monitor · users) */
+      /*
+        이름 앞의 아이콘 — 어느 길인지를 글보다 먼저 말한다 (ui/icons.ts 의 monitor · users).
+
+        **두 상자의 이름 줄은 키가 같아야 한다.** 왼쪽에만 '처음부터 다시 시작' 작은 버튼이 붙으므로,
+        묶어 두지 않으면 그 줄만 높아져 **큰 버튼 둘이 어긋난 높이로** 선다 — 나란히 놓은 뜻이 사라진다.
+      */
       .mode-label {
         margin: 0 0 12px;
+        min-height: 30px;
         font-size: 15px;
         line-height: 1.4;
         color: var(--muted);
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+      /*
+        **처음부터 다시 시작 — 이름 옆의 작은 버튼** (사용자가 정했다).
+
+        훈련 버튼 바로 옆이라는 것은 그대로다 — 설정 깊숙이 넣으면 다음 운전자가 찾지 못하고, 찾지
+        못하면 그냥 앞 운전자의 기록 위에 앉는다 (Screens.ts 의 resetCourseButton 주석). 다만
+        **크기로는 두 단계 낮다**: 되돌릴 수 없는 동작이 출발만큼 커 보이면 실수로 누르는 쪽이 더 무섭다.
+      */
+      .mode-label .btn {
+        margin-left: 4px;
+        min-height: 28px;
+        padding: 0 10px;
+        font-size: 12.5px;
+        font-weight: 700;
+        border-radius: 8px;
+        gap: 5px;
+      }
+      .mode-label .btn svg {
+        width: 14px;
+        height: 14px;
       }
       .mode-label svg {
         width: 20px;
@@ -2662,28 +2701,6 @@
       .mode-split .ai-course-actions button {
         width: 100%;
         justify-content: center;
-      }
-      /*
-        **처음부터 다시 시작은 두 칸 아래 한 줄이다.**
-
-        지우는 것은 온라인 연습만 지우는 것이 아니라 레벨 · 습관 · 뱃지를 통째로 되돌리는 일이라,
-        한쪽 칸 안에 있으면 자리가 거짓말을 한다. 훈련 버튼 바로 아래라는 것은 그대로 지키되
-        (다음 운전자가 찾지 못하면 앞 사람 기록 위에 앉는다), **크기는 한 단계 낮춘다** — 되돌릴 수
-        없는 동작이 출발보다 커 보이면 실수로 누르는 쪽이 더 무섭다.
-      */
-      .mode-reset {
-        margin-top: 12px;
-        display: flex;
-        justify-content: center;
-      }
-      .mode-reset button {
-        min-height: 46px;
-        font-size: 15px;
-        padding: 0 20px;
-      }
-      .mode-reset button svg {
-        width: 18px;
-        height: 18px;
       }
       /* 이름표 바로 아래에 버튼이 붙는다 — 이름표가 이미 간격을 냈으므로 버튼 줄은 좁게 띄운다 */
       .mode-group .ai-course-actions {
