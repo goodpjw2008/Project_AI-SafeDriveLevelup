@@ -2804,16 +2804,37 @@
       .ai-habits {
         min-width: 0;
       }
-      /* 습관이 없을 때의 안내 — 제목 바로 아래 붙는다 */
-      .ai-habits .ai-note {
-        margin-top: 6px;
-      }
+      /*
+        **이 칸의 머리** — 아이콘 · 한 단 큰 글자 · 흰 볼드 (사용자가 정했다).
+
+        14px 회색 글자였을 때는 옆의 차 그림에 눌려 **이 칸이 딸린 설명처럼** 보였다. 실제로는
+        AI 가 무엇을 보고 다음 판을 만드는지가 여기서 나오는, 이 상자에서 가장 할 말이 많은 칸이다.
+        앞의 기록판 아이콘(ui/icons.ts 의 clipboard)이 "적어 둔 것" 이라는 성격을 글보다 먼저 말한다.
+      */
       .ai-habits-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--muted);
-        letter-spacing: 0.02em;
-        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: 0.01em;
+        margin-bottom: 10px;
+      }
+      .ai-habits-title svg {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+      }
+      /*
+        **본문도 한 단 키운다** (사용자가 정했다: "너무 많이 줄였어"). 차 그림을 280px 로 줄이면서
+        이 칸이 넓어져 글이 세 줄에서 두 줄로 접혔는데, 글자까지 그대로라 칸이 홀쭉해 보였다.
+      */
+      .ai-habits .ai-note {
+        /* 제목 바로 아래 붙는다 — 제목이 이미 간격을 냈다 */
+        margin-top: 6px;
+        font-size: 17px;
+        line-height: 1.65;
       }
       .habit-list {
         list-style: none;

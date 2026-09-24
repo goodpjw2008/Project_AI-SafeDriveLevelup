@@ -1235,7 +1235,7 @@ export class Screens {
   private habitList(habits: BadHabit[], level: Difficulty, mastered = false): string {
     const wrap = (body: string): string => `
       <div class="ai-habits">
-        <div class="ai-habits-title">AI 가 기록한 나쁜 운전 습관</div>
+        <div class="ai-habits-title">${icon('clipboard')}AI 가 기록한 나쁜 운전 습관</div>
         ${body}
       </div>`;
 
