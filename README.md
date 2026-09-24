@@ -12,9 +12,9 @@
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.
 
 * 서비스 주소 : https://safelevelup.vercel.app
-* 포트폴리오 : https://safelevelup.vercel.app/AI_safeturn_portfolio.html
+* 포트폴리오 : https://safelevelup.vercel.app/AI_safelevelup_portfolio.html
 
-<a href="https://safelevelup.vercel.app/AI_safeturn_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
+<a href="https://safelevelup.vercel.app/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 22장이 저절로 넘어갑니다" width="880"></a>
 
 ---
 

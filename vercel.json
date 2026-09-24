@@ -4,5 +4,12 @@
   "outputDirectory": "dist",
   "functions": {
     "api/*.js": { "maxDuration": 30 }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/AI_safeturn_portfolio.html",
+      "destination": "/AI_safelevelup_portfolio.html",
+      "permanent": true
+    }
+  ]
 }

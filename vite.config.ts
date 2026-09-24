@@ -63,8 +63,14 @@ function brandHtml(): Plugin {
   };
 }
 
-/** 저장소 맨 위의 포트폴리오 넘겨 보기 페이지 — README 를 장표 그림으로 한 장씩 넘겨 본다 */
-const PORTFOLIO_PAGE = 'AI_safeturn_portfolio.html';
+/**
+ * 저장소 맨 위의 포트폴리오 넘겨 보기 페이지 — README 를 장표 그림으로 한 장씩 넘겨 본다.
+ *
+ * 이름이 바뀌며 파일 이름도 `AI_safeturn_portfolio.html` 에서 옮겨 왔다. **옛 주소로 들어와도 열린다** —
+ * `vercel.json` 이 옛 경로를 이 파일로 넘겨준다(301). 이미 건네 둔 링크와 QR 이 끊기지 않게 하려는 것이고,
+ * 넘겨주기는 배포 쪽 일이라 여기서는 새 이름만 알면 된다.
+ */
+const PORTFOLIO_PAGE = 'AI_safelevelup_portfolio.html';
 
 /** 그 페이지가 부르는 그림의 형식 */
 const IMAGE_TYPES: Record<string, string> = {
@@ -79,7 +85,7 @@ const IMAGE_TYPES: Record<string, string> = {
  *
  * 페이지는 **저장소 맨 위**에 둔다 — GitHub 에서 README 옆에 바로 보이고, 저장소를 내려받아 두 번 누르면
  * 그림(docs/slides/…)을 상대 경로로 찾아 그대로 열린다. 그런데 GitHub 는 HTML 을 그려 주지 않고 소스만
- * 보여 주므로, 누르면 바로 넘겨 볼 수 있게 safelevelup.vercel.app/AI_safeturn_portfolio.html 에도 올린다.
+ * 보여 주므로, 누르면 바로 넘겨 볼 수 있게 safelevelup.vercel.app/AI_safelevelup_portfolio.html 에도 올린다.
  *
  * public/ 으로 옮기지 않는 이유: 저장소 맨 위에서 사라지고, 그림도 public/ 에 한 벌 더 두어야 한다.
  * 그래서 빌드 때 **페이지가 부르는 그림만** 골라 같은 경로로 dist 에 내보낸다 — 그림 목록은 페이지 한 곳에만 있어,
