@@ -232,22 +232,31 @@ describe('가로 휴대폰의 첫 화면', () => {
     **자리가 남았기 때문**이지 글자만 키운 것이 아니다.
     아주 좁은 화면(760px 미만)만 예외다 — 거기서는 한 줄에 들어가지 못해 통째로 꺾인다.
   */
-  it('이름은 폭에 따라 한 줄을 지키는 선까지 키운다', () => {
+  it('제목은 한 줄을 지키는 선까지 키우고, 모자라면 부제를 내준다', () => {
     /*
-      사용자가 두 번 *"두 개 크게"* 라고 해 26 → 30 → 34px 로 올렸다. 상자와 줄 간격을
-      바짝 줄여 **자리가 남았기에** 가능한 것이지 글자만 키운 것이 아니다.
+      사용자가 세 번 *"두 개 크게"* 라고 해 26 → 30 → 34 → 38px 로 올렸다. 상자 · 줄 간격 ·
+      낱말 사이를 바짝 줄여 **자리가 남았기에** 가능한 것이지 글자만 키운 것이 아니다.
 
-      **다만 한 줄을 넘기면 안 된다.** 부제가 다음 줄로 내려가면 첫 화면이 한 화면을 넘겨,
-      키우려다 도로 잃는다 — 그래서 폭이 줄어들 때마다 한 단계씩 되돌린다.
+      **잣대는 '한 줄'이다.** 부제가 다음 줄로 내려가면 첫 화면이 한 화면을 넘겨 키우려다
+      도로 잃는다. 34 를 넘기면서부터는 좁은 화면에서 **부제를 한 단계 내주어야** 제목이
+      자랄 수 있었다 — 이 줄에서 먼저 읽혀야 하는 것은 작품 이름이다.
     */
-    const size = (raw: string): number =>
-      Number(raw.replace(/\/\*[\s\S]*?\*\//g, '').match(/#screen-menu \.brand \{\s*font-size:\s*(\d+)/)![1]);
-    expect(size(block())).toBe(34);
-    expect(size(block(NARROW))).toBeLessThan(size(block()));
-    expect(size(block(TINY))).toBeLessThan(size(block(NARROW)));
-    // 상자와 줄 간격을 줄인 것이 짝이다 — 글자만 키우면 첫 화면이 도로 넘친다
+    const px = (raw: string, sel: string): number | null => {
+      const m = raw
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .match(new RegExp(`#screen-menu ${sel} \\{\\s*font-size:\\s*(\\d+(?:\\.\\d+)?)`));
+      return m ? Number(m[1]) : null;
+    };
+    expect(px(block(), '\\.brand')).toBe(38);
+    // 좁아질수록 부제부터 내준다 — 제목은 그대로다
+    expect(px(block(NARROW), '\\.brand-sub')!).toBeLessThan(px(block(), '\\.brand-sub')!);
+    expect(px(block(NARROW), '\\.brand')).toBeNull();
+    // 아주 좁은 화면에서는 제목까지 내린다 — 거기서는 한 줄이 아예 서지 않는다
+    expect(px(block(TINY), '\\.brand')!).toBeLessThan(38);
+    // 상자 · 줄 간격 · 낱말 사이를 줄인 것이 짝이다 — 글자만 키우면 첫 화면이 도로 넘친다
     const r = rules();
     expect(r).toMatch(/#screen-menu \.hero \{[^}]*padding:\s*5px/);
+    expect(r).toMatch(/#screen-menu \.brand-wrap \{[^}]*gap:\s*4px 8px/);
     expect(r).toMatch(/#screen-menu \.brand,\s*\n?\s*#screen-menu \.brand-sub \{[^}]*line-height:\s*1\.2/);
   });
 

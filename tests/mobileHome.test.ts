@@ -212,13 +212,34 @@ describe('세로 휴대폰의 첫 화면', () => {
     도로 한가운데를 덮어 정작 봐야 할 신호와 보행자를 가렸다.
     **경적 소리는 그대로 울린다** — 재촉의 압박을 만드는 것은 소리이지 글이 아니다.
   */
-  it('세로 휴대폰에서는 뒤차 경적 안내를 띄우지 않는다 — 소리는 그대로', () => {
+  it('손에 든 화면에서는 뒤차 경적 안내를 띄우지 않는다 — 소리는 그대로', () => {
     const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
     const honk = game.slice(game.indexOf('this.audio.horn();'), game.indexOf('뒷차가 경적을 울립니다') + 40);
     expect(honk).toContain('this.audio.horn();');
-    expect(honk).toContain('!this.handheld?.matches');
+    /*
+      **세로만이 아니라 가로도 막는다.** 이 경적은 서 있는 동안 3.5~6.5초마다 되풀이되는데
+      (TrafficCar 의 honkCooldown), 가로에서만 상자가 떠서 신호를 기다리는 내내 떴다 사라지기를
+      반복했다 — 사용자가 "주행 중 가만히 둬도 화면이 자꾸 깜빡거린다" 고 한 것이 이것이었다.
+    */
+    expect(honk).toContain('!this.smallScreen?.matches');
+    expect(honk).not.toContain('!this.handheld?.matches');
     // 소리를 끄는 것이 아니다 — 소리 줄은 조건 밖에 있어야 한다
-    expect(honk.indexOf('this.audio.horn();')).toBeLessThan(honk.indexOf('!this.handheld?.matches'));
+    expect(honk.indexOf('this.audio.horn();')).toBeLessThan(honk.indexOf('!this.smallScreen?.matches'));
+  });
+
+  /*
+    **'손에 든 화면' 은 세로 · 가로 두 덩어리를 합친 것이다** — 화면 규칙(index.html)과 같은 자다.
+    조건이 느슨해지면 PC 에서도 안내가 사라진다: `pointer: coarse` 가 그것을 막는다.
+  */
+  it('손에 든 화면 조건은 화면 규칙 두 덩어리를 그대로 합친 것이다', () => {
+    const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
+    // 쓰는 곳이 파일 앞쪽에 있으므로 **선언**을 집어서 읽는다
+    const at = game.indexOf('private readonly smallScreen');
+    const block = game.slice(at, at + 400);
+    expect(block).toContain('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)');
+    expect(block).toContain('(orientation: landscape) and (pointer: coarse) and (max-height: 540px)');
+    // 판이 흐르는 속도는 세로에서만 늦춘다 — 가로까지 늦추면 사용자가 정하지 않은 난이도가 바뀐다
+    expect(game).toMatch(/this\.handheld\?\.matches \? 0\.8 : 1/);
   });
 
   /*

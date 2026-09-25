@@ -5252,7 +5252,14 @@
           grid-row: 2;
           grid-column: 1 / -1;
           margin-bottom: 0;
-          padding: 5px 20px;
+          padding: 5px 12px;
+        }
+        /*
+          **이름과 부제 사이도 좁힌다.** 한 줄을 지키는 것이 크기를 정하는 잣대라(아래),
+          사이 여백 한 칸이 곧 제목 몇 px 이다.
+        */
+        #screen-menu .brand-wrap {
+          gap: 4px 8px;
         }
         #screen-menu .brand,
         #screen-menu .brand-sub {
@@ -5274,14 +5281,20 @@
         #screen-menu .brand-wrap {
           padding: 0;
         }
+        /*
+          **제목을 키우는 잣대는 '한 줄'이다.** 부제가 다음 줄로 내려가면 첫 화면이 한 화면을
+          넘겨 키우려다 도로 잃는다. 사용자가 세 번 *"두 개 크게"* 라고 해 26 → 30 → 34 → 38px
+          로 올렸는데, 34 를 넘기면서부터는 **부제를 조금 내주어야** 제목이 자랄 수 있었다 —
+          이 줄에서 먼저 읽혀야 하는 것은 작품 이름이다.
+        */
         #screen-menu .brand {
-          font-size: 34px;
+          font-size: 38px;
         }
         #screen-menu .brand-colon {
-          font-size: 29px;
+          font-size: 32px;
         }
         #screen-menu .brand-sub {
-          font-size: 25px;
+          font-size: 24px;
         }
         /*
           **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
@@ -5713,14 +5726,9 @@
           **이름은 한 줄을 지키는 선까지만 키운다.** 넓은 쪽(34px)을 그대로 두면 여기서
           부제가 다음 줄로 내려가 첫 화면이 한 화면을 넘긴다 — 키우려다 도로 잃는다.
         */
-        #screen-menu .brand {
-          font-size: 32px;
-        }
-        #screen-menu .brand-colon {
-          font-size: 27px;
-        }
+        /* 좁아진 만큼 부제만 한 단계 더 내준다 — 제목은 넓은 쪽과 같은 38px 를 지킨다 */
         #screen-menu .brand-sub {
-          font-size: 22px;
+          font-size: 20px;
         }
         #screen-menu .ai-car-photo {
           height: 126px;

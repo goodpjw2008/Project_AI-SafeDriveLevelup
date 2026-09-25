@@ -1237,11 +1237,16 @@ export class Game {
         : () => {
             this.audio.horn();
             /*
-              **세로 휴대폰에서는 글을 띄우지 않는다** (사용자가 정했다) — 좁은 화면에서 안내 상자가
+              **손에 든 화면에서는 글을 띄우지 않는다** (사용자가 정했다) — 좁은 화면에서 안내 상자가
               도로 한가운데를 덮어 정작 봐야 할 신호와 보행자를 가렸다. **경적 소리는 그대로 울린다** —
               재촉의 압박을 만드는 것은 소리이지 글이 아니다.
+
+              **가로도 함께 막는다.** 처음에는 세로만 막았는데, 이 경적은 서 있는 동안 **3.5~6.5초마다
+              되풀이된다**(TrafficCar 의 honkCooldown). 신호를 기다리는 내내 상자가 떴다 사라지기를
+              반복해, 사용자가 *"주행 중 가만히 둬도 화면이 자꾸 깜빡거린다"* 고 한 것이 이것이었다.
+              가로는 높이가 335px 남짓이라 세로보다 더 가린다.
             */
-            if (!this.handheld?.matches) {
+            if (!this.smallScreen?.matches) {
               this.cb.onToast('뒷차가 경적을 울립니다. 그래도 규칙은 규칙입니다.');
             }
           },
@@ -1384,6 +1389,21 @@ export class Game {
   private readonly handheld =
     typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)')
+      : null;
+
+  /**
+   * **손에 든 화면 — 세로든 가로든.** 화면 규칙의 두 덩어리를 그대로 합친 것이다
+   * (index.html 의 '손에 든 세로 화면' · '손에 든 가로 화면').
+   *
+   * 판이 흐르는 속도(`paceScale`)는 세로에서만 늦추지만, **화면을 덮는 안내 상자**는 가로에서도
+   * 덮기는 마찬가지다 — 가로로 들면 높이가 335px 남짓이라 오히려 더 가린다.
+   */
+  private readonly smallScreen =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(
+          '(orientation: portrait) and (pointer: coarse) and (max-width: 720px),' +
+            ' (orientation: landscape) and (pointer: coarse) and (max-height: 540px)',
+        )
       : null;
 
   /**
