@@ -142,7 +142,7 @@ describe('세로 휴대폰의 첫 화면', () => {
     **줄이는 것은 여백뿐이다.** 손가락으로 누르는 화면에서 버튼을 줄이면 못 누르고 글자를 줄이면
     못 읽는다. 그래서 글자 크기(`font-size`)와 버튼 크기는 이 덩어리에서 건드리지 않는다.
   */
-  it('첫 화면은 여백만 줄인다 — 글자 · 버튼 크기는 건드리지 않는다', () => {
+  it('첫 화면은 여백을 줄여 자리를 만든다 — 글자를 깎지 않는다', () => {
     const block = rulesOnly();
     for (const sel of ['#screen-menu .screen-inner', '#screen-menu .hero', '#screen-menu .site-footer']) {
       expect(block).toContain(sel);
@@ -154,6 +154,38 @@ describe('세로 휴대폰의 첫 화면', () => {
     const homeRules = [...block.matchAll(/#screen-menu[^{]*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
     expect(homeRules).not.toContain('font-size');
     expect(homeRules).not.toContain('transform: scale');
+  });
+
+  /*
+    **호칭은 `안전운전 L1`** — 호칭과 경험치 숫자가 한 줄에 들어가지 않아 두 줄로 접혔다
+    (사용자가 사진으로 짚었다). `Level` 의 'evel' 만 감춘다 — 값(curriculum.ts 의 courseTitle)은
+    그대로라 읽어 주는 글과 저장된 것은 바뀌지 않는다. 번 자리는 연습 버튼이 가져간다.
+  */
+  it("호칭을 '안전운전 L1' 로 줄이고 그 자리를 연습 버튼에 준다", () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-menu \.lv-word \{\s*display: none;/);
+    expect(block).toMatch(/#screen-menu \.mode-split \.ai-course-actions button \{\s*min-height:/);
+    const card = readFileSync(fileURLToPath(new URL('../src/ui/playerCard.ts', import.meta.url)), 'utf8');
+    expect(card).toContain('class="lv-word"');
+  });
+
+  /* 새 뱃지 줄 — 글 칸이 세로 flex 라 '새 뱃지' 와 이름이 위아래로 갈라져 있었다 */
+  it('새 뱃지는 한 줄로 적는다 — 까닭 줄만 아랫줄', () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-debrief \.badge-ev-text \{[^}]*flex-direction: row;/);
+    expect(block).toMatch(/#screen-debrief \.badge-ev small \{\s*flex-basis: 100%;/);
+  });
+
+  /* 좁은 화면에서 로봇이 왼쪽을 차지해 코칭 문장이 두세 글자씩 끊겼다 — 이 칸은 글이 주인공이다 */
+  it('결과 화면의 로봇을 접어 글에 자리를 준다', () => {
+    expect(rulesOnly()).toMatch(/#screen-debrief \.verdict \.verdict-robot \{\s*display: none;/);
+  });
+
+  /* 레벨이 오른 순간이 구석에서 일어난 것처럼 보이면 안 된다 — 상자도 내용도 가운데 */
+  it('레벨업 배너는 상자도 내용도 가운데에 둔다', () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-debrief \.level-change \{[^}]*flex-basis: 100%;/);
+    expect(block).toMatch(/#screen-debrief \.level-change \{[^}]*margin-left: auto;/);
   });
 
   /*

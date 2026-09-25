@@ -13,8 +13,17 @@ describe('플레이어 칸', () => {
       const html = playerCard(base, size);
       expect(html).toContain(`class="player ${size}`);
       expect(html).toContain('level-badge-wrap earned');
-      // 호칭은 이름이 아니라 학습자가 키우는 능력이다 — 이름 딱지를 입히지 않는다 (ui/playerCard.ts)
-      expect(html).toContain('<span class="player-name">안전운전 Level6</span>');
+      /*
+        호칭은 이름이 아니라 학습자가 키우는 능력이다 — 이름 딱지를 입히지 않는다 (ui/playerCard.ts).
+
+        `Level` 의 'evel' 만 따로 감싼다 — 세로 휴대폰에서 호칭과 경험치가 한 줄에 들어가지 않아
+        그 줄에서만 **`안전운전 L6`** 으로 줄이기 때문이다 (index.html 의 .lv-word).
+        **글자는 그대로 남는다** — 감추는 것은 화면 규칙이고, 낭독기가 읽는 aria-label 도 그대로다.
+      */
+      expect(html).toContain(
+        '<span class="player-name">안전운전 L<span class="lv-word">evel</span>6</span>',
+      );
+      expect(html).toContain('aria-label="안전운전 Level6 · 경험치 150 / 400"');
       expect(html).not.toContain('brand-');
       expect(html).toContain('<b>150</b> / 400 XP');
       expect(html).toContain('width:37.5%');

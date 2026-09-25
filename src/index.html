@@ -5221,6 +5221,19 @@
         #screen-menu .player-foot-text {
           display: none;
         }
+        /*
+          **호칭은 `안전운전 L1`** — `Level` 의 'evel' 을 감춘다 (ui/playerCard.ts 의 branded).
+          호칭과 경험치 숫자(100 / 200 XP)가 한 줄에 들어가지 않아 두 줄로 접혔다.
+          여기서 번 세로 자리는 바로 아래 연습 버튼이 가져간다 (사용자가 정했다).
+        */
+        #screen-menu .lv-word {
+          display: none;
+        }
+        /* 그 자리만큼 연습 버튼을 키운다 — 손가락으로 누르는 화면에서 가장 큰 과녁이어야 한다 */
+        #screen-menu .mode-split .ai-course-actions button {
+          min-height: 76px;
+        }
+
         /* AI 가 맵을 고르는 창의 '추천 사유' — 좁은 화면에서 카드가 두 배로 길어지던 줄이다 */
         .ai-pick-why {
           display: none;
@@ -5388,6 +5401,47 @@
         /* 버튼 줄도 가운데로 — 위의 등급 · 레벨 칸과 같은 축에 선다 (사용자가 정했다) */
         #screen-debrief .btn-row {
           justify-content: center;
+        }
+
+        /*
+          **새 뱃지 줄을 한 줄로** (사용자가 정했다). 글 칸이 세로 방향 flex 라 `새 뱃지` 와 이름이
+          위아래로 갈라져 있었다 — 가로로 눕히면 `새 뱃지 습관 교정가` 한 줄이 된다.
+          까닭 줄(small)은 늘 아랫줄에 둔다 — 이름 뒤에 붙으면 어디까지가 이름인지 흐려진다.
+        */
+        #screen-debrief .badge-ev-text {
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: baseline;
+          column-gap: 6px;
+        }
+        #screen-debrief .badge-ev small {
+          flex-basis: 100%;
+        }
+
+        /*
+          **AI 주행결과 분석은 글만 남긴다** (사용자가 정했다). 좁은 화면에서 로봇이 왼쪽을
+          차지해 글이 두세 글자씩 끊겼다 — 이 칸에서 읽어야 하는 것은 코칭 문장이다.
+          로봇은 주행 화면과 첫 화면에 여전히 있다.
+        */
+        #screen-debrief .verdict .verdict-robot {
+          display: none;
+        }
+
+        /*
+          **레벨이 오른 판의 배너는 가운데** (사용자가 정했다). 제목이 남는 폭을 다 가져가
+          뱃지 둘이 오른쪽으로 밀려 있었다.
+        */
+        #screen-debrief .level-change {
+          /*
+            배너는 줄 전체를 쓰고, 그래도 좁아지면 **상자째 가운데**로 온다 —
+            내용만큼만 넓은 상자가 왼쪽에 붙으면 레벨이 오른 순간이 구석에서 일어난 것처럼 보인다.
+          */
+          flex-basis: 100%;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        #screen-debrief .level-change-title {
+          flex: 0 0 auto;
         }
 
         /* 반쪽에 들어가려면 칸 안의 여백도 줄어야 한다 — 레벨 뱃지와 이름이 서로를 밀어낸다 */

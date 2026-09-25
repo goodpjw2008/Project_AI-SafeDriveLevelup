@@ -57,7 +57,16 @@ const esc = (s: string): string =>
   **호칭('안전운전 Level6')은 칠하지 않는다.** 호칭은 작품 이름이 아니라 **학습자가 키우는 능력의 이름**이다
   (brand.ts). 이름이 아닌 것에 이름의 딱지를 입히면, 화면에서 무엇이 이름인지 흐려진다.
 */
-const branded = (text: string): string => esc(text);
+/**
+ * 호칭을 화면에 적는 꼴로 바꾼다.
+ *
+ * **`Level1` 의 'evel' 을 감쌀 수 있게 해 둔다** — 세로 휴대폰에서는 호칭과 경험치 숫자가
+ * 한 줄에 들어가지 않아 두 줄로 접혔다(사용자가 사진으로 짚었다). 그 줄에서만 `evel` 을 감춰
+ * **`안전운전 L1`** 으로 줄인다 (index.html 의 .lv-word). 값은 한 곳(curriculum.ts 의 courseTitle)
+ * 그대로 두고 **보이는 꼴만** 줄이는 것이라, 읽어 주는 글과 저장된 값은 바뀌지 않는다.
+ */
+const branded = (text: string): string =>
+  esc(text).replace(/Level(?=\d)/g, 'L<span class="lv-word">evel</span>');
 
 /**
  * 막대 아래 한 줄 — 다음 레벨까지 얼마나 남았는가.
