@@ -285,7 +285,13 @@ export class CameraRig {
         portrait ? dims.height * 1.45 + 1.25 : dims.height * 1.55 + 1.4,
         vehicle.z - f.z * back + right.z * 0.4,
       );
-      target = new THREE.Vector3(vehicle.x + f.x * 8, dims.height * 0.7, vehicle.z + f.z * 8);
+      /*
+        **세로 화면에서는 더 앞을 본다** (사용자가 정했다: "차를 기준으로 앞 시야를 조금 더").
+        보는 지점을 앞으로 밀면 차가 화면 아래쪽으로 내려가고 그만큼 **앞 도로가 더 들어온다** —
+        높이는 그대로라 내려다보는 각도는 바뀌지 않는다.
+      */
+      const aim = portrait ? 15 : 8;
+      target = new THREE.Vector3(vehicle.x + f.x * aim, dims.height * 0.7, vehicle.z + f.z * aim);
       fov = fitHorizontal(
         66 + Math.min(12, vehicle.speedKmh * 0.11),
         this.camera.aspect,
