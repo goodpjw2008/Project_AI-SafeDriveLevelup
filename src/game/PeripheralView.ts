@@ -71,12 +71,17 @@ const LOOK_YAW_WIDE = 0.838;
 const PANEL_FOV_WIDE = 56;
 
 /**
- * **확장 시야가 한쪽으로 늘리는 폭** — 본 화면 가로의 몇 배인가.
+ * **확장 시야는 본 화면과 같은 배율로 그린다** (사용자가 정했다: "실제 눈에 보이는 보행자의
+ * 크기와 동일하게").
  *
- * 1.0 이면 본 화면(가로 화각 46°)의 바깥으로 **23°~52°** 를 담는다. 더 늘리면 더 옆까지
- * 보이지만, 평면에 비추는 그림이라 가장자리가 그만큼 늘어난다 — 사용자가 싫어한 바로 그 왜곡이다.
+ * 창이 담는 각을 넓게 잡으면 그만큼 작게 줄여 그리게 되어, 건너편 보도의 사람이 점이 된다 —
+ * 정작 확인해야 할 것을 못 알아본다. 그래서 **창의 실제 픽셀 폭만큼만** 담는다: 창이 124px 이면
+ * 본 화면 124px 어치를 그대로 옮긴다. 배율이 1:1 이라 **본 화면에서 보이던 크기 그대로** 보인다.
+ *
+ * 대가는 담는 각이다 — 1:1 을 지키면서 더 옆까지 보려면 **창을 더 크게** 만드는 수밖에 없다.
  */
-const WIDE_EXTEND = 1.0;
+const wideExtendFor = (sidePx: number, screenPx: number): number =>
+  Math.max(0.05, Math.min(1.5, sidePx / Math.max(1, screenPx)));
 
 /**
  * 확장 시야가 보는 띠의 높이 자리 (본 화면 높이의 몇 배만큼 위로).
@@ -206,6 +211,8 @@ export class PeripheralView {
   private coachBottom = 0;
   private lastW = 1;
   private lastH = 1;
+  /** 창 하나의 실제 폭(px) — 확장 시야가 담는 각을 여기에 맞춘다 (위 wideExtendFor) */
+  private sidePx = 1;
 
   constructor(
     private scene: THREE.Scene,
@@ -376,8 +383,16 @@ export class PeripheralView {
     const h = Math.max(1, height);
     this.lastW = w;
     this.lastH = h;
-    const sideW = Math.min(w * 0.3, Math.max(MIN_WIDTH_PX, w * WIDTH_FRAC));
     const margin = w * EDGE_MARGIN;
+    /*
+      **확장 시야 창은 화면 폭을 거의 다 쓴다** — 배율이 1:1 이라(위 wideExtendFor) 창이 넓어진
+      만큼 **담는 각도 넓어진다.** 124px 이면 바깥 34° 까지밖에 못 보는데, 둘을 나란히 놓을 수
+      있는 만큼(각 198px) 키우면 40° 까지 본다. 크기를 지키면서 더 보려면 이 길뿐이다.
+    */
+    const sideW = this.wide
+      ? (w - margin * 3) / 2
+      : Math.min(w * 0.3, Math.max(MIN_WIDTH_PX, w * WIDTH_FRAC));
+    this.sidePx = sideW;
     const box = borderBox(PANEL_ASPECT, HUD_BORDER_FRAC);
 
     /*
@@ -436,7 +451,8 @@ export class PeripheralView {
           말풍선이 없으면(PC · 아직 안 뜬 때) 예전처럼 맨 위다.
         */
         const coach = this.wide ? document.getElementById('drive-coach')?.getBoundingClientRect() : undefined;
-        const top = coach && coach.height > 0 ? coach.bottom + rowGap : TOP_MARGIN_PX;
+        // 말풍선 아래로 한 뼘 더 띄운다 (사용자가 정했다) — 붙여 두면 말풍선과 한 덩어리로 읽힌다
+        const top = coach && coach.height > 0 ? coach.bottom + h * 0.045 : TOP_MARGIN_PX;
         cy = top + (pw * PANEL_ASPECT) / 2;
         labelBelow = true; // 창 위에는 자리가 없다
       }
@@ -478,7 +494,8 @@ export class PeripheralView {
     // 세로 화각은 본 화면과 같다 — 가로로만 늘린다
     u.camera.fov = main.fov;
     const mw = main.aspect; // 세로를 1 로 놓았을 때의 본 화면 가로
-    const ew = mw * WIDE_EXTEND;
+    // 창의 픽셀 폭만큼만 담는다 — 본 화면과 배율이 1:1 이 된다 (위 wideExtendFor)
+    const ew = mw * wideExtendFor(this.sidePx, this.lastW);
     const fullW = mw + 2 * ew;
     u.camera.aspect = fullW;
     const bandH = ew * PANEL_ASPECT; // 창은 1.6:1 — 늘린 폭에 맞춘 띠 높이
