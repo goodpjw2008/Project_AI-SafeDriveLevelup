@@ -436,7 +436,10 @@ export class Game {
       창이 떠올라야 한다 (PeripheralView 의 setApproachZone). 장면을 지을 때 쓴 값과 같은
       식이어야 화면에 그려진 횡단보도와 창이 뜨는 자리가 어긋나지 않는다.
     */
-    this.periph.setApproachZone(this.straight || Boolean(this.scenario.approachSchoolZone));
+    const approachZone = this.straight || Boolean(this.scenario.approachSchoolZone);
+    this.periph.setApproachZone(approachZone);
+    // 세로 화면의 후방 카메라도 그 앞에서 올라간다 (CameraRig 의 crosswalkRise)
+    this.rig.setApproachZone(approachZone);
     this.setSeatOffset(seatOffset);
     // 시점은 조용히 맞춘다 (토스트 없이). 거울·시야 창은 운전석에서만 켜야 한다.
     this.rig.setMode(startView);

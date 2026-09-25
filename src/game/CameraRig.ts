@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { LANE_2_OFFSET } from '../layout';
+import { LANE_2_OFFSET, STOP_LINE, STOP_LINE_S } from '../layout';
 import type { CarSpec } from '../economy/cars';
 import { DRIVER_HIDDEN_LAYER, INTERIOR_LAYER, PLAYER_CAR_LAYER, driverEyeLocal } from './CarMesh';
 import { clampSeatOffset } from './carModel';
@@ -121,6 +121,16 @@ export class CameraRig {
       this.camera.layers.enable(DRIVER_HIDDEN_LAYER);
       this.camera.layers.disable(INTERIOR_LAYER);
     }
+  }
+
+  /**
+   * **이 판의 첫 횡단보도가 진입로 보호구역(S)인가** — 세로 화면에서 카메라를 언제 올릴지에 쓴다.
+   * S 는 교차로에서 한참 떨어진 z=70 근처라, 교차로까지의 거리만으로는 영영 올라가지 않는다.
+   */
+  private approachZone = false;
+
+  setApproachZone(on: boolean): void {
+    this.approachZone = on;
   }
 
   setCar(spec: CarSpec): void {
@@ -274,28 +284,46 @@ export class CameraRig {
         "너무 뒤에서 봐서 너무 광각으로 물체가 왜곡되어 보인다").
 
         세로 화면은 가로가 좁아 `fitHorizontal` 이 세로 화각을 108° 까지 밀어 올린다 — 그 화각에서는
-        가장자리의 건물과 사람이 늘어나 보인다. 이제 **좌·우 시야 창이 늘 떠 있으므로**(Game 의
-        setOverlaysVisible) 본 화면까지 억지로 넓힐 까닭이 없어졌다: 가로 화각의 하한을 낮추고,
-        그만큼 좁아진 화면을 차가 채우도록 카메라를 앞으로 당긴다.
+        가장자리의 건물과 사람이 늘어날 뿐 아니라, 정작 봐야 할 신호등과 멀리 있는 보행자가 작아진다.
+        그래서 달리는 동안에는 가로 화각의 하한을 낮추고, 그만큼 좁아진 화면을 차가 채우도록 앞으로 당긴다.
+        넓게 봐야 하는 때는 횡단보도 앞뿐이고, 그때는 화각이 아니라 **카메라를 옮겨서** 넓힌다 (아래 `rise`).
       */
       const portrait = this.camera.aspect < 1;
-      const back = portrait ? dims.length * 1.45 + 2.5 : dims.length * 1.9 + 3.2;
+      /*
+        **횡단보도가 다가오면 카메라가 올라가 뒤로 물러난다** (세로 화면 전용, `rise` 0→1).
+
+        좌·우 확장 시야 창을 걷어내면서 "횡단보도 저쪽 끝이 안 보인다" 가 남았다. 화각만 넓히면
+        108° 까지 밀려 올라가 멀리 있는 신호등과 사람이 작아진다 — 그래서 **화각 대신 카메라를 옮긴다.**
+        높이 올려 눕히면 같은 화각 안에 가로로 더 들어오고(내려다볼수록 바닥의 좌우가 가운데로 모인다),
+        조금 뒤로 물러나면 횡단보도까지의 거리가 멀어져 벌어진 각이 줄어든다.
+
+        **뒤로는 조금만 간다** — 더 물리면 뒤따라오는 차가 화면 아래를 채워 내 차가 주인공이 아니게 된다.
+        모자라는 몫은 높이가 맡는다.
+
+        **늘 올려 두지 않는 까닭**: 달릴 때는 낮고 좁은 편이 멀리 있는 신호등과 보행자를 크게 보여 준다.
+        그래서 좌·우 창이 떠오르던 바로 그 구간에서만 올라갔다가, 지나가면 저절로 돌아온다.
+      */
+      const rise = portrait ? crosswalkRise(vehicle.x, vehicle.z, this.approachZone) : 0;
+      const back = portrait ? dims.length * 1.45 + 2.5 + rise * 3.5 : dims.length * 1.9 + 3.2;
       pos = new THREE.Vector3(
         vehicle.x - f.x * back + right.x * 0.4,
-        portrait ? dims.height * 1.45 + 1.25 : dims.height * 1.55 + 1.4,
+        portrait ? dims.height * 1.45 + 1.25 + rise * 7 : dims.height * 1.55 + 1.4,
         vehicle.z - f.z * back + right.z * 0.4,
       );
       /*
         **세로 화면에서는 더 앞을 본다** (사용자가 정했다: "차를 기준으로 앞 시야를 조금 더").
-        보는 지점을 앞으로 밀면 차가 화면 아래쪽으로 내려가고 그만큼 **앞 도로가 더 들어온다** —
-        높이는 그대로라 내려다보는 각도는 바뀌지 않는다.
+        보는 지점을 앞으로 밀면 차가 화면 아래쪽으로 내려가고 그만큼 **앞 도로가 더 들어온다**.
+        다만 카메라가 올라간 동안에는 보는 지점을 **당겨** 와야 한다 — 그래야 고개가 아래로 더 숙여져
+        횡단보도가 화면 가운데에 놓인다. 멀리 밀어 두면 올라간 만큼 그냥 하늘을 본다.
       */
-      const aim = portrait ? 15 : 8;
+      const aim = portrait ? 15 - rise * 8 : 8;
       target = new THREE.Vector3(vehicle.x + f.x * aim, dims.height * 0.7, vehicle.z + f.z * aim);
       fov = fitHorizontal(
         66 + Math.min(12, vehicle.speedKmh * 0.11),
         this.camera.aspect,
-        portrait ? CHASE_MIN_HFOV_PORTRAIT : CHASE_MIN_HFOV,
+        portrait
+          ? CHASE_MIN_HFOV_PORTRAIT + rise * (CHASE_NEAR_HFOV_PORTRAIT - CHASE_MIN_HFOV_PORTRAIT)
+          : CHASE_MIN_HFOV,
       );
       const k = this.initialized ? Math.min(1, dt * 6.5) : 1;
       this.smoothPos.lerp(pos, k);
@@ -378,15 +406,45 @@ export const PORTRAIT_MAX_FOV = 108;
 /** 후방 시점이 적어도 담아야 할 가로 화각 (°) */
 const CHASE_MIN_HFOV = 72;
 /**
- * 세로 화면의 후방 시점 가로 화각 하한 — **좌·우 시야 창이 몫을 나눠 가진다.**
+ * 세로 화면의 후방 시점 가로 화각 하한 — **달릴 때**.
  *
  * 72° 를 세로 화면(비율 0.53)에 맞추면 세로 화각이 108° 까지 벌어져 가장자리가 늘어나 보였다.
- * 지금은 횡단보도 양 끝을 시야 창이 맡으므로(Game 의 setOverlaysVisible) 본 화면은 앞을
- * 곧게 보는 데만 쓰면 된다.
+ * 좁게 두면 멀리 있는 신호등과 보행자가 그만큼 크게 보인다 — 달리는 동안 봐야 할 것이 그것이다.
  */
 const CHASE_MIN_HFOV_PORTRAIT = 46;
+/**
+ * 횡단보도 앞에 다 왔을 때의 가로 화각 (°). 카메라가 올라가 뒤로 물러난 뒤라 **이만큼만 넓혀도**
+ * 횡단보도가 통째로 들어온다 — 108° 로 밀어 올리지 않아 가장자리가 늘어나지 않는다.
+ */
+const CHASE_NEAR_HFOV_PORTRAIT = 60;
+/**
+ * 카메라가 올라가기 시작하는 · 다 올라가는 지점 — **교차로 중심에서의 거리(m)**.
+ * 좌·우 시야 창이 떠오르던 구간(PeripheralView 의 FADE_DIST · FULL_DIST)과 같은 자리다.
+ */
+const RISE_FADE_DIST = STOP_LINE + 22;
+const RISE_FULL_DIST = STOP_LINE + 8;
 /** 상공 시점이 적어도 담아야 할 가로 화각 (°) — 교차로의 좌우 끝까지 */
 const TOP_MIN_HFOV = 66;
+
+/**
+ * **횡단보도가 얼마나 가까운가** — 0(아직 멀다) ~ 1(코앞). 세로 화면의 후방 카메라가 이만큼 올라간다.
+ *
+ * 자는 좌·우 시야 창이 떠오르던 것과 같다: **교차로 중심에서의 거리.** 들어갈 때(첫 횡단보도)와
+ * 나올 때(우회전 뒤 횡단보도)가 한 값으로 묶여, 교차로를 지나는 동안 내내 올라가 있다.
+ *
+ * @param approachZone 이 판의 첫 횡단보도가 진입로 보호구역(S)인가 — 교차로에서 한참 떨어져 있어
+ *   교차로까지의 거리만으로는 영영 올라가지 않는다. 그 정지선까지 남은 거리를 같은 자로 잰다.
+ */
+export function crosswalkRise(x: number, z: number, approachZone = false): number {
+  const span = RISE_FADE_DIST - RISE_FULL_DIST;
+  const dist = Math.max(Math.abs(x), Math.abs(z));
+  let rise = clamp((RISE_FADE_DIST - dist) / span, 0, 1);
+  if (approachZone) {
+    const gapS = Math.abs(Math.abs(z) - STOP_LINE_S);
+    rise = Math.max(rise, clamp((RISE_FADE_DIST - STOP_LINE - gapS) / span, 0, 1));
+  }
+  return rise;
+}
 
 /**
  * 가로 화각이 `minHorizontal` 이상 되도록 세로 화각을 넓힌다 (`PORTRAIT_MAX_FOV` 까지). 가로로 긴 화면에서는
