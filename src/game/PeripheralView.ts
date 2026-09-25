@@ -101,10 +101,20 @@ const WIDE_ZOOM = 1.6;
  * 후방 시점은 도로를 조금 내려다보므로 **지평선이 화면 가운데보다 위**에 있다. 건너편 보도에
  * 선 사람은 그 지평선 언저리에 있어서, 띠를 조금 올려야 사람이 띠 한가운데로 들어온다.
  */
-const WIDE_LIFT = -0.08;
+/**
+ * 확장 시야가 보는 **가로 띠의 한가운데** — 본 화면 높이의 몇 지점인가 (0 = 맨 위).
+ *
+ * 띠가 좁아지면서 **어디를 자르느냐가 결정적**이 됐다. 바닥 쪽을 자르면 아스팔트만,
+ * 위를 자르면 건물 꼭대기만 들어온다. 건너편 보도에 선 사람은 **지평선 언저리**에 있으므로
+ * 거기에 띠를 맞춘다 — 후방 시점은 도로를 조금 내려다보므로 화면 가운데보다 위다.
+ */
+const WIDE_BAND_CENTER = 0.42;
 
 /** 확장 시야 창의 밑변 — 화면 높이의 몇 지점인가. 내 차 지붕 바로 위다 (아래 resize) */
 const WIDE_BOTTOM_FRAC = 0.545;
+
+/** 확장 시야 창 하나의 폭 (화면 폭 대비) — 둘을 양 끝에 붙이고 가운데 도로를 비운다 */
+const WIDE_PANEL_FRAC = 0.36;
 
 /**
  * 창의 화각. 68° ± 30° = 38°~98° 를 담는다.
@@ -400,12 +410,12 @@ export class PeripheralView {
     this.lastH = h;
     const margin = w * EDGE_MARGIN;
     /*
-      **확장 시야 창은 화면 폭을 거의 다 쓴다** — 배율이 1:1 이라(위 wideExtendFor) 창이 넓어진
-      만큼 **담는 각도 넓어진다.** 124px 이면 바깥 34° 까지밖에 못 보는데, 둘을 나란히 놓을 수
-      있는 만큼(각 198px) 키우면 40° 까지 본다. 크기를 지키면서 더 보려면 이 길뿐이다.
+      **확장 시야 창은 양 끝에 붙고 가운데는 비운다** (사용자가 정했다: "앞의 시야를 모두
+      가려버렸다"). 화면 폭을 다 쓰면 담는 각은 넓어지지만 **앞 도로가 통째로 가린다** —
+      이 게임에서 가장 먼저 봐야 하는 것이 그 도로다. 각 36% 씩 두고 가운데 28% 를 비운다.
     */
     const sideW = this.wide
-      ? (w - margin * 3) / 2
+      ? w * WIDE_PANEL_FRAC
       : Math.min(w * 0.3, Math.max(MIN_WIDTH_PX, w * WIDTH_FRAC));
     this.sidePx = sideW;
     const box = borderBox(PANEL_ASPECT, HUD_BORDER_FRAC);
@@ -527,7 +537,7 @@ export class PeripheralView {
       fullW,
       1,
       u.side < 0 ? 0 : mw + ew, // 왼쪽 조각 · 오른쪽 조각
-      (1 - bandH) / 2 - WIDE_LIFT,
+      WIDE_BAND_CENTER - bandH / 2,
       ew,
       bandH,
     );
