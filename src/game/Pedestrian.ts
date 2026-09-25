@@ -141,33 +141,103 @@ export function setPedestrianAlerts(on: boolean): void {
 }
 
 
-let alertTextures: { intending: THREE.CanvasTexture; crossing: THREE.CanvasTexture } | null = null;
+let alertTextures: { intending: THREE.DataTexture; crossing: THREE.DataTexture } | null = null;
+
+/** 느낌표 그림의 한 변 (px). 2의 거듭제곱이라 어느 기기에서나 밉맵이 곱게 만들어진다 */
+const ALERT_TEX = 128;
+
+/** `#rrggbb` 를 0~255 세 값으로 */
+function rgbOf(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
 
 /**
- * 느낌표 그림. **화면이 없는 곳(테스트)에서는 `null`** — 보행자 로직은 화면 없이도 돌아야
- * 하고(tests/pedestrian.test.ts), 그림 하나 못 굽는다고 사람이 움직이지 않으면 안 된다.
+ * 가장자리를 1px 에 걸쳐 부드럽게 — 거리(px)가 음수면 안, 양수면 밖이다.
+ * 이것이 없으면 원 둘레가 계단처럼 보인다 (캔버스의 안티에일리어싱을 손으로 대신하는 것).
  */
-function alertTexture(kind: 'intending' | 'crossing'): THREE.CanvasTexture | null {
-  if (typeof document === 'undefined') return null;
+function coverage(dist: number): number {
+  return Math.min(1, Math.max(0, 0.5 - dist));
+}
+
+/** 세로 막대(끝이 둥근)까지의 거리 — 느낌표의 몸통을 그리는 데 쓴다 */
+function barDist(x: number, y: number, cx: number, y0: number, y1: number, r: number): number {
+  const dy = y < y0 ? y0 - y : y > y1 ? y - y1 : 0;
+  return Math.hypot(x - cx, dy) - r;
+}
+
+/**
+ * 느낌표 그림 — **그림판(canvas)이 아니라 숫자로 직접 굽는다.**
+ *
+ * 예전에는 `document.createElement('canvas')` 에 `arc` 와 `fillText('!')` 로 그렸다.
+ * 사용자의 휴대폰에서 이 표시가 **위와 왼쪽이 잘린 모양**으로 나왔는데(두 번의 화면 캡처가
+ * 똑같았다), PC·노트북·실제 GPU 어디서도 재현되지 않았다. 캔버스로 굽는 길에는 기기마다
+ * 달라지는 조각이 둘 있다 — **브라우저의 캔버스 래스터라이저**와 **웹폰트(`Pretendard Variable`)**.
+ * 둘 다 걷어내면 원인을 못 찾아도 증상이 사라진다. 같은 판단을 이미 한 번 했다
+ * (CarMesh 의 `makeGlowTexture` — "캔버스를 걷어내면서").
+ *
+ * 화면이 없는 곳(테스트)에서도 그대로 만들어진다 — 순수한 계산이라 `document` 가 필요 없다.
+ * 예전에는 캔버스를 못 만들면 `null` 이었는데, 이제 그럴 일이 없다.
+ */
+export function alertTexture(kind: 'intending' | 'crossing'): THREE.DataTexture {
   if (!alertTextures) {
-    const make = (fill: string, ink: string): THREE.CanvasTexture => {
-      const c = document.createElement('canvas');
-      c.width = c.height = 128;
-      const ctx = c.getContext('2d')!;
-      ctx.beginPath();
-      ctx.arc(64, 64, 56, 0, Math.PI * 2);
-      ctx.fillStyle = fill;
-      ctx.fill();
-      ctx.lineWidth = 8;
-      ctx.strokeStyle = 'rgba(10, 12, 18, 0.85)';
-      ctx.stroke();
-      ctx.fillStyle = ink;
-      ctx.font = 'bold 92px "Pretendard Variable", Pretendard, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('!', 64, 70);
-      const tex = new THREE.CanvasTexture(c);
+    const make = (fill: string, ink: string): THREE.DataTexture => {
+      const N = ALERT_TEX;
+      const half = N / 2;
+      const [fr, fg, fb] = rgbOf(fill);
+      const [ir, ig, ib] = rgbOf(ink);
+      const data = new Uint8Array(N * N * 4);
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          // 픽셀 중심에서 잰다 — 모서리에서 재면 그림이 반 픽셀 치우친다 (makeGlowTexture 와 같다)
+          const px = x + 0.5;
+          /*
+            **세로는 뒤집어 잰다.** DataTexture 의 첫 줄은 그림의 **아래**다(OpenGL 규약) —
+            캔버스와 반대라, 그대로 두면 느낌표의 점이 위로 올라가 'i' 처럼 보인다.
+            여기서 한 번 뒤집어 두면 아래 좌표는 사람이 그림을 읽는 대로(위 → 아래) 쓸 수 있다.
+          */
+          const py = N - (y + 0.5);
+          const rad = Math.hypot(px - half, py - half);
+          // 바깥 테두리(어두운 띠) → 알맹이 → 느낌표 차례로 덮는다
+          const outer = coverage(rad - 60);
+          const inner = coverage(rad - 52);
+          const stroke = Math.max(0, outer - inner);
+          /*
+            몸통과 점 사이를 넉넉히 띄운다 — 멀리 있는 사람 위에서는 그림이 128px → 40px 남짓으로
+            줄어드는데, 사이가 좁으면 둘이 한 막대로 뭉쳐 느낌표로 읽히지 않는다.
+          */
+          const mark = Math.max(
+            coverage(barDist(px, py, half, 32, 70, 6.5)),
+            coverage(Math.hypot(px - half, py - 98) - 8.5),
+          );
+          let r = fr * inner + 10 * stroke;
+          let g = fg * inner + 12 * stroke;
+          let b = fb * inner + 18 * stroke;
+          let a = inner + stroke * 0.85;
+          // 느낌표는 알맹이 위에만 얹는다 — 테두리 밖으로 비어져 나가면 글자가 떠 보인다
+          const m = mark * inner;
+          r = r * (1 - m) + ir * m;
+          g = g * (1 - m) + ig * m;
+          b = b * (1 - m) + ib * m;
+          a = Math.max(a, m);
+          const i = (y * N + x) * 4;
+          data[i] = Math.round(r);
+          data[i + 1] = Math.round(g);
+          data[i + 2] = Math.round(b);
+          data[i + 3] = Math.round(Math.min(1, a) * 255);
+        }
+      }
+      const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+      /*
+        **필터를 손으로 정한다.** DataTexture 의 기본은 NearestFilter 라, 그대로 두면
+        멀리 있는 사람 위에서 테두리가 지글거린다 (makeGlowTexture 와 같은 자리).
+      */
+      tex.magFilter = THREE.LinearFilter;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.generateMipmaps = true;
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
       tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
       return tex;
     };
     // 색은 AI 말풍선의 보행자 알림과 같다 (index.html 의 .ped-cue)

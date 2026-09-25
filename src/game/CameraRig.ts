@@ -311,13 +311,26 @@ export class CameraRig {
         vehicle.z - f.z * back + right.z * 0.4,
       );
       /*
+        **올라간 동안에는 내 차를 화면 오른쪽에 둔다** (사용자가 정했다: *"차량이 가운데 있는데
+        우측으로 옮기면 좌측 반대편의 횡단보도 끝이 더 잘 보일 것 같다"*).
+
+        내 차는 **오른쪽 차로**에 있으므로 횡단보도의 먼 쪽 끝은 늘 **왼쪽**이다 — 가운데 차로만큼
+        더 멀다. 우회전 뒤 횡단보도에서도 같다. 시선만 왼쪽으로 옮기면 차가 오른쪽으로 물러나고
+        그만큼 **왼쪽이 더 들어온다** — 화각을 넓히지 않고 얻는 몫이다.
+      */
+      const pan = portrait ? rise * PAN_LEFT : 0;
+      /*
         **세로 화면에서는 더 앞을 본다** (사용자가 정했다: "차를 기준으로 앞 시야를 조금 더").
         보는 지점을 앞으로 밀면 차가 화면 아래쪽으로 내려가고 그만큼 **앞 도로가 더 들어온다**.
         다만 카메라가 올라간 동안에는 보는 지점을 **당겨** 와야 한다 — 그래야 고개가 아래로 더 숙여져
         횡단보도가 화면 가운데에 놓인다. 멀리 밀어 두면 올라간 만큼 그냥 하늘을 본다.
       */
       const aim = portrait ? 15 - rise * 8 : 8;
-      target = new THREE.Vector3(vehicle.x + f.x * aim, dims.height * 0.7, vehicle.z + f.z * aim);
+      target = new THREE.Vector3(
+        vehicle.x + f.x * aim - right.x * pan,
+        dims.height * 0.7,
+        vehicle.z + f.z * aim - right.z * pan,
+      );
       fov = fitHorizontal(
         66 + Math.min(12, vehicle.speedKmh * 0.11),
         this.camera.aspect,
@@ -416,13 +429,18 @@ const CHASE_MIN_HFOV_PORTRAIT = 46;
  * 횡단보도 앞에 다 왔을 때의 가로 화각 (°). 카메라가 올라가 뒤로 물러난 뒤라 **이만큼만 넓혀도**
  * 횡단보도가 통째로 들어온다 — 108° 로 밀어 올리지 않아 가장자리가 늘어나지 않는다.
  */
-const CHASE_NEAR_HFOV_PORTRAIT = 60;
+const CHASE_NEAR_HFOV_PORTRAIT = 66;
 /**
  * 카메라가 올라가기 시작하는 · 다 올라가는 지점 — **교차로 중심에서의 거리(m)**.
  * 좌·우 시야 창이 떠오르던 구간(PeripheralView 의 FADE_DIST · FULL_DIST)과 같은 자리다.
  */
 const RISE_FADE_DIST = STOP_LINE + 22;
 const RISE_FULL_DIST = STOP_LINE + 8;
+/**
+ * 다 올라갔을 때 시선을 왼쪽으로 옮기는 거리 (m) — 내 차가 그만큼 화면 오른쪽으로 물러난다.
+ * 내 차는 오른쪽 차로에 있어 횡단보도의 먼 쪽 끝이 늘 왼쪽이므로, 그쪽에 자리를 더 준다.
+ */
+const PAN_LEFT = 3;
 /** 상공 시점이 적어도 담아야 할 가로 화각 (°) — 교차로의 좌우 끝까지 */
 const TOP_MIN_HFOV = 66;
 
