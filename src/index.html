@@ -5193,26 +5193,56 @@
         그 약속을 tests/mobileLandscape.test.ts 가 지킨다.
       */
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
-        /* 세로 여백을 걷어낸다 — 여기서는 1px 이 아깝다 */
+        /*
+          **첫 줄을 둘이 나눠 쓴다** — 왼쪽에 길 안내 버튼, 오른쪽에 사이트 전체 성공 · 실패
+          (사용자가 정했다: *"우회전 · 어린이보호구역 · 내 습관 · 설정을 가장 윗 라인으로 옮기고
+          앞의 아이콘은 없앰"*). 버튼 줄이 혼자 한 줄을 쓰던 것을 걷어내, 그만큼을 이름과
+          연습 버튼에 돌려준다.
+
+          차례가 화면과 다르므로(글에서는 성공 · 실패가 먼저다) 자리를 칸으로 직접 짚는다.
+        */
         #screen-menu .screen-inner {
           padding: 6px 14px 6px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          row-gap: 6px;
+          column-gap: 10px;
         }
-        /* 사이트 전체 성공 · 실패 — 오른쪽 위 그대로 두고 한 줄만 낮춘다 */
+        #screen-menu .menu-links {
+          grid-row: 1;
+          grid-column: 1;
+          margin: 0;
+          gap: 6px;
+        }
         #screen-menu .site-stats {
-          margin-bottom: 4px;
+          grid-row: 1;
+          grid-column: 2;
+          margin: 0;
           font-size: 11.5px;
         }
         #screen-menu .hero {
+          grid-row: 2;
+          grid-column: 1 / -1;
           margin-bottom: 0;
         }
+        #screen-menu .ai-course {
+          grid-row: 3;
+          grid-column: 1 / -1;
+        }
+        #screen-menu .site-footer {
+          grid-row: 4;
+          grid-column: 1 / -1;
+        }
+        /* 이름은 이 화면의 얼굴이다 — 자리가 남은 만큼 키운다 (사용자가 정했다) */
         #screen-menu .brand-wrap {
-          padding: 4px 14px;
+          padding: 7px 16px;
         }
         #screen-menu .brand {
-          font-size: 18px;
+          font-size: 24px;
         }
         #screen-menu .brand-sub {
-          font-size: 13px;
+          font-size: 17px;
         }
         /*
           **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
@@ -5224,14 +5254,18 @@
         #screen-menu #btn-trial {
           display: none;
         }
-        #screen-menu .menu-links {
-          margin-top: 5px;
-          gap: 6px;
+        /*
+          아이콘은 뺀다 — 첫 줄에 올라온 작은 버튼에서는 글자만 읽으면 된다 (사용자가 정했다).
+          **글자가 없는 버튼(설정 톱니)은 빼면 안 된다** — 그림이 곧 이름이라, 빼면 빈 상자가 남는다.
+        */
+        #screen-menu .menu-links button:not(.icon) svg {
+          display: none;
         }
         #screen-menu .menu-links button {
-          min-height: 30px;
-          padding: 3px 12px;
-          font-size: 12.5px;
+          min-height: 26px;
+          padding: 2px 10px;
+          font-size: 11.5px;
+          gap: 0;
         }
         /*
           읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다).
@@ -5258,30 +5292,36 @@
           margin-top: 0;
         }
         /*
-          **두 칸.** 왼쪽 위에 레벨 칸, 그 아래 차 그림 — 오른쪽 한 칸을 통째로 연습 버튼이 쓴다.
-          `align-items: stretch` 라야 오른쪽 상자가 왼쪽 두 줄만큼 키가 자라 **버튼이 크게** 선다.
+          **세 칸 — 레벨 | 자동차 | 연습** (사용자가 그림으로 정했다). 레벨 아래에 차를 두던 것을
+          옆으로 옮겼다: 가로 화면에서 아까운 것은 높이이지 폭이 아니라, 셋을 한 줄에 세우면
+          상자가 한 줄만큼 낮아지고 그 몫이 이름과 버튼으로 간다.
+
+          셋이 한 줄이므로 **가운데로 맞춘다** — 키가 서로 다른 칸을 위로 맞추면 차 그림만
+          공중에 뜬 것처럼 보인다.
         */
         #screen-menu .ai-course {
-          margin: 5px 0 0;
-          padding: 6px 12px;
+          margin: 0;
+          padding: 8px 12px;
           display: grid;
-          grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-          grid-template-rows: auto 1fr;
+          grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.5fr) minmax(0, 1.2fr);
+          align-items: center;
           column-gap: 14px;
         }
         #screen-menu .ai-course > .player {
           grid-column: 1;
           grid-row: 1;
         }
+        /* 차 칸의 윗줄 구분선은 뗀다 — 옆으로 섰으니 가로선이 뜻을 잃는다 */
         #screen-menu .ai-split {
-          grid-column: 1;
-          grid-row: 2;
-          margin-top: 6px;
-          padding-top: 6px;
+          grid-column: 2;
+          grid-row: 1;
+          margin-top: 0;
+          padding-top: 0;
+          border-top: none;
         }
         #screen-menu .mode-split {
-          grid-column: 2;
-          grid-row: 1 / span 2;
+          grid-column: 3;
+          grid-row: 1;
           margin-top: 0;
           grid-template-columns: minmax(0, 1fr);
         }
@@ -5291,7 +5331,7 @@
           font-size: 12.5px;
         }
         #screen-menu .ai-car-photo {
-          max-width: 76px;
+          max-width: 96px;
         }
         /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
         #screen-menu .mode-split > .mode-group {
@@ -5308,11 +5348,11 @@
         }
         #screen-menu .mode-split .ai-course-actions button {
           flex: 1;
-          min-height: 58px;
+          min-height: 62px;
         }
         /* 저작권 줄은 짧은 꼴 한 줄로 — 세로 화면에서 쓰는 것과 같은 글이다 */
         #screen-menu .site-footer {
-          margin: 6px 0 0;
+          margin: 0;
           font-size: 11.5px;
         }
         #screen-menu .site-footer .usage-long {

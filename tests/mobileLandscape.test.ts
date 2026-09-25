@@ -109,17 +109,45 @@ describe('가로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **두 칸.** 왼쪽 위 레벨 칸 · 그 아래 차, 오른쪽 한 칸을 통째로 연습 버튼이 쓴다.
-    오른쪽이 두 줄에 걸쳐야(`grid-row: 1 / span 2`) 버튼이 크게 선다.
+    **세 칸 — 레벨 | 자동차 | 연습** (사용자가 그림으로 정했다). 레벨 아래에 차를 두던 것을
+    옆으로 옮겼다: 가로 화면에서 아까운 것은 높이이지 폭이 아니다. 셋이 한 줄이므로
+    차례(1 · 2 · 3)가 뒤바뀌면 그림과 달라진다 — 그래서 칸 번호까지 못 박는다.
   */
-  it('첫 화면 상자를 좌우 두 칸으로 편다', () => {
+  it('첫 화면 상자를 레벨 · 자동차 · 연습 세 칸으로 편다', () => {
     const r = rules();
     expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*display:\s*grid/);
-    expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*grid-template-columns:/);
+    expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*grid-template-columns:[^;]*minmax[^;]*minmax[^;]*minmax/);
     expect(r).toMatch(/#screen-menu \.ai-course > \.player \{[^}]*grid-column:\s*1/);
-    expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*1/);
-    expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*2/);
-    expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-row:\s*1 \/ span 2/);
+    expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*2/);
+    expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*3/);
+    // 셋이 한 줄이다 — 한 칸이라도 아래로 내려가면 상자가 한 줄만큼 높아진다
+    for (const sel of ['\\.ai-course > \\.player', '\\.ai-split', '\\.mode-split']) {
+      expect(r).toMatch(new RegExp(`#screen-menu ${sel} \\{[^}]*grid-row:\\s*1`));
+    }
+  });
+
+  /*
+    **길 안내 버튼은 맨 윗줄에서 성공 · 실패와 한 줄을 나눠 쓴다** (사용자가 정했다).
+    혼자 한 줄을 쓰던 것을 걷어내 그만큼을 이름과 연습 버튼에 돌려준다. 글에서의 차례가
+    화면과 다르므로(성공 · 실패가 먼저 적혀 있다) 자리를 칸으로 직접 짚어야 한다.
+  */
+  it('길 안내 버튼과 성공 · 실패가 맨 윗줄을 나눠 쓴다', () => {
+    const r = rules();
+    expect(r).toMatch(/#screen-menu \.screen-inner \{[^}]*display:\s*grid/);
+    expect(r).toMatch(/#screen-menu \.menu-links \{[^}]*grid-row:\s*1;[^}]*grid-column:\s*1/);
+    expect(r).toMatch(/#screen-menu \.site-stats \{[^}]*grid-row:\s*1;[^}]*grid-column:\s*2/);
+    // 이름 · 상자 · 저작권은 그 아래로 차례대로 — 자리를 안 주면 첫 줄 옆에 끼어든다
+    expect(r).toMatch(/#screen-menu \.hero \{[^}]*grid-row:\s*2/);
+    expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*grid-row:\s*3/);
+    expect(r).toMatch(/#screen-menu \.site-footer \{[^}]*grid-row:\s*4/);
+  });
+
+  /*
+    **작아진 버튼에서는 아이콘을 뺀다** (사용자가 정했다) — 다만 **글자가 없는 버튼**
+    (설정 톱니)에서 빼면 빈 상자만 남는다. 실제로 한 번 그렇게 나왔다.
+  */
+  it('길 안내 버튼의 아이콘은 빼되 톱니는 남긴다', () => {
+    expect(rules()).toMatch(/#screen-menu \.menu-links button:not\(\.icon\) svg \{\s*display:\s*none/);
   });
 
   /*
