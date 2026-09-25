@@ -116,7 +116,9 @@ const STEP_UP_TIME = 0.55;
  * **건너편**(30m 넘게 떨어진 보도)에서 건너오는 사람 위에서는 점만 하게 줄어, 정작 가장 먼저
  * 알아야 할 사람을 놓쳤다. 화면 기준으로 두면 어디에 있든 같은 크기로 눈에 들어온다.
  *
- * 값은 three 의 `sizeAttenuation: false` 스프라이트 배율이다 — 화면 높이의 약 4% 가 된다.
+ * 값은 **카메라에서 1m 떨어졌을 때의 크기(m)** 다 — `faceCamera` 가 거리에 비례해 키우므로
+ * 화면에서는 어디서나 같은 크기(높이의 약 4%)로 맺힌다. 한때 three 의 스프라이트가 이 계산을
+ * 대신 해 줬는데, 같은 값을 그대로 쓰도록 맞춰 두었다 (`faceCamera` 주석 참고).
  * (처음에 6% 로 두었더니 사람보다 느낌표가 커서 너무 크다는 말을 들었다)
  */
 const ALERT_SIZE = 0.055;
@@ -246,6 +248,12 @@ export function alertTexture(kind: 'intending' | 'crossing'): THREE.DataTexture 
   return alertTextures[kind];
 }
 
+/** `faceCamera` 가 그릴 때마다 쓰는 자리 — 매번 새로 만들면 쓰레기가 쌓인다 */
+const FORWARD = new THREE.Vector3();
+const WORLD = new THREE.Vector3();
+const CAM_POS = new THREE.Vector3();
+const CAM_Q = new THREE.Quaternion();
+
 const SKIN = [0xf0c8a0, 0xd9a066, 0xa8703c, 0xf5d5b8];
 const CLOTHES = [0x2f4f8f, 0xb3453a, 0x2e6b4f, 0x6b4a8f, 0x333940, 0xc9752b];
 
@@ -271,8 +279,15 @@ export class Pedestrian {
   private walkPhase = 0;
   /** 연석에서 물러선 정도 (1 = 물러서 있음, 0 = 연석까지 나와 있음) */
   private setback = 1;
-  /** 머리 위 느낌표 — 건너려 하거나 건너는 동안만 뜬다 */
-  private alert: THREE.Sprite | null = null;
+  /**
+   * 머리 위 느낌표 — 건너려 하거나 건너는 동안만 뜬다.
+   *
+   * **스프라이트가 아니라 판 하나다.** 아래 `faceCamera` 가 직접 카메라 쪽으로 돌려세우고
+   * 거리에 맞춰 키운다 (그 까닭은 거기 주석에 적었다).
+   */
+  private alert: THREE.Mesh | null = null;
+  /** 이번 프레임의 맥박 배율 — 크기는 `faceCamera` 가 거리를 알아야 정할 수 있다 */
+  private alertBeat = 1;
   /** 발밑 원 — 느낌표와 같이 켜지고 같은 색이다 */
   private ring: THREE.Mesh | null = null;
   private alertKind: 'intending' | 'crossing' | null = null;
@@ -581,19 +596,25 @@ export class Pedestrian {
       return;
     }
     if (!this.alert) {
-      this.alert = new THREE.Sprite(
+      this.alert = new THREE.Mesh(
+        this.track(new THREE.PlaneGeometry(1, 1)),
         this.track(
-          new THREE.SpriteMaterial({
+          new THREE.MeshBasicMaterial({
             transparent: true,
             depthWrite: false,
             // 앞의 차·기둥에 가려져도 보이게 — 이 표시는 "저기 사람이 있다" 를 말하는 것이다
             depthTest: false,
             toneMapped: false,
-            sizeAttenuation: false,
           }),
         ),
       );
       this.alert.renderOrder = 6;
+      /*
+        크기를 그리기 직전에 정하므로, 잘라 낼지 말지를 재는 **지난 프레임 크기**로는 판단이
+        어긋난다 — 표시는 몇 개 안 되니 잘라 내지 않는다.
+      */
+      this.alert.frustumCulled = false;
+      this.alert.onBeforeRender = (_r, _s, camera) => this.faceCamera(camera);
       this.group.add(this.alert);
 
       /*
@@ -618,8 +639,8 @@ export class Pedestrian {
       this.group.add(this.ring);
     }
     if (kind !== this.alertKind) {
-      (this.alert.material as THREE.SpriteMaterial).map = map;
-      (this.alert.material as THREE.SpriteMaterial).needsUpdate = true;
+      (this.alert.material as THREE.MeshBasicMaterial).map = map;
+      (this.alert.material as THREE.MeshBasicMaterial).needsUpdate = true;
       (this.ring!.material as THREE.MeshBasicMaterial).color.set(
         kind === 'crossing' ? ALERT_RED : ALERT_AMBER,
       );
@@ -635,18 +656,53 @@ export class Pedestrian {
     this.alertPhase += dt * 5;
     const head = (1.54 + 0.125) * this.scale;
     this.alert.position.y = head + ALERT_LIFT + Math.sin(this.alertPhase) * 0.06;
-    const beat = kind === 'crossing' ? 1 + ALERT_PULSE * (0.5 + 0.5 * Math.sin(this.alertPhase * 1.6)) : 1;
-    /*
-      가로·세로를 **같은 값**으로 둔다 — 스프라이트는 시점 공간의 정사각형이라, 화면에서도
-      정사각형으로 맺힌다(가로 픽셀 = W·s/(비율·tan) = H·s/tan = 세로 픽셀).
-      한때 가로만 비율로 나눠 봤는데 그러면 오히려 찌그러졌다.
-
-      사용자가 본 찌그러짐은 여기가 아니라 **화각**이 원인이었다 — 세로 휴대폰의 후방 시점이
-      108° 까지 벌어져 화면 가장자리의 물체가 늘어나 보였다 (CameraRig 의 CHASE_MIN_HFOV_PORTRAIT).
-    */
-    this.alert.scale.set(ALERT_SIZE * beat, ALERT_SIZE * beat, 1);
+    this.alertBeat =
+      kind === 'crossing' ? 1 + ALERT_PULSE * (0.5 + 0.5 * Math.sin(this.alertPhase * 1.6)) : 1;
     (this.ring!.material as THREE.MeshBasicMaterial).opacity =
       0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.alertPhase * 1.6));
+  }
+
+  /**
+   * **머리 위 느낌표를 카메라 쪽으로 돌려세우고, 거리에 맞춰 키운다.**
+   *
+   * 예전에는 three 의 `Sprite`(`sizeAttenuation: false`)가 이 둘을 대신 해 줬다. 그런데
+   * 사용자의 휴대폰에서만 이 표시가 **세로로 늘어진 방패 모양**으로 나왔다 — 세 번의 화면 캡처가
+   * 같은 모양이었고, PC · 노트북 · 실제 GPU 어디서도 재현되지 않았다. 그림을 캔버스에서 숫자
+   * 계산으로 바꿔도 그대로였으니, 남은 것은 **스프라이트를 그리는 길**뿐이었다.
+   *
+   * 그래서 그 길을 걷어냈다. 판 하나를 놓고 카메라의 방향을 그대로 베껴 돌려세우면 늘 정면으로
+   * 맺히고, 거리에 비례해 키우면 화면에서 **늘 같은 크기**가 된다 (멀리 있는 사람 위에서도 점만
+   * 해지지 않게 하려고 스프라이트를 쓴 까닭이 이것이었다 — `ALERT_SIZE` 주석 참고).
+   *
+   * **그리기 직전에, 그리는 카메라마다 따로** 한다 (`onBeforeRender`). 한 판을 그리는 카메라는
+   * 하나가 아니다 — 본 화면 · 거울 · 시야 창이 저마다 다른 자리에서 본다. 한 번만 맞춰 두면
+   * 나머지 창에서는 비스듬히 서 버린다.
+   */
+  private faceCamera(camera: THREE.Camera): void {
+    const mark = this.alert;
+    if (!mark) return;
+    CAM_POS.setFromMatrixPosition(camera.matrixWorld);
+    CAM_Q.setFromRotationMatrix(camera.matrixWorld);
+    /*
+      **어미(this.group)의 회전을 되돌린 뒤 카메라 방향을 얹는다.** 사람은 건너는 쪽을 보고
+      서 있어서 어미가 이미 돌아가 있다 — 그대로 넣으면 그만큼 어긋난다.
+      (어미는 장면에 바로 붙으므로 어미의 회전이 곧 세상에서의 회전이다.)
+    */
+    mark.quaternion.copy(this.group.quaternion).invert().multiply(CAM_Q);
+    /*
+      **카메라 정면 축으로 잰 거리**에 비례해 키운다. 눈에서의 직선 거리로 재면 화면 가장자리에
+      있는 사람의 표시가 가운데 있는 사람보다 커져, 멀고 가까움이 거꾸로 읽힌다.
+    */
+    FORWARD.set(0, 0, -1).applyQuaternion(CAM_Q);
+    WORLD.set(this.group.position.x, mark.position.y, this.group.position.z).sub(CAM_POS);
+    const size = ALERT_SIZE * Math.max(0.01, WORLD.dot(FORWARD)) * this.alertBeat;
+    mark.scale.set(size, size, 1);
+    /*
+      **손으로 행렬을 다시 맞춘다.** `onBeforeRender` 는 장면의 행렬이 이미 계산된 뒤에 불린다 —
+      여기서 바꾼 것을 알려 주지 않으면 지난 프레임 값으로 그려진다.
+    */
+    mark.updateMatrix();
+    if (mark.parent) mark.matrixWorld.multiplyMatrices(mark.parent.matrixWorld, mark.matrix);
   }
 
   /** 팔다리를 한 자세로 맞춘다 — 걷기·한 걸음·발 바꿔 딛기가 모두 이 한 곳을 지난다 */
