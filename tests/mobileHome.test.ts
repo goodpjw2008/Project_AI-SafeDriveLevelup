@@ -152,6 +152,26 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).not.toContain('transform: scale');
   });
 
+  /*
+    **저작권 줄은 짧은 꼴로 두 줄** (사용자가 정했다) — `Copyright © 2026 goodpjw2008` / `비영리 목적 사용`.
+    글은 CSS 로 바꿀 수 없어 두 벌을 두고 화면이 고르게 한다. 메일은 뒷부분만 감추므로
+    **`mailto:` 링크는 그대로다** — 눌러서 메일을 쓸 수 있어야 연락처를 적은 뜻이 산다.
+  */
+  it('저작권 줄은 짧은 꼴로, 늘 두 줄로 선다', () => {
+    const block = rulesOnly();
+    expect(block).toContain('#screen-menu .site-footer .mail-host');
+    expect(block).toContain('#screen-menu .site-footer .usage-long');
+    // 둘째 줄을 못 박는 것은 flex-basis 다 — 폭이 넓어져도 한 줄로 붙지 않는다
+    expect(block).toMatch(/\.usage-short \{[^}]*flex-basis: 100%;/);
+  });
+
+  /* 링크는 통째로 두 벌 두지 않는다 — 주소가 어긋나면 눌러도 다른 곳으로 간다 */
+  it('메일 링크는 한 벌뿐이고 뒷부분만 감싼다', () => {
+    const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
+    expect(screens).toContain('class="mail-host"');
+    expect(screens).toContain('mailto:${esc(APP_CONTACT)}');
+  });
+
   /* 좁은 폭에서 오른쪽에 붙으면 한쪽만 차 보인다 — 가운데로 모은다 */
   it('사이트 전체 성공 · 실패는 가운데로 모은다', () => {
     expect(mobileBlock()).toMatch(/\.site-stats\s*\{\s*justify-content:\s*center;/);

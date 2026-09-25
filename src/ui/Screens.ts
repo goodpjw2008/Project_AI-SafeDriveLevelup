@@ -12,6 +12,7 @@ import {
   APP_TAGLINE,
   APP_TAGLINE_PARTS,
   APP_USAGE,
+  APP_USAGE_SHORT,
 } from '../brand';
 import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
@@ -319,13 +320,22 @@ const OSS_LIBRARIES: Array<{ name: string; role: string; license: string; url: s
  * 이메일은 누르면 바로 메일을 쓰게 `mailto:` 로 둔다. 값은 brand.ts 한 곳에서 온다 (About 창과 같이 쓴다).
  */
 function siteFooter(): string {
+  /*
+    **세로 휴대폰에서는 짧은 꼴로 두 줄** (사용자가 정했다) — `Copyright © 2026 goodpjw2008` / `비영리 목적 사용`.
+    손안 화면에서는 이 줄이 셋으로 갈라져 저작권만 세 줄을 썼다.
+
+    글은 CSS 로 바꿀 수 없으니 **두 벌을 두고 화면이 고르게 한다.** 메일 주소는 통째로 두 벌 두지 않고
+    뒷부분(`@gmail.com`)만 감싼다 — 링크(`mailto:`)는 그대로라 눌러서 메일을 쓸 수 있다.
+  */
+  const [mailName, mailHost] = APP_CONTACT.split('@');
   return `
     <footer class="site-footer">
       <span>Copyright © ${APP_COPYRIGHT_YEAR}</span>
       <span class="dot" aria-hidden="true">·</span>
-      <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a>
+      <a href="mailto:${esc(APP_CONTACT)}">${esc(mailName)}<span class="mail-host">@${esc(mailHost)}</span></a>
       <span class="dot" aria-hidden="true">·</span>
-      <span>${esc(APP_USAGE)}</span>
+      <span class="usage-long">${esc(APP_USAGE)}</span>
+      <span class="usage-short">${esc(APP_USAGE_SHORT)}</span>
     </footer>`;
 }
 

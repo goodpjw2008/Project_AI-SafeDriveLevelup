@@ -473,6 +473,10 @@
         그으면 선이 두 겹으로 보였고, 선과 그 위아래 여백(28 · 14px)이 이 줄을 화면 밖으로 밀어내고
         있었다. 카드가 끝나는 자리가 이미 경계라, 저작권 줄을 가르는 일은 여백만으로 넉넉하다.
       */
+      /* 저작권 줄의 짧은 꼴 — 세로 휴대폰에서만 쓴다 (ui/Screens.ts 의 siteFooter) */
+      .site-footer .usage-short {
+        display: none;
+      }
       .site-footer {
         display: flex;
         flex-wrap: wrap;
@@ -5301,6 +5305,23 @@
         }
         #screen-menu .site-footer {
           margin: 10px 0 0;
+          /* 좁은 화면 규칙이 세로로 세워 셋으로 갈라 놓았다 — 다시 눕혀 두 줄로 접는다 */
+          flex-direction: row;
+          flex-wrap: wrap;
+          gap: 2px 6px;
+        }
+        /* 메일은 앞부분만 — 링크는 그대로라 눌러서 메일을 쓸 수 있다 */
+        #screen-menu .site-footer .mail-host {
+          display: none;
+        }
+        /* 긴 꼴 대신 짧은 꼴. `flex-basis: 100%` 로 **늘 둘째 줄**에 선다 (사용자가 두 줄로 정했다) */
+        #screen-menu .site-footer .usage-long {
+          display: none;
+        }
+        #screen-menu .site-footer .usage-short {
+          display: block;
+          flex-basis: 100%;
+          text-align: center;
         }
       }
 

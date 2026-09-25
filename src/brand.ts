@@ -164,6 +164,11 @@ export const APP_CONTACT = 'goodpjw2008@gmail.com';
 export const APP_COPYRIGHT_YEAR = 2026;
 /** 이용 조건 한 줄 — 차량 모델에 비상업(NC) 조건이 있어 이 작품 전체가 비영리다 (README '이미지 라이선스') */
 export const APP_USAGE = '비영리 목적으로만 사용합니다';
+/**
+ * 같은 말의 **짧은 꼴** — 세로 휴대폰의 저작권 줄이 쓴다 (사용자가 정했다).
+ * 손안 화면에서는 이 줄이 셋으로 갈라졌다. 뜻이 같은 채로 줄만 줄인다.
+ */
+export const APP_USAGE_SHORT = '비영리 목적 사용';
 
 /** 링크로 공유했을 때 제목 아래 붙는 설명 */
 export const APP_DESCRIPTION =
