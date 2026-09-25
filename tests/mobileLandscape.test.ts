@@ -26,24 +26,36 @@ const NARROW = `${COND} and (max-width: 860px) {`;
 const TINY = `${COND} and (max-width: 760px) {`;
 const ALL = [HEAD, NARROW, TINY];
 
-/** 가로 휴대폰 전용 덩어리 — 여는 중괄호부터 짝이 맞는 닫는 중괄호까지 */
-const block = (head = HEAD): string => {
-  const at = html.indexOf(head);
-  if (at < 0) throw new Error(`가로 휴대폰 전용 미디어 쿼리를 찾지 못했다: ${head}`);
-  let depth = 0;
-  for (let i = at + head.length - 1; i < html.length; i++) {
-    if (html[i] === '{') depth++;
-    else if (html[i] === '}' && --depth === 0) return html.slice(at, i + 1);
+/**
+ * 같은 머리를 쓰는 덩어리 **모두** — 첫 화면과 'AI 가 고르는 창' 이 조건이 같아 따로 서 있다.
+ * 여는 중괄호부터 짝이 맞는 닫는 중괄호까지 잘라 온다.
+ */
+const blocks = (head = HEAD): string[] => {
+  const out: string[] = [];
+  for (let at = html.indexOf(head); at >= 0; at = html.indexOf(head, at + 1)) {
+    let depth = 0;
+    for (let i = at + head.length - 1; i < html.length; i++) {
+      if (html[i] === '{') depth++;
+      else if (html[i] === '}' && --depth === 0) {
+        out.push(html.slice(at, i + 1));
+        break;
+      }
+    }
   }
-  throw new Error('미디어 쿼리가 닫히지 않았다');
+  if (out.length === 0) throw new Error(`가로 휴대폰 전용 미디어 쿼리를 찾지 못했다: ${head}`);
+  return out;
 };
+
+/** 그중 첫 덩어리 — 첫 화면 규칙이 여기 있다 */
+const block = (head = HEAD): string => blocks(head)[0];
 
 /** 주석을 걷어낸 규칙만 */
 const rules = (head?: string): string => block(head).replace(/\/\*[\s\S]*?\*\//g, '');
 
 /** 덩어리 안의 선택자들 — `{` 앞에 오는 줄들 */
-const selectors = (head: string = HEAD): string[] =>
-  rules(head)
+const selectorsOf = (raw: string, head: string): string[] =>
+  raw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .slice(head.length)
     .split('{')
     .slice(0, -1)
@@ -69,13 +81,20 @@ describe('가로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **손대는 곳은 첫 화면뿐이다.** 규칙 하나라도 `#screen-menu` 밖으로 나가면 주행 화면 ·
-    결과 화면 · 설정까지 가로에서 달라진다. 사용자가 고쳐 달라고 한 것은 첫 화면이다.
+    **손대는 곳은 둘뿐이다** — 첫 화면(`#screen-menu`)과 AI 가 맵을 고르는 창(`.ai-pick`).
+    규칙 하나라도 이 밖으로 나가면 주행 화면 · 결과 화면 · 설정까지 가로에서 달라진다.
+    사용자가 고쳐 달라고 한 것은 그 둘이다.
   */
-  it('모든 규칙이 첫 화면 안에만 걸린다', () => {
+  it('모든 규칙이 첫 화면과 AI 가 고르는 창 안에만 걸린다', () => {
+    const allowed = ['#screen-menu', '.ai-pick'];
     for (const head of ALL) {
-      for (const sel of selectors(head)) {
-        expect(sel.startsWith('#screen-menu'), `${sel} 가 첫 화면 밖으로 나갔다`).toBe(true);
+      for (const b of blocks(head)) {
+        for (const sel of selectorsOf(b, head)) {
+          expect(
+            allowed.some((prefix) => sel.startsWith(prefix)),
+            `${sel} 가 첫 화면 · AI 창 밖으로 나갔다`,
+          ).toBe(true);
+        }
       }
     }
   });
@@ -232,6 +251,22 @@ describe('가로 휴대폰의 첫 화면', () => {
     expect(r).toMatch(/#screen-menu \.site-footer \.usage-long \{\s*display:\s*none/);
     expect(r).toMatch(/#screen-menu \.site-footer \.usage-short \{\s*display:\s*inline/);
     expect(r).toMatch(/#screen-menu \.site-footer \.mail-host \{\s*display:\s*none/);
+  });
+
+  /*
+    **AI 가 고르는 창도 로봇 | 내용 한 줄이다** (사용자가 정했다: *"AI 안전이 | 내용"*).
+    세로로 쌓으면 로봇(230px)만으로 화면의 2/3 를 써 카드가 390px 이 됐다 — 335px 화면을 넘겼다.
+    **추천 사유는 접는다** — 세로 화면에서 접은 것과 같은 줄이다.
+  */
+  it('AI 가 고르는 창은 로봇과 글이 한 줄로 서고, 추천 사유는 접는다', () => {
+    const pick = blocks(HEAD)[1];
+    expect(pick, '첫 화면 말고 AI 창 덩어리가 따로 있어야 한다').toBeTruthy();
+    const r = pick.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(r).toMatch(/\.ai-pick-card \{[^}]*flex-direction:\s*row/);
+    expect(r).toMatch(/\.ai-pick-robot \{[^}]*flex:\s*0 0 auto/);
+    expect(r).toMatch(/\.ai-pick-why \{\s*display:\s*none/);
+    // 글 칸은 남는 폭을 다 쓰되, 긴 줄이 칸을 밀어내지 않아야 한다
+    expect(r).toMatch(/\.ai-pick-analyzing,\s*\n?\s*\.ai-pick-result \{[^}]*min-width:\s*0/);
   });
 
   /*

@@ -5224,10 +5224,23 @@
           grid-column: 2;
           margin: 0;
         }
+        /*
+          **글자 크기는 건드리지 않는다 — 줄이는 것은 상자와 줄 간격뿐이다** (사용자가 바로잡아 줬다:
+          *"폰트는 예전 크기여야 해. 바깥을 싸고 있는 것과 글자의 위아래 여백을 줄여 달라는 거였어"*).
+
+          한 번 엉뚱한 곳을 줄였다 — 위아래 여백의 대부분은 `.brand-wrap` 이 아니라 **이 상자의
+          `padding: 16px`** 과 이름의 **`line-height: 1.42`** 였다. 세로로 두 줄이 될 때를 위한
+          값인데, 가로에서는 한 줄뿐이라 그만큼이 통째로 빈자리가 된다.
+        */
         #screen-menu .hero {
           grid-row: 2;
           grid-column: 1 / -1;
           margin-bottom: 0;
+          padding: 5px 20px;
+        }
+        #screen-menu .brand,
+        #screen-menu .brand-sub {
+          line-height: 1.2;
         }
         #screen-menu .ai-course {
           grid-row: 3;
@@ -5242,9 +5255,8 @@
           기기를 돌렸다고 커졌다 작아지면 같은 물건으로 읽히지 않는다.
           세로에서 쓰는 값 그대로: 이름 26px · 가운뎃점 22px · 부제 18px.
         */
-        /* 위아래 여백은 바짝 — 여기서 아낀 만큼이 그대로 아래 줄의 키가 된다 (사용자가 정했다) */
         #screen-menu .brand-wrap {
-          padding: 1px 16px;
+          padding: 0;
         }
         #screen-menu .brand {
           font-size: 26px;
@@ -5400,7 +5412,7 @@
         #screen-menu .ai-car-photo {
           width: auto;
           max-width: none;
-          height: 146px;
+          height: 156px;
         }
         /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
         #screen-menu .mode-split > .mode-group {
@@ -5417,7 +5429,7 @@
         }
         #screen-menu .mode-split .ai-course-actions button {
           flex: 1;
-          min-height: 78px;
+          min-height: 84px;
         }
         /* 저작권 줄은 짧은 꼴 한 줄로 — 세로 화면에서 쓰는 것과 같은 글이다 */
         #screen-menu .site-footer {
@@ -5432,6 +5444,76 @@
         }
         /* 메일은 앞부분만 — 세로 화면과 같다. 링크는 그대로라 눌러서 메일을 쓸 수 있다 */
         #screen-menu .site-footer .mail-host {
+          display: none;
+        }
+      }
+      /*
+        ── 손에 든 가로 화면의 'AI 가 고르는 창' ──────────────────────────────
+
+        **로봇 | 내용 한 줄로** (사용자가 정했다: *"AI 안전이 | 내용"*). 세로로 쌓으면
+        로봇(230px)만으로 화면의 2/3 를 쓰고 분석 단계가 아래로 밀려 나간다 — 실제로 카드가
+        390px 이라 335px 화면을 넘겼다. 가로 화면은 넓고 낮으니 여기서도 옆으로 편다.
+
+        **추천 사유는 접는다** (사용자가 정했다) — 세로 화면에서 접은 것과 같은 줄이다.
+        읽을 틈이 있는 화면이 아니고, 무엇을 고치려는 판인지는 바로 위 줄이 이미 말한다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        .ai-pick {
+          padding: 10px 14px;
+        }
+        .ai-pick-card {
+          width: min(880px, 100%);
+          flex-direction: row;
+          align-items: center;
+          gap: 18px;
+          text-align: left;
+        }
+        /* 로봇은 한 칸을 지키되 화면 높이에 맞게 줄인다 */
+        .ai-pick-robot {
+          flex: 0 0 auto;
+          width: 148px;
+          height: 148px;
+        }
+        .ai-pick-robot img {
+          width: 122px;
+          height: 96px;
+        }
+        /* 글은 남은 폭을 다 쓴다 — `min-width: 0` 이라야 긴 줄이 칸을 밀어내지 않는다 */
+        .ai-pick-analyzing,
+        .ai-pick-result {
+          flex: 1 1 auto;
+          min-width: 0;
+          width: auto;
+        }
+        .ai-pick-analyzing h2,
+        .ai-pick-result .ai-pick-picked {
+          font-size: 19px;
+        }
+        .ai-pick-steps {
+          margin-top: 10px;
+          gap: 6px;
+          font-size: 13.5px;
+        }
+        .ai-pick-steps .mark {
+          width: 15px;
+          height: 15px;
+        }
+        .ai-pick-track {
+          margin-top: 10px;
+        }
+        .ai-pick-result {
+          gap: 8px;
+        }
+        .ai-pick-lead {
+          font-size: 15px;
+        }
+        /* 글이 왼쪽으로 정렬됐으니 이 줄만 가운데에 남지 않게 한다 */
+        .ai-pick-status {
+          align-self: flex-start;
+          margin-top: 8px;
+          font-size: 17px;
+        }
+        .ai-pick-why {
           display: none;
         }
       }
