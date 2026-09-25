@@ -142,14 +142,67 @@ describe('세로 휴대폰의 첫 화면', () => {
     **줄이는 것은 여백뿐이다.** 손가락으로 누르는 화면에서 버튼을 줄이면 못 누르고 글자를 줄이면
     못 읽는다. 그래서 글자 크기(`font-size`)와 버튼 크기는 이 덩어리에서 건드리지 않는다.
   */
-  it('여백만 줄인다 — 글자 · 버튼 크기는 건드리지 않는다', () => {
+  it('첫 화면은 여백만 줄인다 — 글자 · 버튼 크기는 건드리지 않는다', () => {
     const block = rulesOnly();
     for (const sel of ['#screen-menu .screen-inner', '#screen-menu .hero', '#screen-menu .site-footer']) {
       expect(block).toContain(sel);
     }
-    // 여백을 줄이려고 글자나 버튼을 깎지 않았는가
-    expect(block).not.toContain('font-size');
-    expect(block).not.toContain('transform: scale');
+    /*
+      첫 화면(`#screen-menu`) 규칙만 모아서 본다 — 결과 화면은 글자를 한 단계 줄이는 것이
+      바로 그 일이라(제목을 한 줄에 세운다) 함께 재면 늘 걸린다.
+    */
+    const homeRules = [...block.matchAll(/#screen-menu[^{]*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
+    expect(homeRules).not.toContain('font-size');
+    expect(homeRules).not.toContain('transform: scale');
+  });
+
+  /*
+    **손에 든 세로 화면에서는 시간이 절반으로 흐른다** (사용자가 정했다). 화면의 화살표 버튼은
+    키보드보다 뭉툭해 같은 판이 휴대폰에서 훨씬 어려웠다. 판을 쉽게 만드는 대신 시간을 늦춘다 —
+    보고 판단할 틈은 두 배가 되지만 **무엇이 위반인지는 그대로다.**
+
+    한 곳(`dt`)에서만 곱해야 차 · 보행자 · 앞차 · 신호 · 제한시간이 **같은 비율로** 느려진다.
+    화면 규칙과 조건이 같아야 가로로 돌렸을 때 곧바로 제 속도로 돌아온다.
+  */
+  it('세로 휴대폰에서는 판이 절반 속도로 흐른다 — 조건은 화면 규칙과 같다', () => {
+    const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
+    expect(game).toContain('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)');
+    expect(game).toMatch(/matches \? 0\.5 : 1/);
+    // dt 한 곳에서만 곱한다 — 두 곳에서 곱하면 판정이 어긋난다
+    expect([...game.matchAll(/paceScale\(\)/g)].length).toBe(2);
+  });
+
+  /* 누가 골랐는지 · 조언했는지의 짧은 꼴 — 이름표는 그대로 두고 설명만 줄인다 */
+  it('AI 이름표 줄은 짧은 꼴로 바뀐다', () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/\.pick-long \{\s*display: none;/);
+    expect(block).toMatch(/\.pick-short \{\s*display: inline;/);
+    const picked = readFileSync(fileURLToPath(new URL('../src/ui/pickedBy.ts', import.meta.url)), 'utf8');
+    expect(picked).toContain('class="pick-short"');
+  });
+
+  /*
+    **결과 화면의 머리는 한 줄** — `← 홈` 과 판 이름이 두 줄로 접히면 등급 배지와 AI 분석이
+    그만큼 밀려 내려간다 (사용자가 사진으로 짚었다). 등급은 제 줄에서 가운데.
+  */
+  it('결과 화면의 머리를 한 줄로 줄이고 등급을 가운데로 둔다', () => {
+    const block = rulesOnly();
+    expect(block).toContain('#screen-debrief .back-short');
+    expect(block).toMatch(/#screen-debrief \.screen-head h1 \{\s*font-size: 20px;/);
+    expect(block).toMatch(/#screen-debrief \.screen-head-right \{\s*justify-content: center;/);
+  });
+
+  /*
+    **레벨 칸과 '다시 운행' 은 버튼이 하나뿐인 판에서만 반반이다** (`.solo`). 다음 판으로 갈 수 있는
+    판은 버튼이 넷이라(다음 판 · 멈춤 · 다시 운행 · 자동 넘어가기) 반쪽에 넣으면 서로 겹친다 —
+    실제로 그렇게 됐고, 그래서 `solo` 표시를 두었다.
+  */
+  it("레벨 칸과 '다시 운행' 은 solo 일 때만 반반이다", () => {
+    const block = rulesOnly();
+    expect(block).toContain('#screen-debrief .debrief-top.solo > .player-box');
+    expect(block).not.toMatch(/\.debrief-top > \.player-box \{\s*flex: 1 1 0/);
+    const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
+    expect(screens).toContain("canAdvance ? '' : ' solo'");
   });
 
   /*

@@ -1350,13 +1350,37 @@ export class Game {
     this.lastFrame = performance.now();
   }
 
+  /**
+   * **손에 든 세로 화면에서는 시간이 절반으로 흐른다** (사용자가 정했다).
+   *
+   * 화면의 화살표 버튼은 키보드보다 느리고 뭉툭하다 — 같은 판이 휴대폰에서는 훨씬 어려웠다.
+   * 판을 쉽게 만드는 대신 **시간을 늦춘다**: 보고 판단할 틈이 두 배가 되지만, 무엇을 봐야 하는지와
+   * 무엇이 위반인지는 그대로다. 쉬운 판을 따로 만들면 휴대폰으로 익힌 습관이 실제 도로와 달라진다.
+   *
+   * 한 곳(`dt`)에서만 곱한다 — 차 · 보행자 · 앞차 · 신호 · 제한시간이 모두 `dt` 를 따라가므로
+   * 여기만 줄이면 **모두 같은 비율로** 느려진다. 어느 하나만 늦추면 판정이 어긋난다.
+   *
+   * **계기판의 숫자는 그대로다** (사용자가 정했다) — 차가 느려지는 것이 아니라 시간이 천천히 흐른다.
+   *
+   * 조건은 화면 규칙(index.html 의 '손에 든 세로 화면')과 **같다.** 가로로 돌리면 곧바로 제 속도로
+   * 돌아온다 — `matches` 는 볼 때마다 지금 값을 준다.
+   */
+  private readonly slowPace =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)')
+      : null;
+
+  private paceScale(): number {
+    return this.slowPace?.matches ? 0.5 : 1;
+  }
+
   private loop = (): void => {
     if (this.disposed) return;
     this.rafId = requestAnimationFrame(this.loop);
 
     const now = performance.now();
     // 탭 전환 등으로 프레임이 크게 벌어지면 물리가 튀므로 상한을 둔다
-    const dt = Math.min(0.05, (now - this.lastFrame) / 1000);
+    const dt = Math.min(0.05, (now - this.lastFrame) / 1000) * this.paceScale();
     this.lastFrame = now;
 
     if (this.running && !this.finished) this.step(dt);

@@ -67,9 +67,12 @@ export function analyzingBy(picker?: Picker, model?: string): string {
  */
 export function advisedBy(picker?: Picker, model?: string): string {
   if (!picker || picker === 'quota' || picker === 'rule' || picker === 'random') return '';
-  return `${chip(picker)}${
-    model ? ` ${modelName(model)} 모델이` : '이'
-  } 조언해 준 AI 의 코칭이에요`;
+  // 세로 휴대폰은 짧은 꼴 — `Groq 모델의 AI 코칭` (index.html 의 .pick-short)
+  return (
+    `${chip(picker)}<span class="pick-long">${
+      model ? ` ${modelName(model)} 모델이` : '이'
+    } 조언해 준 AI 의 코칭이에요</span>` + `<span class="pick-short"> 모델의 AI 코칭</span>`
+  );
 }
 
 /**
@@ -80,9 +83,16 @@ export function advisedBy(picker?: Picker, model?: string): string {
  */
 export function pickedByHud(picker?: Picker, model?: string): string {
   if (!picker) return '';
-  const head = `${chip(picker)} : `;
-  if (picker === 'quota') return `${head}일일 사용량 초과로 프로그램이 고른 맵`;
-  if (picker === 'rule') return `${head}프로그램이 고른 맵`;
-  if (picker === 'random') return `${head}무작위로 고른 마스터 운행 맵`;
-  return `${head}${model ? `${modelName(model)} 모델이 ` : ''}분석해서 추천해준 맵`;
+  const head = chip(picker);
+  /*
+    **세로 휴대폰은 짧은 꼴** — `Gemini 추천 맵` (사용자가 정했다). 달리면서 읽는 줄인데
+    손안 화면에서는 두 줄로 접혀 하늘과 전방 신호등을 가렸다. 누가 골랐는지(이름표)는 그대로 두고
+    설명만 줄인다 — AI 가 한 일이 보여야 한다는 것이 이 줄을 둔 까닭이기 때문이다.
+  */
+  const pair = (long: string, short: string): string =>
+    `${head}<span class="pick-long">${long}</span><span class="pick-short">${short}</span>`;
+  if (picker === 'quota') return pair(' : 일일 사용량 초과로 프로그램이 고른 맵', ' 한도 초과 · 프로그램 맵');
+  if (picker === 'rule') return pair(' : 프로그램이 고른 맵', ' 프로그램 맵');
+  if (picker === 'random') return pair(' : 무작위로 고른 마스터 운행 맵', ' 무작위 마스터 맵');
+  return pair(` : ${model ? `${modelName(model)} 모델이 ` : ''}분석해서 추천해준 맵`, ' 추천 맵');
 }

@@ -494,12 +494,20 @@ export class Screens {
     right?: string;
     /** 뒤로 버튼 글자. 기본은 '뒤로' */
     backLabel?: string;
+    /**
+     * 좁은 화면에서 쓸 짧은 글 (`홈으로` → `홈`).
+     *
+     * 세로 휴대폰의 결과 화면은 이 버튼과 판 이름이 한 줄에 서야 한다 — 두 줄이 되면
+     * 등급 배지와 AI 분석이 그만큼 밀려 내려간다 (사용자가 사진으로 짚었다).
+     * 주지 않으면 긴 글 하나만 쓴다.
+     */
+    backShort?: string;
   }): string {
     return `
       <div class="screen-head">
-        <button class="back" id="btn-back-${o.id}">${icon('back')}<span>${esc(
+        <button class="back" id="btn-back-${o.id}">${icon('back')}<span class="back-long">${esc(
           o.backLabel ?? '뒤로',
-        )}</span></button>
+        )}</span>${o.backShort ? `<span class="back-short">${esc(o.backShort)}</span>` : ''}</button>
         <div>
           <h1>${o.stage ? `<span class="stage">${withAiBadge(esc(o.stage))}</span>` : ''}<span class="head-title">${esc(
             o.title,
@@ -1738,6 +1746,7 @@ export class Screens {
         // 주행 화면의 목표 상자와 **같은 모양**이다 — 판 이름은 파랑, 제목은 본문색
         ...debriefTitle(sc),
         backLabel: '홈으로',
+        backShort: '홈',
         right: `<div class="grade ${result.grade}">${esc(gradeLabel)}</div>`,
       })}
 
@@ -1800,7 +1809,12 @@ export class Screens {
         무엇을 할까" 한 가지 일이라, 위아래로 쌓으면 화면만 길어지고 읽는 순서는 달라지지 않는다.
         좁은 화면에서는 예전처럼 두 줄로 내려간다 (index.html 의 .debrief-top).
       -->
-      <div class="debrief-top">
+      <!--
+        **버튼이 '다시 운행' 하나뿐인 판에만 solo** — 세로 휴대폰에서 레벨 칸과 버튼을 한 줄에
+        반반으로 놓기 위해서다 (사용자가 정했다). 다음 판으로 갈 수 있는 판은 버튼이 넷이라
+        (다음 판 · 멈춤 · 다시 운행 · 자동 넘어가기) 반쪽에 넣으면 서로 겹친다 — 그때는 제 줄을 쓴다.
+      -->
+      <div class="debrief-top${canAdvance ? '' : ' solo'}">
       ${
         /*
           AI 과정의 진행 — **버튼 위에 둔다.** 다음으로 갈 곳을 누르기 전에 방금 무슨

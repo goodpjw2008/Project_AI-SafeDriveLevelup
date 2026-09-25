@@ -477,6 +477,14 @@
       .site-footer .usage-short {
         display: none;
       }
+      /*
+        같은 규칙의 다른 두 곳 — 누가 골랐는지/조언했는지의 짧은 꼴(ui/pickedBy.ts)과
+        뒤로 버튼의 짧은 글(ui/Screens.ts 의 head). 기본은 긴 꼴만 보인다.
+      */
+      .pick-short,
+      .back-short {
+        display: none;
+      }
       .site-footer {
         display: flex;
         flex-wrap: wrap;
@@ -5322,6 +5330,67 @@
           display: block;
           flex-basis: 100%;
           text-align: center;
+        }
+
+        /*
+          ── 누가 골랐는지 · 조언했는지는 짧은 꼴로 ──
+          `Gemini : gemini-3.1-flash-lite 모델이 분석해서 추천해준 맵` → `Gemini 추천 맵`,
+          `Groq qwen/… 모델이 조언해 준 AI 의 코칭이에요` → `Groq 모델의 AI 코칭` (사용자가 정했다).
+          **이름표는 그대로 둔다** — AI 가 한 일이 보여야 한다는 것이 이 줄을 둔 까닭이다.
+        */
+        .pick-long {
+          display: none;
+        }
+        .pick-short {
+          display: inline;
+        }
+
+        /*
+          ── 결과 화면의 머리 ──
+          `← 홈으로` 와 판 이름이 두 줄로 접혀 등급 배지와 AI 분석을 아래로 밀었다.
+          버튼 글을 `홈` 으로 줄이고 제목을 한 단계 작게 해 **한 줄에** 세운다 (사용자가 정했다).
+        */
+        #screen-debrief .back-long {
+          display: none;
+        }
+        #screen-debrief .back-short {
+          display: inline;
+        }
+        #screen-debrief .screen-head h1 {
+          font-size: 20px;
+        }
+        /* 등급(FAIL · PERFECT)은 제 줄에서 가운데 — 왼쪽에 붙으면 뒤로 버튼 아래에 끼인 것처럼 보인다 */
+        #screen-debrief .screen-head-right {
+          justify-content: center;
+        }
+
+        /*
+          ── 레벨 칸과 '다시 운행' 을 한 줄에 반반 ──
+          좁은 화면 규칙(860px)이 둘을 각각 한 줄씩 쓰게 해 두 줄을 먹었다. 손안 화면에서는
+          **둘이 나란히** 선다 (사용자가 정했다). `min-width: 0` 이 있어야 반쪽 안에서 줄바꿈된다.
+        */
+        #screen-debrief .debrief-top.solo > .player-box,
+        #screen-debrief .debrief-top.solo > .btn-row {
+          flex: 1 1 0;
+          min-width: 0;
+        }
+        /* 반쪽에 들어가려면 칸 안의 여백도 줄어야 한다 — 레벨 뱃지와 이름이 서로를 밀어낸다 */
+        #screen-debrief .debrief-top.solo > .player-box {
+          padding: 10px 12px 12px;
+        }
+        #screen-debrief .debrief-top.solo .player.md {
+          gap: 10px;
+        }
+        /*
+          반쪽 칸에서는 호칭이 테두리를 넘었다. 글자만 줄여서는 모자라 **뱃지도 함께 줄인다** —
+          레벨 숫자는 호칭에도 적혀 있어(`안전운전 Level1`) 뱃지가 조금 작아도 읽는 데 지장이 없다.
+        */
+        #screen-debrief .debrief-top.solo .player.md .player-name {
+          font-size: 17px;
+        }
+        #screen-debrief .debrief-top.solo .player.md .level-badge-wrap {
+          width: 42px;
+          height: 42px;
         }
       }
 
