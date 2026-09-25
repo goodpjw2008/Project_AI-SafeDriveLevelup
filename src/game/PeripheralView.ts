@@ -257,10 +257,21 @@ export class PeripheralView {
       양 끝**이 훨씬 급하다. 창 셋이 좁은 화면을 나눠 쓰면 정작 봐야 할 둘이 작아진다.
       뒤차의 재촉은 경적 소리가 이미 알린다 (Game 의 follower).
     */
+    /*
+      **세로 휴대폰에서는 옆 창을 아예 두지 않는다** (사용자가 정했다: "좌측시야, 우측시야는
+      해결책이 아닌 것 같다").
+
+      좁은 세로 화면에서 옆을 보여 주려고 여러 모양을 시도했다 — 사이드미러식 68° 창,
+      화면을 옆으로 늘린 확장 시야, 배율을 당긴 확장 시야. 셋 다 같은 벽에 부딪혔다:
+      **창을 작게 두면 사람이 안 보이고, 크게 두면 정작 봐야 할 앞 도로를 가린다.**
+      좁은 화면에 창을 덧대는 길 자체가 답이 아니었다. 화면을 나누지 않고 푸는 길을 찾는다.
+
+      코드는 남겨 둔다 — PC 의 사이드미러 시야는 이 틀을 그대로 쓴다.
+    */
     this.wide = isHandheldPortrait();
-    this.addUnit(-1, this.wide ? '◀ 좌측 확장 시야' : '◀ 좌측 시야');
-    this.addUnit(1, this.wide ? '우측 확장 시야 ▶' : '우측 시야 ▶');
     if (!this.wide) {
+      this.addUnit(-1, '◀ 좌측 시야');
+      this.addUnit(1, '우측 시야 ▶');
       // 후방은 거울을 대신하므로 좌우를 뒤집는다. 뜨는 시점은 좌·우 창과 같다
       this.addUnit(0, '후방 시야', { mirrored: true });
     }
@@ -689,7 +700,8 @@ export class PeripheralView {
    * (해상도를 내린 이유가 이것이다 — 위 TARGET 주석)
    */
   renderTargets(renderer: THREE.WebGLRenderer): void {
-    if (!this.enabled) return;
+    // 창이 하나도 없으면 그릴 것도 없다 (세로 휴대폰 — 위 생성자)
+    if (!this.enabled || this.units.length === 0) return;
 
     const u = this.units[this.cursor];
     this.cursor = (this.cursor + 1) % this.units.length;
