@@ -5559,29 +5559,85 @@
         AI 코칭 · 주행 지도 · 위반 목록은 그 아래에 그대로 남는다 — 읽고 싶으면 내리면 된다.
       */
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        /*
+          **윗부분을 좌우 두 칸으로** (사용자가 그림으로 정했다):
+          왼쪽에 레벨과 버튼, 오른쪽에 AI 주행결과 분석. 그 아래로 주행 지도 · 주행 기록이
+          폭을 다 쓰며 이어진다 — 읽고 싶으면 내리면 된다.
+
+          위아래로 쌓으면 코칭 상자가 가운데를 막아 **정작 눌러야 할 버튼이 화면 밖**이었다.
+          첫 화면 · AI 창에서 한 것과 같은 판단이다: 가로 화면은 넓고 낮으니 옆으로 편다.
+        */
         #screen-debrief .screen-inner {
-          display: flex;
-          flex-direction: column;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          align-items: start;
+          column-gap: 12px;
+          row-gap: 8px;
           padding: 6px 14px 12px;
         }
-        /* 차례를 못 박는다 — 값을 주지 않은 것이 맨 앞으로 튀어나오지 않게 바닥값을 먼저 깐다 */
+        /* 자리를 주지 않은 것은 폭을 다 쓰며 맨 아래로 — 새 칸이 생겨도 두 칸을 흐트러뜨리지 않는다 */
         #screen-debrief .screen-inner > * {
-          order: 5;
+          grid-column: 1 / -1;
         }
         #screen-debrief .screen-head {
-          order: 1;
-          margin-bottom: 6px;
+          grid-column: 1 / -1;
+          grid-row: 1;
+          margin-bottom: 0;
           align-items: center;
         }
         #screen-debrief .debrief-top {
-          order: 2;
-          margin: 0 0 8px;
+          grid-column: 1;
+          grid-row: 2;
+          margin: 0;
         }
         #screen-debrief .verdict {
-          order: 3;
+          grid-column: 2;
+          grid-row: 2;
+          margin: 0;
         }
         #screen-debrief .debrief-split {
-          order: 4;
+          grid-column: 1 / -1;
+          grid-row: 3;
+        }
+        /*
+          **버튼은 두 줄 두 칸** (사용자가 그림으로 정했다):
+          `다시 도전 | ▶` · `다시 운행 | 자동 넘어가기`. 칸이 반으로 줄었으니 한 줄에 넷은
+          들어가지 않는다 — 접히는 대로 두면 줄 수가 판마다 달라져 아래가 들썩인다.
+          멈춤(▶)은 세고 있을 때만 뜨므로 그 자리는 비어 있기도 하다.
+        */
+        #screen-debrief .debrief-top:not(.solo) .btn-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        #screen-debrief .debrief-top:not(.solo) #btn-next {
+          grid-area: 1 / 1;
+        }
+        #screen-debrief .debrief-top:not(.solo) #btn-auto-pause {
+          grid-area: 1 / 2;
+        }
+        #screen-debrief .debrief-top:not(.solo) #btn-retry {
+          grid-area: 2 / 1;
+        }
+        #screen-debrief .debrief-top:not(.solo) .auto-next {
+          grid-area: 2 / 2;
+        }
+        /* 레벨 칸도 반쪽 칸에 맞게 — 넘치면 오른쪽 코칭 상자를 파고든다 */
+        #screen-debrief .debrief-top .player.md {
+          gap: 12px;
+          margin-top: 0;
+          min-width: 0;
+        }
+        #screen-debrief .debrief-top .player.md .level-badge-wrap {
+          width: 54px;
+          height: 54px;
+        }
+        #screen-debrief .debrief-top .player.md .player-name {
+          font-size: 16px;
+        }
+        #screen-debrief .debrief-top .level-change {
+          margin: 0 0 8px;
         }
         /* 머리는 한 줄로 — 판 번호까지만 둔다 (세로 화면과 같은 기준) */
         #screen-debrief .screen-head h1 .head-title {

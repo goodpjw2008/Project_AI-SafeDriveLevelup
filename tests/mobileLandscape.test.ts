@@ -323,18 +323,48 @@ describe('가로 휴대폰의 첫 화면', () => {
     대신 **차례**를 바꾼다. 원래는 `머리(등급) → AI 코칭 → 레벨 · 버튼` 이라 코칭 상자가
     가운데를 막아 정작 눌러야 할 버튼이 화면 밖에 있었다.
   */
-  it('주행 분석 화면은 등급 · 레벨 · 버튼이 먼저 온다', () => {
-    const deb = blocks(HEAD)[2];
+  it('주행 분석 화면은 윗부분을 좌우 두 칸으로 나눈다', () => {
+    const deb = blocks(HEAD).find((b) => b.includes('#screen-debrief'))!;
     expect(deb, '분석 화면 덩어리가 따로 있어야 한다').toBeTruthy();
     const r = deb.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(r).toMatch(/#screen-debrief \.screen-inner \{[^}]*display:\s*flex/);
-    // 값을 주지 않은 것이 맨 앞으로 튀어나오지 않게 바닥값을 먼저 깐다
-    expect(r).toMatch(/#screen-debrief \.screen-inner > \* \{[^}]*order:\s*5/);
-    const order = (sel: string): number =>
-      Number(r.match(new RegExp(`#screen-debrief ${sel} \\{[^}]*order:\\s*(\\d+)`))![1]);
-    expect(order('\\.screen-head')).toBeLessThan(order('\\.debrief-top'));
-    expect(order('\\.debrief-top')).toBeLessThan(order('\\.verdict'));
-    expect(order('\\.verdict')).toBeLessThan(order('\\.debrief-split'));
+    expect(r).toMatch(/#screen-debrief \.screen-inner \{[^}]*display:\s*grid/);
+    // 자리를 주지 않은 것은 폭을 다 쓰며 맨 아래로 — 새 칸이 생겨도 두 칸을 흐트러뜨리지 않는다
+    expect(r).toMatch(/#screen-debrief \.screen-inner > \* \{[^}]*grid-column:\s*1 \/ -1/);
+    const at = (sel: string): { col: string; row: string } => {
+      const body = r.match(new RegExp(`#screen-debrief ${sel} \\{([^}]*)\\}`))![1];
+      return {
+        col: body.match(/grid-column:\s*([^;]+)/)![1].trim(),
+        row: body.match(/grid-row:\s*([^;]+)/)![1].trim(),
+      };
+    };
+    // 머리는 한 줄을 다 쓰고, 그 아래 한 줄을 레벨 · 버튼(왼쪽)과 AI 코칭(오른쪽)이 나눈다
+    expect(at('\\.screen-head')).toEqual({ col: '1 / -1', row: '1' });
+    expect(at('\\.debrief-top')).toEqual({ col: '1', row: '2' });
+    expect(at('\\.verdict')).toEqual({ col: '2', row: '2' });
+    // 주행 지도 · 주행 기록은 그 아래에서 폭을 다 쓴다
+    expect(at('\\.debrief-split')).toEqual({ col: '1 / -1', row: '3' });
+  });
+
+  /*
+    **버튼은 두 줄 두 칸** (사용자가 그림으로 정했다): `다시 도전 | ▶` · `다시 운행 | 자동 넘어가기`.
+    칸이 반으로 줄었으니 한 줄에 넷은 들어가지 않는다 — 접히는 대로 두면 줄 수가 판마다 달라져
+    아래가 들썩인다. 다음 판이 없는 판(`.solo`)은 버튼이 하나뿐이라 그대로 둔다.
+  */
+  it('분석 화면의 버튼은 두 줄 두 칸으로 선다', () => {
+    const r = blocks(HEAD)
+      .find((b) => b.includes('#screen-debrief'))!
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(r).toMatch(/#screen-debrief \.debrief-top:not\(\.solo\) \.btn-row \{[^}]*display:\s*grid/);
+    for (const [sel, area] of [
+      ['#btn-next', '1 / 1'],
+      ['#btn-auto-pause', '1 / 2'],
+      ['#btn-retry', '2 / 1'],
+      ['\\.auto-next', '2 / 2'],
+    ]) {
+      expect(r).toMatch(
+        new RegExp(`#screen-debrief \\.debrief-top:not\\(\\.solo\\) ${sel} \\{[^}]*grid-area:\\s*${area}`),
+      );
+    }
   });
 
   /*
