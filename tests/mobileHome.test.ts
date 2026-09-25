@@ -351,3 +351,67 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(after.trim()).toBe('');
   });
 });
+
+/*
+  **손에 든 화면의 주행 HUD 는 뒤를 흐리지 않는다** (index.html 의 `@media (pointer: coarse)`).
+
+  사용자가 화면 사진 둘로 짚었다 — *"주행 중 가만히 둬도 깜빡거린다. 모바일에서만."* 찍힌 프레임을
+  재 보니 3D 그림의 일부만 그려지고 나머지가 검게 남아 있었고, 그 경계가 **화면 폭의 정확히 절반**
+  이었다. 그리다 만 것이 아니라 **합성하다 만** 모양이다 (fps 는 56~60 으로 멀쩡했다).
+
+  남는 원인은 이 상자들이 **살아 움직이는 3D 위에서 매 프레임 뒤를 다시 흐리는 것**이다.
+  PC 에서는 나지 않으므로(사용자 확인) `pointer: coarse` 로 손가락 화면에서만 끈다 —
+  조건이 느슨해지면 PC 의 흐림까지 사라진다.
+*/
+describe('손에 든 화면의 주행 HUD', () => {
+  const head = '@media (pointer: coarse) {';
+  const block = (): string => {
+    const at = html.indexOf(head);
+    if (at < 0) throw new Error('손가락 화면 전용 미디어 쿼리를 찾지 못했다');
+    let depth = 0;
+    for (let i = at + head.length - 1; i < html.length; i++) {
+      if (html[i] === '{') depth++;
+      else if (html[i] === '}' && --depth === 0) return html.slice(at, i + 1);
+    }
+    throw new Error('미디어 쿼리가 닫히지 않았다');
+  };
+
+  it('3D 위에 뜨는 상자들의 흐림을 끈다', () => {
+    const b = block();
+    for (const sel of [
+      '.hud-objective',
+      '.hud-home',
+      '.keyhints',
+      '.hud-player',
+      '.hud-auto',
+      '.fps',
+      '.signal-chip',
+      '.drive-coach-bubble',
+      '.tbtn',
+    ]) {
+      expect(b, `${sel} 이 빠졌다`).toContain(sel);
+    }
+    expect(b).toContain('backdrop-filter: none');
+    // 웹킷 접두사도 함께 — 사파리 · 안드로이드 웹뷰가 그쪽을 본다
+    expect(b).toContain('-webkit-backdrop-filter: none');
+  });
+
+  /*
+    **흐림이 맡던 가독성은 바탕이 대신한다.** 흐림만 끄면 달리는 도로 위에서 글이 묻힌다 —
+    이미 0.72 였던 것들을 0.9 언저리로 올려 둔다.
+  */
+  it('흐림을 끈 만큼 바탕을 더 채운다', () => {
+    const b = block().replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of b.matchAll(/background:\s*rgba\([^)]*?,\s*([\d.]+)\)/g)) {
+      expect(Number(m[1])).toBeGreaterThanOrEqual(0.88);
+    }
+    expect([...b.matchAll(/background:/g)].length).toBeGreaterThanOrEqual(3);
+  });
+
+  /* PC 는 그대로다 — 조건에 `pointer: coarse` 가 있어야 마우스 화면이 휩쓸리지 않는다 */
+  it('마우스 화면은 흐림을 그대로 쓴다', () => {
+    expect(block().startsWith('@media (pointer: coarse) {')).toBe(true);
+    // 기본 규칙에는 흐림이 그대로 남아 있어야 한다
+    expect(html).toContain('backdrop-filter: blur(10px)');
+  });
+});
