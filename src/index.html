@@ -5374,6 +5374,22 @@
           flex: 1 1 0;
           min-width: 0;
         }
+        /*
+          **뒤로 버튼과 판 이름을 같은 선에 놓는다** (사용자가 짚었다). 머리는 기본이 `align-items: start`
+          이고 뒤로 버튼에는 3px 을 내려 둔 값이 있는데, 제목을 20px 로 줄이자 버튼이 제목보다 내려앉았다.
+          한 줄로 세운 화면에서는 가운데로 맞추는 쪽이 맞다.
+        */
+        #screen-debrief .screen-head {
+          align-items: center;
+        }
+        #screen-debrief button.back {
+          margin-top: 0;
+        }
+        /* 버튼 줄도 가운데로 — 위의 등급 · 레벨 칸과 같은 축에 선다 (사용자가 정했다) */
+        #screen-debrief .btn-row {
+          justify-content: center;
+        }
+
         /* 반쪽에 들어가려면 칸 안의 여백도 줄어야 한다 — 레벨 뱃지와 이름이 서로를 밀어낸다 */
         #screen-debrief .debrief-top.solo > .player-box {
           padding: 10px 12px 12px;

@@ -167,7 +167,7 @@ describe('세로 휴대폰의 첫 화면', () => {
   it('세로 휴대폰에서는 판이 절반 속도로 흐른다 — 조건은 화면 규칙과 같다', () => {
     const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
     expect(game).toContain('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)');
-    expect(game).toMatch(/matches \? 0\.5 : 1/);
+    expect(game).toMatch(/matches \? 2 \/ 3 : 1/);
     // dt 한 곳에서만 곱한다 — 두 곳에서 곱하면 판정이 어긋난다
     expect([...game.matchAll(/paceScale\(\)/g)].length).toBe(2);
   });
@@ -190,6 +190,21 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).toContain('#screen-debrief .back-short');
     expect(block).toMatch(/#screen-debrief \.screen-head h1 \{\s*font-size: 20px;/);
     expect(block).toMatch(/#screen-debrief \.screen-head-right \{\s*justify-content: center;/);
+  });
+
+  /*
+    **뒤로 버튼과 판 이름은 같은 선에 선다** (사용자가 짚었다). 머리는 기본이 `align-items: start`
+    이고 뒤로 버튼에는 3px 을 내려 둔 값이 있어, 제목을 20px 로 줄이자 버튼이 제목보다 내려앉았다.
+  */
+  it('뒤로 버튼과 판 이름이 같은 선에 선다', () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-debrief \.screen-head \{\s*align-items: center;/);
+    expect(block).toMatch(/#screen-debrief button\.back \{\s*margin-top: 0;/);
+  });
+
+  /* 버튼 줄도 위의 등급 · 레벨 칸과 같은 가운데 축에 놓는다 */
+  it('결과 화면의 버튼 줄을 가운데로 모은다', () => {
+    expect(rulesOnly()).toMatch(/#screen-debrief \.btn-row \{\s*justify-content: center;/);
   });
 
   /*

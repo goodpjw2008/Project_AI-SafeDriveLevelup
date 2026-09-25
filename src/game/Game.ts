@@ -1370,8 +1370,14 @@ export class Game {
       ? window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)')
       : null;
 
+  /**
+   * 늦추는 정도는 **3분의 1**이다 — 원래 속도의 2/3.
+   *
+   * 처음에는 절반(0.5)으로 뒀는데 사용자가 직접 몰아 보고 "너무 느리다" 고 했다.
+   * 판단할 틈은 벌어지되 **달리는 맛이 남아야** 한다 — 너무 느리면 그것대로 실제 도로와 멀어진다.
+   */
   private paceScale(): number {
-    return this.slowPace?.matches ? 0.5 : 1;
+    return this.slowPace?.matches ? 2 / 3 : 1;
   }
 
   private loop = (): void => {
