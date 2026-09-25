@@ -18,9 +18,13 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(fileURLToPath(new URL('../src/index.html', import.meta.url)), 'utf8');
 
-const HEAD = '@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {';
-/** 더 좁은 가로 화면 — 넓은 쪽 조건을 그대로 물려받고 폭 하나를 더 건다 */
-const NARROW = `${HEAD.slice(0, -2)} and (max-width: 760px) {`;
+const COND = '@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px)';
+/** 가장 넓은 가로 — 조건이 셋뿐인 덩어리 */
+const HEAD = `${COND} {`;
+/** 좁아질 때마다 한 단계씩 — 넓은 쪽 조건을 그대로 물려받고 폭 하나를 더 건다 */
+const NARROW = `${COND} and (max-width: 860px) {`;
+const TINY = `${COND} and (max-width: 700px) {`;
+const ALL = [HEAD, NARROW, TINY];
 
 /** 가로 휴대폰 전용 덩어리 — 여는 중괄호부터 짝이 맞는 닫는 중괄호까지 */
 const block = (head = HEAD): string => {
@@ -69,7 +73,7 @@ describe('가로 휴대폰의 첫 화면', () => {
     결과 화면 · 설정까지 가로에서 달라진다. 사용자가 고쳐 달라고 한 것은 첫 화면이다.
   */
   it('모든 규칙이 첫 화면 안에만 걸린다', () => {
-    for (const head of [HEAD, NARROW]) {
+    for (const head of ALL) {
       for (const sel of selectors(head)) {
         expect(sel.startsWith('#screen-menu'), `${sel} 가 첫 화면 밖으로 나갔다`).toBe(true);
       }
@@ -101,11 +105,11 @@ describe('가로 휴대폰의 첫 화면', () => {
     접는 목록이 늘어나다 여기까지 번지면 첫 화면이 아무 쓸모가 없어진다.
   */
   it('연습 버튼과 차 그림은 남는다', () => {
-    const r = rules() + rules(NARROW);
+    const r = ALL.map((h) => rules(h)).join('\n');
     expect(r).not.toMatch(/#btn-generate[^{]*\{[^}]*display:\s*none/);
     expect(r).not.toMatch(/\.ai-car[^{]*\{[^}]*display:\s*none/);
     // 차 그림은 감추는 대신 줄인다 (사용자가 세로에서 "차량은 보여야 해" 라고 했다)
-    expect(r).toMatch(/#screen-menu \.ai-car-photo \{\s*max-width:/);
+    expect(rules(NARROW)).toMatch(/#screen-menu \.ai-car-photo \{\s*height:/);
   });
 
   /*
@@ -116,7 +120,7 @@ describe('가로 휴대폰의 첫 화면', () => {
   it('첫 화면 상자를 레벨 · 자동차 · 연습 세 칸으로 편다', () => {
     const r = rules();
     expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*display:\s*grid/);
-    expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*grid-template-columns:[^;]*minmax[^;]*minmax[^;]*minmax/);
+    expect(r).toMatch(/grid-template-columns:\s*minmax\(min-content, 1fr\) auto minmax\(0, 340px\)/);
     expect(r).toMatch(/#screen-menu \.ai-course > \.player \{[^}]*grid-column:\s*1/);
     expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*2/);
     expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*3/);
@@ -155,10 +159,62 @@ describe('가로 휴대폰의 첫 화면', () => {
     호칭을 `안전운전 L1` 로 줄인다 — 세로 화면에서 쓰는 것과 같은 수법(.lv-word)이다.
   */
   it('좁은 가로 화면은 호칭을 줄인다 — 조건은 넓은 쪽을 그대로 물려받는다', () => {
-    const b = block(NARROW);
-    expect(b).toContain('orientation: landscape');
-    expect(b).toContain('pointer: coarse');
-    expect(b).toContain('max-height: 540px');
+    // 좁아지는 단계마다 셋을 그대로 물려받는다 — 하나라도 빠지면 그 단계에서 PC 가 휩쓸린다
+    for (const head of ALL) {
+      const b = block(head);
+      expect(b).toContain('orientation: landscape');
+      expect(b).toContain('pointer: coarse');
+      expect(b).toContain('max-height: 540px');
+    }
     expect(rules(NARROW)).toMatch(/#screen-menu \.lv-word \{\s*display:\s*none/);
+  });
+
+  /*
+    **레벨 칸은 글이 잘리지 않는다.** 좁은 화면에서 세 칸이 폭을 다투면 `0 / 200 XP` 가
+    차 그림 뒤로 잘렸다 — 실제로 한 번 그렇게 나왔다. 레벨 칸이 적어도 `min-content` 는
+    받게 해 두면, 모자라는 몫은 연습 칸에서 먼저 나온다.
+  */
+  it('레벨 칸은 글이 다 들어가는 만큼은 받는다', () => {
+    expect(rules()).toMatch(
+      /#screen-menu \.ai-course \{[^}]*grid-template-columns:\s*minmax\(min-content, 1fr\)/,
+    );
+  });
+
+  /*
+    **첫 줄의 버튼은 성공 · 실패 알약과 같은 키다** (사용자가 정했다). 늘어나게 두면
+    가장 키 큰 버튼(톱니)에 맞춰 줄 전체가 두꺼워진다 — 실제로 44px 이 되어 있었다.
+  */
+  it('첫 줄 버튼은 성공 · 실패와 같은 키로, 그 옆에 붙는다', () => {
+    const r = rules();
+    expect(r).toMatch(/#screen-menu \.menu-links \{[^}]*justify-self:\s*end/);
+    expect(r).toMatch(/#screen-menu \.menu-links \{[^}]*align-items:\s*center/);
+    // 알약과 같은 여백 · 글자 크기 (index.html 의 .site-stat — 5px 12px · 13px)
+    expect(r).toMatch(/#screen-menu \.menu-links button \{[^}]*padding:\s*5px 11px/);
+    expect(r).toMatch(/#screen-menu \.menu-links button \{[^}]*font-size:\s*13px/);
+    expect(r).toMatch(/#screen-menu \.menu-links button\.icon \{/);
+  });
+
+  /*
+    **이름은 세로 화면과 같은 크기다** (사용자가 정했다) — 한 작품의 이름이 기기를 돌렸다고
+    커졌다 작아지면 같은 물건으로 읽히지 않는다. 세로에서 쓰는 값은 26 · 22 · 18px 이다.
+    아주 좁은 화면(700px 미만)만 예외다 — 거기서는 한 줄에 들어가지 못해 통째로 꺾인다.
+  */
+  it('이름은 세로 화면과 같은 크기다', () => {
+    const r = rules();
+    expect(r).toMatch(/#screen-menu \.brand \{\s*font-size:\s*26px/);
+    expect(r).toMatch(/#screen-menu \.brand-colon \{\s*font-size:\s*22px/);
+    expect(r).toMatch(/#screen-menu \.brand-sub \{\s*font-size:\s*18px/);
+    // 줄이는 곳은 아주 좁은 단계뿐이다
+    expect(rules(NARROW)).not.toContain('.brand');
+    expect(rules(TINY)).toMatch(/#screen-menu \.brand \{\s*font-size:/);
+  });
+
+  /*
+    **차는 폭이 아니라 높이로 잰다** (사용자가 정했다: *"남은 공간 높이에 꽉 맞게"*).
+    높이로 재야 4:3 비율대로 커지고, 칸 폭(`auto`)도 그림을 따라 저절로 정해진다.
+  */
+  it('차 그림은 높이로 재서 줄을 채운다', () => {
+    expect(rules()).toMatch(/#screen-menu \.ai-car-photo \{[^}]*height:\s*\d+px/);
+    expect(rules()).toMatch(/#screen-menu \.ai-car-photo \{[^}]*max-width:\s*none/);
   });
 });

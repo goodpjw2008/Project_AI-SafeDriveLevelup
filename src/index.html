@@ -5214,12 +5214,15 @@
           grid-column: 1;
           margin: 0;
           gap: 6px;
+          /* 성공 · 실패 바로 옆에 붙인다 (사용자가 정했다) — 왼쪽 끝이 아니라 오른쪽 끝에서 시작한다 */
+          justify-self: end;
+          /* 늘어나지 않게 — 늘리면 가장 키 큰 버튼(톱니)에 맞춰 줄 전체가 두꺼워진다 */
+          align-items: center;
         }
         #screen-menu .site-stats {
           grid-row: 1;
           grid-column: 2;
           margin: 0;
-          font-size: 11.5px;
         }
         #screen-menu .hero {
           grid-row: 2;
@@ -5234,15 +5237,22 @@
           grid-row: 4;
           grid-column: 1 / -1;
         }
-        /* 이름은 이 화면의 얼굴이다 — 자리가 남은 만큼 키운다 (사용자가 정했다) */
+        /*
+          **이름은 세로 화면과 똑같은 크기다** (사용자가 정했다) — 한 작품의 이름이
+          기기를 돌렸다고 커졌다 작아지면 같은 물건으로 읽히지 않는다.
+          세로에서 쓰는 값 그대로: 이름 26px · 가운뎃점 22px · 부제 18px.
+        */
         #screen-menu .brand-wrap {
-          padding: 7px 16px;
+          padding: 6px 16px;
         }
         #screen-menu .brand {
-          font-size: 24px;
+          font-size: 26px;
+        }
+        #screen-menu .brand-colon {
+          font-size: 22px;
         }
         #screen-menu .brand-sub {
-          font-size: 17px;
+          font-size: 18px;
         }
         /*
           **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
@@ -5261,11 +5271,26 @@
         #screen-menu .menu-links button:not(.icon) svg {
           display: none;
         }
+        /*
+          **성공 · 실패 알약과 같은 키로** (사용자가 정했다). 그 알약은 `5px 12px · 13px` 이라
+          27px 이다 — 같은 여백과 글자 크기를 주면 두 덩어리의 윗변 · 아랫변이 맞는다.
+        */
         #screen-menu .menu-links button {
-          min-height: 26px;
-          padding: 2px 10px;
-          font-size: 11.5px;
+          min-height: 0;
+          padding: 5px 11px;
+          font-size: 13px;
           gap: 0;
+        }
+        /* 톱니는 그림뿐이라 따로 재 준다 — 그냥 두면 이 버튼 하나가 줄을 두껍게 만든다 */
+        #screen-menu .menu-links button.icon {
+          min-height: 0;
+          width: auto;
+          height: auto;
+          padding: 5px 8px;
+        }
+        #screen-menu .menu-links button.icon svg {
+          width: 17px;
+          height: 17px;
         }
         /*
           읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다).
@@ -5280,13 +5305,24 @@
         #screen-menu .mode-split > .mode-group:nth-child(2) {
           display: none;
         }
-        /* 레벨 칸 — 뱃지를 줄이고 한 줄씩 당긴다 */
+        /* 레벨 칸 — 남는 폭이 모두 이리로 오므로 그만큼 크게 읽힌다 (사용자가 정했다) */
         #screen-menu .player.lg .level-badge-wrap {
-          width: 52px;
-          height: 52px;
+          width: 62px;
+          height: 62px;
         }
+        /*
+          **호칭과 경험치는 한 줄이다.** 칸이 좁아 꺾이면 레벨 칸만 두 줄이 되어 옆의 차 · 버튼과
+          윗변이 어긋난다 — 한 줄에 들어가는 크기로 잡는다.
+        */
         #screen-menu .player.lg .player-name {
-          font-size: 17px;
+          font-size: 18px;
+        }
+        #screen-menu .player.lg .player-head {
+          flex-wrap: nowrap;
+          gap: 10px;
+        }
+        #screen-menu .player.lg .player-xp {
+          white-space: nowrap;
         }
         #screen-menu .player.lg .player-foot {
           margin-top: 0;
@@ -5299,13 +5335,22 @@
           셋이 한 줄이므로 **가운데로 맞춘다** — 키가 서로 다른 칸을 위로 맞추면 차 그림만
           공중에 뜬 것처럼 보인다.
         */
+        /*
+          **차 칸은 제 그림만큼(`auto`), 연습 칸은 지금 크기 그대로, 남는 폭은 모두 레벨 칸으로**
+          (사용자가 정했다). 차는 폭이 아니라 **줄 높이에 맞춰** 키운다 — 아래 `.ai-car-photo`.
+        */
         #screen-menu .ai-course {
           margin: 0;
           padding: 8px 12px;
           display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.5fr) minmax(0, 1.2fr);
+          /*
+            레벨 칸은 **적어도 글이 다 들어가는 만큼**(`min-content`)은 받고, 남는 폭도 모두
+            가져간다 — 좁은 화면에서 `0` 으로 두었더니 `0 / 200 XP` 가 차 그림 뒤로 잘렸다.
+            모자라면 연습 칸이 먼저 줄어든다 (버튼은 글만 들어가면 제 몫을 한다).
+          */
+          grid-template-columns: minmax(min-content, 1fr) auto minmax(0, 340px);
           align-items: center;
-          column-gap: 14px;
+          column-gap: 16px;
         }
         #screen-menu .ai-course > .player {
           grid-column: 1;
@@ -5325,13 +5370,19 @@
           margin-top: 0;
           grid-template-columns: minmax(0, 1fr);
         }
-        /* 차 그림은 남긴다 — 다만 반쪽 칸에 맞게 줄인다 (사용자가 세로에서 "차량은 보여야 해" 라고 했다) */
+        /*
+          **차는 줄 높이를 꽉 채운다** (사용자가 정했다). 줄 높이는 오른쪽 연습 칸이 정하므로
+          (132px 남짓) 거기서 이름 한 줄을 뺀 만큼을 그림에 준다. 폭이 아니라 **높이로** 재야
+          4:3 비율대로 커지고, 칸 폭(`auto`)도 그림을 따라 저절로 정해진다.
+        */
         #screen-menu .ai-car {
           gap: 5px;
           font-size: 12.5px;
         }
         #screen-menu .ai-car-photo {
-          max-width: 96px;
+          width: auto;
+          max-width: none;
+          height: 122px;
         }
         /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
         #screen-menu .mode-split > .mode-group {
@@ -5363,22 +5414,35 @@
         }
       }
       /*
-        **더 좁은 가로 화면**(760px 미만 — 작은 휴대폰을 가로로 든 경우). 위 규칙만으로는
-        레벨 줄이 두 줄로 꺾여 연습 버튼 아래가 잘렸다. 호칭을 `안전운전 L1` 로 줄이고
-        (세로 화면에서 쓰는 것과 같은 수법) 차 그림과 이름 줄을 한 단계 더 줄인다.
+        **좁은 가로 화면**(860px 미만). 레벨 칸이 좁아져 `안전운전 Level1` 과 `0 / 200 XP` 가
+        한 줄에 들어가지 않고 경험치가 잘렸다. 호칭을 `안전운전 L1` 로 줄이고(세로 화면에서
+        쓰는 것과 같은 수법) 차를 한 단계 줄여 그만큼을 레벨 칸에 돌려준다.
       */
-      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 760px) {
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 860px) {
         #screen-menu .lv-word {
           display: none;
         }
+        #screen-menu .ai-car-photo {
+          height: 104px;
+        }
+      }
+      /*
+        **아주 좁은 가로 화면**(700px 미만). 여기서는 이름 한 줄이 통째로 꺾여 화면 하나를
+        넘겼다. 이름은 세로와 같은 크기로 두는 것이 원칙이지만(위), **한 줄에 들어가지 못하면
+        그 원칙이 오히려 이름을 망가뜨린다** — 이 크기에서만 한 단계 줄인다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 700px) {
         #screen-menu .brand {
+          font-size: 19px;
+        }
+        #screen-menu .brand-colon {
           font-size: 16px;
         }
         #screen-menu .brand-sub {
-          font-size: 12px;
+          font-size: 13.5px;
         }
         #screen-menu .ai-car-photo {
-          max-width: 62px;
+          height: 88px;
         }
       }
       /*
