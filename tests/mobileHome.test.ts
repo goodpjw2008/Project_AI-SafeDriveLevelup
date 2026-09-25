@@ -204,6 +204,20 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect([...game.matchAll(/paceScale\(\)/g)].length).toBe(2);
   });
 
+  /*
+    **세로 휴대폰에서는 경적 안내를 띄우지 않는다** (사용자가 정했다) — 좁은 화면에서 안내 상자가
+    도로 한가운데를 덮어 정작 봐야 할 신호와 보행자를 가렸다.
+    **경적 소리는 그대로 울린다** — 재촉의 압박을 만드는 것은 소리이지 글이 아니다.
+  */
+  it('세로 휴대폰에서는 뒤차 경적 안내를 띄우지 않는다 — 소리는 그대로', () => {
+    const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
+    const honk = game.slice(game.indexOf('this.audio.horn();'), game.indexOf('뒷차가 경적을 울립니다') + 40);
+    expect(honk).toContain('this.audio.horn();');
+    expect(honk).toContain('!this.handheld?.matches');
+    // 소리를 끄는 것이 아니다 — 소리 줄은 조건 밖에 있어야 한다
+    expect(honk.indexOf('this.audio.horn();')).toBeLessThan(honk.indexOf('!this.handheld?.matches'));
+  });
+
   /* 누가 골랐는지 · 조언했는지의 짧은 꼴 — 이름표는 그대로 두고 설명만 줄인다 */
   it('AI 이름표 줄은 짧은 꼴로 바뀐다', () => {
     const block = rulesOnly();

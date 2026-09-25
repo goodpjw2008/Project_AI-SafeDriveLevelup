@@ -1227,7 +1227,14 @@ export class Game {
         ? undefined
         : () => {
             this.audio.horn();
-            this.cb.onToast('뒷차가 경적을 울립니다. 그래도 규칙은 규칙입니다.');
+            /*
+              **세로 휴대폰에서는 글을 띄우지 않는다** (사용자가 정했다) — 좁은 화면에서 안내 상자가
+              도로 한가운데를 덮어 정작 봐야 할 신호와 보행자를 가렸다. **경적 소리는 그대로 울린다** —
+              재촉의 압박을 만드는 것은 소리이지 글이 아니다.
+            */
+            if (!this.handheld?.matches) {
+              this.cb.onToast('뒷차가 경적을 울립니다. 그래도 규칙은 규칙입니다.');
+            }
           },
       speedLimit,
       warmNear,
@@ -1365,7 +1372,7 @@ export class Game {
    * 조건은 화면 규칙(index.html 의 '손에 든 세로 화면')과 **같다.** 가로로 돌리면 곧바로 제 속도로
    * 돌아온다 — `matches` 는 볼 때마다 지금 값을 준다.
    */
-  private readonly slowPace =
+  private readonly handheld =
     typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)')
       : null;
@@ -1377,7 +1384,7 @@ export class Game {
    * 판단할 틈은 벌어지되 **달리는 맛이 남아야** 한다 — 너무 느리면 그것대로 실제 도로와 멀어진다.
    */
   private paceScale(): number {
-    return this.slowPace?.matches ? 2 / 3 : 1;
+    return this.handheld?.matches ? 2 / 3 : 1;
   }
 
   private loop = (): void => {
