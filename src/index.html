@@ -4020,21 +4020,6 @@
       #t-down {
         grid-area: 3 / 2;
       }
-      /*
-        **손에 든 세로 화면에서는 PC 화살표 키와 같은 모양**으로 놓는다 (사용자가 정했다).
-        마름모(위 · 좌 · 우 · 아래)는 가운데가 비어 엄지가 갈 곳을 한 번 더 찾게 한다 —
-        키보드에서 익힌 ◀ ▼ ▶ 한 줄이 손에 더 익다. 줄이 하나 줄어드는 만큼
-        **계기판 줄에 맞춰 아래로** 내려앉는다.
-      */
-      @media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
-        .dpad {
-          grid-template-rows: repeat(2, 60px);
-          bottom: max(16px, env(safe-area-inset-bottom));
-        }
-        #t-down {
-          grid-area: 2 / 2;
-        }
-      }
       /* 지금 상태 — 가는 중 ↑ 초록 · 서 있음 ↓ 빨강 (main.ts 의 syncGoStop) */
       #t-up.on {
         background: rgba(46, 224, 106, 0.85);
@@ -5366,6 +5351,20 @@
           `Groq qwen/… 모델이 조언해 준 AI 의 코칭이에요` → `Groq 모델의 AI 코칭` (사용자가 정했다).
           **이름표는 그대로 둔다** — AI 가 한 일이 보여야 한다는 것이 이 줄을 둔 까닭이다.
         */
+        /*
+          **조작 버튼은 PC 화살표 키와 같은 모양**으로 놓는다 (사용자가 정했다).
+          마름모(위 · 좌 · 우 · 아래)는 가운데가 비어 엄지가 갈 곳을 한 번 더 찾게 한다 —
+          키보드에서 익힌 ◀ ▼ ▶ 한 줄이 손에 더 익다. 줄이 하나 줄어드는 만큼
+          **계기판 줄에 맞춰 아래로** 내려앉는다.
+        */
+        .dpad {
+          grid-template-rows: repeat(2, 60px);
+          bottom: max(16px, env(safe-area-inset-bottom));
+        }
+        #t-down {
+          grid-area: 2 / 2;
+        }
+
         .pick-long {
           display: none;
         }
