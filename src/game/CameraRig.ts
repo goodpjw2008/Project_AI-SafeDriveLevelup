@@ -269,13 +269,28 @@ export class CameraRig {
       this.smoothPos.copy(pos);
       this.smoothTarget.lerp(target, this.initialized ? Math.min(1, dt * 14) : 1);
     } else if (this.mode === 'chase') {
+      /*
+        **세로 화면에서는 조금 앞으로 당기고, 덜 넓게 본다** (사용자가 사진으로 짚었다:
+        "너무 뒤에서 봐서 너무 광각으로 물체가 왜곡되어 보인다").
+
+        세로 화면은 가로가 좁아 `fitHorizontal` 이 세로 화각을 108° 까지 밀어 올린다 — 그 화각에서는
+        가장자리의 건물과 사람이 늘어나 보인다. 이제 **좌·우 시야 창이 늘 떠 있으므로**(Game 의
+        setOverlaysVisible) 본 화면까지 억지로 넓힐 까닭이 없어졌다: 가로 화각의 하한을 낮추고,
+        그만큼 좁아진 화면을 차가 채우도록 카메라를 앞으로 당긴다.
+      */
+      const portrait = this.camera.aspect < 1;
+      const back = portrait ? dims.length * 1.6 + 2.8 : dims.length * 1.9 + 3.2;
       pos = new THREE.Vector3(
-        vehicle.x - f.x * (dims.length * 1.9 + 3.2) + right.x * 0.4,
-        dims.height * 1.55 + 1.4,
-        vehicle.z - f.z * (dims.length * 1.9 + 3.2) + right.z * 0.4,
+        vehicle.x - f.x * back + right.x * 0.4,
+        portrait ? dims.height * 1.45 + 1.25 : dims.height * 1.55 + 1.4,
+        vehicle.z - f.z * back + right.z * 0.4,
       );
       target = new THREE.Vector3(vehicle.x + f.x * 8, dims.height * 0.7, vehicle.z + f.z * 8);
-      fov = fitHorizontal(66 + Math.min(12, vehicle.speedKmh * 0.11), this.camera.aspect, CHASE_MIN_HFOV);
+      fov = fitHorizontal(
+        66 + Math.min(12, vehicle.speedKmh * 0.11),
+        this.camera.aspect,
+        portrait ? CHASE_MIN_HFOV_PORTRAIT : CHASE_MIN_HFOV,
+      );
       const k = this.initialized ? Math.min(1, dt * 6.5) : 1;
       this.smoothPos.lerp(pos, k);
       this.smoothTarget.lerp(target, k);
@@ -356,6 +371,14 @@ export class CameraRig {
 export const PORTRAIT_MAX_FOV = 108;
 /** 후방 시점이 적어도 담아야 할 가로 화각 (°) */
 const CHASE_MIN_HFOV = 72;
+/**
+ * 세로 화면의 후방 시점 가로 화각 하한 — **좌·우 시야 창이 몫을 나눠 가진다.**
+ *
+ * 72° 를 세로 화면(비율 0.53)에 맞추면 세로 화각이 108° 까지 벌어져 가장자리가 늘어나 보였다.
+ * 지금은 횡단보도 양 끝을 시야 창이 맡으므로(Game 의 setOverlaysVisible) 본 화면은 앞을
+ * 곧게 보는 데만 쓰면 된다.
+ */
+const CHASE_MIN_HFOV_PORTRAIT = 56;
 /** 상공 시점이 적어도 담아야 할 가로 화각 (°) — 교차로의 좌우 끝까지 */
 const TOP_MIN_HFOV = 66;
 

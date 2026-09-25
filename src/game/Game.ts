@@ -431,6 +431,12 @@ export class Game {
     this.rig = new CameraRig(canvas.clientWidth / canvas.clientHeight, carSpec);
     // 횡단보도 양 끝은 화면 화각 밖(좌 78°·우 67°)이라 주변시야 창으로 보완한다
     this.periph = new PeripheralView(this.world.scene, carSpec);
+    /*
+      **시야 창도 같은 값을 안다** — 진입로 보호구역 횡단보도가 있는 판에서는 그 앞에서도
+      창이 떠올라야 한다 (PeripheralView 의 setApproachZone). 장면을 지을 때 쓴 값과 같은
+      식이어야 화면에 그려진 횡단보도와 창이 뜨는 자리가 어긋나지 않는다.
+    */
+    this.periph.setApproachZone(this.straight || Boolean(this.scenario.approachSchoolZone));
     this.setSeatOffset(seatOffset);
     // 시점은 조용히 맞춘다 (토스트 없이). 거울·시야 창은 운전석에서만 켜야 한다.
     this.rig.setMode(startView);

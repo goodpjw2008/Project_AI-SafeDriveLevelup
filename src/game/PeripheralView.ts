@@ -30,7 +30,7 @@
 
 import * as THREE from 'three';
 import type { CarSpec } from '../economy/cars';
-import { STOP_LINE } from '../layout';
+import { STOP_LINE, STOP_LINE_S } from '../layout';
 import { STOP_ZONE_DEPTH } from '../rules/lawRules';
 import { driverEyeLocal } from './CarMesh';
 import { clampSeatOffset } from './carModel';
@@ -286,6 +286,16 @@ export class PeripheralView {
   }
 
   /** 운전석 시점에서만 띄운다 */
+  /**
+   * 이 판에 **진입로 보호구역 횡단보도(S)** 가 있는가 — 있으면 그 앞에서도 창이 떠오른다.
+   * 없는 판에서 켜 두면 아무 일 없는 자리에서 창이 떠 시선을 뺏는다.
+   */
+  private approachZone = false;
+
+  setApproachZone(on: boolean): void {
+    this.approachZone = on;
+  }
+
   setEnabled(on: boolean): void {
     this.enabled = on;
     if (!on) this.strength = this.targetStrength = 0;
@@ -385,7 +395,20 @@ export class PeripheralView {
 
     // 교차로 중심에서의 거리로 표시 여부를 정한다 (FADE_DIST 부터 떠올라 FULL_DIST 에서 완전히)
     const dist = Math.max(Math.abs(vehicle.x), Math.abs(vehicle.z));
-    this.setTargetStrength(this.enabled ? panelStrengthAt(dist) : 0);
+    let strength = panelStrengthAt(dist);
+    /*
+      **진입로 보호구역 횡단보도(S) 앞에서도 같은 규칙으로 떠오른다.**
+
+      S 는 z=70 근처라 교차로(0,0)에서 한참 멀다 — 교차로 거리만 보면 첫 횡단보도에서는
+      창이 내내 꺼져 있었다(사용자가 사진으로 짚었다). 그런데 "저쪽 끝에 사람이 남아 있나" 는
+      **거기서도 똑같이 물어야 하는 것**이다. 정지선까지의 남은 거리를 교차로 때와 같은 자로 재서
+      같은 곡선으로 떠올린다.
+    */
+    if (this.approachZone) {
+      const gapS = Math.abs(Math.abs(vehicle.z) - STOP_LINE_S);
+      strength = Math.max(strength, panelStrengthAt(gapS + STOP_LINE));
+    }
+    this.setTargetStrength(this.enabled ? strength : 0);
 
     const k = Math.min(1, dt * 5);
     if (Math.abs(this.targetStrength - this.strength) > 0.001) {

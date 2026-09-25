@@ -140,6 +140,7 @@ export function setPedestrianAlerts(on: boolean): void {
   alertsEnabled = on;
 }
 
+
 let alertTextures: { intending: THREE.CanvasTexture; crossing: THREE.CanvasTexture } | null = null;
 
 /**
@@ -565,6 +566,14 @@ export class Pedestrian {
     const head = (1.54 + 0.125) * this.scale;
     this.alert.position.y = head + ALERT_LIFT + Math.sin(this.alertPhase) * 0.06;
     const beat = kind === 'crossing' ? 1 + ALERT_PULSE * (0.5 + 0.5 * Math.sin(this.alertPhase * 1.6)) : 1;
+    /*
+      가로·세로를 **같은 값**으로 둔다 — 스프라이트는 시점 공간의 정사각형이라, 화면에서도
+      정사각형으로 맺힌다(가로 픽셀 = W·s/(비율·tan) = H·s/tan = 세로 픽셀).
+      한때 가로만 비율로 나눠 봤는데 그러면 오히려 찌그러졌다.
+
+      사용자가 본 찌그러짐은 여기가 아니라 **화각**이 원인이었다 — 세로 휴대폰의 후방 시점이
+      108° 까지 벌어져 화면 가장자리의 물체가 늘어나 보였다 (CameraRig 의 CHASE_MIN_HFOV_PORTRAIT).
+    */
     this.alert.scale.set(ALERT_SIZE * beat, ALERT_SIZE * beat, 1);
     (this.ring!.material as THREE.MeshBasicMaterial).opacity =
       0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.alertPhase * 1.6));

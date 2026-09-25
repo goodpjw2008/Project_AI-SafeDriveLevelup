@@ -32,4 +32,26 @@ describe('세로로 긴 화면의 화각', () => {
       expect(fitHorizontal(66, aspect, 72)).toBeGreaterThanOrEqual(66);
     }
   });
+
+  /*
+    **세로 화면의 후방 시점은 덜 넓게 본다** (사용자가 사진으로 짚었다: "너무 광각으로 물체가
+    왜곡되어 보인다"). 72° 를 세로 화면에 맞추면 세로 화각이 상한(108°)까지 벌어져 가장자리가
+    늘어나 보였다. 지금은 횡단보도 양 끝을 **좌·우 시야 창이 맡으므로**(Game 의 setOverlaysVisible)
+    본 화면까지 억지로 넓힐 까닭이 없다.
+  */
+  it('세로 화면의 후방 시점 하한을 낮추면 세로 화각이 눈에 띄게 좁아진다', () => {
+    const wide = fitHorizontal(66, PHONE, 72);
+    const calm = fitHorizontal(66, PHONE, 56);
+    // 상한(108°)에 닿아 있던 것이 10° 가까이 내려온다 — 가장자리 늘어남은 이 차이에서 온다
+    expect(wide).toBeGreaterThan(105);
+    expect(calm).toBeLessThan(wide - 8);
+    // 그래도 앞을 보기에는 넉넉하다 — 가로로 50° 넘게 담는다
+    expect(horizontalFov(calm, PHONE)).toBeGreaterThan(50);
+  });
+
+  /* PC 는 그대로다 — 하한을 낮춰도 이미 넉넉해서 원래 화각을 그대로 돌려준다 */
+  it('PC 는 하한을 낮춰도 달라지지 않는다', () => {
+    expect(fitHorizontal(66, PC, 56)).toBe(66);
+    expect(fitHorizontal(66, PC, 72)).toBe(66);
+  });
 });

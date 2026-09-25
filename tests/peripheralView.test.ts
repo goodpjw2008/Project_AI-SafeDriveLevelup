@@ -58,4 +58,36 @@ describe('주변 시야 창 노출', () => {
     expect(panelStrengthAt(0)).toBe(1);
     expect(panelStrengthAt(STOP_LINE)).toBe(1);
   });
+
+  /*
+    **진입로 보호구역 횡단보도(S) 앞에서도 같은 규칙으로 떠오른다** (사용자가 사진으로 짚었다:
+    "첫번째 횡단보도에는 좌우 후방 시선이 나오지 않아").
+
+    S 는 z=70 근처라 교차로(0,0)에서 한참 멀다 — 교차로 거리만 보면 그 앞에서는 창이 내내
+    꺼져 있었다. 그런데 "저쪽 끝에 사람이 남아 있나" 는 **거기서도 똑같이 물어야 하는 것**이다.
+    PeripheralView 는 정지선까지의 남은 거리를 교차로 때와 같은 자로 재서(`gap + STOP_LINE`)
+    같은 곡선으로 띄운다 — 그 환산이 실제로 맞는지 여기서 못 박는다.
+  */
+  describe('진입로 보호구역 횡단보도 앞', () => {
+    /** PeripheralView.update 가 쓰는 환산 — 정지선까지 남은 거리를 교차로 자로 바꾼다 */
+    const strengthAtGapS = (gap: number): number => panelStrengthAt(gap + STOP_LINE);
+
+    it('정지선에 다가가면 완전히 드러난다', () => {
+      for (let gap = 0; gap <= STOP_ZONE_DEPTH; gap += 3) {
+        expect(strengthAtGapS(gap)).toBeGreaterThan(0.99);
+      }
+    });
+
+    it('멀리 있을 때는 접혀 있다 — 교차로에서와 같다', () => {
+      expect(strengthAtGapS(STOP_ZONE_DEPTH + 20)).toBe(0);
+    });
+
+    it('다가가는 동안 서서히 떠오른다', () => {
+      // 떠오르는 구간은 정지 구역 뒤 8~16m 다 (FULL_DIST ~ FADE_DIST)
+      const far = strengthAtGapS(STOP_ZONE_DEPTH + 14);
+      const near = strengthAtGapS(STOP_ZONE_DEPTH + 9);
+      expect(far).toBeLessThan(near);
+      expect(near).toBeGreaterThan(0);
+    });
+  });
 });
