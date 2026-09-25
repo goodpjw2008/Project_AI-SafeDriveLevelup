@@ -610,10 +610,18 @@ export class Pedestrian {
       );
       this.alert.renderOrder = 6;
       /*
-        크기를 그리기 직전에 정하므로, 잘라 낼지 말지를 재는 **지난 프레임 크기**로는 판단이
-        어긋난다 — 표시는 몇 개 안 되니 잘라 내지 않는다.
+        **화면 밖에 있으면 그리지 않는다 (`frustumCulled` 는 켠 채로 둔다).**
+
+        한때 껐었다 — 크기를 그리기 직전에 정하니 잘라 낼지 말지를 재는 **지난 프레임 크기**로는
+        판단이 어긋난다고 본 것이다. 그런데 끄면 **카메라 뒤에 있는 사람의 표식까지 그리게** 된다.
+        이 판은 거리에 비례해 커지므로, 카메라 뒤에 있으면 꼭짓점이 near 평면을 가로질러
+        **찌그러진 삼각형**이 된다 — 휴대폰의 타일 방식 GPU 에서는 그런 삼각형 하나가 **그 프레임의
+        타일 몇 장을 통째로 비게** 만든다 (사용자가 사진으로 짚은 깜빡임의 모양이 그랬다:
+        화면 폭의 정확히 절반에서 잘린 채 나머지가 비어 있었다).
+
+        지난 프레임 크기로 재는 것은 사실 문제가 없다 — 이 표식은 거리에 비례해 커지므로
+        경계 상자도 거리를 따라가고, 한 프레임의 차이는 눈에 보이지 않는다.
       */
-      this.alert.frustumCulled = false;
       this.alert.onBeforeRender = (_r, _s, camera) => this.faceCamera(camera);
       this.group.add(this.alert);
 
@@ -695,7 +703,12 @@ export class Pedestrian {
     */
     FORWARD.set(0, 0, -1).applyQuaternion(CAM_Q);
     WORLD.set(this.group.position.x, mark.position.y, this.group.position.z).sub(CAM_POS);
-    const size = ALERT_SIZE * Math.max(0.01, WORLD.dot(FORWARD)) * this.alertBeat;
+    /*
+      **카메라보다 뒤면 재지 않는다.** 거리가 0 이나 음수면 판이 뒤집히거나 한 점으로 접혀
+      꼭짓점이 near 평면에 걸린다 — 그런 삼각형은 그리는 쪽에서 무슨 짓을 할지 알 수 없다.
+      1m 를 바닥으로 둔다: 어차피 화면 밖이라 `frustumCulled` 이 걸러 낸다.
+    */
+    const size = ALERT_SIZE * Math.max(1, WORLD.dot(FORWARD)) * this.alertBeat;
     mark.scale.set(size, size, 1);
     /*
       **손으로 행렬을 다시 맞춘다.** `onBeforeRender` 는 장면의 행렬이 이미 계산된 뒤에 불린다 —
