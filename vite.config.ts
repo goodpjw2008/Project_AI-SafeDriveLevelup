@@ -9,7 +9,7 @@ import { handleRecommend } from './server/recommendHandler.mjs';
 import { handleReport } from './server/reportHandler.mjs';
 import { handleScenario } from './server/scenarioHandler.mjs';
 import { handleStatsRead, handleStatsWrite } from './server/statsHandler.mjs';
-import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_TAGLINE } from './src/brand';
+import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_SITE, APP_TAGLINE } from './src/brand';
 import { CARS } from './src/economy/cars';
 
 /** 전시관 대표 사진을 저장하는 폴더 (server/carPhotoHandler.mjs) */
@@ -45,6 +45,7 @@ function brandHtml(): Plugin {
         APP_NAME,
         APP_TAGLINE,
         APP_DESCRIPTION,
+        APP_SITE,
         /*
           아이콘은 **SVG 를 그 자리에서 만든다** (brand.ts 의 APP_ICON_SVG) — 그림 파일을 읽던 때와 달리
           크기마다 흐려지지 않고, 색이 이름의 딱지와 늘 같다.
@@ -56,7 +57,7 @@ function brandHtml(): Plugin {
         APP_ICON: `data:image/svg+xml;base64,${Buffer.from(APP_ICON_SVG, 'utf8').toString('base64')}`,
       };
       return html.replace(
-        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_ICON)\}\}/g,
+        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_SITE|APP_ICON)\}\}/g,
         (_, key: string) => escapeHtml(values[key]),
       );
     },

@@ -85,14 +85,27 @@ describe('가로 휴대폰의 첫 화면', () => {
     주행 분석 화면(`#screen-debrief`). 규칙 하나라도 이 밖으로 나가면 주행 화면 · 설정까지
     가로에서 달라진다. 사용자가 고쳐 달라고 한 것은 이 셋이다.
   */
-  it('모든 규칙이 첫 화면 · AI 창 · 분석 화면 안에만 걸린다', () => {
-    const allowed = ['#screen-menu', '.ai-pick', '#screen-debrief'];
+  it('모든 규칙이 정해 둔 자리 안에만 걸린다', () => {
+    /*
+      첫 화면 · AI 창 · 분석 화면, 그리고 주행 화면에서 **딱 두 가지**(윗줄 · 조작 버튼).
+      목록을 늘릴 때는 늘 한 번 더 묻는다 — 여기에 없는 것이 걸리면 가로에서 조용히 달라진다.
+    */
+    const allowed = [
+      '#screen-menu',
+      '.ai-pick',
+      '#screen-debrief',
+      '#hud-scenario',
+      '.pick-long',
+      '.pick-short',
+      '.dpad',
+      '#t-down',
+    ];
     for (const head of ALL) {
       for (const b of blocks(head)) {
         for (const sel of selectorsOf(b, head)) {
           expect(
             allowed.some((prefix) => sel.startsWith(prefix)),
-            `${sel} 가 첫 화면 · AI 창 · 분석 화면 밖으로 나갔다`,
+            `${sel} 가 정해 둔 자리 밖으로 나갔다`,
           ).toBe(true);
         }
       }
@@ -219,17 +232,40 @@ describe('가로 휴대폰의 첫 화면', () => {
     **자리가 남았기 때문**이지 글자만 키운 것이 아니다.
     아주 좁은 화면(760px 미만)만 예외다 — 거기서는 한 줄에 들어가지 못해 통째로 꺾인다.
   */
-  it('이름은 세로보다 두 단계 크다 — 좁은 화면만 예외', () => {
-    const r = rules();
-    expect(r).toMatch(/#screen-menu \.brand \{\s*font-size:\s*30px/);
-    expect(r).toMatch(/#screen-menu \.brand-colon \{\s*font-size:\s*25px/);
-    expect(r).toMatch(/#screen-menu \.brand-sub \{\s*font-size:\s*21px/);
+  it('이름은 폭에 따라 한 줄을 지키는 선까지 키운다', () => {
+    /*
+      사용자가 두 번 *"두 개 크게"* 라고 해 26 → 30 → 34px 로 올렸다. 상자와 줄 간격을
+      바짝 줄여 **자리가 남았기에** 가능한 것이지 글자만 키운 것이 아니다.
+
+      **다만 한 줄을 넘기면 안 된다.** 부제가 다음 줄로 내려가면 첫 화면이 한 화면을 넘겨,
+      키우려다 도로 잃는다 — 그래서 폭이 줄어들 때마다 한 단계씩 되돌린다.
+    */
+    const size = (raw: string): number =>
+      Number(raw.replace(/\/\*[\s\S]*?\*\//g, '').match(/#screen-menu \.brand \{\s*font-size:\s*(\d+)/)![1]);
+    expect(size(block())).toBe(34);
+    expect(size(block(NARROW))).toBeLessThan(size(block()));
+    expect(size(block(TINY))).toBeLessThan(size(block(NARROW)));
     // 상자와 줄 간격을 줄인 것이 짝이다 — 글자만 키우면 첫 화면이 도로 넘친다
+    const r = rules();
     expect(r).toMatch(/#screen-menu \.hero \{[^}]*padding:\s*5px/);
     expect(r).toMatch(/#screen-menu \.brand,\s*\n?\s*#screen-menu \.brand-sub \{[^}]*line-height:\s*1\.2/);
-    // 줄이는 곳은 아주 좁은 단계뿐이다
-    expect(rules(NARROW)).not.toContain('.brand');
-    expect(rules(TINY)).toMatch(/#screen-menu \.brand \{\s*font-size:/);
+  });
+
+  /*
+    **주행 화면의 윗줄은 짧게, 조작 버튼은 세로와 같은 모양으로** (사용자가 정했다).
+    긴 꼴(모델 이름 · 판 제목까지)은 낮은 화면에서 두 줄로 접혀 하늘과 전방 신호등을 가린다.
+    조작 버튼은 `출발 / 좌 · 정지 · 우` 두 줄 — 마름모는 줄이 하나 더 있어 그만큼을 더 먹는다.
+  */
+  it('주행 화면은 윗줄을 줄이고 조작 버튼을 두 줄로 놓는다', () => {
+    const drive = blocks(HEAD).find((b) => b.includes('.dpad'))!;
+    expect(drive, '주행 화면 덩어리가 따로 있어야 한다').toBeTruthy();
+    const r = drive.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(r).toMatch(/#hud-scenario \.sep,\s*\n?\s*#hud-scenario \.scn-title \{\s*display:\s*none/);
+    expect(r).toMatch(/\.pick-long \{\s*display:\s*none/);
+    expect(r).toMatch(/\.pick-short \{\s*display:\s*inline/);
+    // 두 줄이라야 `출발 / 좌 · 정지 · 우` 가 된다 — 세 줄이면 마름모로 되돌아간다
+    expect(r).toMatch(/\.dpad \{[^}]*grid-template-rows:\s*repeat\(2, 60px\)/);
+    expect(r).toMatch(/#t-down \{[^}]*grid-area:\s*2 \/ 2/);
   });
 
   /*

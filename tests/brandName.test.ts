@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { AI_BADGE_HTML, BRAND_NAME_HTML, withAiBadge } from '../src/ui/brandName';
-import { APP_ICON_SVG, APP_NAME, APP_NAME_PARTS, APP_TAGLINE, APP_TAGLINE_PARTS } from '../src/brand';
+import {
+  APP_DESCRIPTION,
+  APP_ICON_SVG,
+  APP_NAME,
+  APP_NAME_PARTS,
+  APP_SITE,
+  APP_TAGLINE,
+  APP_TAGLINE_PARTS,
+} from '../src/brand';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { courseTitle } from '../src/scenarios/curriculum';
 
 /*
@@ -103,5 +113,59 @@ describe('탭 아이콘', () => {
   it('크기를 타지 않는 SVG 다 — 탭 16px 부터 홈 화면 180px 까지', () => {
     expect(APP_ICON_SVG.startsWith('<svg')).toBe(true);
     expect(APP_ICON_SVG).toContain('viewBox="0 0 64 64"');
+  });
+});
+
+/*
+  **검색 결과와 공유 카드에 뜨는 글** — `<meta name="description">` 과 og / twitter 태그.
+
+  구글이 우리 사이트를 보여 줄 때 첫 화면 본문("기록된 나쁜 운전 습관이 없습니다 …")을 뽑아 쓰고
+  있었다. 그 줄은 **이미 들어온 사람에게 하는 말**이지, 아직 안 들어온 사람에게 할 말이 아니다.
+  사용자가 직접 글을 적어 줬다 — 무엇을 하는 곳이고 무엇을 바라는가.
+
+  글은 **한 곳**(brand.ts 의 APP_DESCRIPTION)에서 온다. 두 벌로 적으면 한쪽만 고쳐 놓고
+  다른 쪽이 옛말을 하는 일이 생긴다 — 그래서 HTML 에는 자리표시자만 둔다.
+*/
+describe('검색 결과와 공유 카드', () => {
+  const html = readFileSync(fileURLToPath(new URL('../src/index.html', import.meta.url)), 'utf8');
+
+  it('설명은 무엇을 하는 곳이고 무엇을 바라는지를 말한다', () => {
+    expect(APP_DESCRIPTION).toContain('AI');
+    expect(APP_DESCRIPTION).toContain('우회전');
+    expect(APP_DESCRIPTION).toContain('어린이보호구역');
+    expect(APP_DESCRIPTION).toContain('안전운전');
+    // 검색 결과는 대략 이만큼까지 보인다 — 넘치면 뒷말이 잘린 채 뜬다
+    expect(APP_DESCRIPTION.length).toBeLessThanOrEqual(160);
+  });
+
+  it('설명 · 공유 카드 · 대표 주소가 모두 한 곳에서 온다', () => {
+    for (const tag of [
+      '<meta name="description" content="{{APP_DESCRIPTION}}"',
+      '<meta property="og:description" content="{{APP_DESCRIPTION}}"',
+      '<meta name="twitter:description" content="{{APP_DESCRIPTION}}"',
+      '<meta property="og:url" content="{{APP_SITE}}"',
+      '<link rel="canonical" href="{{APP_SITE}}"',
+    ]) {
+      expect(html).toContain(tag);
+    }
+    // 글을 HTML 에 그대로 적어 두지 않는다 — 그러면 brand.ts 를 고쳐도 따라오지 않는다
+    expect(html).not.toContain(APP_DESCRIPTION.slice(0, 20));
+  });
+
+  /* 자리표시자는 vite.config.ts 가 갈아 끼운다 — 목록에서 빠지면 `{{…}}` 가 그대로 배포된다 */
+  it('자리표시자가 빌드에서 갈아 끼워진다', () => {
+    const vite = readFileSync(fileURLToPath(new URL('../vite.config.ts', import.meta.url)), 'utf8');
+    for (const key of ['APP_NAME', 'APP_TAGLINE', 'APP_DESCRIPTION', 'APP_SITE', 'APP_ICON']) {
+      expect(vite).toContain(key);
+    }
+    // HTML 이 쓰는 자리표시자가 하나라도 목록에 빠지면 `{{…}}` 가 그대로 배포된다
+    const listed = vite.match(/\\\{\\\{\(([^)]+)\)\\\}\\\}/)![1].split('|');
+    for (const used of new Set([...html.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))) {
+      expect(listed, `${used} 가 치환 목록에 없다`).toContain(used);
+    }
+  });
+
+  it('공개 주소는 https 한 벌이다 — 끝에 빗금을 두지 않는다', () => {
+    expect(APP_SITE).toBe('https://safedrive.ai.kr');
   });
 });

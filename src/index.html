@@ -14,6 +14,22 @@
     -->
     <link rel="icon" type="image/svg+xml" href="{{APP_ICON}}" />
     <meta name="description" content="{{APP_DESCRIPTION}}" />
+    <!--
+      **링크를 어디에 붙여도 같은 말이 뜨게 한다** (카카오톡 · 페이스북 · 엑스 · 슬랙).
+      한동안 이 태그가 아예 없어서, 주소를 보내면 제목도 설명도 없는 맨 링크로 떴다.
+      글은 위의 `description` 과 **같은 한 곳**(brand.ts 의 APP_DESCRIPTION)에서 온다 —
+      두 벌로 적으면 한쪽만 고쳐 놓고 다른 쪽이 옛말을 하는 일이 생긴다.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="{{APP_NAME}}" />
+    <meta property="og:url" content="{{APP_SITE}}" />
+    <meta property="og:title" content="{{APP_NAME}} — {{APP_TAGLINE}}" />
+    <meta property="og:description" content="{{APP_DESCRIPTION}}" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="{{APP_NAME}} — {{APP_TAGLINE}}" />
+    <meta name="twitter:description" content="{{APP_DESCRIPTION}}" />
+    <!-- 대표 주소 — 같은 내용이 여러 주소로 잡히지 않게 한 곳을 가리킨다 -->
+    <link rel="canonical" href="{{APP_SITE}}" />
 
     <!--
       본문 글꼴 (Pretendard, SIL OFL 1.1).
@@ -5259,13 +5275,13 @@
           padding: 0;
         }
         #screen-menu .brand {
-          font-size: 30px;
+          font-size: 34px;
         }
         #screen-menu .brand-colon {
-          font-size: 25px;
+          font-size: 29px;
         }
         #screen-menu .brand-sub {
-          font-size: 21px;
+          font-size: 25px;
         }
         /*
           **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
@@ -5597,6 +5613,38 @@
         }
       }
       /*
+        ── 손에 든 가로 화면의 주행 화면 ──────────────────────────────────────
+
+        **윗줄은 짧게, 조작 버튼은 세로와 같은 모양으로** (사용자가 정했다).
+
+        윗줄은 세로 화면과 같은 기준으로 줄인다 — `Gemini 추천 맵` · `AI 추천 시나리오 C00034`.
+        긴 꼴(`… 모델이 분석해서 추천해준 맵` · 판 제목까지)은 낮은 화면에서 두 줄로 접혀
+        **하늘과 전방 신호등을 가린다.** 무엇을 시험하는 판인지는 달리며 로봇이 말해 주고,
+        번호가 있으면 맵 체험으로 다시 찾을 수 있다.
+
+        조작 버튼은 **출발 / 좌 · 정지 · 우** 두 줄이다 — PC 화살표 키와 같은 모양이고
+        세로 화면에서 쓰는 것과도 같다. 마름모(위 · 좌 · 우 · 아래)는 가운데가 비어 엄지가
+        갈 곳을 한 번 더 찾게 하고, 줄이 하나 더 있어 낮은 화면에서 그만큼을 더 먹는다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        #hud-scenario .sep,
+        #hud-scenario .scn-title {
+          display: none;
+        }
+        .pick-long {
+          display: none;
+        }
+        .pick-short {
+          display: inline;
+        }
+        .dpad {
+          grid-template-rows: repeat(2, 60px);
+        }
+        #t-down {
+          grid-area: 2 / 2;
+        }
+      }
+      /*
         **좁은 가로 화면**(860px 미만). 레벨 칸이 좁아져 `안전운전 Level1` 과 `0 / 200 XP` 가
         한 줄에 들어가지 않고 경험치가 잘렸다. 호칭을 `안전운전 L1` 로 줄이고(세로 화면에서
         쓰는 것과 같은 수법) 차를 한 단계 줄여 그만큼을 레벨 칸에 돌려준다.
@@ -5604,6 +5652,19 @@
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 860px) {
         #screen-menu .lv-word {
           display: none;
+        }
+        /*
+          **이름은 한 줄을 지키는 선까지만 키운다.** 넓은 쪽(34px)을 그대로 두면 여기서
+          부제가 다음 줄로 내려가 첫 화면이 한 화면을 넘긴다 — 키우려다 도로 잃는다.
+        */
+        #screen-menu .brand {
+          font-size: 32px;
+        }
+        #screen-menu .brand-colon {
+          font-size: 27px;
+        }
+        #screen-menu .brand-sub {
+          font-size: 22px;
         }
         #screen-menu .ai-car-photo {
           height: 126px;
