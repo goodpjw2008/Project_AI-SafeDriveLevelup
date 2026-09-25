@@ -2241,11 +2241,23 @@ export class Game {
    *   운전자 시점에서만  기본값. 후방·상공에서는 주변이 이미 화면에 다 보이므로,
    *                   **학습 가치를 하나도 잃지 않고** 그 시점에서만 아낀다
    *   끄기            어디서도 그리지 않는다
+   *
+   * **세로 휴대폰은 예외다 — 시점도 화질도 가리지 않고 켠다** (사용자가 정했다).
+   *
+   * 손에 든 세로 화면은 가로 화각이 더 좁아, 이 창이 풀려던 문제(횡단보도 양 끝이 화면
+   * 밖으로 밀려난다 — PeripheralView.ts 의 실측 좌 78° · 우 67°)가 **PC 보다 심하다.**
+   * 게다가 휴대폰에는 시점 전환 버튼이 없어 운전석 시점으로 갈 방법이 없고, 화질이 낮게
+   * 잡히면 아예 꺼진다. 그대로 두면 "저쪽에 사람이 남아 있나" 를 확인할 길이 없어져,
+   * 이 게임이 가르치려는 판단(제27조 보행자 보호) 자체를 못 하게 된다 —
+   * **프레임보다 판단이 먼저다.**
+   *
+   * 위에서 내려다보는 시점(`top`)만 뺀다. 거기서는 주변이 이미 화면에 다 보인다.
    */
   private setOverlaysVisible(mode: ViewMode): void {
     const want =
       this.graphics.peripheral === 'always' ||
-      (this.graphics.peripheral === 'driverOnly' && mode === 'driver');
+      (this.graphics.peripheral === 'driverOnly' && mode === 'driver') ||
+      (this.handheld?.matches === true && mode !== 'top');
     this.periph.setEnabled(want);
     this.cluster.setVisible(true);
   }
@@ -2271,6 +2283,11 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.rig.resize(w / h);
     this.periph.resize(w, h);
+    /*
+      **화면을 돌리면 시야 창도 다시 판단한다.** 세로일 때만 켜는 규칙이 생겼으므로,
+      가로로 돌렸는데 세로의 판단이 그대로 남아 있으면 안 된다 (그 반대도 같다).
+    */
+    this.setOverlaysVisible(this.rig.mode);
   }
 
   /** 결과 화면에서 교차로 전체를 보여주기 위해 */

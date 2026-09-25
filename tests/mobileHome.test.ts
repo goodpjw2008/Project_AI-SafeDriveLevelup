@@ -218,6 +218,35 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(honk.indexOf('this.audio.horn();')).toBeLessThan(honk.indexOf('!this.handheld?.matches'));
   });
 
+  /*
+    **세로 휴대폰에서는 좌·우·후방 시야 창을 시점도 화질도 가리지 않고 켠다** (사용자가 정했다).
+
+    이 창이 풀려던 문제 — 횡단보도 양 끝이 화면 밖으로 밀려난다(PeripheralView.ts 의 실측
+    좌 78° · 우 67°) — 는 좁은 세로 화면에서 **더 심하다.** 게다가 휴대폰에는 시점 전환 버튼이
+    없어 운전석 시점으로 갈 방법이 없고, 화질이 낮게 잡히면 아예 꺼진다. 그대로 두면
+    "저쪽에 사람이 남아 있나" 를 확인할 길이 없어진다 — **프레임보다 판단이 먼저다.**
+  */
+  it('세로 휴대폰에서는 시야 창을 늘 켠다 — 위에서 보는 시점만 뺀다', () => {
+    const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
+    const fn = game.slice(game.indexOf('private setOverlaysVisible'), game.indexOf('this.periph.setEnabled(want)'));
+    expect(fn).toContain("this.handheld?.matches === true && mode !== 'top'");
+    // PC 의 판단은 그대로 남아 있어야 한다
+    expect(fn).toContain("this.graphics.peripheral === 'always'");
+    expect(fn).toContain("this.graphics.peripheral === 'driverOnly' && mode === 'driver'");
+  });
+
+  /* 화면을 돌리면 다시 판단한다 — 세로일 때만 켜는 규칙이라 가로의 판단이 남아 있으면 안 된다 */
+  it('화면 크기가 바뀌면 시야 창을 다시 판단한다', () => {
+    const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
+    const resize = game.slice(game.indexOf('  resize(): void {'), game.indexOf('showTopView'));
+    expect(resize).toContain('this.setOverlaysVisible(this.rig.mode)');
+  });
+
+  /* 시야 창이 위쪽 양 끝을 쓰므로 안내 띠는 그 아래에 선다 — 띠가 DOM 이라 3D 창을 덮는다 */
+  it('주행 안내 띠를 시야 창 아래로 내린다', () => {
+    expect(rulesOnly()).toMatch(/\.hud-top \{\s*padding-top:/);
+  });
+
   /* 누가 골랐는지 · 조언했는지의 짧은 꼴 — 이름표는 그대로 두고 설명만 줄인다 */
   it('AI 이름표 줄은 짧은 꼴로 바뀐다', () => {
     const block = rulesOnly();
