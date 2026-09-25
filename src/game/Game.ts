@@ -1824,7 +1824,8 @@ export class Game {
     if (this.vehicle.braking && this.vehicle.speedKmh > 25) this.rig.addShake(dt * 1.2);
     this.audio.updateEngine(this.vehicle.speedKmh, !this.vehicle.braking, this.vehicle.braking);
     this.rig.update(this.vehicle, dt);
-    this.periph.update(this.vehicle, dt);
+    // 본 화면 카메라를 넘긴다 — 확장 시야는 그 자리·방향을 그대로 쓴다 (PeripheralView 의 aimWide)
+    this.periph.update(this.vehicle, dt, this.rig.camera);
     // 벡터를 재사용한다 — 매 프레임 새로 만들면 그 쓰레기를 치우느라 언젠가 한 번 멈칫한다
     this.world.update(dt, this.scratch.set(this.vehicle.x, 0, this.vehicle.z));
 

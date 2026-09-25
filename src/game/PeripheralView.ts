@@ -71,6 +71,22 @@ const LOOK_YAW_WIDE = 0.838;
 const PANEL_FOV_WIDE = 56;
 
 /**
+ * **확장 시야가 한쪽으로 늘리는 폭** — 본 화면 가로의 몇 배인가.
+ *
+ * 1.0 이면 본 화면(가로 화각 46°)의 바깥으로 **23°~52°** 를 담는다. 더 늘리면 더 옆까지
+ * 보이지만, 평면에 비추는 그림이라 가장자리가 그만큼 늘어난다 — 사용자가 싫어한 바로 그 왜곡이다.
+ */
+const WIDE_EXTEND = 1.0;
+
+/**
+ * 확장 시야가 보는 띠의 높이 자리 (본 화면 높이의 몇 배만큼 위로).
+ *
+ * 후방 시점은 도로를 조금 내려다보므로 **지평선이 화면 가운데보다 위**에 있다. 건너편 보도에
+ * 선 사람은 그 지평선 언저리에 있어서, 띠를 조금 올려야 사람이 띠 한가운데로 들어온다.
+ */
+const WIDE_LIFT = -0.08;
+
+/**
  * 창의 화각. 68° ± 30° = 38°~98° 를 담는다.
  * 메인 화면의 수평 반각(화면비에 따라 45°~53°)과 겹치므로 사이 구간이 비지 않는다.
  */
@@ -445,8 +461,40 @@ export class PeripheralView {
     }
   }
 
+  /**
+   * **확장 시야** — 본 화면과 **같은 자리에서 같은 방향**을 보되, 화면이 가로로 넓었다면
+   * 보였을 바깥쪽 조각을 그대로 그린다 (사용자가 정했다: "사이드미러로 외곡된 시야가 아니라
+   * 반대쪽 차선의 상황이 시야 왜곡 없이 그대로").
+   *
+   * 카메라를 **옆으로 돌리지 않는다.** 돌리면 같은 장면도 비스듬히 기울어 보여 사이드미러처럼
+   * 읽힌다. 대신 화면을 가로로 늘린 **가상의 넓은 그림**을 상상하고 그중 바깥쪽 조각만
+   * 잘라 그린다(`setViewOffset`) — 본 화면과 **한 장의 그림**이라 이어 붙이면 그대로 맞는다.
+   */
+  private aimWide(u: Unit, main: THREE.PerspectiveCamera): void {
+    u.camera.position.copy(main.position);
+    u.camera.quaternion.copy(main.quaternion);
+    u.camera.near = main.near;
+    u.camera.far = main.far;
+    // 세로 화각은 본 화면과 같다 — 가로로만 늘린다
+    u.camera.fov = main.fov;
+    const mw = main.aspect; // 세로를 1 로 놓았을 때의 본 화면 가로
+    const ew = mw * WIDE_EXTEND;
+    const fullW = mw + 2 * ew;
+    u.camera.aspect = fullW;
+    const bandH = ew * PANEL_ASPECT; // 창은 1.6:1 — 늘린 폭에 맞춘 띠 높이
+    u.camera.setViewOffset(
+      fullW,
+      1,
+      u.side < 0 ? 0 : mw + ew, // 왼쪽 조각 · 오른쪽 조각
+      (1 - bandH) / 2 - WIDE_LIFT,
+      ew,
+      bandH,
+    );
+    u.camera.updateProjectionMatrix();
+  }
+
   /** 차량 움직임에 맞춰 창의 시점을 옮긴다. 고개(글랜스) 회전은 따르지 않는다. */
-  update(vehicle: Vehicle, dt: number): void {
+  update(vehicle: Vehicle, dt: number, main?: THREE.PerspectiveCamera): void {
     const f = vehicle.forward;
     const right = { x: -f.z, z: f.x };
 
@@ -491,6 +539,11 @@ export class PeripheralView {
     }
 
     for (const u of this.units) {
+      // 확장 시야는 본 화면을 그대로 잇는다 — 차 기준으로 돌려 잡지 않는다 (위 aimWide)
+      if (this.wide && u.side !== 0 && main) {
+        this.aimWide(u, main);
+        continue;
+      }
       /*
         카메라를 **그쪽 어깨 자리**에 둔다 — 좌측 창은 운전석, 우측 창은 그 대칭 자리.
 
