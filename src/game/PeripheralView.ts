@@ -43,8 +43,32 @@ import {
 } from './overlayTextures';
 import type { Vehicle } from './Vehicle';
 
+/**
+ * 손에 든 세로 화면인가 — 화면 규칙(index.html 의 '손에 든 세로 화면')과 **같은 조건**이다.
+ * 조건이 갈라지면 창의 모양과 화면의 규칙이 어긋난다.
+ */
+function isHandheldPortrait(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)').matches;
+}
+
 /** 차체 정면 기준 창이 보는 방향 (rad ≒ 68°) */
 const LOOK_YAW = 1.19;
+
+/**
+ * **세로 휴대폰의 좌·우 창은 '확장 시야' 다** (사용자가 정했다).
+ *
+ * 68° 는 사이드미러처럼 **옆을 보는** 각이다. 그런데 세로 화면에서 정작 안 보이는 것은
+ * "내 앞 횡단보도의 **반대쪽 끝**" 이다 — 본 화면이 ±28° 밖에 담지 못하는데 창은 38° 부터
+ * 보고 있어, 그 사이 10° 가 비고 창에는 엉뚱한 옆 풍경이 들어왔다 (사용자: "좌측시야로
+ * 사람이 지나가는 게 인지가 안 된다").
+ *
+ * 그래서 각을 안쪽으로 당겨 **본 화면 가장자리에서 이어지게** 한다 — 48° ± 28° = 20°~76°.
+ * 20° 는 본 화면(±28°) 안이라 끊기지 않고, 76° 는 정지선에서 본 횡단보도 양 끝(좌 78° · 우 67°)에
+ * 닿는다. 화각도 조금 좁혀 같은 사람이 더 크게 보인다.
+ */
+const LOOK_YAW_WIDE = 0.838;
+const PANEL_FOV_WIDE = 56;
 
 /**
  * 창의 화각. 68° ± 30° = 38°~98° 를 담는다.
@@ -159,16 +183,29 @@ export class PeripheralView {
    */
   private cursor = 0;
 
+  /** 확장 시야로 쓰는가 — 세로 휴대폰 (위 LOOK_YAW_WIDE) */
+  private wide = false;
+
   constructor(
     private scene: THREE.Scene,
     spec: CarSpec,
   ) {
     this.eye = driverEyeLocal(spec);
     this.baseEyeZ = this.eye.z;
-    this.addUnit(-1, '◀ 좌측 시야');
-    this.addUnit(1, '우측 시야 ▶');
-    // 후방은 거울을 대신하므로 좌우를 뒤집는다. 뜨는 시점은 좌·우 창과 같다
-    this.addUnit(0, '후방 시야', { mirrored: true });
+    /*
+      **세로 휴대폰에서는 좌·우 확장 시야 둘만 둔다** (사용자가 정했다).
+
+      후방 창은 "뒤차가 얼마나 붙었나" 를 읽는 창인데, 손안 화면에서는 그 답보다 **앞 횡단보도
+      양 끝**이 훨씬 급하다. 창 셋이 좁은 화면을 나눠 쓰면 정작 봐야 할 둘이 작아진다.
+      뒤차의 재촉은 경적 소리가 이미 알린다 (Game 의 follower).
+    */
+    this.wide = isHandheldPortrait();
+    this.addUnit(-1, this.wide ? '◀ 좌측 확장 시야' : '◀ 좌측 시야');
+    this.addUnit(1, this.wide ? '우측 확장 시야 ▶' : '우측 시야 ▶');
+    if (!this.wide) {
+      // 후방은 거울을 대신하므로 좌우를 뒤집는다. 뜨는 시점은 좌·우 창과 같다
+      this.addUnit(0, '후방 시야', { mirrored: true });
+    }
     this.overlayCamera.position.z = 5;
     /*
       처음 상태를 **반드시 한 번 적용한다.**
@@ -218,7 +255,7 @@ export class PeripheralView {
 
     // far 는 하늘 구체(반지름 420)보다 멀어야 한다 — 짧으면 배경이 검게 잘린다
     const camera = new THREE.PerspectiveCamera(
-      side === 0 ? REAR_FOV : PANEL_FOV,
+      side === 0 ? REAR_FOV : this.wide ? PANEL_FOV_WIDE : PANEL_FOV,
       TARGET.w / TARGET.h,
       0.15,
       600,
@@ -276,7 +313,10 @@ export class PeripheralView {
       dir:
         side === 0
           ? { x: 0, z: 1 } // 정후방
-          : { x: side * Math.sin(LOOK_YAW), z: -Math.cos(LOOK_YAW) },
+          : {
+              x: side * Math.sin(this.wide ? LOOK_YAW_WIDE : LOOK_YAW),
+              z: -Math.cos(this.wide ? LOOK_YAW_WIDE : LOOK_YAW),
+            },
     });
   }
 
