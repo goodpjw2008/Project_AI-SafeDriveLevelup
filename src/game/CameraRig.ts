@@ -279,7 +279,7 @@ export class CameraRig {
         그만큼 좁아진 화면을 차가 채우도록 카메라를 앞으로 당긴다.
       */
       const portrait = this.camera.aspect < 1;
-      const back = portrait ? dims.length * 1.6 + 2.8 : dims.length * 1.9 + 3.2;
+      const back = portrait ? dims.length * 1.45 + 2.5 : dims.length * 1.9 + 3.2;
       pos = new THREE.Vector3(
         vehicle.x - f.x * back + right.x * 0.4,
         portrait ? dims.height * 1.45 + 1.25 : dims.height * 1.55 + 1.4,
@@ -378,7 +378,7 @@ const CHASE_MIN_HFOV = 72;
  * 지금은 횡단보도 양 끝을 시야 창이 맡으므로(Game 의 setOverlaysVisible) 본 화면은 앞을
  * 곧게 보는 데만 쓰면 된다.
  */
-const CHASE_MIN_HFOV_PORTRAIT = 56;
+const CHASE_MIN_HFOV_PORTRAIT = 46;
 /** 상공 시점이 적어도 담아야 할 가로 화각 (°) — 교차로의 좌우 끝까지 */
 const TOP_MIN_HFOV = 66;
 

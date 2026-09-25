@@ -242,11 +242,6 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(resize).toContain('this.setOverlaysVisible(this.rig.mode)');
   });
 
-  /* 시야 창이 위쪽 양 끝을 쓰므로 안내 띠는 그 아래에 선다 — 띠가 DOM 이라 3D 창을 덮는다 */
-  it('주행 안내 띠를 시야 창 아래로 내린다', () => {
-    expect(rulesOnly()).toMatch(/\.hud-top \{\s*padding-top:/);
-  });
-
   /* 누가 골랐는지 · 조언했는지의 짧은 꼴 — 이름표는 그대로 두고 설명만 줄인다 */
   it('AI 이름표 줄은 짧은 꼴로 바뀐다', () => {
     const block = rulesOnly();

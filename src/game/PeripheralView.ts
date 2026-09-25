@@ -185,6 +185,11 @@ export class PeripheralView {
 
   /** 확장 시야로 쓰는가 — 세로 휴대폰 (위 LOOK_YAW_WIDE) */
   private wide = false;
+  /** 말풍선 아래에 붙이기 위해 기억해 두는 값 (위 resize) */
+  private relayoutIn = 0;
+  private coachBottom = 0;
+  private lastW = 1;
+  private lastH = 1;
 
   constructor(
     private scene: THREE.Scene,
@@ -353,6 +358,8 @@ export class PeripheralView {
   resize(width: number, height: number): void {
     const w = Math.max(1, width);
     const h = Math.max(1, height);
+    this.lastW = w;
+    this.lastH = h;
     const sideW = Math.min(w * 0.3, Math.max(MIN_WIDTH_PX, w * WIDTH_FRAC));
     const margin = w * EDGE_MARGIN;
     const box = borderBox(PANEL_ASPECT, HUD_BORDER_FRAC);
@@ -404,7 +411,17 @@ export class PeripheralView {
         cy = h * REAR_VERTICAL_FRAC;
       } else {
         cx = u.side < 0 ? margin + (pw * box.outerW) / 2 : w - margin - (pw * box.outerW) / 2;
-        cy = TOP_MARGIN_PX + (pw * PANEL_ASPECT) / 2;
+        /*
+          **확장 시야는 AI 말풍선 아래**에 선다 (사용자가 정했다).
+
+          위쪽 양 끝에 두었더니 안전이와 말풍선이 창 사이에 끼어 화면 위가 빽빽했다.
+          말풍선은 글에 따라 높이가 바뀌므로 **화면에서 실제 자리를 읽어** 그 아래에 붙인다 —
+          값을 베껴 두면 한쪽만 고쳤을 때 둘이 어긋난다 (계기판·방향키와 같은 방식이다).
+          말풍선이 없으면(PC · 아직 안 뜬 때) 예전처럼 맨 위다.
+        */
+        const coach = this.wide ? document.getElementById('drive-coach')?.getBoundingClientRect() : undefined;
+        const top = coach && coach.height > 0 ? coach.bottom + rowGap : TOP_MARGIN_PX;
+        cy = top + (pw * PANEL_ASPECT) / 2;
         labelBelow = true; // 창 위에는 자리가 없다
       }
 
@@ -449,6 +466,23 @@ export class PeripheralView {
       strength = Math.max(strength, panelStrengthAt(gapS + STOP_LINE));
     }
     this.setTargetStrength(this.enabled ? strength : 0);
+
+    /*
+      **말풍선이 커지고 줄어들면 창도 따라 내려간다.** 말풍선은 글에 따라 높이가 바뀌는데
+      자리 계산은 `resize` 에서만 하므로, 확장 시야일 때만 이따금 다시 잰다 —
+      매 프레임 재면 브라우저가 배치를 다시 계산해 버벅인다.
+    */
+    if (this.wide) {
+      this.relayoutIn -= dt;
+      if (this.relayoutIn <= 0) {
+        this.relayoutIn = 0.3;
+        const bottom = document.getElementById('drive-coach')?.getBoundingClientRect().bottom ?? 0;
+        if (Math.abs(bottom - this.coachBottom) > 2) {
+          this.coachBottom = bottom;
+          this.resize(this.lastW, this.lastH);
+        }
+      }
+    }
 
     const k = Math.min(1, dt * 5);
     if (Math.abs(this.targetStrength - this.strength) > 0.001) {
