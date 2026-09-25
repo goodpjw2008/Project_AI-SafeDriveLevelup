@@ -23,7 +23,7 @@ const COND = '@media (orientation: landscape) and (pointer: coarse) and (max-hei
 const HEAD = `${COND} {`;
 /** 좁아질 때마다 한 단계씩 — 넓은 쪽 조건을 그대로 물려받고 폭 하나를 더 건다 */
 const NARROW = `${COND} and (max-width: 860px) {`;
-const TINY = `${COND} and (max-width: 700px) {`;
+const TINY = `${COND} and (max-width: 760px) {`;
 const ALL = [HEAD, NARROW, TINY];
 
 /** 가로 휴대폰 전용 덩어리 — 여는 중괄호부터 짝이 맞는 닫는 중괄호까지 */
@@ -90,7 +90,7 @@ describe('가로 휴대폰의 첫 화면', () => {
     for (const id of ['#btn-shop', '#btn-about', '#btn-credits', '#btn-trial']) {
       expect(r).toContain(`#screen-menu ${id}`);
     }
-    for (const cls of ['.badge-summary', '.ai-habits', '.level-track']) {
+    for (const cls of ['.badge-summary', '.ai-habits']) {
       expect(r).toContain(`#screen-menu ${cls}`);
     }
     expect(r).toContain('#screen-menu .mode-split > .mode-group:nth-child(2)');
@@ -207,6 +207,31 @@ describe('가로 휴대폰의 첫 화면', () => {
     // 줄이는 곳은 아주 좁은 단계뿐이다
     expect(rules(NARROW)).not.toContain('.brand');
     expect(rules(TINY)).toMatch(/#screen-menu \.brand \{\s*font-size:/);
+  });
+
+  /*
+    **레벨 길(①②③…M)은 세로 화면처럼 이름 아래에 남는다** (사용자가 정했다).
+    한때 접었었다 — 두 칸이던 시절 반쪽 칸에 열한 칸이 들어가지 않았기 때문이다. 지금은
+    레벨 칸이 남는 폭을 모두 가져가므로 자리가 난다. **아주 좁은 화면에서만** 접는다:
+    거기서는 길이 차지한 만큼 연습 버튼의 글이 두 줄로 꺾여 화면 하나를 넘겼다.
+  */
+  it('레벨 길은 이름 아래에 남고, 아주 좁은 화면에서만 접는다', () => {
+    expect(rules()).not.toMatch(/#screen-menu \.level-track[^{]*\{[^}]*display:\s*none/);
+    // 칸을 줄여야 들어간다 — 기본 크기(30px) 그대로면 옆 칸으로 비어져 나간다
+    expect(rules()).toMatch(/#screen-menu \.player-foot \.level-step \{[^}]*width:\s*\d+px/);
+    expect(rules(TINY)).toMatch(/#screen-menu \.level-track \{\s*display:\s*none/);
+  });
+
+  /*
+    **저작권 줄은 세로 화면과 같은 글이다** (사용자가 정했다) —
+    `Copyright © 2026 · goodpjw2008 · 비영리 목적 사용`. 메일은 앞부분만 보이지만
+    **링크는 그대로**라 눌러서 메일을 쓸 수 있다.
+  */
+  it('저작권 줄은 세로 화면과 같은 글이다', () => {
+    const r = rules();
+    expect(r).toMatch(/#screen-menu \.site-footer \.usage-long \{\s*display:\s*none/);
+    expect(r).toMatch(/#screen-menu \.site-footer \.usage-short \{\s*display:\s*inline/);
+    expect(r).toMatch(/#screen-menu \.site-footer \.mail-host \{\s*display:\s*none/);
   });
 
   /*

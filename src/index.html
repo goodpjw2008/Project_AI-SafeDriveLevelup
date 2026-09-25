@@ -5242,8 +5242,9 @@
           기기를 돌렸다고 커졌다 작아지면 같은 물건으로 읽히지 않는다.
           세로에서 쓰는 값 그대로: 이름 26px · 가운뎃점 22px · 부제 18px.
         */
+        /* 위아래 여백은 바짝 — 여기서 아낀 만큼이 그대로 아래 줄의 키가 된다 (사용자가 정했다) */
         #screen-menu .brand-wrap {
-          padding: 6px 16px;
+          padding: 1px 16px;
         }
         #screen-menu .brand {
           font-size: 26px;
@@ -5292,23 +5293,40 @@
           width: 17px;
           height: 17px;
         }
-        /*
-          읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다).
-
-          **레벨 길(`.level-track`)도 접는다.** 열한 칸이 반쪽 칸에 들어가지 않아 오른쪽
-          연습 버튼 밑으로 비어져 나갔다. 지금 레벨과 남은 경험치는 바로 위 줄이 이미 말한다.
-        */
+        /* 읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다) */
         #screen-menu .badge-summary,
         #screen-menu .ai-habits,
         #screen-menu .player-foot-text,
-        #screen-menu .level-track,
         #screen-menu .mode-split > .mode-group:nth-child(2) {
           display: none;
         }
+        /*
+          **레벨 길(①②③…M)은 세로 화면처럼 이름 아래에 둔다** (사용자가 정했다).
+          한때 접었었다 — 두 칸이던 시절 반쪽 칸에 열한 칸이 들어가지 않아 옆으로 비어져
+          나갔기 때문이다. 지금은 레벨 칸이 남는 폭을 모두 가져가므로 자리가 난다.
+          다만 칸을 한 단계 줄여야 들어간다 (세로의 좁은 화면이 쓰는 18px 보다 조금 더 작게).
+        */
+        #screen-menu .player-foot .level-track {
+          /* 이름 바로 아래 왼쪽부터 — 기본값은 오른쪽으로 밀어붙인다 */
+          margin-left: 0;
+          gap: 3px;
+        }
+        #screen-menu .player-foot .level-step {
+          width: 15px;
+          height: 15px;
+        }
+        #screen-menu .player-foot .level-step + .level-step::before {
+          left: -3px;
+          width: 3px;
+        }
+        #screen-menu .player-foot .level-step.now {
+          width: 22px;
+          height: 22px;
+        }
         /* 레벨 칸 — 남는 폭이 모두 이리로 오므로 그만큼 크게 읽힌다 (사용자가 정했다) */
         #screen-menu .player.lg .level-badge-wrap {
-          width: 62px;
-          height: 62px;
+          width: 74px;
+          height: 74px;
         }
         /*
           **호칭과 경험치는 한 줄이다.** 칸이 좁아 꺾이면 레벨 칸만 두 줄이 되어 옆의 차 · 버튼과
@@ -5382,7 +5400,7 @@
         #screen-menu .ai-car-photo {
           width: auto;
           max-width: none;
-          height: 122px;
+          height: 146px;
         }
         /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
         #screen-menu .mode-split > .mode-group {
@@ -5399,7 +5417,7 @@
         }
         #screen-menu .mode-split .ai-course-actions button {
           flex: 1;
-          min-height: 62px;
+          min-height: 78px;
         }
         /* 저작권 줄은 짧은 꼴 한 줄로 — 세로 화면에서 쓰는 것과 같은 글이다 */
         #screen-menu .site-footer {
@@ -5412,6 +5430,10 @@
         #screen-menu .site-footer .usage-short {
           display: inline;
         }
+        /* 메일은 앞부분만 — 세로 화면과 같다. 링크는 그대로라 눌러서 메일을 쓸 수 있다 */
+        #screen-menu .site-footer .mail-host {
+          display: none;
+        }
       }
       /*
         **좁은 가로 화면**(860px 미만). 레벨 칸이 좁아져 `안전운전 Level1` 과 `0 / 200 XP` 가
@@ -5423,7 +5445,23 @@
           display: none;
         }
         #screen-menu .ai-car-photo {
-          height: 104px;
+          height: 126px;
+        }
+        /* 레벨 길도 한 단계 더 — 이 칸이 넓어진 만큼 연습 버튼의 글이 두 줄로 꺾인다 */
+        #screen-menu .player-foot .level-step {
+          width: 14px;
+          height: 14px;
+        }
+        #screen-menu .player-foot .level-track {
+          gap: 2px;
+        }
+        #screen-menu .player-foot .level-step + .level-step::before {
+          left: -2px;
+          width: 2px;
+        }
+        #screen-menu .player-foot .level-step.now {
+          width: 20px;
+          height: 20px;
         }
       }
       /*
@@ -5431,7 +5469,14 @@
         넘겼다. 이름은 세로와 같은 크기로 두는 것이 원칙이지만(위), **한 줄에 들어가지 못하면
         그 원칙이 오히려 이름을 망가뜨린다** — 이 크기에서만 한 단계 줄인다.
       */
-      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 700px) {
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 760px) {
+        /*
+          **레벨 길은 여기서 접는다.** 열한 칸이 자리를 차지하는 만큼 연습 버튼의 글이
+          두 줄로 꺾여 화면 하나를 넘겼다 — 이 크기에서는 길보다 버튼이 먼저다.
+        */
+        #screen-menu .level-track {
+          display: none;
+        }
         #screen-menu .brand {
           font-size: 19px;
         }
