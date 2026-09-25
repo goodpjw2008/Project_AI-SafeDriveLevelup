@@ -5171,6 +5171,177 @@
         }
       }
       /*
+        ── 손에 든 가로 화면의 첫 화면 ─────────────────────────────────────────
+
+        **가로로 들면 높이가 335px 남짓이다.** 세로에서 쓰던 "위에서 아래로" 차례가 여기서는
+        통하지 않는다 — 이름 · 메뉴 · 레벨 칸을 지나면 정작 눌러야 할 **연습 버튼이 화면 두 배쯤
+        아래**에 있었다 (사용자가 사진으로 짚었다: *"한참 내려야 보여"*).
+
+        가로 화면은 **넓고 낮다.** 그래서 아래로 쌓던 것을 **좌우 두 칸으로** 편다 —
+        왼쪽은 *지금 나는 어디쯤인가*(레벨 · 차), 오른쪽은 *지금 할 것*(연습 버튼)이다.
+        둘러보는 것들(전시관 · About · 저작권 · 맵 체험 · 뱃지 요약 · 습관 문단 · 오프라인 교육)은
+        **세로 화면과 같은 기준으로** 접는다.
+
+        조건 셋이 모두 맞을 때만 걸린다 — 가로 · 손가락 · 낮은 화면(540px).
+        `pointer: coarse` 가 PC 를 지킨다: 창을 아무리 낮춰도 마우스는 coarse 가 아니다.
+        높이로 가르는 것은 태블릿 가로(높이가 넉넉하다)를 그대로 두기 위해서다 —
+        주행 화면의 가로 규칙과 같은 자(540px)를 쓴다.
+
+        **자리는 세로 덩어리 앞이다.** 세로 덩어리는 스타일시트의 맨 뒤여야 한다(거기에는
+        `.badge-summary` 처럼 맨 선택자가 있어 순서로 이긴다). 여기 규칙은 **모두
+        `#screen-menu` 로 시작**해 우선순위가 한 단계 높으므로 어디에 두어도 진다는 걱정이 없다 —
+        그 약속을 tests/mobileLandscape.test.ts 가 지킨다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        /* 세로 여백을 걷어낸다 — 여기서는 1px 이 아깝다 */
+        #screen-menu .screen-inner {
+          padding: 6px 14px 6px;
+        }
+        /* 사이트 전체 성공 · 실패 — 오른쪽 위 그대로 두고 한 줄만 낮춘다 */
+        #screen-menu .site-stats {
+          margin-bottom: 4px;
+          font-size: 11.5px;
+        }
+        #screen-menu .hero {
+          margin-bottom: 0;
+        }
+        #screen-menu .brand-wrap {
+          padding: 4px 14px;
+        }
+        #screen-menu .brand {
+          font-size: 18px;
+        }
+        #screen-menu .brand-sub {
+          font-size: 13px;
+        }
+        /*
+          **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
+          전시관 · About · 저작권 · 맵 체험은 그 다음의 일이다 (설정 톱니는 남긴다).
+        */
+        #screen-menu #btn-shop,
+        #screen-menu #btn-about,
+        #screen-menu #btn-credits,
+        #screen-menu #btn-trial {
+          display: none;
+        }
+        #screen-menu .menu-links {
+          margin-top: 5px;
+          gap: 6px;
+        }
+        #screen-menu .menu-links button {
+          min-height: 30px;
+          padding: 3px 12px;
+          font-size: 12.5px;
+        }
+        /*
+          읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다).
+
+          **레벨 길(`.level-track`)도 접는다.** 열한 칸이 반쪽 칸에 들어가지 않아 오른쪽
+          연습 버튼 밑으로 비어져 나갔다. 지금 레벨과 남은 경험치는 바로 위 줄이 이미 말한다.
+        */
+        #screen-menu .badge-summary,
+        #screen-menu .ai-habits,
+        #screen-menu .player-foot-text,
+        #screen-menu .level-track,
+        #screen-menu .mode-split > .mode-group:nth-child(2) {
+          display: none;
+        }
+        /* 레벨 칸 — 뱃지를 줄이고 한 줄씩 당긴다 */
+        #screen-menu .player.lg .level-badge-wrap {
+          width: 52px;
+          height: 52px;
+        }
+        #screen-menu .player.lg .player-name {
+          font-size: 17px;
+        }
+        #screen-menu .player.lg .player-foot {
+          margin-top: 0;
+        }
+        /*
+          **두 칸.** 왼쪽 위에 레벨 칸, 그 아래 차 그림 — 오른쪽 한 칸을 통째로 연습 버튼이 쓴다.
+          `align-items: stretch` 라야 오른쪽 상자가 왼쪽 두 줄만큼 키가 자라 **버튼이 크게** 선다.
+        */
+        #screen-menu .ai-course {
+          margin: 5px 0 0;
+          padding: 6px 12px;
+          display: grid;
+          grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+          grid-template-rows: auto 1fr;
+          column-gap: 14px;
+        }
+        #screen-menu .ai-course > .player {
+          grid-column: 1;
+          grid-row: 1;
+        }
+        #screen-menu .ai-split {
+          grid-column: 1;
+          grid-row: 2;
+          margin-top: 6px;
+          padding-top: 6px;
+        }
+        #screen-menu .mode-split {
+          grid-column: 2;
+          grid-row: 1 / span 2;
+          margin-top: 0;
+          grid-template-columns: minmax(0, 1fr);
+        }
+        /* 차 그림은 남긴다 — 다만 반쪽 칸에 맞게 줄인다 (사용자가 세로에서 "차량은 보여야 해" 라고 했다) */
+        #screen-menu .ai-car {
+          gap: 5px;
+          font-size: 12.5px;
+        }
+        #screen-menu .ai-car-photo {
+          max-width: 76px;
+        }
+        /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
+        #screen-menu .mode-split > .mode-group {
+          display: flex;
+          flex-direction: column;
+          padding: 10px 12px 12px;
+        }
+        #screen-menu .mode-split .mode-label {
+          margin-bottom: 8px;
+        }
+        #screen-menu .mode-split .ai-course-actions {
+          flex: 1;
+          display: flex;
+        }
+        #screen-menu .mode-split .ai-course-actions button {
+          flex: 1;
+          min-height: 58px;
+        }
+        /* 저작권 줄은 짧은 꼴 한 줄로 — 세로 화면에서 쓰는 것과 같은 글이다 */
+        #screen-menu .site-footer {
+          margin: 6px 0 0;
+          font-size: 11.5px;
+        }
+        #screen-menu .site-footer .usage-long {
+          display: none;
+        }
+        #screen-menu .site-footer .usage-short {
+          display: inline;
+        }
+      }
+      /*
+        **더 좁은 가로 화면**(760px 미만 — 작은 휴대폰을 가로로 든 경우). 위 규칙만으로는
+        레벨 줄이 두 줄로 꺾여 연습 버튼 아래가 잘렸다. 호칭을 `안전운전 L1` 로 줄이고
+        (세로 화면에서 쓰는 것과 같은 수법) 차 그림과 이름 줄을 한 단계 더 줄인다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 760px) {
+        #screen-menu .lv-word {
+          display: none;
+        }
+        #screen-menu .brand {
+          font-size: 16px;
+        }
+        #screen-menu .brand-sub {
+          font-size: 12px;
+        }
+        #screen-menu .ai-car-photo {
+          max-width: 62px;
+        }
+      }
+      /*
         ── 손에 든 세로 화면의 첫 화면 ──────────────────────────────
 
         PC 에서는 한 화면에 다 들어오지만 세로 휴대폰에서는 **연습 버튼까지 내려가야** 했다.
@@ -5486,6 +5657,7 @@
           height: 42px;
         }
       }
+
 
     </style>
   </head>
