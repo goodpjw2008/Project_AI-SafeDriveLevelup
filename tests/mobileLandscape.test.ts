@@ -81,18 +81,18 @@ describe('가로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **손대는 곳은 둘뿐이다** — 첫 화면(`#screen-menu`)과 AI 가 맵을 고르는 창(`.ai-pick`).
-    규칙 하나라도 이 밖으로 나가면 주행 화면 · 결과 화면 · 설정까지 가로에서 달라진다.
-    사용자가 고쳐 달라고 한 것은 그 둘이다.
+    **손대는 곳은 셋뿐이다** — 첫 화면(`#screen-menu`) · AI 가 맵을 고르는 창(`.ai-pick`) ·
+    주행 분석 화면(`#screen-debrief`). 규칙 하나라도 이 밖으로 나가면 주행 화면 · 설정까지
+    가로에서 달라진다. 사용자가 고쳐 달라고 한 것은 이 셋이다.
   */
-  it('모든 규칙이 첫 화면과 AI 가 고르는 창 안에만 걸린다', () => {
-    const allowed = ['#screen-menu', '.ai-pick'];
+  it('모든 규칙이 첫 화면 · AI 창 · 분석 화면 안에만 걸린다', () => {
+    const allowed = ['#screen-menu', '.ai-pick', '#screen-debrief'];
     for (const head of ALL) {
       for (const b of blocks(head)) {
         for (const sel of selectorsOf(b, head)) {
           expect(
             allowed.some((prefix) => sel.startsWith(prefix)),
-            `${sel} 가 첫 화면 · AI 창 밖으로 나갔다`,
+            `${sel} 가 첫 화면 · AI 창 · 분석 화면 밖으로 나갔다`,
           ).toBe(true);
         }
       }
@@ -139,7 +139,7 @@ describe('가로 휴대폰의 첫 화면', () => {
   it('첫 화면 상자를 레벨 · 자동차 · 연습 세 칸으로 편다', () => {
     const r = rules();
     expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*display:\s*grid/);
-    expect(r).toMatch(/grid-template-columns:\s*minmax\(min-content, 1fr\) auto minmax\(0, 340px\)/);
+    expect(r).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\) auto minmax\(0, 340px\)/);
     expect(r).toMatch(/#screen-menu \.ai-course > \.player \{[^}]*grid-column:\s*1/);
     expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*2/);
     expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*3/);
@@ -195,7 +195,7 @@ describe('가로 휴대폰의 첫 화면', () => {
   */
   it('레벨 칸은 글이 다 들어가는 만큼은 받는다', () => {
     expect(rules()).toMatch(
-      /#screen-menu \.ai-course \{[^}]*grid-template-columns:\s*minmax\(min-content, 1fr\)/,
+      /#screen-menu \.ai-course \{[^}]*grid-template-columns:\s*minmax\(max-content, 1fr\)/,
     );
   });
 
@@ -214,15 +214,19 @@ describe('가로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **이름은 세로 화면과 같은 크기다** (사용자가 정했다) — 한 작품의 이름이 기기를 돌렸다고
-    커졌다 작아지면 같은 물건으로 읽히지 않는다. 세로에서 쓰는 값은 26 · 22 · 18px 이다.
-    아주 좁은 화면(700px 미만)만 예외다 — 거기서는 한 줄에 들어가지 못해 통째로 꺾인다.
+    **이름은 이 화면의 얼굴이다.** 세로 화면과 같은 크기(26 · 22 · 18px)로 맞췄다가,
+    사용자가 *"두 개만 크게"* 라고 해 한 단계 더 올렸다 — 상자와 줄 간격을 바짝 줄여
+    **자리가 남았기 때문**이지 글자만 키운 것이 아니다.
+    아주 좁은 화면(760px 미만)만 예외다 — 거기서는 한 줄에 들어가지 못해 통째로 꺾인다.
   */
-  it('이름은 세로 화면과 같은 크기다', () => {
+  it('이름은 세로보다 두 단계 크다 — 좁은 화면만 예외', () => {
     const r = rules();
-    expect(r).toMatch(/#screen-menu \.brand \{\s*font-size:\s*26px/);
-    expect(r).toMatch(/#screen-menu \.brand-colon \{\s*font-size:\s*22px/);
-    expect(r).toMatch(/#screen-menu \.brand-sub \{\s*font-size:\s*18px/);
+    expect(r).toMatch(/#screen-menu \.brand \{\s*font-size:\s*30px/);
+    expect(r).toMatch(/#screen-menu \.brand-colon \{\s*font-size:\s*25px/);
+    expect(r).toMatch(/#screen-menu \.brand-sub \{\s*font-size:\s*21px/);
+    // 상자와 줄 간격을 줄인 것이 짝이다 — 글자만 키우면 첫 화면이 도로 넘친다
+    expect(r).toMatch(/#screen-menu \.hero \{[^}]*padding:\s*5px/);
+    expect(r).toMatch(/#screen-menu \.brand,\s*\n?\s*#screen-menu \.brand-sub \{[^}]*line-height:\s*1\.2/);
     // 줄이는 곳은 아주 좁은 단계뿐이다
     expect(rules(NARROW)).not.toContain('.brand');
     expect(rules(TINY)).toMatch(/#screen-menu \.brand \{\s*font-size:/);
@@ -234,11 +238,19 @@ describe('가로 휴대폰의 첫 화면', () => {
     레벨 칸이 남는 폭을 모두 가져가므로 자리가 난다. **아주 좁은 화면에서만** 접는다:
     거기서는 길이 차지한 만큼 연습 버튼의 글이 두 줄로 꺾여 화면 하나를 넘겼다.
   */
-  it('레벨 길은 이름 아래에 남고, 아주 좁은 화면에서만 접는다', () => {
-    expect(rules()).not.toMatch(/#screen-menu \.level-track[^{]*\{[^}]*display:\s*none/);
+  it('레벨 길은 어떤 폭에서도 접지 않는다 — 모자라면 다음 줄로 흘린다', () => {
+    /*
+      한때 좁은 화면에서 통째로 접었는데, 사용자의 기기가 그 조건에 걸려 길이 **영영 보이지
+      않았다** — 화면 폭은 기기의 화면 배율 · 브라우저 확대에 따라 달라져 미리 짚기 어렵다.
+      접는 대신 흘리면 어떤 폭에서도 보인다.
+    */
+    const all = ALL.map((h) => blocks(h).join('\n')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(all).not.toMatch(/\.level-track[^{]*\{[^}]*display:\s*none/);
+    expect(rules()).toMatch(/#screen-menu \.player-foot \.level-track \{[^}]*flex-wrap:\s*wrap/);
     // 칸을 줄여야 들어간다 — 기본 크기(30px) 그대로면 옆 칸으로 비어져 나간다
     expect(rules()).toMatch(/#screen-menu \.player-foot \.level-step \{[^}]*width:\s*\d+px/);
-    expect(rules(TINY)).toMatch(/#screen-menu \.level-track \{\s*display:\s*none/);
+    // 레벨 칸이 길 한 줄만큼은 받아야 'M' 하나만 다음 줄에 남지 않는다
+    expect(rules()).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\)/);
   });
 
   /*
@@ -267,6 +279,26 @@ describe('가로 휴대폰의 첫 화면', () => {
     expect(r).toMatch(/\.ai-pick-why \{\s*display:\s*none/);
     // 글 칸은 남는 폭을 다 쓰되, 긴 줄이 칸을 밀어내지 않아야 한다
     expect(r).toMatch(/\.ai-pick-analyzing,\s*\n?\s*\.ai-pick-result \{[^}]*min-width:\s*0/);
+  });
+
+  /*
+    **주행 분석 화면은 결론이 먼저다** (사용자가 정했다: *"한 화면에 주요 내용이 보이고
+    세부 내용은 스크롤로"*). 내용이 1,000px 을 넘는데 화면은 330px 이라 스크롤은 피할 수 없다 —
+    대신 **차례**를 바꾼다. 원래는 `머리(등급) → AI 코칭 → 레벨 · 버튼` 이라 코칭 상자가
+    가운데를 막아 정작 눌러야 할 버튼이 화면 밖에 있었다.
+  */
+  it('주행 분석 화면은 등급 · 레벨 · 버튼이 먼저 온다', () => {
+    const deb = blocks(HEAD)[2];
+    expect(deb, '분석 화면 덩어리가 따로 있어야 한다').toBeTruthy();
+    const r = deb.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(r).toMatch(/#screen-debrief \.screen-inner \{[^}]*display:\s*flex/);
+    // 값을 주지 않은 것이 맨 앞으로 튀어나오지 않게 바닥값을 먼저 깐다
+    expect(r).toMatch(/#screen-debrief \.screen-inner > \* \{[^}]*order:\s*5/);
+    const order = (sel: string): number =>
+      Number(r.match(new RegExp(`#screen-debrief ${sel} \\{[^}]*order:\\s*(\\d+)`))![1]);
+    expect(order('\\.screen-head')).toBeLessThan(order('\\.debrief-top'));
+    expect(order('\\.debrief-top')).toBeLessThan(order('\\.verdict'));
+    expect(order('\\.verdict')).toBeLessThan(order('\\.debrief-split'));
   });
 
   /*

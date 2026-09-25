@@ -5259,13 +5259,13 @@
           padding: 0;
         }
         #screen-menu .brand {
-          font-size: 26px;
+          font-size: 30px;
         }
         #screen-menu .brand-colon {
-          font-size: 22px;
+          font-size: 25px;
         }
         #screen-menu .brand-sub {
-          font-size: 18px;
+          font-size: 21px;
         }
         /*
           **둘러보는 버튼은 접는다** — 세로 화면과 같은 목록이다. 여기서 할 일은 연습을 누르는 것이고,
@@ -5322,6 +5322,14 @@
           /* 이름 바로 아래 왼쪽부터 — 기본값은 오른쪽으로 밀어붙인다 */
           margin-left: 0;
           gap: 3px;
+          /*
+            **모자라면 다음 줄로 흘린다.** 한때 좁은 화면에서 이 길을 통째로 접었는데,
+            사용자의 기기에서 그 조건에 걸려 길이 영영 보이지 않았다 (화면 폭은 기기의
+            화면 배율 · 브라우저 확대에 따라 달라져 미리 짚기 어렵다). 접는 대신 흘리면
+            **어떤 폭에서도 길이 보이고**, 레벨 칸이 억지로 넓어지지도 않는다.
+          */
+          flex-wrap: wrap;
+          row-gap: 4px;
         }
         #screen-menu .player-foot .level-step {
           width: 15px;
@@ -5378,7 +5386,12 @@
             가져간다 — 좁은 화면에서 `0` 으로 두었더니 `0 / 200 XP` 가 차 그림 뒤로 잘렸다.
             모자라면 연습 칸이 먼저 줄어든다 (버튼은 글만 들어가면 제 몫을 한다).
           */
-          grid-template-columns: minmax(min-content, 1fr) auto minmax(0, 340px);
+          /*
+            레벨 칸은 **글과 레벨 길이 한 줄에 다 들어가는 만큼**(`max-content`)은 받고, 남는 폭도
+            모두 가져간다. `min-content` 로 두었더니 길이 열 칸 + 'M' 으로 꺾여 M 하나만
+            다음 줄에 남았다. 모자라면 연습 칸이 먼저 줄어든다 (버튼은 글만 들어가면 제 몫을 한다).
+          */
+          grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 340px);
           align-items: center;
           column-gap: 16px;
         }
@@ -5518,6 +5531,72 @@
         }
       }
       /*
+        ── 손에 든 가로 화면의 주행 분석(결과) 화면 ──────────────────────────
+
+        **첫 화면에 결론을, 자세한 것은 스크롤로** (사용자가 정했다: *"한 화면에 주요 내용이 보이고
+        세부 내용은 스크롤로 보이게"*). 내용이 1,177px 인데 화면은 330px 이라 어차피 스크롤은
+        피할 수 없다 — 대신 **무엇이 먼저 오는가**를 바꾼다.
+
+        결론은 셋이다: **등급 · 레벨 변화 · 다음에 무엇을 누를까.** 그런데 차례가
+        `머리(등급) → AI 코칭 → 레벨·버튼` 이라, 코칭 상자(192px)가 가운데를 막아 정작
+        눌러야 할 버튼이 화면 밖에 있었다. `order` 로 **레벨·버튼을 머리 바로 아래**로 올린다.
+        AI 코칭 · 주행 지도 · 위반 목록은 그 아래에 그대로 남는다 — 읽고 싶으면 내리면 된다.
+      */
+      @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        #screen-debrief .screen-inner {
+          display: flex;
+          flex-direction: column;
+          padding: 6px 14px 12px;
+        }
+        /* 차례를 못 박는다 — 값을 주지 않은 것이 맨 앞으로 튀어나오지 않게 바닥값을 먼저 깐다 */
+        #screen-debrief .screen-inner > * {
+          order: 5;
+        }
+        #screen-debrief .screen-head {
+          order: 1;
+          margin-bottom: 6px;
+          align-items: center;
+        }
+        #screen-debrief .debrief-top {
+          order: 2;
+          margin: 0 0 8px;
+        }
+        #screen-debrief .verdict {
+          order: 3;
+        }
+        #screen-debrief .debrief-split {
+          order: 4;
+        }
+        /* 머리는 한 줄로 — 판 번호까지만 둔다 (세로 화면과 같은 기준) */
+        #screen-debrief .screen-head h1 .head-title {
+          display: none;
+        }
+        #screen-debrief .back-long {
+          display: none;
+        }
+        #screen-debrief .back-short {
+          display: inline;
+        }
+        #screen-debrief .screen-head h1 {
+          font-size: 19px;
+        }
+        #screen-debrief button.back {
+          min-height: 32px;
+          padding: 4px 12px;
+          font-size: 13px;
+        }
+        /* 등급 딱지는 머리 오른쪽 그대로 — 한 줄에 맞게만 줄인다 */
+        #screen-debrief .screen-head-right {
+          align-items: center;
+        }
+        #screen-debrief .verdict .verdict-robot {
+          display: none;
+        }
+        #screen-debrief .btn-row {
+          margin-top: 8px;
+        }
+      }
+      /*
         **좁은 가로 화면**(860px 미만). 레벨 칸이 좁아져 `안전운전 Level1` 과 `0 / 200 XP` 가
         한 줄에 들어가지 않고 경험치가 잘렸다. 호칭을 `안전운전 L1` 로 줄이고(세로 화면에서
         쓰는 것과 같은 수법) 차를 한 단계 줄여 그만큼을 레벨 칸에 돌려준다.
@@ -5529,7 +5608,14 @@
         #screen-menu .ai-car-photo {
           height: 126px;
         }
-        /* 레벨 길도 한 단계 더 — 이 칸이 넓어진 만큼 연습 버튼의 글이 두 줄로 꺾인다 */
+        /*
+          레벨 길도 한 단계 더 — 이 칸이 넓어진 만큼 연습 버튼의 글이 두 줄로 꺾인다.
+          **뱃지도 같이 줄인다**: 길이 한 줄에 들어가야 'M' 하나만 다음 줄에 남지 않는다.
+        */
+        #screen-menu .player.lg .level-badge-wrap {
+          width: 62px;
+          height: 62px;
+        }
         #screen-menu .player-foot .level-step {
           width: 14px;
           height: 14px;
@@ -5552,13 +5638,6 @@
         그 원칙이 오히려 이름을 망가뜨린다** — 이 크기에서만 한 단계 줄인다.
       */
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 760px) {
-        /*
-          **레벨 길은 여기서 접는다.** 열한 칸이 자리를 차지하는 만큼 연습 버튼의 글이
-          두 줄로 꺾여 화면 하나를 넘겼다 — 이 크기에서는 길보다 버튼이 먼저다.
-        */
-        #screen-menu .level-track {
-          display: none;
-        }
         #screen-menu .brand {
           font-size: 19px;
         }
