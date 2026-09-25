@@ -274,6 +274,14 @@ export class World {
   dispose(): void {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
+    /*
+      **그림자 맵까지 버린다.** 조명은 track 목록에 없고 `scene.clear()` 는 붙어 있던 것을 떼어 낼 뿐이라, 태양이
+      처음 그려질 때 만든 그림자 맵(렌더 타깃 — '보통' 512² 에 2MB · '아주 높음' 2048² 에 32MB)이 판마다, 그리고
+      첫 화면의 World 마다 GPU 에 남았다. 렌더러 한 벌을 계속 쓰므로(renderer.ts) 스스로 사라지지 않는다 — 사용자
+      휴대폰에서 판을 거듭하면 검은 줄이 생기던 누적의 하나다 (CHANGELOG).
+    */
+    this.sun.dispose();
+    this.hemi.dispose();
     this.scene.clear();
   }
 }

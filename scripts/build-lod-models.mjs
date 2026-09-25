@@ -20,7 +20,10 @@
  *     깨지는 차(K5)는 하지 않는다 (아래 NO_SIMPLIFY).
  *  3. **join — 같은 재질의 부품을 하나로 합친다.** 드로우콜이 준다(SL63 은 부품 174개 → 174콜이었다). 배경 차는 부품을
  *     따로 움직이지 않으므로 합쳐도 잃는 것이 없다. 유리는 유리 재질끼리만 합쳐져 carModel.ts 의 유리 처리가 그대로 돈다.
- *  4. meshopt 압축 (원본과 같은 방식 — 풀기가 빠르다).
+ *  4. **텍스처를 512² 로 줄인다** (원본은 1024²). 배경 차는 교차로를 스쳐 가는 거리에서만 보여 512 로도 구별되지
+ *     않는데, 텍스처는 GPU 에서 가로×세로에 비례하므로 **한 대의 텍스처 메모리가 1/4** 이 된다 (코롤라 115MB → 29MB).
+ *     캐시가 카탈로그를 다 담아도 휴대폰 GPU 가 버티게 하려는 것이다 — carModel.ts 의 캐시 상한과 한 짝이다.
+ *  5. meshopt 압축 (원본과 같은 방식 — 풀기가 빠르다).
  *
  *   쏘렌토  정점 129만 → 6만 (1/21) · 4.2MB → 0.9MB
  *   SF90    그리기 1254 → 24 (부품이 1254개로 쪼개져 있었다)
@@ -38,8 +41,9 @@ import { readdirSync, statSync } from 'node:fs';
 import { join as joinPath } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, flatten, join, meshopt, prune, simplify, weld } from '@gltf-transform/functions';
+import { dedup, flatten, join, meshopt, prune, simplify, textureCompress, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
+import sharp from 'sharp';
 
 const DIR = 'public/models';
 /** 메시 반지름에 대한 오차 한계 — 0.005 는 덜 줄고(쏘렌토 9.8만), 0.02 는 더 줄지 않는다(6.4만) */
@@ -54,6 +58,8 @@ const ERROR = Number(process.env.LOD_ERROR ?? 0.01);
 const NO_SIMPLIFY = new Set(['k5']);
 /** 게임이 버리는 부품 (carModel.ts 의 DROP_PARTS 와 같다) */
 const DROP_PARTS = /^Cube/i;
+/** 배경 차 텍스처의 한 변 상한 (px) — 위 4번 */
+const TEXTURE_MAX = Number(process.env.LOD_TEXTURE ?? 512);
 
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
@@ -99,6 +105,7 @@ for (const id of ids) {
     join(),
     dedup(),
     prune(),
+    textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEXTURE_MAX, TEXTURE_MAX] }),
     meshopt({ encoder: MeshoptEncoder }),
   );
   await io.write(dst, out);

@@ -339,6 +339,118 @@ const inflight = new Map<string, Promise<THREE.Group | null>>();
 
 /** 캐시 키 — 배경 차용 가벼운 모델(LOD)은 원본과 따로 둔다 */
 const cacheKey = (id: string, lod: boolean) => (lod ? `${id}:lod` : id);
+const idOfKey = (key: string) => (key.endsWith(':lod') ? key.slice(0, -':lod'.length) : key);
+
+/**
+ * ## 캐시의 상한 — **GPU 메모리로 잰다**
+ *
+ * 캐시는 원래 끝이 없었다. 렌더러 한 벌을 계속 쓰는 것(renderer.ts)과 배역표가 판마다 **새 얼굴 하나**를 넣는
+ * 것(npcVehicles.ts)이 겹쳐, 판을 거듭할수록 카탈로그가 통째로 GPU 에 올라갔다 — 텍스처만 약 700MB 다
+ * (코롤라 115MB · SL63 104MB, 1024² 텍스처가 모델마다 20~40장이고 원본과 LOD 가 각자 한 벌씩이다).
+ *
+ * PC 는 아무 일도 없다. 휴대폰은 GPU 메모리가 빠듯해 할당이 막히면 **드라이버가 프레임의 타일 몇 칸을 빼고
+ * 그린다** — 사용자 휴대폰에서 판을 거듭하면 화면에 검은 줄이 왔다갔다 하다가, 처음부터 다시 시작하면 한동안
+ * 괜찮던 것이 이것이었다 (CHANGELOG). 그래서 기기에 맞는 상한을 두고, **장면이 하나도 없는 순간**(판 사이 ·
+ * 첫 화면으로 돌아올 때 · 차고를 닫을 때)에 오래 안 쓴 것부터 내린다 — 장면에 든 복제본은 캐시본의 지오메트리와
+ * 텍스처를 **공유**하므로(copyOf) 장면이 살아 있는 동안 버리면 그 차가 깨진다.
+ *
+ * 크기는 올릴 때 한 번 재 둔다 — 지오메트리는 속성 배열의 바이트, 텍스처는 가로×세로×4 에 밉맵 1/3 을 더한 값이다.
+ * 내린 모델은 다시 쓰일 때 다시 받는다 (브라우저 캐시가 있어 보통은 풀기만 한다).
+ */
+const MB = 1024 * 1024;
+const bytesOf = new Map<string, number>();
+const lastUsed = new Map<string, number>();
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+/**
+ * 기기별 상한. **손가락 화면(휴대폰 · 태블릿)은 160MB** — 내 차 원본(30~104MB)과 배경 차 두어 대가 든다.
+ * 넘는 만큼 판 사이에 내리고, 다음 판의 새 얼굴은 다시 받는다. PC 는 800MB 로 사실상 카탈로그 전체가 들어간다.
+ */
+export function modelCacheBudget(): number {
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return (coarse ? 160 : 800) * MB;
+}
+
+/** 지금 캐시가 차지하는 GPU 메모리(추정, 바이트) */
+export function modelCacheBytes(): number {
+  let total = 0;
+  for (const [key, m] of cache) if (m) total += bytesOf.get(key) ?? 0;
+  return total;
+}
+
+/**
+ * 상한을 넘는 만큼 **오래 안 쓴 모델부터** 내린다. `keepIds` 의 차(지금 타는 차)는 남긴다.
+ * **장면이 하나도 없을 때만 부른다** (위 주석). 돌려주는 값은 내린 바이트.
+ */
+export function trimCarModelCache(keepIds: readonly string[], budget = modelCacheBudget()): number {
+  const keep = new Set(keepIds);
+  let total = modelCacheBytes();
+  if (total <= budget) return 0;
+  const victims = [...cache.entries()]
+    .filter(([key, m]) => m && !keep.has(idOfKey(key)) && !inflight.has(key))
+    .sort((a, b) => (lastUsed.get(a[0]) ?? 0) - (lastUsed.get(b[0]) ?? 0));
+  let freed = 0;
+  for (const [key, m] of victims) {
+    if (total <= budget) break;
+    disposeModel(m!);
+    cache.delete(key);
+    const b = bytesOf.get(key) ?? 0;
+    bytesOf.delete(key);
+    lastUsed.delete(key);
+    total -= b;
+    freed += b;
+  }
+  return freed;
+}
+
+/** 캐시본의 지오메트리 · 재질 · 텍스처를 GPU 에서 내린다. 환경맵(envMap)은 여러 차가 나눠 쓰는 것이라 건드리지 않는다 */
+function disposeModel(model: THREE.Object3D): void {
+  const geos = new Set<THREE.BufferGeometry>();
+  const mats = new Set<THREE.Material>();
+  const texs = new Set<THREE.Texture>();
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    geos.add(mesh.geometry);
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      mats.add(m);
+      for (const [k, v] of Object.entries(m)) {
+        if (k !== 'envMap' && (v as THREE.Texture)?.isTexture) texs.add(v as THREE.Texture);
+      }
+    }
+  });
+  for (const t of texs) t.dispose();
+  for (const m of mats) m.dispose();
+  for (const g of geos) g.dispose();
+}
+
+/** 모델이 GPU 에서 차지할 크기(추정) — 지오메트리 속성 배열과 텍스처 픽셀(밉맵 포함) */
+function gpuBytesOf(model: THREE.Object3D): number {
+  const geos = new Set<THREE.BufferGeometry>();
+  const texs = new Set<THREE.Texture>();
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    geos.add(mesh.geometry);
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      for (const [k, v] of Object.entries(m)) {
+        if (k !== 'envMap' && (v as THREE.Texture)?.isTexture) texs.add(v as THREE.Texture);
+      }
+    }
+  });
+  let bytes = 0;
+  for (const g of geos) {
+    for (const a of Object.values(g.attributes)) bytes += (a as THREE.BufferAttribute).array?.byteLength ?? 0;
+    bytes += g.index?.array.byteLength ?? 0;
+  }
+  for (const t of texs) {
+    const img = t.image as { width?: number; height?: number } | undefined;
+    const w = img?.width ?? 0;
+    const h = img?.height ?? 0;
+    bytes += w * h * 4 * (t.generateMipmaps ? 4 / 3 : 1);
+  }
+  return Math.round(bytes);
+}
 
 /**
  * 이미 받아 둔(= 바로 쓸 수 있는) **배경 차용** 차 id 들 — NPC 배역을 고를 때 쓴다.
@@ -452,7 +564,10 @@ export async function loadCarModel(
 async function baseModel(spec: CarSpec, lod: boolean): Promise<THREE.Group | null> {
   const key = cacheKey(spec.id, lod);
   const cached = cache.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    lastUsed.set(key, now());
+    return cached;
+  }
   const running = inflight.get(key);
   if (running) return running;
 
@@ -520,6 +635,8 @@ async function readModel(spec: CarSpec, lod: boolean): Promise<THREE.Group | nul
     for (const o of drop) o.removeFromParent();
 
     cache.set(key, root);
+    bytesOf.set(key, gpuBytesOf(root));
+    lastUsed.set(key, now());
     return root;
   } catch {
     cache.set(key, null);

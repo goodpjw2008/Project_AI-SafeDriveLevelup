@@ -319,6 +319,14 @@ export class Game {
   private leadWarned = false;
   /** 후방 시점에서 내 차 위에 뜨는 "내 차" 말풍선 (PlayerMarker.ts) */
   private myCarMarker: PlayerMarker;
+  /**
+   * **Game 이 직접 만든 소품의 GPU 자원** — 단속 카메라 갠트리 · 명판 · 30 표지 · 보호구역 표지판 · 신호등 지주.
+   *
+   * 렌더러는 판을 넘어 한 벌을 계속 쓰므로(renderer.ts) **버리지 않은 지오메트리 · 재질 · 텍스처는 판마다 GPU 에
+   * 쌓인다.** 다른 부품(Intersection · World · PeripheralView …)은 저마다 track 목록으로 버리는데 여기 소품만 빠져
+   * 있었다 — 사용자 휴대폰에서 판을 거듭하면 화면에 검은 줄이 생기던 누적의 하나다 (CHANGELOG).
+   */
+  private readonly props: Array<{ dispose(): void }> = [];
 
   private elapsed = 0;
   private running = false;
@@ -445,8 +453,6 @@ export class Game {
     this.rig.setMode(startView);
     this.setOverlaysVisible(startView);
 
-    this.installPartProbe(canvas);
-
     /*
       3D 차량 모델이 있으면 절차적 차체를 대체한다 (없으면 그대로 둔다).
 
@@ -532,74 +538,6 @@ export class Game {
     const m = Math.min(this.seatOffset, this.seatLimit);
     this.rig.setSeatOffset(m);
     this.periph.setSeatOffset(m);
-  }
-
-  /*
-    ── 부품 찍어보기 (임시 진단용) ────────────────────────────────────────────
-
-    화면의 어떤 부분이 무슨 부품인지 **게임에게 직접 묻는다.** Alt(Option) 을 누른 채
-    화면을 클릭하면 그 방향으로 광선을 쏴, 맞은 물체의 이름·재질·거리를 화면에 띄운다.
-
-    모델 파일을 밖에서 분석해 추측하는 방식은 카메라 위치·화각·좌석 위치를 똑같이
-    재현해야 맞아떨어지는데, 그게 어긋나면 엉뚱한 부품을 지목하게 된다(실제로 그랬다).
-    화면에서 직접 찍는 편이 확실하다.
-
-    진단이 끝나면 이 메서드와 호출부를 지운다.
-  */
-  private installPartProbe(canvas: HTMLCanvasElement): void {
-    const raycaster = new THREE.Raycaster();
-    // 실내는 전용 레이어에 있어 기본 광선에 안 잡힌다 — 모든 레이어를 본다
-    raycaster.layers.enableAll();
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!e.altKey) return;
-      e.preventDefault();
-      const r = canvas.getBoundingClientRect();
-      const ndc = new THREE.Vector2(
-        ((e.clientX - r.left) / r.width) * 2 - 1,
-        -((e.clientY - r.top) / r.height) * 2 + 1,
-      );
-      raycaster.setFromCamera(ndc, this.rig.camera);
-      const hits = raycaster.intersectObject(this.world.scene, true);
-      const seen = new Set<string>();
-      const lines: string[] = [];
-      for (const h of hits) {
-        const mesh = h.object as THREE.Mesh;
-        if (!mesh.isMesh || !mesh.visible) continue;
-        const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-        const name = `${mesh.name || '(이름없음)'} / ${mat?.name || '(재질없음)'}`;
-        if (seen.has(name)) continue;
-        seen.add(name);
-        const transparent = (mat as THREE.MeshStandardMaterial)?.transparent ? '투명' : '불투명';
-        /*
-          **면 번호(faceIndex)** 를 함께 알린다. 이름만으로는 통짜 메시 안의 어느 부품인지
-          알 수 없는데, 면 번호가 있으면 모델 파일에서 그 삼각형이 속한 덩어리를 정확히
-          집어낼 수 있다. 이름·거리만으로 추측하다 여러 번 헛짚었다.
-        */
-        const face = h.faceIndex ?? -1;
-        const p = h.point;
-        lines.push(
-          `${h.distance.toFixed(2)}m · ${transparent} · 면#${face} · ` +
-            `점(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}) · ${name}`,
-        );
-        if (lines.length >= 2) break;
-      }
-      const c = this.rig.camera;
-      lines.push(
-        `차종 ${this.carSpec.id} · 카메라(${c.position.x.toFixed(2)}, ${c.position.y.toFixed(2)}, ${c.position.z.toFixed(2)}) fov=${(c as THREE.PerspectiveCamera).fov.toFixed(0)}`,
-      );
-      const msg = lines.length > 0 ? lines.join('  ||  ') : '아무것도 맞지 않았습니다 (바깥이 보이는 방향)';
-      console.log('[부품 찍기]', msg);
-
-      /*
-        **클립보드에 바로 넣는다.** 화면의 토스트를 눈으로 옮겨 적는 것보다 정확하고 빠르다
-        (면 번호가 한 자리만 틀려도 엉뚱한 덩어리를 짚게 된다).
-        클릭은 사용자 제스처라 권한 문제가 없고, localhost 는 보안 컨텍스트로 취급된다.
-      */
-      void navigator.clipboard
-        .writeText(msg)
-        .then(() => this.cb.onToast?.(`📋 복사됨 — ${msg}`))
-        .catch(() => this.cb.onToast?.(`(복사 실패, 아래 내용을 직접 복사하세요) ${msg}`));
-    });
   }
 
   // ── 구성 ─────────────────────────────────────────────────────────────────
@@ -807,17 +745,17 @@ export class Game {
    */
   private cantileverPole(x: number, z: number, reachX: number, armY: number): THREE.Group {
     const g = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x4c5057, roughness: 0.6, metalness: 0.5 });
+    const mat = this.track(new THREE.MeshStandardMaterial({ color: 0x4c5057, roughness: 0.6, metalness: 0.5 }));
 
     const height = armY + 0.1;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, height, 8), mat);
+    const pole = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.07, 0.09, height, 8)), mat);
     pole.position.set(x, height / 2, z);
     g.add(pole);
 
     // 팔은 지주에서 등화 자리까지 — 길이를 좌표에서 뽑는다.
     // 고정 길이로 두면 도로 폭이나 등화 자리가 바뀔 때 팔이 등화에 닿지 않는다
     const reach = x - reachX;
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, reach, 8), mat);
+    const arm = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.055, 0.07, reach, 8)), mat);
     arm.rotation.z = Math.PI / 2;
     arm.position.set(x - reach / 2, armY, z);
     g.add(arm);
@@ -869,8 +807,8 @@ export class Game {
 
   private smallPole(x: number, z: number, height = PED_SIGNAL_POLE_HEIGHT): THREE.Mesh {
     const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.09, height, 8),
-      new THREE.MeshStandardMaterial({ color: 0x4c5057, roughness: 0.6, metalness: 0.5 }),
+      this.track(new THREE.CylinderGeometry(0.07, 0.09, height, 8)),
+      this.track(new THREE.MeshStandardMaterial({ color: 0x4c5057, roughness: 0.6, metalness: 0.5 })),
     );
     mesh.position.set(x, height / 2, z);
     return mesh;
@@ -899,14 +837,14 @@ export class Game {
     mount: { poleX?: number; armY?: number; withSignal?: boolean } = {},
   ): void {
     const g = new THREE.Group();
-    const orange = new THREE.MeshStandardMaterial({ color: 0xe0651f, roughness: 0.55, metalness: 0.35 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.5, metalness: 0.4 });
-    const pale = new THREE.MeshStandardMaterial({ color: 0xd8dade, roughness: 0.5, metalness: 0.3 });
+    const orange = this.track(new THREE.MeshStandardMaterial({ color: 0xe0651f, roughness: 0.55, metalness: 0.35 }));
+    const dark = this.track(new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.5, metalness: 0.4 }));
+    const pale = this.track(new THREE.MeshStandardMaterial({ color: 0xd8dade, roughness: 0.5, metalness: 0.3 }));
     /** 운전자를 향한 면 — 표지는 모두 이 면에 붙는다 (운전자는 +Z 쪽에서 온다) */
     const face = (w: number, h: number, tex: THREE.Texture): THREE.Mesh =>
       new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.72, side: THREE.DoubleSide }),
+        this.track(new THREE.PlaneGeometry(w, h)),
+        this.track(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.72, side: THREE.DoubleSide })),
       );
 
     /*
@@ -928,14 +866,14 @@ export class Game {
     const armLen = poleX - armEndX;
     const armMidX = (poleX + armEndX) / 2;
 
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.44, armY + 0.7, 0.44), orange);
+    const pole = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.44, armY + 0.7, 0.44)), orange);
     pole.position.set(poleX, (armY + 0.7) / 2, z);
     g.add(pole);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(armLen, armH, armDepth), orange);
+    const arm = new THREE.Mesh(this.track(new THREE.BoxGeometry(armLen, armH, armDepth)), orange);
     arm.position.set(armMidX, armY, z);
     g.add(arm);
     // 지주와 팔이 만나는 곳의 삼각 보강재 (사진의 사선 브래킷)
-    const brace = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 0.12), orange);
+    const brace = new THREE.Mesh(this.track(new THREE.BoxGeometry(1.3, 0.12, 0.12)), orange);
     brace.position.set(poleX - 0.62, armY - 0.62, z);
     brace.rotation.z = Math.PI / 4;
     g.add(brace);
@@ -966,18 +904,18 @@ export class Game {
       작은 보조 장비가 섞여 있으므로 크기를 달리해 둘·하나로 얹는다.
     */
     const camAt = (cx: number, s: number, mat: THREE.Material): void => {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s, 0.34 * s, 0.7 * s), mat);
+      const body = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.4 * s, 0.34 * s, 0.7 * s)), mat);
       body.position.set(cx, armY + armH / 2 + 0.17 * s, z);
       body.rotation.x = 0.3;
       // 햇빛 가리개 — 렌즈 위로 내민 차양
-      const hood = new THREE.Mesh(new THREE.BoxGeometry(0.46 * s, 0.06 * s, 0.5 * s), mat);
+      const hood = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.46 * s, 0.06 * s, 0.5 * s)), mat);
       hood.position.set(cx, armY + armH / 2 + 0.33 * s, z + 0.2 * s);
       hood.rotation.x = 0.3;
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.14 * s, 0.24 * s, 12), dark);
+      const lens = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.12 * s, 0.14 * s, 0.24 * s, 12)), dark);
       lens.rotation.x = Math.PI / 2 + 0.3;
       lens.position.set(cx, armY + armH / 2 + 0.11 * s, z + 0.4 * s);
       // 팔과 카메라를 잇는 짧은 목
-      const neck = new THREE.Mesh(new THREE.BoxGeometry(0.1 * s, 0.16 * s, 0.1 * s), dark);
+      const neck = new THREE.Mesh(this.track(new THREE.BoxGeometry(0.1 * s, 0.16 * s, 0.1 * s)), dark);
       neck.position.set(cx, armY + armH / 2 + 0.06 * s, z);
       g.add(body, hood, lens, neck);
     };
@@ -991,11 +929,11 @@ export class Game {
       보고 비스듬히 눕는다. 전원이 따로 없는 길에도 세울 수 있게 하는 물건이라, 이것이
       있어야 "길가에 세운 장비" 로 보인다.
     */
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), dark);
+    const mast = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8)), dark);
     mast.position.set(poleX - 0.55, armY + armH / 2 + 0.3, z);
     const panel = new THREE.Mesh(
-      new THREE.BoxGeometry(0.95, 0.05, 0.62),
-      new THREE.MeshStandardMaterial({ color: 0x1b2a4a, roughness: 0.32, metalness: 0.55 }),
+      this.track(new THREE.BoxGeometry(0.95, 0.05, 0.62)),
+      this.track(new THREE.MeshStandardMaterial({ color: 0x1b2a4a, roughness: 0.32, metalness: 0.55 })),
     );
     panel.position.set(poleX - 0.55, armY + armH / 2 + 0.66, z + 0.06);
     panel.rotation.x = -0.5;
@@ -1020,7 +958,7 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(withSignal ? '신호 과속단속장비' : '과속 단속장비', 256, 48);
-    const tex = new THREE.CanvasTexture(c);
+    const tex = this.track(new THREE.CanvasTexture(c));
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
@@ -1058,7 +996,7 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('30', 128, 134);
-    const tex = new THREE.CanvasTexture(c);
+    const tex = this.track(new THREE.CanvasTexture(c));
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return tex;
@@ -1087,10 +1025,10 @@ export class Game {
     ctx.fillText('어린이', 128, 118);
     ctx.fillText('보호구역', 128, 166);
 
-    const tex = new THREE.CanvasTexture(c);
+    const tex = this.track(new THREE.CanvasTexture(c));
     tex.colorSpace = THREE.SRGBColorSpace;
-    const geo = new THREE.PlaneGeometry(1.5, 1.5);
-    const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8 });
+    const geo = this.track(new THREE.PlaneGeometry(1.5, 1.5));
+    const mat = this.track(new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8 }));
 
     /*
       **표지판은 구간이 시작하는 자리에 선다.**
@@ -1141,8 +1079,8 @@ export class Game {
     }
 
     // 뒷판 — 마름모(텍스처 속 마름모와 같은 크기)를 회색으로. 실물 표지판도 뒤는 무늬 없는 금속판이다
-    const backGeo = new THREE.PlaneGeometry(0.93, 0.93);
-    const backMat = new THREE.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.7, metalness: 0.3 });
+    const backGeo = this.track(new THREE.PlaneGeometry(0.93, 0.93));
+    const backMat = this.track(new THREE.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.7, metalness: 0.3 }));
     /*
       **표지판은 기둥보다 앞(운전자 쪽)에 단다.**
 
@@ -2346,6 +2284,11 @@ export class Game {
     return PLAYER_EXIT_Z;
   }
 
+  private track<T extends { dispose(): void }>(o: T): T {
+    this.props.push(o);
+    return o;
+  }
+
   dispose(): void {
     this.disposed = true;
     this.running = false;
@@ -2364,6 +2307,8 @@ export class Game {
     this.carModel.dispose();
     this.intersection.dispose();
     this.world.dispose();
+    for (const d of this.props) d.dispose();
+    this.props.length = 0;
     // 렌더러는 버리지 않는다 — 다음 판이 그대로 이어 쓴다 (renderer.ts)
   }
 }

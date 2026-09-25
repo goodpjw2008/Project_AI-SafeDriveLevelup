@@ -13,7 +13,7 @@ import { setClusterStopCue } from './game/ClusterPanel';
 import { AUTO_DRIVE_RULE, challengeRule } from './scenarios/challenge';
 import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
-import { loadCarModel } from './game/carModel';
+import { loadCarModel, trimCarModelCache } from './game/carModel';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { setMsaaPreference, sharedRenderer } from './game/renderer';
 import { presetGraphics, usesLampLights } from './game/quality';
@@ -598,6 +598,8 @@ function renderMenu(): void {
   // 추천 장면이 떠 있는 채로 첫 화면에 왔으면(준비 중에 뒤로 가기 등) 걷는다
   aiPick.hide();
   disposeSeatPreview();
+  // 첫 화면의 배경 장면을 만들기 전 — 장면이 없는 이 순간에 모델 캐시를 상한까지 비운다 (carModel.ts 의 trimCarModelCache)
+  trimCarModelCache([saveData.activeCarId]);
   // 주행 중에 나왔을 수 있다 — 키 입력을 끊지 않으면 메뉴에서 누른 방향키가 그대로 먹힌다
   controls.setEnabled(false);
   hud.hide();
@@ -995,6 +997,8 @@ function renderSeatPreview(carId: string): void {
     preview.dispose();
     seatPreview = null;
     seatTeardown = null;
+    // 차고에서 여러 차를 둘러봤으면 캐시가 불어 있다 — 좌석 화면을 걷은 이 순간에 상한까지 비운다
+    trimCarModelCache([saveData.activeCarId]);
     panel?.classList.remove('on');
   }
   seatTeardown = cleanup;
@@ -1124,6 +1128,8 @@ async function startRun(id: number): Promise<void> {
 
   currentScenario = prepareScenario(resolveScenario(id));
   const carSpec = getCar(saveData.activeCarId);
+  // 장면이 하나도 없는 지금이 모델 캐시를 상한까지 비울 순간이다 — 내 차만 남긴다 (carModel.ts 의 trimCarModelCache)
+  trimCarModelCache([carSpec.id]);
   audio.setCar(carSpec);
   // 설정에서 고른 소리 셋. 바뀐 것이 없으면 아무 일도 하지 않는다
   audio.setSounds(saveData.settings.sounds);
