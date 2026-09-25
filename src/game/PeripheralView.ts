@@ -81,7 +81,19 @@ const PANEL_FOV_WIDE = 56;
  * 대가는 담는 각이다 — 1:1 을 지키면서 더 옆까지 보려면 **창을 더 크게** 만드는 수밖에 없다.
  */
 const wideExtendFor = (sidePx: number, screenPx: number): number =>
-  Math.max(0.05, Math.min(1.5, sidePx / Math.max(1, screenPx)));
+  Math.max(0.05, Math.min(1.5, sidePx / Math.max(1, screenPx) / WIDE_ZOOM));
+
+/**
+ * **확대 배율** — 1 이면 본 화면과 똑같은 크기, 키우면 그만큼 크게 보인다.
+ *
+ * 1:1 로 맞춰 봤더니 건너편 보도의 사람이 **여전히 작아 알아보기 어려웠다**(사용자가 짚었다).
+ * 손안 화면은 본 화면 자체가 작아서, 거기서 작던 것은 옮겨 놓아도 작다. 그래서 조금 **당겨
+ * 본다** — 이 창이 답하는 질문은 "저기 사람이 있나" 이지 "얼마나 떨어져 있나" 가 아니라,
+ * 크게 보이는 편이 낫다.
+ *
+ * 대가는 담는 각이다 — 배율을 올린 만큼 좁아진다.
+ */
+const WIDE_ZOOM = 1.6;
 
 /**
  * 확장 시야가 보는 띠의 높이 자리 (본 화면 높이의 몇 배만큼 위로).
@@ -90,6 +102,9 @@ const wideExtendFor = (sidePx: number, screenPx: number): number =>
  * 선 사람은 그 지평선 언저리에 있어서, 띠를 조금 올려야 사람이 띠 한가운데로 들어온다.
  */
 const WIDE_LIFT = -0.08;
+
+/** 확장 시야 창의 밑변 — 화면 높이의 몇 지점인가. 내 차 지붕 바로 위다 (아래 resize) */
+const WIDE_BOTTOM_FRAC = 0.545;
 
 /**
  * 창의 화각. 68° ± 30° = 38°~98° 를 담는다.
@@ -451,9 +466,18 @@ export class PeripheralView {
           말풍선이 없으면(PC · 아직 안 뜬 때) 예전처럼 맨 위다.
         */
         const coach = this.wide ? document.getElementById('drive-coach')?.getBoundingClientRect() : undefined;
-        // 말풍선 아래로 한 뼘 더 띄운다 (사용자가 정했다) — 붙여 두면 말풍선과 한 덩어리로 읽힌다
-        const top = coach && coach.height > 0 ? coach.bottom + h * 0.045 : TOP_MARGIN_PX;
-        cy = top + (pw * PANEL_ASPECT) / 2;
+        /*
+          **확장 시야는 내 차 바로 위**에 선다 (사용자가 정했다).
+
+          후방 시점에서 내 차는 화면의 늘 같은 자리(세로 56% 언저리)에 있으므로, 그 위에 밑변을
+          맞춘다 — 눈이 차에서 창으로, 창에서 다시 앞 도로로 짧게 오간다. 위쪽에 두었을 때는
+          시선이 화면 끝까지 갔다 와야 했다. 말풍선이 길어져 겹치면 그 아래로 밀어 둔다.
+        */
+        const ph0 = pw * PANEL_ASPECT;
+        // 사이드미러 시야(PC)는 예전처럼 맨 위다 — 자리를 옮기는 것은 확장 시야뿐이다
+        const aboveCar = this.wide ? h * WIDE_BOTTOM_FRAC - ph0 : TOP_MARGIN_PX;
+        const top = coach && coach.height > 0 ? Math.max(aboveCar, coach.bottom + rowGap) : aboveCar;
+        cy = top + ph0 / 2;
         labelBelow = true; // 창 위에는 자리가 없다
       }
 
