@@ -485,7 +485,8 @@ export class PeripheralView {
         */
         const ph0 = pw * PANEL_ASPECT;
         // 사이드미러 시야(PC)는 예전처럼 맨 위다 — 자리를 옮기는 것은 확장 시야뿐이다
-        const aboveCar = this.wide ? h * WIDE_BOTTOM_FRAC - ph0 : TOP_MARGIN_PX;
+        // 차 지붕에서 **창 높이의 반만큼 더** 띄운다 (사용자가 정했다) — 차와 창이 붙어 보이지 않게
+        const aboveCar = this.wide ? h * WIDE_BOTTOM_FRAC - ph0 * 1.5 : TOP_MARGIN_PX;
         const top = coach && coach.height > 0 ? Math.max(aboveCar, coach.bottom + rowGap) : aboveCar;
         cy = top + ph0 / 2;
         labelBelow = true; // 창 위에는 자리가 없다
