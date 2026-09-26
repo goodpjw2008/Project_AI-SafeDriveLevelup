@@ -4152,6 +4152,59 @@
         것이라 페이지가 바꾸거나 없앨 수 없다 — 그래서 사용자가 정한 글을 우리 상자로 한 번 더 띄운다.
         첫 화면 · 주행 HUD 어디 위에서나 보여야 하므로 HUD 안의 .toast 가 아니라 #app 바로 아래 따로 둔다.
       */
+      /* 크롬 + 삼성 Xclipse + Vulkan 안내 — 첫 화면 아래쪽 카드. 버튼이 있어 pointer-events 를 살린다 (fs-notice 와 다르다) */
+      .gpu-notice {
+        position: fixed;
+        left: 50%;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        transform: translateX(-50%) translateY(8px);
+        z-index: 91;
+        width: min(92vw, 520px);
+        padding: 14px 16px 12px;
+        border: 1px solid #c9a227;
+        border-radius: 12px;
+        background: rgba(18, 23, 33, 0.96);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s, transform 0.25s;
+      }
+      .gpu-notice.show {
+        opacity: 1;
+        transform: translateX(-50%);
+        pointer-events: auto;
+      }
+      .gpu-notice b {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+      .gpu-notice p {
+        margin: 0 0 10px;
+        color: var(--muted, #b8c0cc);
+      }
+      .gpu-notice-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .gpu-notice-actions .btn {
+        padding: 8px 14px;
+        font-size: 14px;
+        text-decoration: none;
+      }
+      /* 링크(a)를 버튼처럼 — button.primary 와 같은 옷 */
+      .gpu-notice-actions a.btn {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #4c8dff;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #3d8bff, #2f6fe0);
+        color: #fff;
+        font-weight: 600;
+      }
       .fs-notice {
         position: fixed;
         left: 50%;
@@ -5357,6 +5410,18 @@
         그 약속을 tests/mobileLandscape.test.ts 가 지킨다.
       */
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+        /* 크롬 + 삼성 Xclipse 안내 상자 — 가로는 높이가 짧아 한 단계 조인다 (.gpu-notice) */
+        .gpu-notice {
+          width: min(94vw, 640px);
+          padding: 10px 14px 10px;
+          font-size: 13px;
+        }
+        .gpu-notice b {
+          font-size: 14px;
+        }
+        .gpu-notice p {
+          margin-bottom: 8px;
+        }
         /*
           **첫 줄을 둘이 나눠 쓴다** — 왼쪽에 길 안내 버튼, 오른쪽에 사이트 전체 성공 · 실패
           (사용자가 정했다: *"우회전 · 어린이보호구역 · 내 습관 · 설정을 가장 윗 라인으로 옮기고
@@ -6541,6 +6606,15 @@
       <canvas id="scene"></canvas>
       <!-- 전체 화면 안내 (휴대폰) — main.ts 의 showFullscreenNotice. 크롬의 흰 안내 상자와 별개다 -->
       <div class="fs-notice" id="fs-notice" role="status" aria-live="polite"></div>
+      <!-- 크롬 + 삼성 Xclipse + Vulkan 안내 — 그 조합에서만 뜬다 (main.ts 의 maybeShowGpuNotice · game/browserQuirk.ts) -->
+      <div class="gpu-notice" id="gpu-notice" role="alertdialog" aria-live="polite" aria-labelledby="gpu-notice-title">
+        <b id="gpu-notice-title">이 휴대폰의 크롬 브라우저에서는 주행 화면에 검은 띠가 번쩍일 수 있습니다</b>
+        <p>삼성 Xclipse GPU 휴대폰의 크롬 앱에서만 나는 크롬 쪽 문제입니다. 같은 휴대폰의 삼성 인터넷이나 다른 앱 안에서 열면 정상입니다.</p>
+        <div class="gpu-notice-actions">
+          <a class="btn primary" id="gpu-notice-open" href="#">삼성 인터넷으로 열기</a>
+          <button class="btn ghost" id="gpu-notice-close" type="button">닫기</button>
+        </div>
+      </div>
 
       <!-- ── 주행 HUD ─────────────────────────────────────────── -->
       <div id="hud">

@@ -17,7 +17,8 @@ import { loadCarModel, trimCarModelCache, playerLod } from './game/carModel';
 import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
-import { setMsaaPreference, sharedRenderer } from './game/renderer';
+import { gpuName, setMsaaPreference, sharedRenderer } from './game/renderer';
+import { samsungInternetIntent, vulkanXclipseChrome } from './game/browserQuirk';
 import { presetGraphics, usesLampLights } from './game/quality';
 import { setLampLights } from './game/TrafficLight';
 import { bakeEnvironment } from './game/environment';
@@ -531,6 +532,24 @@ function toggleFullscreen(): void {
  * 없앨 수 없다. 그래서 그 옆에 우리 상자를 한 번 더 띄운다 — 몇 초 뒤 사라지고, 전체 화면을 나가면 곧 걷는다.
  */
 let fsNoticeTimer = 0;
+/*
+  **크롬 + 삼성 Xclipse + Vulkan 안내** — 그 조합(game/browserQuirk.ts)에서만, 세션에 한 번, 첫 화면에 띄운다.
+  GPU 문자열은 렌더러가 있어야 읽을 수 있다 — 첫 화면의 배경 장면이 렌더러를 만든 뒤(renderMenu) 부른다.
+*/
+let gpuNoticeDecided = false;
+function maybeShowGpuNotice(): void {
+  if (gpuNoticeDecided) return;
+  const el = document.getElementById('gpu-notice');
+  if (!el) return;
+  gpuNoticeDecided = true;
+  const gpu = gpuName(sharedRenderer(canvas));
+  if (!vulkanXclipseChrome(gpu, navigator.userAgent)) return;
+  const open = document.getElementById('gpu-notice-open') as HTMLAnchorElement | null;
+  if (open) open.href = samsungInternetIntent(new URL(window.location.href));
+  document.getElementById('gpu-notice-close')?.addEventListener('click', () => el.classList.remove('show'));
+  el.classList.add('show');
+}
+
 function showFullscreenNotice(on: boolean): void {
   const el = document.getElementById('fs-notice');
   if (!el) return;
@@ -676,6 +695,7 @@ function renderMenu(): void {
   // 주행 중에 나왔을 수 있다 — 키 입력을 끊지 않으면 메뉴에서 누른 방향키가 그대로 먹힌다
   controls.setEnabled(false);
   hud.hide();
+  maybeShowGpuNotice();
   ensureMenuScene();
   screens.show('menu');
   // 사진 목록을 못 받은 채 켜졌으면 다시 받아, 받는 대로 '지금 타는 차' 사진을 채운다

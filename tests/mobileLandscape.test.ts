@@ -94,6 +94,8 @@ describe('가로 휴대폰의 첫 화면', () => {
       '#screen-menu',
       '.ai-pick',
       '#screen-debrief',
+      // 크롬 + 삼성 Xclipse 안내 상자 — 첫 화면 위에 뜨는 카드, 가로는 높이가 짧아 한 단계 조인다 (2026-09-26)
+      '.gpu-notice',
       '#hud-scenario',
       '.pick-long',
       '.pick-short',
