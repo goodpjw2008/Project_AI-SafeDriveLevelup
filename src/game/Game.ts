@@ -2229,6 +2229,8 @@ export class Game {
   // ── 외부 조작 ─────────────────────────────────────────────────────────────
 
   cycleView(): void {
+    // 손에 든 화면은 후방 시점 고정이다 (main.ts 의 startViewOfRun) — 키보드를 붙인 태블릿에서도 돌지 않는다
+    if (this.smallScreen?.matches) return;
     const mode = this.rig.cycle();
     this.setOverlaysVisible(mode);
     this.cb.onViewChange(mode);

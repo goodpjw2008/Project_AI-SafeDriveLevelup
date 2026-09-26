@@ -42,15 +42,8 @@ import {
   makeHudFrameTexture,
 } from './overlayTextures';
 import type { Vehicle } from './Vehicle';
+import { isHandheld, isHandheldPortrait } from './handheld';
 
-/**
- * 손에 든 세로 화면인가 — 화면 규칙(index.html 의 '손에 든 세로 화면')과 **같은 조건**이다.
- * 조건이 갈라지면 창의 모양과 화면의 규칙이 어긋난다.
- */
-function isHandheldPortrait(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)').matches;
-}
 
 /** 차체 정면 기준 창이 보는 방향 (rad ≒ 68°) */
 const LOOK_YAW = 1.19;
@@ -269,7 +262,13 @@ export class PeripheralView {
       코드는 남겨 둔다 — PC 의 사이드미러 시야는 이 틀을 그대로 쓴다.
     */
     this.wide = isHandheldPortrait();
-    if (!this.wide) {
+    /*
+      **손에 든 화면(세로 · 가로)에서는 창을 아예 두지 않는다** (사용자가 정했다: *"모바일에서는 C 시점 전환을
+      쓰지 않는다. 운전석이 가장 큰 부하를 줄 텐데 모바일에는 가지고 오지 않아도 된다."*). 시점이 후방으로
+      고정이라(main.ts 의 startViewOfRun) 운전석의 좌·우·후방 창이 뜰 일이 없다 — 창이 없으면 렌더 타깃 세 장,
+      프레임마다 한 장씩 굽던 패스, 미리 굽기가 통째로 빠진다. 가로 휴대폰도 같다.
+    */
+    if (!isHandheld()) {
       this.addUnit(-1, '◀ 좌측 시야');
       this.addUnit(1, '우측 시야 ▶');
       // 후방은 거울을 대신하므로 좌우를 뒤집는다. 뜨는 시점은 좌·우 창과 같다

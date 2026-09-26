@@ -14,6 +14,7 @@ import { AUTO_DRIVE_RULE, challengeRule } from './scenarios/challenge';
 import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
 import { loadCarModel, trimCarModelCache } from './game/carModel';
+import { isHandheld } from './game/handheld';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { setMsaaPreference, sharedRenderer } from './game/renderer';
 import { presetGraphics, usesLampLights } from './game/quality';
@@ -504,7 +505,10 @@ if (window.matchMedia('(pointer: coarse)').matches) {
 }
 
 const controls = new Controls(canvas, {
-  onToggleView: () => game?.cycleView(),
+  // 손에 든 화면은 시점을 바꾸지 않는다 — 후방 시점 고정 (아래 startViewOfRun)
+  onToggleView: () => {
+    if (!isHandheld()) game?.cycleView();
+  },
   // 깜빡이는 판을 시작할 때 저절로 켜진다 — 키보드(Q)로만 끄고 켤 수 있고, 휴대폰에는 버튼을 두지 않는다
   onToggleSignal: () => void audio.resume(),
   onRestart: () => {
@@ -1250,8 +1254,15 @@ async function startRun(id: number): Promise<void> {
   setStopBands(hints !== 'none');
   setClusterStopCue(hints !== 'none');
 
-  // 시작 시점 — 자율 주행 중에는 후방 시점으로 고정한다 (아래 startView 주석)
-  const startViewOfRun: ViewMode = aiDriving ? 'chase' : saveData.settings.startView;
+  /*
+    시작 시점 — 자율 주행 중에는 후방 시점으로 고정한다 (아래 startView 주석).
+
+    **손에 든 화면도 후방 시점으로 고정한다** (사용자가 정했다: *"모바일에서는 C 시점 전환을 쓰지 않는다.
+    세로는 횡단보도 앞에서 카메라가 올라갔다 내려오는 후방 시점, 가로는 후방 시점 하나."*). 운전석 시점이
+    끌고 오는 것(좌·우·후방 시야 창의 렌더 타깃과 그 패스)은 휴대폰에 가장 무거운 짐이라, 시점을 고정하면
+    그것을 아예 만들지 않을 수 있다 (PeripheralView). 설정의 시작 시점은 PC 에서만 뜻이 있다.
+  */
+  const startViewOfRun: ViewMode = aiDriving || isHandheld() ? 'chase' : saveData.settings.startView;
   markView(startViewOfRun);
   game = new Game(canvas, currentScenario, carSpec, controls, audio, {
     onSnapshot: (s: GameSnapshot) => {

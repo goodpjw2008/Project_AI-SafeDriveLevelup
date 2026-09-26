@@ -9,6 +9,7 @@
  */
 
 import * as THREE from 'three';
+import { isHandheldLandscape } from './handheld';
 import { LANE_2_OFFSET, STOP_LINE, STOP_LINE_S } from '../layout';
 import type { CarSpec } from '../economy/cars';
 import { DRIVER_HIDDEN_LAYER, INTERIOR_LAYER, PLAYER_CAR_LAYER, driverEyeLocal } from './CarMesh';
@@ -427,18 +428,6 @@ export const PORTRAIT_MAX_FOV = 108;
 const CHASE_MIN_HFOV = 72;
 /** 손에 든 가로 화면의 후방 시점을 당겨 보는 배율 — 세로 화각을 이만큼 나눈다 (위 chase 주석). "조금만" 이라 1.2 */
 const CHASE_ZOOM_LANDSCAPE = 1.2;
-
-/** 손에 든 가로 화면인가 — 화면 규칙(index.html 의 '손에 든 가로 화면')과 같은 조건이다. 프레임마다 보므로 한 번만 만든다 */
-let handheldLandscapeQuery: MediaQueryList | null | undefined;
-function isHandheldLandscape(): boolean {
-  if (handheldLandscapeQuery === undefined) {
-    handheldLandscapeQuery =
-      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        ? window.matchMedia('(orientation: landscape) and (pointer: coarse) and (max-height: 540px)')
-        : null;
-  }
-  return handheldLandscapeQuery?.matches === true;
-}
 /**
  * 세로 화면의 후방 시점 가로 화각 하한 — **달릴 때**.
  *

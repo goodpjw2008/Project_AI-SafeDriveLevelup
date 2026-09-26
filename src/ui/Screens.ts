@@ -25,6 +25,7 @@ import { GRADE_TEXT, type JudgeResult } from '../rules/lawRules';
 import { VIOLATIONS, fineOf, penaltyPointsOf, type ViolationCode } from '../rules/violations';
 import type { ViewMode } from '../game/CameraRig';
 import { CAR_MODEL_CREDITS } from '../game/carModel';
+import { isHandheld } from '../game/handheld';
 import {
   BLINKER_SOUNDS,
   DEFAULT_SOUNDS,
@@ -1378,7 +1379,19 @@ export class Screens {
             save.settings.track,
             { note: '자동은 고칠 습관과 기록을 보고 AI 가 고릅니다 · 다음 추천부터 반영' },
           )}
-          <div class="opt-row">
+          ${
+            /*
+              **휴대폰에서는 고르지 않는다** — 시점이 후방으로 고정이다 (main.ts 의 startViewOfRun). 고를 수 없는
+              것을 버튼으로 두면 눌러도 안 바뀌는 고장으로 읽히므로, 왜 없는지를 한 줄로 적는다.
+            */
+            isHandheld()
+              ? `<div class="opt-row">
+            <div class="opt-label">
+              초기 화면
+              <span class="opt-hint">휴대폰에서는 후방 시점으로 고정됩니다 — 세로는 횡단보도 앞에서 카메라가 올라갔다 내려옵니다</span>
+            </div>
+          </div>`
+              : `<div class="opt-row">
             <div class="opt-label">
               초기 화면
               <span class="opt-hint">주행을 시작할 때의 시점 (주행 중 C 로 바꿈)</span>
@@ -1391,7 +1404,8 @@ export class Screens {
                   }</button>`,
               ).join('')}
             </div>
-          </div>
+          </div>`
+          }
 
           ${this.soundSection(snd)}
         </section>
@@ -1473,7 +1487,8 @@ export class Screens {
       $(`diff-${c.id}`).addEventListener('click', () => handlers.onDifficulty(c.id));
     }
     for (const v of START_VIEWS) {
-      $(`view-${v.id}`).addEventListener('click', () => handlers.onStartView(v.id));
+      // 휴대폰에서는 이 버튼이 없다 (위 — 시점 고정)
+      document.getElementById(`view-${v.id}`)?.addEventListener('click', () => handlers.onStartView(v.id));
     }
     this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
 
