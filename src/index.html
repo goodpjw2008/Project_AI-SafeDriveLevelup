@@ -6153,6 +6153,61 @@
         창을 좁힌 PC 는 마우스라서 `pointer: coarse` 에 걸리지 않는다.
       */
       @media (orientation: portrait) and (pointer: coarse) and (max-width: 720px) {
+        /*
+          **갤럭시 S21 폭(360px)에서 밀리던 것들** (사용자가 사진으로 짚었다, 2026-09-26).
+          제목 · 부제는 한 단계(1px) 작게, 레벨 이름은 '안전 L2', 온라인 연습은 '온라인', 처음부터 다시 시작은 '처음부터',
+          레벨 길(1~M)은 칸을 줄여 한 줄에, 주행 중 AI 말풍선은 화면 폭 안에서 줄을 바꾼다.
+        */
+        #screen-menu .brand {
+          font-size: clamp(25px, 4vw, 37px);
+        }
+        #screen-menu .brand-sub {
+          font-size: clamp(17px, 2.3vw, 25px);
+        }
+        /* '안전운전 L2' → '안전 L2' (가로 화면과 같은 꼴, ui/playerCard.ts 의 name-word) */
+        #screen-menu .name-word {
+          display: none;
+        }
+        /* 긴 꼴의 꼬리를 감춘다 — '온라인 연습' → '온라인', '처음부터 다시 시작' → '처음부터' (ui/Screens.ts) */
+        #screen-menu .lbl-portrait {
+          display: none;
+        }
+        /* 레벨 길 열한 칸이 'L2까지 100 XP' 옆 한 줄에 들도록 칸을 줄인다 (가로 좁은 화면과 같은 값) */
+        #screen-menu .player-foot {
+          gap: 6px 10px;
+        }
+        #screen-menu .player-foot .level-track {
+          gap: 2px;
+        }
+        #screen-menu .player-foot .level-step {
+          width: 14px;
+          height: 14px;
+        }
+        #screen-menu .player-foot .level-step + .level-step::before {
+          left: -2px;
+          width: 2px;
+        }
+        #screen-menu .player-foot .level-step.now {
+          width: 20px;
+          height: 20px;
+        }
+        /*
+          주행 중 AI 말풍선 — 안내 글이 한 줄(nowrap)이라 '보행자 통행 확인 — 통행 종료 후 출발' 처럼 긴 말은 360px 폭을
+          넘어 화면 밖으로 나갔다 (사용자가 사진으로 짚었다). 세로 화면에서는 화면 폭 안에서 줄을 바꾼다.
+        */
+        #hud .drive-coach {
+          max-width: calc(100vw - 12px);
+        }
+        #hud .drive-coach-bubble {
+          min-width: 0;
+        }
+        #hud .drive-coach .advice,
+        #hud .drive-coach .stopdist,
+        #hud .drive-coach .ped-cue {
+          white-space: normal;
+          word-break: keep-all;
+          overflow-wrap: anywhere;
+        }
         /* 사이트 전체 성공 · 실패 — 오른쪽에 붙으면 좁은 폭에서 한쪽만 차 보인다 */
         .site-stats {
           justify-content: center;

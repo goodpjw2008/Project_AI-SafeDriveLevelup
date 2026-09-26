@@ -684,9 +684,10 @@ export class Screens {
     if (!el) return;
     const n = (v: number): string => v.toLocaleString('ko-KR');
     el.innerHTML =
-      `<span class="site-stat ok">전체 안전운전 성공 : <b>${n(s.success)}</b>회</span>` +
-      `<span class="site-stat bad">전체 안전운전 실패 : <b>${n(s.fail)}</b>회</span>`;
-    el.setAttribute('aria-label', `이 사이트 전체의 안전운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
+      // 짧게 — '전체 운전 성공:164회' (사용자가 정했다: 갤럭시 S21 폭에서 두 알약이 밀렸다, 2026-09-26)
+      `<span class="site-stat ok">전체 운전 성공:<b>${n(s.success)}</b>회</span>` +
+      `<span class="site-stat bad">전체 운전 실패:<b>${n(s.fail)}</b>회</span>`;
+    el.setAttribute('aria-label', `이 사이트 전체의 운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
     el.hidden = false;
   }
 
@@ -918,9 +919,10 @@ export class Screens {
    */
   private resetCourseButton(save: SaveData): string {
     if (!hasProgress(save)) return '';
+    // 손에 든 세로 화면에서는 '처음부터' 만 (index.html 의 .lbl-portrait)
     return `<button class="btn ghost caution" id="btn-reset-course">${icon(
       'retry',
-    )}처음부터 다시 시작</button>`;
+    )}처음부터<span class="lbl-portrait"> 다시 시작</span></button>`;
   }
 
   private aiTrainingSection(ai: AiTrainingState, save: SaveData): string {
@@ -1087,7 +1089,8 @@ export class Screens {
         -->
         <div class="mode-split">
           <div class="mode-group">
-            <p class="mode-label">${icon('monitor')}<b>온라인 연습</b>${resetButton}</p>
+            <!-- 손에 든 세로 화면에서는 '온라인' 만 (index.html 의 .lbl-portrait) — 갤럭시 S21 폭에서 줄이 밀렸다 -->
+            <p class="mode-label">${icon('monitor')}<b>온라인<span class="lbl-portrait"> 연습</span></b>${resetButton}</p>
             <!--
               **여기서 누를 것은 하나뿐이다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
               사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만

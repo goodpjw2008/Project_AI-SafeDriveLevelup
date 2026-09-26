@@ -428,3 +428,24 @@ describe('손에 든 화면의 주행 HUD', () => {
     expect(html).toContain('backdrop-filter: blur(10px)');
   });
 });
+
+/*
+  갤럭시 S21 폭(360px)에서 밀리던 것들 (사용자가 사진으로 짚었다, 2026-09-26) — 세로 덩어리에 그 규칙이 있어야 한다.
+*/
+describe('세로 휴대폰 — 좁은 폭(360px)에서 밀리지 않게', () => {
+  it("레벨 이름은 '안전 L2', 긴 꼬리('연습' · '다시 시작')는 감춘다", () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-menu \.name-word \{\s*display: none;/);
+    expect(block).toMatch(/#screen-menu \.lbl-portrait \{\s*display: none;/);
+    const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
+    expect(screens).toContain('온라인<span class="lbl-portrait"> 연습</span>');
+    expect(screens).toContain('처음부터<span class="lbl-portrait"> 다시 시작</span>');
+    expect(screens).toContain('전체 운전 성공:<b>');
+  });
+  it('레벨 길은 칸을 줄이고, 주행 중 AI 말풍선은 화면 폭 안에서 줄을 바꾼다', () => {
+    const block = rulesOnly();
+    expect(block).toMatch(/#screen-menu \.player-foot \.level-step \{\s*width: 14px;/);
+    expect(block).toMatch(/#hud \.drive-coach \{\s*max-width: calc\(100vw - 12px\);/);
+    expect(block).toMatch(/#hud \.drive-coach \.advice,[^{]*\{[^}]*white-space: normal;/);
+  });
+});

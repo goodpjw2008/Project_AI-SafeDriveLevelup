@@ -544,13 +544,16 @@ function maybeShowGpuNotice(): void {
   if (!el) return;
   gpuNoticeDecided = true;
   const gpu = gpuName(sharedRenderer(canvas));
-  if (!needsChromeUpdateNotice(gpu, navigator.userAgent)) return;
+  // **임시 — 테스트용 강제 표시** (사용자가 "테스트를 위해 무조건 나오게 해줘", 2026-09-26). 확인이 끝나면 false 로 되돌린다.
+  const FORCE_GPU_NOTICE = true;
+  if (!FORCE_GPU_NOTICE && !needsChromeUpdateNotice(gpu, navigator.userAgent)) return;
   const open = document.getElementById('gpu-notice-open') as HTMLAnchorElement | null;
   if (open) open.href = samsungInternetIntent(new URL(window.location.href));
   const update = document.getElementById('gpu-notice-update') as HTMLAnchorElement | null;
   if (update) update.href = CHROME_PLAY_STORE_URL;
   const text = document.getElementById('gpu-notice-text');
-  if (text) {
+  // 강제 표시일 때 문제 버전이 아니면 기본 문구(크롬 151~153)를 그대로 둔다
+  if (text && needsChromeUpdateNotice(gpu, navigator.userAgent)) {
     text.textContent =
       `지금 크롬(${chromeMajor(navigator.userAgent)})의 알려진 문제로, 크롬 ${CHROME_WITH_XCLIPSE_FIX} 부터 고쳐졌습니다. ` +
       '플레이 스토어에서 크롬을 업데이트해 주세요. 당장 어려우면 같은 휴대폰의 삼성 인터넷으로 열어도 정상입니다.';
