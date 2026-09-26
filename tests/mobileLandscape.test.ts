@@ -125,7 +125,8 @@ describe('가로 휴대폰의 첫 화면', () => {
     for (const cls of ['.badge-summary', '.ai-habits']) {
       expect(r).toContain(`#screen-menu ${cls}`);
     }
-    expect(r).toContain('#screen-menu .mode-split > .mode-group:nth-child(2)');
+    // 오프라인 교육 칸은 남긴다 (사용자가 정했다) — 접는 목록에 없어야 한다
+    expect(r).not.toContain('.mode-group:nth-child(2)');
     // 설정 톱니와 규정 안내 둘은 남는다 — 접는 목록에 없어야 한다
     expect(r).not.toContain('#btn-settings');
     expect(r).not.toContain('#btn-help');
@@ -149,10 +150,11 @@ describe('가로 휴대폰의 첫 화면', () => {
     옆으로 옮겼다: 가로 화면에서 아까운 것은 높이이지 폭이 아니다. 셋이 한 줄이므로
     차례(1 · 2 · 3)가 뒤바뀌면 그림과 달라진다 — 그래서 칸 번호까지 못 박는다.
   */
-  it('첫 화면 상자를 레벨 · 자동차 · 연습 세 칸으로 편다', () => {
+  it('첫 화면 상자를 레벨 · 자동차 · 온라인 연습 · 안전운전 교육 네 칸으로 편다', () => {
     const r = rules();
     expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*display:\s*grid/);
-    expect(r).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\) auto minmax\(0, 340px\)/);
+    // 네 칸 — 연습 칸 하나가 쓰던 폭을 온라인 연습 · 안전운전 교육 둘로 나눈다 (사용자가 정했다)
+    expect(r).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\) auto minmax\(0, \d+px\) minmax\(0, \d+px\)/);
     expect(r).toMatch(/#screen-menu \.ai-course > \.player \{[^}]*grid-column:\s*1/);
     expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*2/);
     expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*3/);

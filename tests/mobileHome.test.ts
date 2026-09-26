@@ -60,11 +60,12 @@ describe('세로 휴대폰의 첫 화면', () => {
     }
   });
 
-  it('뱃지 요약 · 나쁜 운전 습관 · 오프라인 교육 활용을 접는다', () => {
+  it('뱃지 요약 · 나쁜 운전 습관은 접고, 오프라인 교육 활용은 남긴다', () => {
     const block = mobileBlock();
     expect(block).toContain('.badge-summary');
     expect(block).toContain('.ai-habits');
-    expect(block).toContain('.mode-split > .mode-group:nth-child(2)');
+    // 오프라인 교육 칸은 남긴다 (사용자가 정했다) — 접는 목록에 없어야 한다
+    expect(block).not.toContain('.mode-group:nth-child(2)');
   });
 
   /*

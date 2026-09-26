@@ -5479,11 +5479,10 @@
           width: 17px;
           height: 17px;
         }
-        /* 읽을거리는 접는다 — 뱃지 요약 · 습관 문단 · 오프라인 교육 (세로 화면과 같다) */
+        /* 읽을거리는 접는다 — 뱃지 요약 · 습관 문단 (세로 화면과 같다). 오프라인 교육 칸은 남긴다 (아래 .mode-split) */
         #screen-menu .badge-summary,
         #screen-menu .ai-habits,
-        #screen-menu .player-foot-text,
-        #screen-menu .mode-split > .mode-group:nth-child(2) {
+        #screen-menu .player-foot-text {
           display: none;
         }
         /*
@@ -5565,9 +5564,14 @@
             모두 가져간다. `min-content` 로 두었더니 길이 열 칸 + 'M' 으로 꺾여 M 하나만
             다음 줄에 남았다. 모자라면 연습 칸이 먼저 줄어든다 (버튼은 글만 들어가면 제 몫을 한다).
           */
-          grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 340px);
+          /*
+            **네 칸 — 레벨 · 차 · 온라인 연습 · 안전운전 교육** (사용자가 정했다: 휴대폰에서도 오프라인 교육을 할 수
+            있게). 연습 칸 하나가 쓰던 340px 을 둘로 나눈다. 그만큼 레벨 칸의 글자 · 뱃지, 차 그림, 버튼을 한 단계씩 줄여
+            720px 폭에도 한 화면에 든다 (아래).
+          */
+          grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 175px) minmax(0, 175px);
           align-items: center;
-          column-gap: 16px;
+          column-gap: 10px;
         }
         #screen-menu .ai-course > .player {
           grid-column: 1;
@@ -5582,10 +5586,12 @@
           border-top: none;
         }
         #screen-menu .mode-split {
-          grid-column: 3;
+          grid-column: 3 / 5;
           grid-row: 1;
           margin-top: 0;
-          grid-template-columns: minmax(0, 1fr);
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 8px;
         }
         /*
           **차는 줄 높이를 꽉 채운다** (사용자가 정했다). 줄 높이는 오른쪽 연습 칸이 정하므로
@@ -5599,16 +5605,20 @@
         #screen-menu .ai-car-photo {
           width: auto;
           max-width: none;
-          height: 156px;
+          height: 118px;
         }
-        /* 연습 버튼이 오른쪽 칸을 끝까지 채운다 — 이 화면에서 누를 것은 이것 하나다 */
+        /* 두 버튼이 저마다 칸을 끝까지 채운다 — 온라인 연습 · 안전운전 자율주행 */
         #screen-menu .mode-split > .mode-group {
           display: flex;
           flex-direction: column;
-          padding: 10px 12px 12px;
+          padding: 8px 8px 10px;
         }
         #screen-menu .mode-split .mode-label {
-          margin-bottom: 8px;
+          margin-bottom: 6px;
+          font-size: 12.5px;
+          gap: 5px;
+          /* 좁은 칸에서 낱말 가운데가 끊기지 않게 — '오프라인 교육 / 활용' 으로 접힌다 */
+          word-break: keep-all;
         }
         #screen-menu .mode-split .ai-course-actions {
           flex: 1;
@@ -5616,7 +5626,37 @@
         }
         #screen-menu .mode-split .ai-course-actions button {
           flex: 1;
-          min-height: 84px;
+          min-height: 64px;
+          font-size: 14px;
+          padding-left: 8px;
+          padding-right: 8px;
+          word-break: keep-all;
+        }
+        /* 레벨 칸은 한 단계 작게 — 네 칸이 되면서 폭을 내주었다 */
+        #screen-menu .player.lg .level-badge-wrap {
+          width: 58px;
+          height: 58px;
+        }
+        #screen-menu .player.lg .player-name {
+          font-size: 16px;
+        }
+        #screen-menu .player.lg .player-xp b {
+          font-size: 16px;
+        }
+        #screen-menu .player-foot .level-step {
+          width: 14px;
+          height: 14px;
+        }
+        #screen-menu .player-foot .level-track {
+          gap: 2px;
+        }
+        #screen-menu .player-foot .level-step + .level-step::before {
+          left: -2px;
+          width: 2px;
+        }
+        #screen-menu .player-foot .level-step.now {
+          width: 20px;
+          height: 20px;
         }
         /* 저작권 줄은 짧은 꼴 한 줄로 — 세로 화면에서 쓰는 것과 같은 글이다 */
         #screen-menu .site-footer {
@@ -6025,10 +6065,11 @@
         .ai-habits {
           display: none;
         }
-        /* 오프라인 교육 활용 — 강의실에서 화면을 띄워 놓고 함께 보는 길이라, 손안 화면에서 누를 일이 없다 */
-        .mode-split > .mode-group:nth-child(2) {
-          display: none;
-        }
+        /*
+          오프라인 교육 활용 칸은 **남긴다** (사용자가 정했다: "모바일에서도 사람들이 안전운전 교육을 할 수 있을 것
+          같다"). 한때 접었었다 — 강의실에서 큰 화면으로 함께 보는 길이라 손안 화면에서는 누를 일이 없다고 봤다.
+          온라인 연습 아래에 같은 모양으로 선다 (아래 .mode-split). 그만큼 레벨 · 차 그림 · 버튼을 한 단계 줄인다.
+        */
 
         /*
           부제의 '연습편' — 무엇을 연습하는지는 앞의 세 낱말이 이미 말한다.
@@ -6054,9 +6095,9 @@
         }
         /* 그 자리만큼 연습 버튼을 키운다 — 손가락으로 누르는 화면에서 가장 큰 과녁이어야 한다 */
         #screen-menu .mode-split .ai-course-actions button {
-          /* 전체 화면에서는 높이와 글자가 같이 자란다 (아래 .ai-course 주석) */
-          min-height: max(76px, 10.9dvh);
-          font-size: max(20px, 2.85dvh);
+          /* 전체 화면에서는 높이와 글자가 같이 자란다 (아래 .ai-course 주석). 두 칸이 되며 한 단계 낮췄다 */
+          min-height: max(56px, 8dvh);
+          font-size: max(18px, 2.6dvh);
         }
 
         /* AI 가 맵을 고르는 창의 '추천 사유' — 좁은 화면에서 카드가 두 배로 길어지던 줄이다 */
@@ -6139,8 +6180,9 @@
           자동차 · 연습 버튼이 고르게 벌어진다(space-evenly). 주소창이 있을 때는 남는 높이가 없어 지금과 같다.
         */
         #screen-menu .screen-inner {
-          padding-top: 16px;
-          padding-bottom: 14px;
+          /* 오프라인 교육 칸이 들어오며 위아래 여백을 한 단계 더 조였다 (16/14 → 10/8) — 700px 높이에도 든다 */
+          padding-top: 10px;
+          padding-bottom: 8px;
           min-height: 100%;
           display: flex;
           flex-direction: column;
@@ -6158,17 +6200,25 @@
           화면(780~915px)에서 11~30% 자란다. 남는 높이는 위의 space-evenly 가 고르게 나눈다.
         */
         #screen-menu .player.lg .level-badge-wrap {
-          width: max(76px, 10.9dvh);
-          height: max(76px, 10.9dvh);
+          width: max(56px, 8dvh);
+          height: max(56px, 8dvh);
         }
         #screen-menu .player.lg .player-name {
-          font-size: max(21px, 3dvh);
+          font-size: max(19px, 2.7dvh);
         }
         #screen-menu .player.lg .player-xp b {
-          font-size: max(20px, 2.85dvh);
+          font-size: max(18px, 2.6dvh);
         }
         #screen-menu .ai-car-photo {
-          max-width: max(200px, 28.5dvh);
+          max-width: max(140px, 20dvh);
+        }
+        /* 온라인 연습 · 안전운전 교육 두 칸이 위아래로 선다 — 칸 안쪽 여백도 한 단계 줄인다 */
+        #screen-menu .mode-split {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 8px;
+        }
+        #screen-menu .mode-split > .mode-group {
+          padding: 6px 12px 8px;
         }
         #screen-menu .site-stats {
           margin-bottom: 6px;
@@ -6176,24 +6226,25 @@
         #screen-menu .hero {
           padding-top: 10px;
           padding-bottom: 10px;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
         #screen-menu .menu-links {
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
+        /* 오프라인 교육 칸이 들어오며 위아래를 한 단계 더 조인다 — 700px 높이에서 9px 넘치던 것을 없앤다 */
         #screen-menu .ai-split {
-          margin-top: 8px;
-          padding-top: 8px;
+          margin-top: 4px;
+          padding-top: 4px;
         }
         #screen-menu .mode-split {
-          margin-top: 12px;
+          margin-top: 6px;
         }
         #screen-menu .mode-label {
           min-height: 0;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
         #screen-menu .site-footer {
-          margin: 10px 0 0;
+          margin: 6px 0 0;
           /* 좁은 화면 규칙이 세로로 세워 셋으로 갈라 놓았다 — 다시 눕혀 두 줄로 접는다 */
           flex-direction: row;
           flex-wrap: wrap;
