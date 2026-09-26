@@ -4116,7 +4116,12 @@
       body.no-fullscreen-api .fs-toggle {
         display: none !important;
       }
-      body.touch .hud-fullscreen {
+      /*
+        선택자를 하나 더 붙여 세로 블록의 `body.touch .hud-home { bottom: … }` 보다 구체적으로 만든다 — 같은 무게로
+        두었더니 뒤에 오는 그 규칙이 bottom 을 다시 채워, 위아래가 다 잡힌 알약이 세로 화면을 통째로 채웠다
+        (사용자가 사진으로 짚었다).
+      */
+      body.touch .hud-home.hud-fullscreen {
         left: max(12px, env(safe-area-inset-left));
         top: max(12px, env(safe-area-inset-top));
         bottom: auto;
