@@ -17,7 +17,7 @@ import { loadCarModel, trimCarModelCache, playerLod } from './game/carModel';
 import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
-import { setMsaaPreference, setPreserveDrawingBuffer, sharedRenderer } from './game/renderer';
+import { setMsaaPreference, sharedRenderer } from './game/renderer';
 import { presetGraphics, usesLampLights } from './game/quality';
 import { setLampLights } from './game/TrafficLight';
 import { bakeEnvironment } from './game/environment';
@@ -1829,7 +1829,6 @@ function boot(): void {
     적는다. 여기가 그 '다시 시작' 이다.
   */
   setMsaaPreference(saveData.settings.graphics.msaa);
-  setPreserveDrawingBuffer(saveData.settings.graphics.glitchGuard === 'preserve');
   hud.setShowFps(saveData.settings.graphics.showFps);
 
   /*

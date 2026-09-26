@@ -49,19 +49,6 @@ export type PeripheralMode = 'always' | 'driverOnly' | 'off';
 /** 프레임 상한 (0 = 제한 없음) */
 export type FrameCap = 0 | 60 | 30;
 
-/**
- * 화면 깨짐 대응 — 휴대폰 GPU 드라이버가 프레임의 한 구역을 통째로 빠뜨리는 문제(삼성 Xclipse · ANGLE-Vulkan,
- * CHANGELOG)에 **그리는 길을 바꿔 보는 손잡이.** 사용자 휴대폰에서 진단 줄이 그림 버퍼 안의 순검정 띠를 잡았다 —
- * 우리 그리기 논리가 아니라 드라이버가 구역을 빠뜨리는 것이라, 드라이버가 다르게 움직이는 길을 골라 본다.
- *
- * · `copy` — 장면을 렌더 타깃에 그린 뒤 캔버스에는 한 장으로 옮긴다(CopyPass). 캔버스에 닿는 그리기가 백여 번에서
- *   한 번이 된다.
- * · `preserve` — 캔버스의 그림 버퍼를 프레임 사이에 버리지 않게 한다(preserveDrawingBuffer). 브라우저가 프레임마다
- *   버퍼를 '버려도 된다' 고 표시하는 길이 사라진다. 컨텍스트 속성이라 **다시 시작해야 적용**된다 (MSAA 와 같다).
- */
-export type GlitchGuard = 'off' | 'copy' | 'preserve';
-export const GLITCH_GUARD_LABEL: Record<GlitchGuard, string> = { off: '없음', copy: '복사', preserve: '버퍼 유지' };
-
 export interface GraphicsSettings {
   /** 그림자 — 맵 크기와 필터가 함께 내려간다 */
   shadow: QualityTier;
@@ -82,11 +69,11 @@ export interface GraphicsSettings {
   msaa: boolean;
   /** 화면 구석에 fps 를 띄운다 — 설정을 바꾼 효과를 직접 보게 하는 장치. 켜면 진단 줄이 된다 (Game 의 diagText) */
   showFps: boolean;
-  /** 화면 깨짐 대응 (위 GlitchGuard) */
-  glitchGuard: GlitchGuard;
   /**
    * 렌더 해상도 — 화면 배율(최대 2) 에 곱하는 비율. `auto` 는 느릴 때만 스스로 낮춘다 (AutoResolution).
    * 약한 GPU(노트북 내장 그래픽)에서 가장 잘 듣는 손잡이다 — 픽셀을 반으로 줄이면 픽셀 처리가 반이 된다.
+   * 1 이 아니면 캔버스 크기를 바꾸는 것이 아니라 **작은 렌더 타깃에 그려 캔버스로 올린다** (CopyPass — 캔버스 크기를
+   * 바꾸면 삼성 Xclipse 드라이버가 구역을 빠뜨린다, CHANGELOG).
    */
   resolution: RenderResolution;
 }
@@ -164,7 +151,6 @@ export function defaultGraphics(): GraphicsSettings {
     frameCap: 60,
     msaa: true,
     showFps: false,
-    glitchGuard: 'off',
     resolution: 'auto',
   };
 }
@@ -177,14 +163,14 @@ export function defaultGraphics(): GraphicsSettings {
  * 보기 설정이다.
  */
 export function presetGraphics(tier: QualityTier, current: GraphicsSettings): GraphicsSettings {
-  const byTier: Record<QualityTier, Omit<GraphicsSettings, 'msaa' | 'showFps' | 'glitchGuard'>> = {
+  const byTier: Record<QualityTier, Omit<GraphicsSettings, 'msaa' | 'showFps'>> = {
     ultra: { shadow: 'ultra', reflection: 'ultra', peripheral: 'always', frameCap: 0, resolution: 100 },
     high: { shadow: 'high', reflection: 'high', peripheral: 'driverOnly', frameCap: 0, resolution: 'auto' },
     medium: { shadow: 'medium', reflection: 'medium', peripheral: 'driverOnly', frameCap: 60, resolution: 'auto' },
     // 낮음은 처음부터 75% — 느린 기기에서 '자동' 이 낮출 때까지 기다리는 몇 초도 아깝다
     low: { shadow: 'low', reflection: 'low', peripheral: 'off', frameCap: 30, resolution: 75 },
   };
-  return { ...byTier[tier], msaa: current.msaa, showFps: current.showFps, glitchGuard: current.glitchGuard };
+  return { ...byTier[tier], msaa: current.msaa, showFps: current.showFps };
 }
 
 /** 지금 설정이 어느 프리셋과 같은가 — 같은 것이 없으면 null (= 사용자 지정) */
@@ -226,6 +212,8 @@ export function graphicsFromSaved(
   autoIsUnset = false,
 ): GraphicsSettings {
   const g = { ...defaultGraphics(), ...(saved ?? {}) };
+  // 하루 있다 사라진 '화면 깨짐 대응' 항목(2026-09-26) — 저장본에 남아 있으면 버린다
+  delete (g as Record<string, unknown>).glitchGuard;
   if (saved && (saved.resolution === undefined || (autoIsUnset && saved.resolution === 'auto'))) {
     const tier = (['ultra', 'high', 'medium', 'low'] as const).find((t) => {
       const p = presetGraphics(t, g);

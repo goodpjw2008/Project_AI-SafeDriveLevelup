@@ -51,7 +51,7 @@ import { GameAudio } from './Audio';
 import { buildCar, type CarModel } from './CarMesh';
 import { AutoDriver, type AutoDriveState } from './AutoDriver';
 import { FpsMeter } from './FpsMeter';
-import { AutoResolution, defaultGraphics, startScale, type GraphicsSettings, GLITCH_GUARD_LABEL } from './quality';
+import { AutoResolution, defaultGraphics, startScale, type GraphicsSettings } from './quality';
 import { CameraRig, type ViewMode } from './CameraRig';
 import { Controls } from './Controls';
 import { Intersection } from './Intersection';
@@ -326,7 +326,8 @@ export class Game {
   private diagBlackFrames = 0;
   private diagLast = '';
   private diagBuf: Uint8Array | null = null;
-  /** 설정 '화면 깨짐 대응 · 복사' 의 그리기 길 — 처음 그릴 때 만든다 (loop) */
+  private diagFrame = 0;
+  /** 배율을 낮췄을 때의 그리기 길 — 처음 필요할 때 만든다 (loop) */
   private copyPass: CopyPass | null = null;
   private diagGpu = '';
   private diagTris = 0;
@@ -1487,35 +1488,37 @@ export class Game {
     }
     this.renderer.shadowMap.needsUpdate = true;
     this.periph.renderTargets(this.renderer);
-    if (this.graphics.glitchGuard === 'copy') {
-      // 설정 '화면 깨짐 대응 · 복사' — 렌더 타깃에 그린 뒤 캔버스에 한 장으로 옮긴다 (CopyPass)
+    const scaled = this.renderScale < 1;
+    if (scaled) {
+      // 배율을 낮췄으면 캔버스가 아니라 작은 렌더 타깃에 그린다 — 캔버스 크기는 바꾸지 않는다 (CopyPass 의 주석)
       this.copyPass ??= new CopyPass();
-      this.copyPass.render(this.renderer, this.world.scene, this.rig.camera);
+      this.copyPass.renderScene(this.renderer, this.world.scene, this.rig.camera, this.renderScale);
     } else {
       this.renderer.render(this.world.scene, this.rig.camera);
     }
-    // 삼각형 · 호출 수는 **메인 화면을 그린 직후**에 적는다 — 뒤의 오버레이 렌더가 three 의 계수기를 0 으로 되돌린다
+    // 삼각형 · 호출 수는 **장면을 그린 직후**에 적는다 — 뒤의 올리기 · 오버레이 렌더가 three 의 계수기를 0 으로 되돌린다
     if (this.graphics.showFps) {
       this.diagTris = this.renderer.info.render.triangles;
       this.diagCalls = this.renderer.info.render.calls;
     }
+    if (scaled) this.copyPass!.present(this.renderer);
     this.periph.renderOverlay(this.renderer);
-    if (this.graphics.showFps) this.sampleDiag(now);
+    // 진단 읽기는 GPU 를 기다리게 하므로 두 프레임에 한 번만 — 자동 해상도 조절이 진단 때문에 움직이는 것을 줄인다
+    if (this.graphics.showFps && (this.diagFrame++ & 1) === 0) this.sampleDiag(now);
 
     // 해상도 '자동' — 느린 것이 이어지면 한 단계 낮춘다 (그린 프레임으로 잰다)
     const next = this.autoRes?.frame(now);
     if (next != null && next !== this.renderScale) {
-      this.renderScale = next;
       /*
-        **여기서 바로 캔버스를 바꾸지 않는다** — 다음 프레임의 그리기 **직전**에 바꾼다 (아래 pendingResize).
+        **배율이 바뀌어도 캔버스는 건드리지 않는다** — 다음 프레임부터 렌더 타깃의 크기만 달라진다 (위 CopyPass).
 
-        예전에는 방금 그린 프레임 뒤에서 곧바로 `resize()` 를 불렀다. 캔버스의 크기를 바꾸면 브라우저는 그림 버퍼를
-        새로 만들고 **방금 그린 그림을 버린다** — 이 프레임 콜백이 끝나면 합성기는 빈(또는 절반만 그려진) 버퍼를 화면에
-        올린다. 휴대폰의 타일 GPU 에서는 그것이 **가로로 곧게 잘린 검은 띠**로 보였다 (사용자가 사진으로 짚었다: 낮은
-        레벨에서는 안 나다가 판이 무거워질수록 난다 — 프레임이 떨어져야 자동 조절이 움직이기 때문이다. PC 는 프레임이
-        넉넉해 조절 자체가 일어나지 않는다).
+        예전에는 배율을 캔버스의 픽셀 배율에 곱해 그림 버퍼 자체를 줄였다. 그러면 버퍼가 915×422 같은 어중간한 크기가
+        되는데, 사용자 휴대폰(삼성 Xclipse 940)의 드라이버는 그런 크기에서 프레임의 가로 띠를 통째로 빠뜨렸다 —
+        **낮은 레벨에서는 안 나다가 판이 무거워질수록 나고, 새로고침하면 한동안 괜찮던** 것이 바로 이 자동 조절이
+        움직이는 시점과 같았다 (배율은 새로고침해야 1 로 돌아간다, quality.ts 의 learnedScale). 캔버스를 바꾸는 시점을
+        다음 그리기 직전으로 미뤄 봤지만(pendingResize) 크기 자체가 문제라 소용없었다. 진단 줄이 확정했다 (CHANGELOG).
       */
-      this.pendingResize = true;
+      this.renderScale = next;
     }
   };
 
@@ -2361,7 +2364,8 @@ export class Game {
    * 비율과 그 순간의 정황(몇 초 · 크기 바꾼 지 얼마나 됐는지 · fps · 삼각형 수)을 남긴다. 그린 픽셀은 조명 · 안개 ·
    * 톤매핑을 거쳐 완전한 0 이 거의 없고, 밤 장면의 어두운 픽셀이 있어도 흩어져 있어 이어진 구간은 짧다.
    * 바탕색이 하늘빛이 된 뒤(World)에는 '지우기는 됐는데 그리기가 빠진' 구역은 하늘색이라 여기 잡히지 않는다 —
-   * 그래도 잡히는 검정은 **지우기까지 빠진** 구역이다. 그래서 이 수는 대응 설정(quality.ts 의 GlitchGuard)이 듣는지 가른다.
+   * 그래도 잡히는 검정은 **지우기까지 빠진** 구역이다. 사용자 휴대폰에서 잡힌 것이 그것이었고(화면 전체 폭의 가로 띠),
+   * 모두 배율을 낮춰 캔버스가 어중간한 크기였을 때였다 (CopyPass 의 주석).
    */
   private sampleDiag(now: number): void {
     const gl = this.renderer.getContext();
@@ -2425,7 +2429,9 @@ export class Game {
     return [
       `${this.fps.fps} fps · 해상도 ${Math.round(this.renderScale * 100)}% · ${gl.drawingBufferWidth}×${gl.drawingBufferHeight} · ` +
         `tri ${Math.round(this.diagTris / 1000)}k · call ${this.diagCalls} · ${document.fullscreenElement ? '전체화면' : '주소창'} · ` +
-        `대응 ${GLITCH_GUARD_LABEL[this.graphics.glitchGuard]}`,
+        (this.renderScale < 1 && this.copyPass
+          ? `타깃 ${this.copyPass.size.width}×${this.copyPass.size.height} → 캔버스`
+          : '캔버스 직접'),
       `GPU ${this.diagGpu || '?'}`,
       `검은 프레임 ${this.diagBlackFrames}${this.diagLast ? ` (${this.diagLast})` : ''} · 컨텍스트 잃음 ${loss.lost}/복구 ${loss.restored}`,
     ].join('\n');
@@ -2435,8 +2441,9 @@ export class Game {
     this.lastResizeAt = performance.now();
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
-    // 화면 배율(최대 2) × 렌더 해상도 — 창을 옮기면(외장 모니터 ↔ 노트북) 화면 배율이 달라지므로 매번 다시 잰다
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * this.renderScale);
+    // 화면 배율(최대 2) — 창을 옮기면(외장 모니터 ↔ 노트북) 화면 배율이 달라지므로 매번 다시 잰다.
+    // 렌더 해상도 배율은 여기 곱하지 않는다 — 캔버스는 늘 화면 크기이고, 배율은 렌더 타깃이 낸다 (CopyPass)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(w, h, false);
     this.rig.resize(w / h);
     this.periph.resize(w, h);

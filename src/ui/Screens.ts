@@ -37,7 +37,7 @@ import {
 } from '../game/soundAssets';
 import { carThumbnail, releaseCarThumbRenderer } from '../game/carThumb';
 import { carPhotoUrl } from '../economy/carPhotos';
-import { FRAME_CAP_CHOICES, PERIPHERAL_LABEL, RESOLUTION_CHOICES, TIER_LABEL, matchedPreset, presetDiff, type GraphicsSettings, type QualityTier, GLITCH_GUARD_LABEL, type GlitchGuard } from '../game/quality';
+import { FRAME_CAP_CHOICES, PERIPHERAL_LABEL, RESOLUTION_CHOICES, TIER_LABEL, matchedPreset, presetDiff, type GraphicsSettings, type QualityTier } from '../game/quality';
 import { SCENARIOS, stageLabel, type ScenarioSpec } from '../scenarios/scenarios';
 import { libraryEntry } from '../scenarios/library';
 import {
@@ -1489,10 +1489,6 @@ export class Screens {
             </div>
           </div>
 
-          ${this.optionRow('gq-glitch', '화면 깨짐 대응', Object.entries(GLITCH_GUARD_LABEL), g.glitchGuard, {
-            note: '휴대폰에서 검은 띠가 번쩍이면 하나씩 바꿔 보세요 · 버퍼 유지는 다시 시작해야 적용',
-          })}
-
           <div class="opt-row">
             <div class="opt-label">fps 표시</div>
             <div class="opt-choices">
@@ -1541,9 +1537,6 @@ export class Screens {
     );
     this.bindOptions('gq-reflection', Object.keys(TIER_LABEL), (v) =>
       handlers.onGraphics({ reflection: v as QualityTier }),
-    );
-    this.bindOptions('gq-glitch', Object.keys(GLITCH_GUARD_LABEL), (v) =>
-      handlers.onGraphics({ glitchGuard: v as GlitchGuard }),
     );
     this.bindOptions('gq-frameCap', FRAME_CAP_CHOICES.map(([k]) => k), (v) =>
       handlers.onGraphics({ frameCap: Number(v) as GraphicsSettings['frameCap'] }),
