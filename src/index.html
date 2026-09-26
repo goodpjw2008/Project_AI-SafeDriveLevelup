@@ -6141,9 +6141,13 @@
         }
         /* 그 자리만큼 연습 버튼을 키운다 — 손가락으로 누르는 화면에서 가장 큰 과녁이어야 한다 */
         #screen-menu .mode-split .ai-course-actions button {
-          /* 전체 화면에서는 높이와 글자가 같이 자란다 (아래 .ai-course 주석). 온라인 연습은 크게 — 이 화면에서 누를 것이다 */
-          min-height: max(66px, 9.4dvh);
-          font-size: max(20px, 2.85dvh);
+          /*
+            전체 화면에서는 높이와 글자가 같이 자란다 (아래 .ai-course 주석). 온라인 연습은 크게 — 이 화면에서 누를 것이다.
+            주소창이 있는 높이(700px 남짓)에서는 66px 그대로이고, 전체 화면(780~915px)에서 75~96px 로 자란다 (사용자가
+            "전체 화면일 때 더 늘려" 라고 했다) — 기울기를 세워(16dvh − 50px) 주소창 높이에서는 아직 66px 아래에 있게 한다.
+          */
+          min-height: max(66px, calc(16dvh - 50px));
+          font-size: max(20px, calc(3.6dvh - 8px));
         }
         /* 오프라인 교육 칸은 작게 — 글자 · 높이 · 여백을 줄여 그 몫을 온라인 연습에 준다 (사용자가 정했다) */
         #screen-menu .mode-split > .mode-group + .mode-group {
@@ -6240,8 +6244,11 @@
           자동차 · 연습 버튼이 고르게 벌어진다(space-evenly). 주소창이 있을 때는 남는 높이가 없어 지금과 같다.
         */
         #screen-menu .screen-inner {
-          /* 오프라인 교육 칸이 들어오며 위아래 여백을 한 단계 더 조였다 (16/14 → 10/8) — 700px 높이에도 든다 */
-          padding-top: 10px;
+          /*
+            위는 조금 띄운다 — 성공 · 실패 알약이 화면 위 테두리에 붙어 답답해 보였다 (사용자가 짚었다).
+            아래는 오프라인 교육 칸이 들어오며 조인 8px 그대로다.
+          */
+          padding-top: max(18px, env(safe-area-inset-top));
           padding-bottom: 8px;
           min-height: 100%;
           display: flex;
@@ -6280,8 +6287,9 @@
         #screen-menu .mode-split > .mode-group {
           padding: 6px 12px 8px;
         }
+        /* 위 여백을 당겨 쓰던 -6px 을 푼다 — 성공 · 실패 알약이 화면 위 테두리에서 18px 떨어진다 (사용자가 짚었다) */
         #screen-menu .site-stats {
-          margin-bottom: 6px;
+          margin: 0 0 6px;
         }
         #screen-menu .hero {
           padding-top: 10px;
