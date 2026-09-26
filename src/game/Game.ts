@@ -429,7 +429,16 @@ export class Game {
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
     // 자율 주행도 코스에 맞는 길을 따라간다 — 직진 코스면 돌지 않고 곧장 통과한다 (game/AutoDriver.ts)
-    if (opts.autoDrive) this.auto = new AutoDriver(carSpec.dims.length * 0.58, undefined, scenario.drive ?? 'rightTurn');
+    /*
+      **브레이크는 차와 같은 값을 준다** (opts.pace.brakeDecel). 운전자가 서는 거리를 계산하는 감속도와 차가 실제로 서는 감속도가
+      다르면 서는 자리가 어긋난다 — 기본값 4.8 을 둔 채 난이도 5 의 차(3.4)를 몰면 정지선 앞 1.8m 에 서야 할 차가 0.97m 에 선다
+      (시뮬레이션). 지금 자율 주행은 AUTO_DRIVE_RULE(4.8)로만 달려 값이 같지만, 시뮬레이터(playSim.ts)처럼 늘 차의 값을 넘겨
+      둔다. 사용자가 "후방에서 볼 때 정지선을 조금 넘는 느낌" 이라 짚어 확인한 자리다 — 실제 정지 자리는 정지선 앞 1.8m 이고,
+      느낌은 높고 뒤에 있는 후방 카메라의 시차(범퍼가 노면 2m 쯤 앞을 덮어 보인다)에서 온다 (CameraRig.ts).
+    */
+    if (opts.autoDrive) {
+      this.auto = new AutoDriver(carSpec.dims.length * 0.58, opts.pace?.brakeDecel, scenario.drive ?? 'rightTurn');
+    }
     // 판마다 새로 만들지 않는다 — 모델의 텍스처·셰이더가 그대로 남는다 (renderer.ts)
     this.renderer = sharedRenderer(canvas);
     this.renderScale = startScale(this.graphics.resolution);
