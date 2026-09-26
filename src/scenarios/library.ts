@@ -1548,50 +1548,49 @@ export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
 // ── AI 자율 주행 시범 ──────────────────────────────────────────────────────
 
 /**
- * **AI 자율 주행 시범(오프라인 교육)**에서 돌 대표 코스 — 교차로 판 **아홉**. 보호구역 전용 도로 한 판
- * (scenarios/zoneCourse.ts 의 zoneDemoCourses)과 합쳐 **열 판**이 한 차례다 (main.ts 의 demoQueue).
+ * **AI 자율 주행 시범(오프라인 교육)**에서 돌 교차로 판 **여덟** — 보호구역 전용 도로 두 판(scenarios/zoneCourse.ts 의
+ * zoneDemoCourses)과 사용자가 정한 차례로 엮어 **열 판**이 한 차례다 (scenarios/offlineCourse.ts).
  *
- * 사용자가 정했다 — "10판 정도로 구성해서 … 난이도가 낮은 것부터 높은 것으로. 우회전 시 발생할 수 있는 경우의 수 중
- * 대표적인 것, 어린이보호구역에서 신호 없는 횡단보도 상황." 그 뒤 보호구역이 강화되며(학교 · 아이들 · 자전거횡단도 ·
- * 단속 카메라 · 전용 도로) 다시 정했다 — "우회전 + 어린이보호구역을 10개 시나리오 안에서 교육할 수 있게."
+ * 사용자가 열 판을 하나하나 정했다 (2026-09-26): ① 우회전 적색 · 사람 없음 ② 우회전 녹색 · 사람 없음 ③ 보호구역 기본
+ * ④ 우회전 + 사람 둘(양쪽에서) ⑤ 보호구역 + 사람 둘(양쪽에서) ⑥ 우회전+보호구역 중급(사람 둘) ⑦ 상급(사람 둘 + 자전거)
+ * ⑧ 최상급(사람 셋 + 자전거 둘) ⑨ 최상급2(보호구역 진입로 뒤 교차로 · 사람 넷 + 자전거 둘) ⑩ 최상급3(같은 길 · 사람 다섯 + 자전거 둘).
  *
- *  - **우회전의 기본 넷** — 녹색 서행 · 적색 일시정지 · 우회전 후 횡단보도 보행자(녹색이어도 선다) ·
- *    우회전 신호등 적색(녹색 화살표까지 기다린다)
- *  - **어린이보호구역 교차로 넷** — 첫 횡단보도 무신호(사람이 없어도 선다) · 자전거횡단도를 타고 건너는 어린이(제15조의2) ·
- *    우회전 후 무신호 횡단보도(아이가 나올 수도) · 녹색 화살표인데 무단횡단하는 어린이(화살표여도 사람이 있으면 선다)
- *  - **앞차 하나** — 일시정지를 무시하고 도는 앞차(따라가지 않는다)
- *  - 여기에 전용 도로 한 판 — 30km/h · 신호 둘을 지키고 마지막 무신호 횡단보도에서 양쪽의 아이들에게 양보
+ * **라이브러리에 있는 것으로 가장 가깝게 맞췄다.** 없는 것은 셋이다 — 자전거와 다른 사람이 한 판에 서는 판(자전거 판은 첫
+ * 횡단보도 하나로 끝낸다, combinationAllowed), 타는 자전거와 끄는 자전거가 함께 있는 판(A 축은 값 하나다), 다섯 사람(가장
+ * 많은 판이 넷 — 첫 횡단보도 둘(mixed) + 우회전 후 둘(group)). 그래서 ⑦은 자전거 한 대(사람 없음), ⑧은 사람 셋(자전거 없음),
+ * ⑨ · ⑩은 사람 넷이다. 사용자에게 그렇게 알렸다 (CHANGELOG).
  *
- * 뺀 것: 적색에 무단횡단하는 노인(무단횡단은 보호구역 어린이 판이 맡는다) · 진입로 보호구역(전용 도로 판이 같은 장면을
- * 더 길게 보여 준다) · 꼬리물기(앞이 막혔는지가 애매하다고 사용자가 뱃지에서 뺀 장면). 밤 · 비 · 재촉은 시범에 넣지
- * 않는다 — 보여 줄 것은 판단이지 시야가 아니다.
- *
- * **차례는 여기 적힌 순서가 아니다** — demoCourses 가 판의 레벨 · 난이도 점수로 쉬운 것부터 줄 세운다.
+ * 밤 · 비 · 재촉 · 앞차는 넣지 않는다 — 보여 줄 것은 판단이지 시야가 아니다. **차례는 여기 적힌 순서다** (사용자가 정한 차례).
  */
 const DEMO: readonly Partial<LibraryTags>[] = [
-  { signal: 'green' },
+  // ① 우회전 차량신호 적색 · 보행자 없음 (L00271)
   { signal: 'red' },
-  { signal: 'green', c: 'crossing' },
-  { signal: 'arrowRed', c: 'crossing' },
-  { signal: 'green', zone: 'yes', sigA: 'no' },
+  // ② 우회전 차량신호 녹색 · 보행자 없음 (L00001)
+  { signal: 'green' },
+  // ④ 우회전 + 보행자 둘 — 우회전 후 횡단보도 양쪽에서 한 사람씩 (L00091)
+  { signal: 'green', c: 'group' },
+  // ⑥ 중급 — 어린이보호구역 교차로 · 우회전 후 양방향 어린이 둘 (M00625)
+  { signal: 'green', zone: 'yes', c: 'group', kind: 'child' },
+  // ⑦ 상급 — 보호구역 첫 횡단보도 무신호 · 자전거횡단도를 타고 건너는 어린이 (M08413). 사람은 함께 둘 수 없다
   { signal: 'green', zone: 'yes', sigA: 'no', a: 'bikeRide', kind: 'child' },
-  { signal: 'green', zone: 'yes', sigC: 'no', c: 'maybe', kind: 'child' },
-  { signal: 'arrowGreen', zone: 'yes', c: 'jaywalk', kind: 'child' },
-  { signal: 'red', lead: 'rolling' },
+  // ⑧ 최상급 — 첫 횡단보도에 신호 지키는 사람 + 무단횡단 어린이, 우회전 후 건너는 사람: 셋이 저마다 다른 쪽에서 (M05401)
+  { signal: 'green', zone: 'yes', a: 'mixed', c: 'crossing', kind: 'child' },
+  // ⑨ 최상급2 — 진입로 보호구역 무신호 횡단보도를 지나 교차로 · 사람 넷(첫 횡단보도 둘 + 우회전 후 양방향 둘) (M05179)
+  { signal: 'green', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child' },
+  // ⑩ 최상급3 — 같은 길에 우회전 신호등 적색까지 · 사람 넷 (M06763, 가장 어려운 판)
+  { signal: 'arrowRed', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child' },
 ];
 
-/** 시범 코스 — 맑은 낮 · 재촉 없음 · 나머지는 가장 단순한 값으로 채운 판 */
+/** 시범 코스 — 맑은 낮 · 재촉 없음 · 나머지는 가장 단순한 값으로 채운 판. **DEMO 에 적힌 차례 그대로** */
 export function demoCourses(): LibraryEntry[] {
   const plain: Partial<LibraryTags> = {
     zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
     approach: 'none', lead: 'none', pressure: 'calm', env: 'day', jam: 'none',
   };
-  const found = DEMO.map((want) => {
+  return DEMO.map((want) => {
     const t = { ...plain, ...want };
     const hit = scenarioLibrary().find((e) => AXIS_KEYS.every((k) => t[k] === undefined || e.tags[k] === t[k]));
     if (!hit) throw new Error(`시범 코스가 라이브러리에 없습니다: ${JSON.stringify(want)}`);
     return hit;
   });
-  // **쉬운 것부터** — 판의 레벨, 같으면 난이도 점수(costOf). 같은 값이면 위에 적힌 차례를 지킨다 (sort 는 안정적이다)
-  return found.sort((p, q) => p.level - q.level || p.cost - q.cost);
 }

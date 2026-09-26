@@ -28,6 +28,7 @@ import {
   zoneKindOf,
 } from '../src/scenarios/library';
 import { GENERATED_ID_BASE, SCENARIOS } from '../src/scenarios/scenarios';
+import { scenarioCode } from '../src/scenarios/scenarioCode';
 import { challengeRule } from '../src/scenarios/challenge';
 import { XP_PER_CLEAN_RUN, xpToNext, type Difficulty } from '../src/scenarios/curriculum';
 
@@ -171,41 +172,45 @@ describe('이 판이 무엇을 시험했는가 — habitsTestedBy', () => {
 });
 
 /*
-  **자율 주행 시범은 열 판** — 교차로 아홉 + 보호구역 전용 도로 하나 (zoneCourse.ts 의 zoneDemoCourses).
-  사용자가 정했다: "10판 정도로 … 난이도가 낮은 것부터 높은 것으로", 보호구역이 강화된 뒤에는
-  "우회전 + 어린이보호구역을 10개 시나리오 안에서 교육할 수 있게."
+  **자율 주행 시범은 열 판 — 사용자가 하나하나 정한 차례** (2026-09-26): 교차로 여덟(library.ts 의 DEMO) + 보호구역 전용 도로
+  둘(zoneCourse.ts 의 zoneDemoCourses), 엮는 차례는 scenarios/offlineCourse.ts. 판 번호는 밀리지 않으므로 번호로 못 박는다.
 */
 describe('AI 자율 주행 시범 코스', () => {
-  it('교차로 아홉 판이 모두 라이브러리에 있고, 우회전 · 보호구역의 대표 판단을 두루 담는다', () => {
+  it('교차로 여덟 판이 라이브러리에 있고, 적힌 차례 그대로다', () => {
     const demo = demoCourses();
-    expect(demo).toHaveLength(9);
-    expect(new Set(demo.map((e) => e.spec.id)).size).toBe(demo.length);
+    expect(demo.map((e) => scenarioCode(e.spec.id))).toEqual([
+      'L00271', // ① 우회전 적색 · 사람 없음
+      'L00001', // ② 우회전 녹색 · 사람 없음
+      'L00091', // ④ 우회전 + 사람 둘(양쪽에서)
+      'M00625', // ⑥ 중급 — 보호구역 교차로 · 우회전 후 양방향 어린이 둘
+      'M08413', // ⑦ 상급 — 보호구역 첫 횡단보도 무신호 · 타고 건너는 어린이 자전거
+      'M05401', // ⑧ 최상급 — 첫 횡단보도 둘(지키는 사람 · 무단횡단 어린이) + 우회전 후 하나
+      'M05179', // ⑨ 최상급2 — 진입로 보호구역 무신호 뒤 교차로 · 사람 넷
+      'M06763', // ⑩ 최상급3 — 같은 길 + 우회전 신호등 적색 · 사람 넷
+    ]);
     const all = new Set(demo.flatMap((e) => e.targets));
     for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP', 'BIKE_BLOCKED'] as const) {
       expect(all.has(code), code).toBe(true);
     }
-    expect(demo.some((e) => e.tags.lead === 'rolling'), '일시정지를 무시하는 앞차').toBe(true);
-    // 녹색 화살표여도 사람이 있으면 선다 — 보호구역의 무단횡단 어린이로 보여 준다
-    expect(demo.some((e) => e.tags.signal === 'arrowGreen' && e.tags.zone === 'yes' && e.tags.c === 'jaywalk')).toBe(true);
-    // 꼬리물기는 앞이 막혔는지가 애매하다고 사용자가 뺀 장면이다
-    expect(demo.some((e) => e.tags.jam === 'jam')).toBe(false);
-    expect(demo.every((e) => e.tags.env === 'day' && e.tags.pressure === 'calm')).toBe(true);
+    expect(demo.every((e) => e.tags.env === 'day' && e.tags.pressure === 'calm' && e.tags.jam === 'none' && e.tags.lead === 'none')).toBe(true);
   });
 
-  it('신호 없는 보호구역 횡단보도가 셋 — 교차로 첫 횡단보도(사람 없음 · 자전거) · 우회전 후', () => {
-    const zone = demoCourses().filter((e) => zoneKindOf(e.tags) === 'noSignal');
-    expect(zone).toHaveLength(3);
-    expect(zone.filter((e) => e.tags.sigA === 'no')).toHaveLength(2);
-    expect(zone.some((e) => e.tags.sigA === 'no' && e.tags.a === 'bikeRide' && e.tags.kind === 'child')).toBe(true);
-    expect(zone.some((e) => e.tags.sigC === 'no')).toBe(true);
-  });
-
-  it('쉬운 것부터 어려운 것으로 — 레벨, 같으면 난이도 점수', () => {
-    const demo = demoCourses();
-    for (let i = 1; i < demo.length; i++) {
-      const [p, q] = [demo[i - 1], demo[i]];
-      expect(p.level < q.level || (p.level === q.level && p.cost <= q.cost), `${p.spec.title} → ${q.spec.title}`).toBe(true);
-    }
+  it('사람 수와 오는 쪽이 사용자가 정한 것에 가장 가깝다 — 둘 · 둘 · 자전거 · 셋 · 넷 · 넷', () => {
+    const walkers = (e: { spec: { pedestrians: Array<{ bike?: string; crosswalk: string; from: string }> } }) =>
+      e.spec.pedestrians.filter((p) => !p.bike);
+    const dirs = (e: Parameters<typeof walkers>[0]) => new Set(walkers(e).map((p) => `${p.crosswalk}:${p.from}`)).size;
+    const [red, green, two, mid, bike, three, four, four2] = demoCourses();
+    expect(walkers(red)).toHaveLength(0);
+    expect(walkers(green)).toHaveLength(0);
+    expect([walkers(two).length, dirs(two)]).toEqual([2, 2]);
+    expect([walkers(mid).length, dirs(mid)]).toEqual([2, 2]);
+    expect(bike.spec.pedestrians.filter((p) => p.bike === 'ride')).toHaveLength(1);
+    expect([walkers(three).length, dirs(three)]).toEqual([3, 3]);
+    expect([walkers(four).length, dirs(four)]).toEqual([4, 4]);
+    expect([walkers(four2).length, dirs(four2)]).toEqual([4, 4]);
+    // ⑨ · ⑩ 은 진입로 보호구역을 지나 교차로에 닿는 길이다
+    expect(four.spec.approachSchoolZone).toBeTruthy();
+    expect(four2.spec.approachSchoolZone).toBeTruthy();
   });
 });
 

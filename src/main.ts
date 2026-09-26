@@ -40,12 +40,12 @@ import {
   type ScenarioSpec,
 } from './scenarios/scenarios';
 import {
-  demoCourses,
   habitsTestedBy,
   libraryEntry,
   scenarioLibrary,
 } from './scenarios/library';
-import { zoneCourse, zoneDemoCourses } from './scenarios/zoneCourse';
+import { zoneCourse } from './scenarios/zoneCourse';
+import { offlineCourses } from './scenarios/offlineCourse';
 import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
 import { practiceTrack } from './scenarios/trackPick';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
@@ -156,7 +156,7 @@ let mapTrial = false;
 let justMastered = false;
 
 /**
- * **AI 자율 주행 시범**에서 돌 코스 (library.ts 의 `demoCourses`) — 앞에서부터 하나씩 꺼낸다.
+ * **AI 자율 주행 시범**에서 돌 코스 (scenarios/offlineCourse.ts 의 `offlineCourses`) — 앞에서부터 하나씩 꺼낸다.
  * 비어 있으면 시범이 아니다.
  */
 let demoQueue: number[] = [];
@@ -719,14 +719,8 @@ function renderMenu(): void {
     onAiDrive: () => {
       aiDriving = true;
       aiCourse = false;
-      /*
-        **시범은 두 코스를 한 줄로 이어 보여 준다** — 교차로 아홉 판 + 보호구역 전용 도로 한 판 = **열 판**
-        (library.ts 의 demoCourses · scenarios/zoneCourse.ts 의 zoneDemoCourses). 배우는 사람에게는
-        '오프라인 교육 한 차례' 이지 두 묶음이 아니라, 쉬운 것부터 이어서 돈다.
-      */
-      demoQueue = [...demoCourses(), ...zoneDemoCourses()]
-        .sort((p, q) => p.level - q.level || p.cost - q.cost)
-        .map((e) => e.spec.id);
+      // **열 판, 사용자가 정한 차례 그대로** (scenarios/offlineCourse.ts) — 교차로 여덟 + 보호구역 전용 도로 둘
+      demoQueue = offlineCourses().map((e) => e.spec.id);
       goRun(demoQueue[0]);
     },
     onShop: () => nav.go({ name: 'shop', enter: renderShop }),

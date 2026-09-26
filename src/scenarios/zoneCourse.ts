@@ -568,29 +568,23 @@ export function zoneEntry(id: number): LibraryEntry | undefined {
 }
 
 /**
- * **오프라인 교육 시범에 넣을 보호구역 직진 코스 셋.**
+ * **오프라인 교육 시범에 넣을 보호구역 전용 도로 두 판** — 사용자가 정한 열 판(library.ts 의 DEMO 주석)의 ③ · ⑤ 다.
  *
- * 우회전 시범(library.ts 의 demoCourses)에 없는 세 장면을 맡는다 — **무신호로 시작하는 길**,
- * **무신호로 끝나는 길**(다 왔다고 끝이 아니다), **양쪽에서 사람이 나오는 길**.
- * 합치는 일은 부르는 쪽이 한다 (main.ts) — 라이브러리와 서로를 부르지 않게.
+ *  - ③ **기본** — 무신호 → 신호(단속) → 신호(ROADS[0]), 사람 없음 (C00001). 사람이 없어도 서는 무신호 횡단보도 · 30km/h · 단속 카메라
+ *  - ⑤ **사람 둘** — 신호 → 신호(단속) → 무신호(ROADS[1]), 마지막 무신호 횡단보도에 양쪽에서 한 명씩 건너려는 아이 (C00086)
+ *
+ * 합치는 일은 offlineCourse.ts 가 한다 — 라이브러리와 서로를 부르지 않게. **차례는 여기 적힌 순서다.**
  */
 export function zoneDemoCourses(): LibraryEntry[] {
-  /*
-    **한 판** — 시범 한 차례는 열 판이고(사용자가 정했다: "10개 시나리오 안에서"), 아홉은 교차로 판이다
-    (library.ts 의 DEMO). 한때 셋이었는데, 사람 없는 두 길이 보여 주는 것(사람이 없어도 선다 · 적색은 기다린다)은
-    이 한 판 안에 다 들어 있다 — 신호 둘을 지키고 **마지막 무신호 횡단보도**에서 양쪽의 아이 둘에게 양보한다.
-    30km/h · 단속 카메라 · 학교 앞 풍경도 이 판이 보여 준다.
-  */
   const want: Partial<ZoneTags>[] = [
+    { road: 0, sPed: 'none', aPed: 'none', bPed: 'none' },
     { road: 1, sPed: 'none', aPed: 'none', bPed: 'waiting', kind: 'child', dir: 'both', count: 2 },
   ];
   const tags = allCombinations();
   const entries = zoneEntries();
-  return want
-    .map((w) => {
-      const i = tags.findIndex((t) => (Object.keys(w) as (keyof ZoneTags)[]).every((k) => t[k] === w[k]));
-      if (i < 0) throw new Error(`시범 코스가 없습니다: ${JSON.stringify(w)}`);
-      return entries[i];
-    })
-    .sort((p, q) => p.level - q.level || p.cost - q.cost);
+  return want.map((w) => {
+    const i = tags.findIndex((t) => (Object.keys(w) as (keyof ZoneTags)[]).every((k) => t[k] === w[k]));
+    if (i < 0) throw new Error(`시범 코스가 없습니다: ${JSON.stringify(w)}`);
+    return entries[i];
+  });
 }
