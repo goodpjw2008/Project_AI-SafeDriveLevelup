@@ -1316,6 +1316,10 @@
         border-color: rgba(76, 141, 255, 0.5);
         color: var(--text);
       }
+      /* 짧은 꼴('다음 판 자동')은 손에 든 가로 화면에서만 — 결과 화면의 back-short 와 같은 짝이다 (아래 가로 규칙) */
+      .auto-next-short {
+        display: none;
+      }
 
       /*
         남은 초. 버튼 **안**에 둔다 — 어느 버튼이 스스로 눌릴 것인지가 숫자가 붙은
@@ -5329,7 +5333,8 @@
           **제목을 키우는 잣대는 '한 줄'이다.** 부제가 다음 줄로 내려가면 첫 화면이 한 화면을
           넘겨 키우려다 도로 잃는다. 사용자가 세 번 *"두 개 크게"* 라고 해 26 → 30 → 34 → 38px
           로 올렸는데, 34 를 넘기면서부터는 **부제를 조금 내주어야** 제목이 자랄 수 있었다 —
-          이 줄에서 먼저 읽혀야 하는 것은 작품 이름이다.
+          이 줄에서 먼저 읽혀야 하는 것은 작품 이름이다. (여기서 42px 로 올려 보니 780px 폭에서 두 줄로
+          꺾였다 — 넓은 쪽은 38 이 한 줄의 한계다. 사용자가 네 번째로 키워 달라고 한 것은 아주 좁은 화면 쪽이다, 아래.)
         */
         #screen-menu .brand {
           font-size: 38px;
@@ -5626,7 +5631,12 @@
         */
         #screen-debrief .screen-inner {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          /*
+            **왼쪽 45 · 오른쪽 55** — 반반으로 두었더니 AI 주행결과 분석이 낱말마다 꺾였다 (사용자가 사진으로
+            짚었다: "AI 주행결과 분석의 비중을 조금 크게"). 왼쪽 칸이 좁아지는 만큼은 레벨 칸의 뱃지 · 사이 여백,
+            '다시 운행' 의 안쪽 여백, '다음 판 자동 넘어가기' 의 짧은 꼴로 벌어 둔다 (아래).
+          */
+          grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
           align-items: start;
           column-gap: 12px;
           row-gap: 8px;
@@ -5680,18 +5690,33 @@
         #screen-debrief .debrief-top:not(.solo) .auto-next {
           grid-area: 2 / 2;
         }
-        /* 레벨 칸도 반쪽 칸에 맞게 — 넘치면 오른쪽 코칭 상자를 파고든다 */
+        /* '다시 운행' 은 안쪽 여백을 줄여 좁은 칸에 들인다 — 글자 크기는 그대로다 */
+        #screen-debrief .debrief-top:not(.solo) #btn-retry {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+        /* '다음 판 자동 넘어가기' → '다음 판 자동' (Screens 의 autoShort) */
+        #screen-debrief .auto-next-long {
+          display: none;
+        }
+        #screen-debrief .auto-next-short {
+          display: inline;
+        }
+        /* 레벨 칸도 좁은 칸에 맞게 — 뱃지와 사이 여백을 줄여 가로를 아낀다. 넘치면 오른쪽 코칭 상자를 파고든다 */
         #screen-debrief .debrief-top .player.md {
-          gap: 12px;
+          gap: 8px;
           margin-top: 0;
           min-width: 0;
         }
         #screen-debrief .debrief-top .player.md .level-badge-wrap {
-          width: 54px;
-          height: 54px;
+          width: 46px;
+          height: 46px;
         }
         #screen-debrief .debrief-top .player.md .player-name {
-          font-size: 16px;
+          font-size: 15px;
+        }
+        #screen-debrief .debrief-top .player.md .player-xp b {
+          font-size: 15px;
         }
         #screen-debrief .debrief-top .level-change {
           margin: 0 0 8px;
@@ -5802,19 +5827,23 @@
         }
       }
       /*
-        **아주 좁은 가로 화면**(700px 미만). 여기서는 이름 한 줄이 통째로 꺾여 화면 하나를
+        **아주 좁은 가로 화면**(760px 미만). 여기서는 이름 한 줄이 통째로 꺾여 화면 하나를
         넘겼다. 이름은 세로와 같은 크기로 두는 것이 원칙이지만(위), **한 줄에 들어가지 못하면
-        그 원칙이 오히려 이름을 망가뜨린다** — 이 크기에서만 한 단계 줄인다.
+        그 원칙이 오히려 이름을 망가뜨린다** — 이 크기에서만 줄인다.
+
+        **사용자의 휴대폰이 이 폭이다.** 19 · 16 · 13.5px 로 두었더니 사진에서 이름 줄의 오른쪽 40% 가
+        비어 있었고, 사용자가 *"제목은 두 개, 부제는 한 개 크게"* 라고 했다 (2026-09-26). 한 단계는 2px
+        (넓은 쪽을 키울 때와 같은 잣대) — 23 · 19 · 15.5px. 한 줄은 그대로 남는다 (720px 흉내로 확인).
       */
       @media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) and (max-width: 760px) {
         #screen-menu .brand {
-          font-size: 19px;
+          font-size: 23px;
         }
         #screen-menu .brand-colon {
-          font-size: 16px;
+          font-size: 19px;
         }
         #screen-menu .brand-sub {
-          font-size: 13.5px;
+          font-size: 15.5px;
         }
         #screen-menu .ai-car-photo {
           height: 88px;

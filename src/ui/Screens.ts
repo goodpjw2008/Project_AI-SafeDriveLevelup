@@ -1622,6 +1622,12 @@ export class Screens {
     const autoLabel = course
       ? '다음 판 자동 넘어가기'
       : '다음 Stage 자동 넘어가기';
+    /*
+      **짧은 꼴은 손에 든 가로 화면에서만 보인다** (index.html 의 가로 규칙 — 결과 화면의 back-short 와 같은 짝).
+      가로 화면은 왼쪽 반 칸에 버튼 넷이 두 줄로 서는데, 이 글이 길면 그 칸이 넓어져 오른쪽의 AI 주행결과
+      분석이 좁아진다 (사용자가 정했다: "다음 판 자동 넘어가기 → 다음 판 자동").
+    */
+    const autoShort = course ? '다음 판 자동' : '다음 Stage 자동';
 
     /*
       **틀린 판에만 코치를 부른다.** 무위반으로 끝난 판에는 설명할 것이 없다 —
@@ -1881,7 +1887,9 @@ export class Screens {
                  <input type="checkbox" id="chk-auto-next" ${
                    save.settings.autoNextStage ? 'checked' : ''
                  } />
-                 <span>${esc(autoLabel)}</span>
+                 <span class="auto-next-long">${esc(autoLabel)}</span><span class="auto-next-short">${esc(
+                   autoShort,
+                 )}</span>
                </label>`
             : ''
         }

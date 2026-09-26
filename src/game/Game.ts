@@ -255,6 +255,12 @@ export interface GameCallbacks {
   onViewChange(view: ViewMode): void;
 }
 
+/**
+ * 손에 든 가로 화면에서 보행자 · 차량신호등을 **보이는 크기만** 키우는 배율 (Game 의 viewBoost).
+ * 1.25 — "조금 크게" (사용자). 더 키우면 신호등 몸통이 가로암과 포개지고, 사람이 횡단보도 폭을 벗어나 보인다.
+ */
+const VIEW_BOOST_LANDSCAPE = 1.25;
+
 export class Game {
   private renderer: THREE.WebGLRenderer;
   private world: World;
@@ -577,6 +583,8 @@ export class Game {
     // 배면판 윗변이 팔을 뚫고 올라간다 — 등화 크기가 바뀌어도 늘 팔에 매달려 있게 한다.
     const signalY = SIGNAL_ARM_Y - 0.09 - VEHICLE_SIGNAL_HALF_HEIGHT;
     this.vehicleSignal.group.position.set(signalX, signalY, -(CROSSWALK_OUTER + 1.2));
+    // 손에 든 가로 화면에서만 몸통을 키운다 — 등화의 자리는 그대로다 (viewBoost)
+    this.vehicleSignal.group.scale.setScalar(this.viewBoost());
     this.world.scene.add(this.vehicleSignal.group);
 
     // 보행신호등. 설치되지 않은 횡단보도(어린이보호구역 시나리오)에는 아예 세우지 않는다.
@@ -647,6 +655,7 @@ export class Game {
         ZONE_SIGNAL_ARM_Y - 0.09 - ZONE_SIGNAL_HALF_HEIGHT,
         zoneSignalZ,
       );
+      this.zoneSignal.group.scale.setScalar(this.viewBoost());
       this.world.scene.add(
         this.zoneSignal.group,
         this.cantileverPole(ROAD_HALF_WIDTH + 1.5, zoneSignalZ, zoneSignalX, ZONE_SIGNAL_ARM_Y),
@@ -696,6 +705,7 @@ export class Game {
       const rx = ROAD_HALF_WIDTH + 0.6;
       const rz = ROAD_HALF_WIDTH + 2.2;
       this.rightSignal.group.position.set(rx, RIGHT_SIGNAL_POLE_HEIGHT - RIGHT_SIGNAL_HALF_HEIGHT, rz);
+      this.rightSignal.group.scale.setScalar(this.viewBoost());
       // 렌즈는 로컬 +Z 를 보므로, 남쪽(+Z)에서 오는 운전자를 향하려면 그대로 두고
       // 도로 안쪽으로 조금만 틀어 준다
       this.rightSignal.group.rotation.y = 0.28;
@@ -787,6 +797,7 @@ export class Game {
         ZONE_SIGNAL_ARM_Y - 0.09 - ZONE_SIGNAL_HALF_HEIGHT,
         signalZ,
       );
+      signal.group.scale.setScalar(this.viewBoost());
       this.world.scene.add(
         signal.group,
         this.cantileverPole(ROAD_HALF_WIDTH + 1.5, signalZ, PLAYER_APPROACH_X, ZONE_SIGNAL_ARM_Y),
@@ -1122,7 +1133,7 @@ export class Game {
       const curb = `${spawn.crosswalk}:${spawn.from}`;
       const slot = taken.get(curb) ?? 0;
       taken.set(curb, slot + 1);
-      const p = new Pedestrian(spawn, slot);
+      const p = new Pedestrian(spawn, slot, this.viewBoost());
       this.pedestrians.push(p);
       this.world.scene.add(p.group);
     }
@@ -1343,6 +1354,27 @@ export class Game {
             ' (orientation: landscape) and (pointer: coarse) and (max-height: 540px)',
         )
       : null;
+
+  /**
+   * **손에 든 가로 화면** — 화면 규칙(index.html 의 '손에 든 가로 화면')과 같은 조건이다.
+   *
+   * 여기서는 **보행자와 차량신호등을 보이는 크기만 1.25배**로 키운다 (사용자가 사진으로 짚었다: *"멀리 보행자와
+   * 차량신호를 인지하는 것이 가장 중요한데 모바일로 오면서 크기가 작다"*). 가로 휴대폰은 높이가 300px 남짓이라
+   * 같은 장면이 PC 의 1/3 로 찍히는데, 이 둘이야말로 멀리서 먼저 알아봐야 하는 것들이다.
+   *
+   * **판정은 건드리지 않는다** — 보행자는 무리(group)의 배율만 바꾸고 판정 반지름은 그대로이며(Pedestrian 의
+   * visualScale), 신호등은 등화의 자리와 색이 같고 몸통만 커진다. PC 와 세로 휴대폰은 그대로다 —
+   * 세로는 카메라가 올라가 전체를 담는 쪽으로 이미 풀었다(CameraRig 의 crosswalkRise).
+   */
+  private readonly handheldLandscape =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(orientation: landscape) and (pointer: coarse) and (max-height: 540px)')
+      : null;
+
+  /** 보행자 · 차량신호등의 보이는 크기 배율 — 손에 든 가로 화면에서만 1 이 아니다 (위 handheldLandscape) */
+  private viewBoost(): number {
+    return this.handheldLandscape?.matches ? VIEW_BOOST_LANDSCAPE : 1;
+  }
 
   /**
    * 늦추는 정도는 **5분의 1**이다 — 원래 속도의 0.8.

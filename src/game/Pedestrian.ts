@@ -300,8 +300,11 @@ export class Pedestrian {
 
   /**
    * @param slot 같은 보도에서 몇 번째로 서는 사람인가 (자리를 어긋나게 두는 데만 쓴다)
+   * @param visualScale **보이는 크기만** 키우는 배율 — 판정(hits) · 걸음 · 표식 자리는 `this.scale` 그대로다.
+   *          손에 든 가로 화면은 높이가 300px 남짓이라 멀리 선 사람이 PC 의 1/3 크기로 찍힌다 — 사람을 미리
+   *          알아보는 것이 이 게임의 핵심이라 그 화면에서만 1.25배로 키운다 (Game 의 viewBoost).
    */
-  constructor(spawn: PedSpawn, slot = 0) {
+  constructor(spawn: PedSpawn, slot = 0, visualScale = 1) {
     this.walk = new PedWalk(spawn);
     this.offset = WAIT_SLOTS[slot % WAIT_SLOTS.length];
     this.crosswalk = spawn.crosswalk;
@@ -311,6 +314,8 @@ export class Pedestrian {
     this.scale = (kind === 'child' ? 0.66 : kind === 'elder' ? 0.92 : 1) * SIZE_SCALE;
 
     this.build();
+    // 무리(group)째 키운다 — 표식 · 발밑 원 · 자전거까지 같은 배율로 따라온다
+    if (visualScale !== 1) this.group.scale.setScalar(visualScale);
     /*
       **처음부터 보이게 둔다.** 예전에는 등장 시각까지 숨겨 두었는데, 그러면 우회전을
       시작하는 순간 사람이 허공에서 튀어나온다 — 멀리서 미리 알아보고 판단할 기회가 없다.

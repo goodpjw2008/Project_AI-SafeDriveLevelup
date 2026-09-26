@@ -253,6 +253,9 @@ describe('가로 휴대폰의 첫 화면', () => {
     expect(px(block(NARROW), '\\.brand')).toBeNull();
     // 아주 좁은 화면에서는 제목까지 내린다 — 거기서는 한 줄이 아예 서지 않는다
     expect(px(block(TINY), '\\.brand')!).toBeLessThan(38);
+    // 아주 좁은 화면은 사용자의 기기다 — 네 번째 요청("제목은 두 개, 부제는 한 개 크게")으로 23 · 15.5px
+    expect(px(block(TINY), '\\.brand')).toBe(23);
+    expect(px(block(TINY), '\\.brand-sub')).toBe(15.5);
     // 상자 · 줄 간격 · 낱말 사이를 줄인 것이 짝이다 — 글자만 키우면 첫 화면이 도로 넘친다
     const r = rules();
     expect(r).toMatch(/#screen-menu \.hero \{[^}]*padding:\s*5px/);
