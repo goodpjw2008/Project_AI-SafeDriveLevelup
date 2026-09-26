@@ -164,7 +164,7 @@ export const CHALLENGES: readonly ChallengeRule[] = [
   {
     id: 3,
     name: '보통',
-    desc: '복잡한 코스 + 한 레벨 위 · 빠르게 · 정지선 9m 안 · 위반 −40',
+    desc: '복잡한 코스 + 한 레벨 위가 더 빨리 나옴',
     complexity: 0.75,
     cap: 16,
     skipEmpty: true,

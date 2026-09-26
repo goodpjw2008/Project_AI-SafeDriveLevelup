@@ -1353,7 +1353,7 @@ export class Screens {
           <div class="opt-row">
             <div class="opt-label">
               난이도
-              <span class="opt-hint">${esc(diffNow.desc)} · 다음 추천부터 반영</span>
+              <span class="opt-hint">${esc(diffNow.desc)}</span>
             </div>
             <div class="opt-choices">
               ${CHALLENGES.map(
@@ -1376,10 +1376,10 @@ export class Screens {
           -->
           ${this.optionRow(
             'track',
-            '연습 갈래',
+            '연습 구분',
             TRACK_CHOICES.map((t) => [t, CHOICE_LABEL[t] + (t === 'auto' ? ' ·기본' : '')]),
             save.settings.track,
-            { note: '자동은 고칠 습관과 기록을 보고 AI 가 고릅니다 · 다음 추천부터 반영' },
+            { note: '자동은 고칠 습관과 기록을 보고 AI 가 우회전, 어린이보호구역, 우회전+어린이보호구역 을 선택' },
           )}
           ${
             /*
@@ -1397,7 +1397,7 @@ export class Screens {
                   ],
                   save.settings.driverView ? 'on' : 'off',
                   {
-                    note: '미사용이면 운전석 시점 · 좌·우·후방 시야 창 · 좌석 맞추기를 처음부터 만들지 않습니다 — 저사양 PC 에 권합니다',
+                    note: '미사용이면 운전석 시점 기능을 처음부터 만들지 않습니다. 저사양 PC 에 권합니다',
                   },
                 )
           }

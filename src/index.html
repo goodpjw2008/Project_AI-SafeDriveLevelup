@@ -207,15 +207,43 @@
         예전에는 설정·도움말·저작권은 제목 아래, 전시관은 그 아래 폼 뒤, 디브리핑은 맨
         아래 '홈으로' 였다. 화면마다 문을 새로 찾아야 했다. 지금은 언제나 왼쪽 위다.
       */
+      /*
+        **뒤로 버튼은 제목 첫 줄의 한가운데에 선다.** 제목과 부제를 싼 상자를 `display: contents` 로 풀어
+        제목 · 부제가 저마다 칸이 되게 하고, 버튼은 제목이 선 첫 줄에서 세로 가운데를 맞춘다.
+        예전에는 위에 맞추고 3px 을 내려 눈대중으로 맞췄는데, 제목 크기가 화면 폭에 따라 변하니
+        (clamp 28~44px) PC 와 휴대폰 어디서도 조금씩 어긋났다 — 사용자가 사진으로 짚었다.
+        줄 사이 간격은 두지 않는다 — 부제의 위 여백(8px)이 그 몫이다.
+      */
       .screen-head {
         display: grid;
         grid-template-columns: auto 1fr auto;
         align-items: start;
-        gap: 16px;
+        gap: 0 16px;
         margin-bottom: 24px;
       }
+      .screen-head > div:not(.screen-head-right) {
+        display: contents;
+      }
+      /* 제목 · 오른쪽 딱지도 같은 줄의 가운데에 — 휴대폰에서는 버튼(38px)이 제목(26px)보다 커서 제목이 위로 붙었다 */
       .screen-head h1 {
         margin: 0;
+        grid-column: 2;
+        grid-row: 1;
+        align-self: center;
+      }
+      .screen-head .lede {
+        grid-column: 2;
+        grid-row: 2;
+      }
+      .screen-head > button.back {
+        grid-column: 1;
+        grid-row: 1;
+        align-self: center;
+      }
+      .screen-head-right {
+        grid-column: 3;
+        grid-row: 1;
+        align-self: center;
       }
       /*
         **결과 화면의 제목만 작게** (사용자 요청 — 두 단계). 이 화면에서 주인공은 판 이름이 아니라 바로 아래의
@@ -234,11 +262,10 @@
         flex-wrap: wrap;
         justify-content: flex-end;
       }
-      /* 뒤로 버튼 — 제목의 첫 줄 높이에 맞춰 붙는다 */
+      /* 뒤로 버튼 — 제목의 첫 줄 한가운데에 선다 (위 .screen-head) */
       button.back {
         padding: 9px 14px 9px 11px;
         gap: 4px;
-        margin-top: 3px;
       }
       @media (max-width: 620px) {
         .screen-head {
@@ -246,6 +273,7 @@
         }
         .screen-head-right {
           grid-column: 1 / -1;
+          grid-row: auto;
           justify-content: flex-start;
         }
       }
