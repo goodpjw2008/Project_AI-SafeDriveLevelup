@@ -436,10 +436,10 @@ describe('세로 휴대폰 — 좁은 폭(360px)에서 밀리지 않게', () => 
   it("레벨 이름은 '안전 L2', 긴 꼬리('연습' · '다시 시작')는 감춘다", () => {
     const block = rulesOnly();
     expect(block).toMatch(/#screen-menu \.name-word \{\s*display: none;/);
-    expect(block).toMatch(/#screen-menu \.lbl-portrait \{\s*display: none;/);
+    expect(block).toMatch(/#screen-menu \.lbl-tail \{\s*display: none;/);
     const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
-    expect(screens).toContain('온라인<span class="lbl-portrait"> 연습</span>');
-    expect(screens).toContain('처음부터<span class="lbl-portrait"> 다시 시작</span>');
+    expect(screens).toContain('온라인<span class="lbl-tail"> 연습</span>');
+    expect(screens).toContain('처음부터<span class="lbl-tail"> 다시 시작</span>');
     expect(screens).toContain('전체 운전 성공:<b>');
   });
   it('레벨 길은 칸을 줄이고, 주행 중 AI 말풍선은 화면 폭 안에서 줄을 바꾼다', () => {

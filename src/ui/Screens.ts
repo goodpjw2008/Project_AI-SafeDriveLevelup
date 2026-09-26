@@ -919,10 +919,10 @@ export class Screens {
    */
   private resetCourseButton(save: SaveData): string {
     if (!hasProgress(save)) return '';
-    // 손에 든 세로 화면에서는 '처음부터' 만 (index.html 의 .lbl-portrait)
+    // 손에 든 화면(세로 · 가로)에서는 '처음부터' 만 (index.html 의 .lbl-tail)
     return `<button class="btn ghost caution" id="btn-reset-course">${icon(
       'retry',
-    )}처음부터<span class="lbl-portrait"> 다시 시작</span></button>`;
+    )}처음부터<span class="lbl-tail"> 다시 시작</span></button>`;
   }
 
   private aiTrainingSection(ai: AiTrainingState, save: SaveData): string {
@@ -1089,8 +1089,8 @@ export class Screens {
         -->
         <div class="mode-split">
           <div class="mode-group">
-            <!-- 손에 든 세로 화면에서는 '온라인' 만 (index.html 의 .lbl-portrait) — 갤럭시 S21 폭에서 줄이 밀렸다 -->
-            <p class="mode-label">${icon('monitor')}<b>온라인<span class="lbl-portrait"> 연습</span></b>${resetButton}</p>
+            <!-- 손에 든 화면(세로 · 가로)에서는 '온라인' 만 (index.html 의 .lbl-tail) — 갤럭시 S21 폭에서 줄이 밀렸다 -->
+            <p class="mode-label">${icon('monitor')}<b>온라인<span class="lbl-tail"> 연습</span></b>${resetButton}</p>
             <!--
               **여기서 누를 것은 하나뿐이다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
               사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만

@@ -5750,39 +5750,60 @@
         #screen-menu .lbl-short {
           display: inline;
         }
-        /* 레벨 칸은 제 글만큼만 — '안전 L2', 작은 뱃지, 촘촘한 길, 좁은 여백. 남는 폭은 온라인 연습 칸으로 간다 */
+        /* 긴 꼴의 꼬리 — '온라인 연습' → '온라인', '처음부터 다시 시작' → '처음부터' (세로와 같다, ui/Screens.ts) */
+        #screen-menu .lbl-tail {
+          display: none;
+        }
+        /*
+          레벨 칸은 **될 수 있는 대로 좁게** — '안전 L2', 작은 뱃지, 두 줄 레벨 길, 좁은 여백 (사용자가 정했다: 레벨 부분을
+          최대한 줄여 온라인 · 오프라인 칸에 자리를 주라, 2026-09-26). 남는 폭은 온라인 연습 칸으로 간다.
+        */
         #screen-menu .name-word {
           display: none;
         }
         #screen-menu .player.lg {
-          gap: 6px;
+          gap: 4px;
         }
         #screen-menu .player.lg .level-badge-wrap {
-          width: 50px;
-          height: 50px;
+          width: 44px;
+          height: 44px;
         }
         #screen-menu .player.lg .player-name {
-          font-size: 15px;
+          font-size: 14px;
         }
         #screen-menu .player.lg .player-head {
-          gap: 6px;
+          gap: 5px;
         }
         #screen-menu .player.lg .player-xp {
-          font-size: 12px;
+          font-size: 11px;
         }
         #screen-menu .player.lg .player-xp b {
-          font-size: 14px;
+          font-size: 13px;
         }
         #screen-menu .player-foot .level-step {
           width: 11px;
           height: 11px;
         }
+        /*
+          **레벨 길은 두 줄** — 1 2 3 4 5 6 / 7 8 9 10 M (사용자가 정했다). 한 줄로 열한 칸을 늘어놓으면 레벨 칸이 그만큼
+          넓어져 옆 칸의 몫을 먹는다. 여섯 칸짜리 격자로 두면 지금 칸(.now)이 커도 나뉘는 자리가 늘 같다. 위 규칙의
+          flex-wrap 은 남겨 둔다(어떤 폭에서도 접지 않는다는 뜻은 같다) — 격자가 뒤에 와서 이긴다.
+        */
         #screen-menu .player-foot .level-track {
-          gap: 1px;
+          display: grid;
+          grid-template-columns: repeat(6, max-content);
+          justify-content: start;
+          align-items: center;
+          column-gap: 1px;
+          row-gap: 3px;
         }
         #screen-menu .player-foot .level-step + .level-step::before {
           left: -1px;
           width: 1px;
+        }
+        /* 둘째 줄 첫 칸(7)은 앞 칸과 잇는 선이 없다 — 줄이 바뀌었다 */
+        #screen-menu .player-foot .level-step:nth-child(7)::before {
+          display: none;
         }
         #screen-menu .player-foot .level-step.now {
           width: 18px;
@@ -6097,9 +6118,10 @@
           레벨 길도 한 단계 더 — 이 칸이 넓어진 만큼 연습 버튼의 글이 두 줄로 꺾인다.
           **뱃지도 같이 줄인다**: 길이 한 줄에 들어가야 'M' 하나만 다음 줄에 남지 않는다.
         */
+        /* 레벨 칸은 될 수 있는 대로 좁게 — 넓은 가로와 같은 44px (위 주석) */
         #screen-menu .player.lg .level-badge-wrap {
-          width: 62px;
-          height: 62px;
+          width: 44px;
+          height: 44px;
         }
         #screen-menu .player-foot .level-step {
           width: 14px;
@@ -6162,14 +6184,14 @@
           font-size: clamp(25px, 4vw, 37px);
         }
         #screen-menu .brand-sub {
-          font-size: clamp(17px, 2.3vw, 25px);
+          font-size: clamp(16px, 2.3vw, 24px);
         }
         /* '안전운전 L2' → '안전 L2' (가로 화면과 같은 꼴, ui/playerCard.ts 의 name-word) */
         #screen-menu .name-word {
           display: none;
         }
-        /* 긴 꼴의 꼬리를 감춘다 — '온라인 연습' → '온라인', '처음부터 다시 시작' → '처음부터' (ui/Screens.ts) */
-        #screen-menu .lbl-portrait {
+        /* 긴 꼴의 꼬리를 감춘다 — '온라인 연습' → '온라인', '처음부터 다시 시작' → '처음부터' (ui/Screens.ts). 가로도 같다 */
+        #screen-menu .lbl-tail {
           display: none;
         }
         /* 레벨 길 열한 칸이 'L2까지 100 XP' 옆 한 줄에 들도록 칸을 줄인다 (가로 좁은 화면과 같은 값) */
@@ -6672,9 +6694,8 @@
       <!-- 크롬 151~153 + 삼성 Xclipse 안내 — 그 조합에서만 뜬다 (main.ts 의 maybeShowGpuNotice · game/browserQuirk.ts) -->
       <div class="gpu-notice" id="gpu-notice" role="alertdialog" aria-live="polite" aria-labelledby="gpu-notice-title">
         <b id="gpu-notice-title">지금 쓰는 크롬 버전에서는 주행 화면에 검은 띠가 번쩍일 수 있습니다</b>
-        <p id="gpu-notice-text">크롬 151~153 의 알려진 문제로, 크롬 154 부터 고쳐졌습니다. 플레이 스토어에서 크롬을 업데이트해 주세요. 당장 어려우면 같은 휴대폰의 삼성 인터넷으로 열어도 정상입니다.</p>
+        <p id="gpu-notice-text">크롬 151~153 의 알려진 문제로, 크롬 154 부터 고쳐졌습니다. 플레이 스토어에서 크롬을 업데이트해 주세요.</p>
         <div class="gpu-notice-actions">
-          <a class="btn ghost" id="gpu-notice-open" href="#">삼성 인터넷으로 열기</a>
           <a class="btn primary" id="gpu-notice-update" href="https://play.google.com/store/apps/details?id=com.android.chrome" target="_blank" rel="noopener">크롬 업데이트</a>
           <button class="btn ghost" id="gpu-notice-close" type="button">닫기</button>
         </div>

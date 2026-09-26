@@ -392,3 +392,16 @@ describe('가로 휴대폰의 첫 화면', () => {
     expect(rules()).toMatch(/#screen-menu \.ai-car-photo \{[^}]*max-width:\s*none/);
   });
 });
+
+/*
+  레벨 칸을 될 수 있는 대로 좁게 (사용자가 정했다, 2026-09-26) — 레벨 길은 두 줄(1~6 / 7~M), 긴 꼬리('연습' · '다시 시작')는 감춘다.
+*/
+describe('가로 휴대폰 — 레벨 칸 최소화', () => {
+  it('레벨 길은 여섯 칸 격자라 두 줄이 되고, 둘째 줄 첫 칸은 잇는 선이 없다', () => {
+    expect(rules()).toMatch(/#screen-menu \.player-foot \.level-track \{[^}]*grid-template-columns: repeat\(6, max-content\);/);
+    expect(rules()).toMatch(/#screen-menu \.player-foot \.level-step:nth-child\(7\)::before \{\s*display: none;/);
+  });
+  it("'온라인 연습' · '처음부터 다시 시작' 의 꼬리를 감춘다", () => {
+    expect(rules()).toMatch(/#screen-menu \.lbl-tail \{\s*display: none;/);
+  });
+});

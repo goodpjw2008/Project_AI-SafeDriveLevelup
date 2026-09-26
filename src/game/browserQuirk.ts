@@ -44,15 +44,3 @@ export function vulkanXclipseChrome(gpu: string, userAgent: string): boolean {
   // 삼성 인터넷 · 앱 안의 WebView · 다른 크로미움 브라우저는 크롬의 Vulkan 실험을 타지 않는다
   return !/SamsungBrowser|; wv\)|EdgA\/|Whale\/|NAVER\(/.test(userAgent);
 }
-
-/**
- * 같은 주소를 **삼성 인터넷에서 여는** 안드로이드 intent 링크 — 크롬에서 사용자가 누르면 삼성 인터넷이 뜬다.
- * 삼성 인터넷이 없는 기기에서는 fallback 주소(같은 페이지)로 돌아온다.
- */
-export function samsungInternetIntent(url: URL): string {
-  const scheme = url.protocol.replace(':', '');
-  return (
-    `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=${scheme};` +
-    `package=com.sec.android.app.sbrowser;S.browser_fallback_url=${encodeURIComponent(url.href)};end`
-  );
-}
