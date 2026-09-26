@@ -4122,6 +4122,35 @@
         bottom: auto;
       }
       /*
+        전체 화면으로 들어갈 때 **우리 말로 한 번 알린다** (main.ts 의 showFullscreenNotice). 크롬은 전체 화면마다
+        제 말("상단에서 드래그한 후 뒤로 버튼을 터치하세요")을 흰 상자로 띄우는데, 그 상자와 글은 브라우저의
+        것이라 페이지가 바꾸거나 없앨 수 없다 — 그래서 사용자가 정한 글을 우리 상자로 한 번 더 띄운다.
+        첫 화면 · 주행 HUD 어디 위에서나 보여야 하므로 HUD 안의 .toast 가 아니라 #app 바로 아래 따로 둔다.
+      */
+      .fs-notice {
+        position: fixed;
+        left: 50%;
+        bottom: max(24px, env(safe-area-inset-bottom));
+        transform: translateX(-50%) translateY(8px);
+        z-index: 90;
+        max-width: min(92vw, 520px);
+        padding: 10px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(18, 23, 33, 0.94);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s, transform 0.25s;
+      }
+      .fs-notice.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      /*
         **휴대폰에서는 주행 중 레벨 칸을 감춘다** (사용자 요청) — 가로 · 세로 모두. 작은 화면에서는 도로를 가려
         시야를 방해했다. 레벨과 경험치는 첫 화면과 결과 화면에서 같은 모양(playerCard)으로 본다.
       */
@@ -6363,6 +6392,8 @@
 
     <div id="app">
       <canvas id="scene"></canvas>
+      <!-- 전체 화면 안내 (휴대폰) — main.ts 의 showFullscreenNotice. 크롬의 흰 안내 상자와 별개다 -->
+      <div class="fs-notice" id="fs-notice" role="status" aria-live="polite"></div>
 
       <!-- ── 주행 HUD ─────────────────────────────────────────── -->
       <div id="hud">

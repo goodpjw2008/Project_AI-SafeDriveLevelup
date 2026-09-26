@@ -14,7 +14,7 @@ import { AUTO_DRIVE_RULE, challengeRule } from './scenarios/challenge';
 import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
 import { loadCarModel, trimCarModelCache } from './game/carModel';
-import { isHandheld } from './game/handheld';
+import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { setMsaaPreference, sharedRenderer } from './game/renderer';
@@ -525,8 +525,29 @@ function toggleFullscreen(): void {
     void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
   }
 }
+/**
+ * 전체 화면으로 들어갈 때 **우리 말로 나가는 길을 알린다** (사용자가 글을 정했다 — 세로 · 가로가 다르다).
+ * 크롬이 띄우는 흰 상자("상단에서 드래그한 후 뒤로 버튼을 터치하세요")는 브라우저의 것이라 페이지가 바꾸거나
+ * 없앨 수 없다. 그래서 그 옆에 우리 상자를 한 번 더 띄운다 — 몇 초 뒤 사라지고, 전체 화면을 나가면 곧 걷는다.
+ */
+let fsNoticeTimer = 0;
+function showFullscreenNotice(on: boolean): void {
+  const el = document.getElementById('fs-notice');
+  if (!el) return;
+  window.clearTimeout(fsNoticeTimer);
+  if (!on || !isHandheld()) {
+    el.classList.remove('show');
+    return;
+  }
+  el.textContent = isHandheldLandscape()
+    ? '전체 화면을 종료하려면 상단에서 주소창 보기를 눌러주세요.'
+    : '전체 화면을 종료하려면 우회전 옆의 전체화면/주소화면 전환 아이콘을 눌러주세요.';
+  el.classList.add('show');
+  fsNoticeTimer = window.setTimeout(() => el.classList.remove('show'), 5000);
+}
 function syncFullscreenButtons(): void {
   const on = !!document.fullscreenElement;
+  showFullscreenNotice(on);
   const label = on ? '주소창 보기' : '전체 화면';
   for (const b of document.querySelectorAll<HTMLButtonElement>('.fs-toggle')) {
     b.title = label;
