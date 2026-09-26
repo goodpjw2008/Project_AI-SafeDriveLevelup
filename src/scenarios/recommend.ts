@@ -203,6 +203,8 @@ const COVER_AXES = [
   'sideA',
   'sideC',
   'sideS',
+  // 덧붙인 사람(library.ts 의 EXTRAS) — 자전거횡단도의 자전거 · 끄는 사람 · 진입로 어린이를 이 레벨에서 한 번은 만나게
+  'extra',
 ] as const;
 
 /**
@@ -231,6 +233,7 @@ const NEW_BONUS: Record<(typeof COVER_AXES)[number], number> = {
   env: 0.4,
   pressure: 0.3,
   jam: 0.3,
+  extra: 0.8,
 };
 
 /** 겪은 횟수 → '새것' 값. 계단으로 둔다 — 한 번 겪은 것과 안 겪은 것의 차가 커야 한다 */
@@ -545,7 +548,18 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
 
 /** 코스의 **모양** — 서로 다른 후보를 뽑을 때 같은 모양은 하나만 둔다 (보행자 종류·재촉·환경·정체는 보지 않는다) */
 const shapeOf = (e: LibraryEntry): string =>
-  [e.tags.signal, e.tags.zone, e.tags.sigA, e.tags.sigC, e.tags.approach, e.tags.a, e.tags.c, e.tags.lead].join('/');
+  [
+    e.tags.signal,
+    e.tags.zone,
+    e.tags.sigA,
+    e.tags.sigC,
+    e.tags.approach,
+    e.tags.a,
+    e.tags.c,
+    e.tags.lead,
+    // 덧붙인 사람(자전거횡단도의 자전거 · 끄는 사람 · 진입로 어린이)은 같은 신호 · 보행자 조합이라도 다른 장면이다 — 한 자리를 다투지 않게
+    e.tags.extra,
+  ].join('/');
 
 /**
  * AI 에게 보여 줄 **후보 코스** — 서로 모양이 다른 것으로 `SHORTLIST_SIZE` 개 안팎.

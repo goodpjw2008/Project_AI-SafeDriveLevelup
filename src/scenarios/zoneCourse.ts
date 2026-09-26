@@ -409,7 +409,11 @@ export function zoneCourses(): ScenarioSpec[] {
   return (built ??= allCombinations().map((t, i) => buildZoneSpec(t, zoneId(i))));
 }
 
-export const isZoneCourseId = (id: number): boolean => id >= ZONE_ID_BASE;
+/**
+ * 전용 도로 판의 id 인가 — **범위를 닫는다.** 라이브러리 id 는 열세 자리(library.ts 의 EXTRAS 가 맨 앞자리)라
+ * 2조를 넘는 값이 있다 — `>= ZONE_ID_BASE` 만 보면 그 판들이 전용 도로로 읽힌다. 전용 도로는 156판이라 1,000 안에 다 든다.
+ */
+export const isZoneCourseId = (id: number): boolean => id >= ZONE_ID_BASE && id < ZONE_ID_BASE + 1000;
 
 /** id 로 찾기 — 이 코스의 판이 아니면 `undefined` */
 export function zoneCourse(id: number): ScenarioSpec | undefined {
@@ -525,7 +529,7 @@ export function zoneEntries(): LibraryEntry[] {
       const spec = zoneCourses()[i];
       const libTags: LibraryTags = {
         // 교차로가 없는 길이라 '정면 신호' 도 없다 — 추천이 모양을 가르는 데만 쓰는 값이다
-        signal: 'green',
+        extra: 'none', signal: 'green',
         zone: 'yes',
         sigA: hasSignal(t, 'A') ? 'yes' : 'no',
         sigC: hasSignal(t, 'B') ? 'yes' : 'no',

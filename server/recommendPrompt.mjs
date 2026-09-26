@@ -114,6 +114,7 @@ const FRESH_TEXT = {
   sideA: '첫횡단방향',
   sideC: '우회전후방향',
   sideS: '진입로방향',
+  extra: '덧붙인사람',
 };
 
 /**

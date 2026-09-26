@@ -108,6 +108,63 @@ export const C_PEDS = ['none', 'waiting', 'crossing', 'jaywalk', 'group', 'late'
   두 값으로 갈리면 판만 늘고 배우는 것은 늘지 않는다 (보호구역 전용 도로에서 겪은 일이다).
 */
 
+/*
+  **더 복잡한 판 — 덧붙이는 사람들** (사용자가 정했다, 2026-09-26: "라이브러리에 새 축을 더해줘. 더 복잡한 케이스가 필요해").
+
+  A · C 축은 값이 열 개로 꽉 차 있고, 자전거 판은 첫 횡단보도 하나로 끝내는 규칙이라(combinationAllowed) **자전거와 다른
+  사람이 한 판에 서는 장면 · 타는 자전거와 끄는 자전거가 함께 있는 장면 · 다섯 사람**이 없었다. 그래서 열셋째 축을 둔다 —
+  기본 조합 위에 **사람을 덧붙이는** 축이다.
+
+   - `rideA` · `pushA` — 첫 횡단보도에 타고 건너는 자전거 · 끌고 건너는 사람이 **기존 사람들과 함께** 선다
+   - `rideC` · `pushC` — 우회전 후 횡단보도에 같은 것 (자전거횡단도가 C 에 붙는다, layout 의 bikeLaneCenter('C'))
+   - `rideApushC` — 첫 횡단보도 타는 자전거 + 우회전 후 끌고 가는 사람
+   - `rideCpushC` — 우회전 후 횡단보도에 타는 자전거와 끌고 가는 사람이 함께
+   - `pedS` — 진입로 보호구역 무신호 횡단보도의 어린이가 **첫 횡단보도에 사람이 있어도** 선다 (hasApproachPed 는 첫
+     횡단보도가 비었을 때만 세운다 — 그 판과 겹치지 않게 첫 횡단보도에 사람이 있는 판에만 둔다)
+   - `pedSrideCpushC` — 위의 둘을 겹친 것. 다섯 사람 + 자전거 둘까지 간다 (진입로 어린이 + 첫 횡단보도 둘 + 우회전 후 둘 + 자전거 둘)
+
+  **id 의 맨 앞자리다** (AXES 의 첫 열쇠). 'none' 이 0 이라 이미 있던 판의 id 는 한 자리도 달라지지 않고, 번호는 ADDED_LATER 의
+  마지막 세대라 맨 뒤에 선다. 값은 아홉이다 — 열 개까지 붙일 수 있고, 그 뒤는 축을 하나 더 두어야 한다.
+  **맑은 낮의 조용한 판에만** 둔다 — 앞차 · 정체 · 경적 · 우회전 신호등 · 밤 · 비는 뺀다. 판이 묻는 것을 사람 쪽에 모으고
+  (화살표 타이밍에 사람을 맞추는 규칙과 얽히지 않게), 라이브러리가 필요 이상 불어나지 않게 한다 — 처음 밤 · 비까지 두었더니
+  5,721판이 더해져 레벨 뼈대(L1 의 몫)가 흔들렸다. 한 횡단보도에 걷는 사람(끌고 가는 사람 포함)은 셋까지다 — 타는 자전거는
+  자전거횡단도 위라 세지 않는다.
+*/
+export const EXTRAS = [
+  'none',
+  'rideA',
+  'pushA',
+  'rideC',
+  'pushC',
+  'rideApushC',
+  'rideCpushC',
+  'pedS',
+  'pedSrideCpushC',
+] as const;
+
+/** `extra` 값을 풀어 읽는다 — 어디에 무엇을 덧붙이는가 */
+export function extrasOf(t: { extra: (typeof EXTRAS)[number] }): {
+  rideA: boolean;
+  pushA: boolean;
+  rideC: boolean;
+  pushC: boolean;
+  pedS: boolean;
+} {
+  const x = t.extra;
+  return {
+    rideA: x === 'rideA' || x === 'rideApushC',
+    pushA: x === 'pushA',
+    rideC: x === 'rideC' || x === 'rideCpushC' || x === 'pedSrideCpushC',
+    pushC: x === 'pushC' || x === 'rideApushC' || x === 'rideCpushC' || x === 'pedSrideCpushC',
+    pedS: x === 'pedS' || x === 'pedSrideCpushC',
+  };
+}
+export const APPROACHES = ['none', 'signal', 'noSignal'] as const;
+export const LEADS = ['none', 'lawful', 'rolling', 'straight'] as const;
+export const PRESSURES = ['calm', 'honk'] as const;
+export const ENVS = ['day', 'night', 'rain'] as const;
+export const JAMS = ['none', 'jam'] as const;
+
 /**
  * **나중에 붙인 값 — 붙인 차례(세대)대로 쌓는다.** 이 값을 쓰는 판은 라이브러리 뒤쪽에 서서, 이미 있던 판의
  * 번호가 밀리지 않는다 (numberedTags).
@@ -123,15 +180,13 @@ const ADDED_LATER: ReadonlyArray<{ [K in keyof LibraryTags]?: ReadonlySet<string
   { a: new Set(['bothWays', 'crowd']), c: new Set(['crowd']) },
   // 3세대 — 자전거 (타고 건넘 · 끌고 건넘)
   { a: new Set(['bikeRide', 'bikePush']) },
+  // 4세대 — 덧붙이는 사람들 (EXTRAS)
+  { extra: new Set(EXTRAS.filter((v) => v !== 'none')) },
 ];
 export const KINDS = ['adult', 'child', 'elder'] as const;
-export const APPROACHES = ['none', 'signal', 'noSignal'] as const;
-export const LEADS = ['none', 'lawful', 'rolling', 'straight'] as const;
-export const PRESSURES = ['calm', 'honk'] as const;
-export const ENVS = ['day', 'night', 'rain'] as const;
-export const JAMS = ['none', 'jam'] as const;
-
 export interface LibraryTags {
+  /** 덧붙이는 사람들 — id 의 맨 앞자리 (EXTRAS 주석) */
+  extra: (typeof EXTRAS)[number];
   signal: (typeof SIGNALS)[number];
   zone: (typeof ZONES)[number];
   sigA: (typeof SIG_AS)[number];
@@ -148,6 +203,8 @@ export interface LibraryTags {
 
 /** 축 이름 → 값 목록. **id 의 자리 순서이기도 하다** — 순서를 바꾸면 id 가 바뀐다 */
 export const AXES: { [K in keyof LibraryTags]: readonly LibraryTags[K][] } = {
+  // 맨 앞자리 — 'none' 이 0 이라 이미 있던 열두 자리 id 가 그대로다
+  extra: EXTRAS,
   signal: SIGNALS,
   zone: ZONES,
   sigA: SIG_AS,
@@ -312,6 +369,31 @@ export function combinationAllowed(t: LibraryTags): boolean {
   */
   if (t.jam === 'jam' && (hasPeds(t) || t.zone === 'yes' || t.approach !== 'none' || hasArrow(t))) return false;
 
+  /*
+    ── 덧붙이는 사람들 (EXTRAS) ──
+    맑고 조용한 판에만 · 우회전 신호등 판에는 두지 않는다. 자전거는 신호를 지키므로 그 횡단보도의 보행신호가 녹색인
+    구간이거나 신호기가 없어야 한다 (위 자전거 규칙과 같다). 첫 횡단보도의 자전거는 기본 자전거 판(A 축)과 겹치지 않게
+    다른 사람이 함께 있을 때만 — 첫 횡단보도가 비었으면 우회전 후에는 사람이 있어야 한다. 우회전 후 횡단보도의 자전거는
+    거기 사람이 있을 때만이고('나올 수도' · '뛰어듦' 은 뺀다), 자전거횡단도는 한 판에 하나다.
+  */
+  if (t.extra !== 'none') {
+    const x = extrasOf(t);
+    if (t.lead !== 'none' || t.jam === 'jam' || t.pressure === 'honk' || t.env !== 'day' || hasArrow(t)) return false;
+    if (x.rideA || x.pushA) {
+      if (t.a === 'bikeRide' || t.a === 'bikePush') return false;
+      if (t.a === 'none' && t.c === 'none') return false;
+      if (t.sigA === 'yes' && !pedAGreen(t)) return false;
+      // 걷는 사람은 한 횡단보도에 셋까지 — 셋이 이미 있으면 끌고 가는 사람을 더하지 않는다
+      if (x.pushA && t.a === 'crowd') return false;
+    }
+    if (x.rideC || x.pushC) {
+      if (t.c === 'none' || t.c === 'maybe' || t.c === 'late') return false;
+      if (t.sigC === 'yes' && !pedCGreen(t)) return false;
+      if (x.rideC && t.a === 'bikeRide') return false;
+      if (x.pushC && t.c === 'crowd') return false;
+    }
+    if (x.pedS && (t.approach !== 'noSignal' || t.a === 'none')) return false;
+  }
   return true;
 }
 
@@ -821,6 +903,36 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     out.push({ crosswalk: 'C', at: 0, from: waits, kind: companion(t), letsCarPass: true });
     out.push({ crosswalk: 'C', at: 0, startWithin: 10, from: other(waits), obeysSignal: false, kind });
   }
+
+  /*
+    ── 덧붙이는 사람들 (EXTRAS) ──
+    자전거는 기본 자전거 판과 같은 방아쇠(타고 6m · 끌고 12m)를 쓴다 — 멀리서 나서면 내가 닿기 전에 다 건너 역할을 잃는다.
+    함께 선 사람은 보호구역이면 아이다(companion). 진입로 횡단보도의 아이는 pedestriansOf 의 것과 같은 값이다.
+  */
+  const x = extrasOf(t);
+  if (x.rideA) out.push({ crosswalk: 'A', at: 0, startWithin: 6, from: side(41), kind: companion(t), bike: 'ride', ...freeA });
+  if (x.pushA) out.push({ crosswalk: 'A', at: 0, startWithin: 12, from: side(42), kind: companion(t), bike: 'push', ...freeA });
+  /*
+    우회전 후 횡단보도의 자전거 · 끄는 사람은 **기본 C 사람과 같은 시각 규칙**을 따른다 (위 cSelfStart) — 첫 횡단보도에서
+    늦어지는 판에서 처음부터 서서 차를 기다리게 두었더니, 녹색이 점멸로 바뀌어 뜻을 접고 서 있기만 했다 (플레이테스트가 잡았다).
+  */
+  if (x.rideC) {
+    // 자전거는 걸음의 두 배라 **먼저**(cAt−1) 나선다 — cAt+2 로 두었더니 녹색점멸에 걸려 뜻을 접었다 (플레이테스트가 잡았다).
+    // 22.8m 를 9초에 건너므로 내가 우회전 후 횡단보도에 닿을 때(약 30초) 아직 차도 위에 있다
+    out.push(
+      cSelfStart
+        ? { crosswalk: 'C', at: cAt - 1, from: side(43), kind: companion(t), bike: 'ride' }
+        : { crosswalk: 'C', at: 0, startWithin: 6, from: side(43), kind: companion(t), bike: 'ride', ...freeC },
+    );
+  }
+  if (x.pushC) {
+    out.push(
+      cSelfStart
+        ? { crosswalk: 'C', at: cAt, from: side(44), kind: companion(t), bike: 'push' }
+        : { crosswalk: 'C', at: 0, startWithin: 12, from: side(44), kind: companion(t), bike: 'push', ...freeC },
+    );
+  }
+  if (x.pedS) out.push({ crosswalk: 'S', at: 0, startWithin: 14, from: side(45), obeysSignal: false, kind: 'child' });
   return out;
 }
 
@@ -852,7 +964,7 @@ function titleOf(t: LibraryTags): string {
   if (t.approach === 'signal') parts.push('진입로 보호구역 신호 횡단보도');
   if (t.approach === 'noSignal') parts.push('진입로 보호구역 무신호 횡단보도');
   // 그 횡단보도에 선 아이 — 판 번호가 아니라 태그로 갈리므로 제목이 판과 어긋나지 않는다 (hasApproachPed)
-  if (hasApproachPed(t)) parts.push('진입로 횡단보도 어린이');
+  if (hasApproachPed(t) || extrasOf(t).pedS) parts.push('진입로 횡단보도 어린이');
   if (t.a === 'waiting') parts.push(`첫 횡단보도 건너려는 ${who}`);
   if (t.a === 'crossing') parts.push(`첫 횡단보도 ${who}`);
   if (t.a === 'jaywalk') parts.push(`첫 횡단보도 무단횡단 ${who}`);
@@ -881,6 +993,15 @@ function titleOf(t: LibraryTags): string {
   if (t.c === 'maybe') parts.push('아이가 나올 수도 있음');
   if (t.c === 'jaywalkWait') parts.push(`우회전 후 무단횡단하려는 ${cWho}`);
   if (t.c === 'mixed') parts.push(`우회전 후 신호 지키는 사람 · 무단횡단 ${cWho}`);
+  {
+    // 덧붙이는 사람들 (EXTRAS) — 판마다 제목이 달라야 한다 (tests: 제목이 모두 다르다)
+    const x = extrasOf(t);
+    const rider = companion(t) === 'child' ? '어린이' : '어른';
+    if (x.rideA) parts.push(`첫 횡단보도 자전거횡단도 · 함께 타고 건너는 ${rider} 자전거`);
+    if (x.pushA) parts.push('첫 횡단보도 자전거 끌고 건너는 사람 함께');
+    if (x.rideC) parts.push(`우회전 후 자전거횡단도 · 타고 건너는 ${rider} 자전거`);
+    if (x.pushC) parts.push('우회전 후 자전거 끌고 건너는 사람');
+  }
   if (t.lead === 'lawful') parts.push('앞차 우회전');
   if (t.lead === 'rolling') parts.push('앞차 일시정지 무시');
   if (t.lead === 'straight') parts.push('앞차 직진 대기');
@@ -933,6 +1054,14 @@ function briefOf(t: LibraryTags): string {
   else if (t.c === 'jaywalkWait') s.push('우회전해서 나가는 횡단보도 앞에 보행신호가 적색인데도 건너려는 사람이 서 있습니다.');
   else if (t.c === 'mixed') s.push('우회전해서 나가는 횡단보도에 신호를 지키는 사람과, 신호를 무시하려는 사람이 함께 있습니다.');
   else if (t.c !== 'none') s.push('우회전해서 나가는 횡단보도에 사람이 있습니다.');
+  {
+    const x = extrasOf(t);
+    if (x.rideA) s.push('첫 횡단보도 옆 자전거횡단도로 자전거도 함께 건넙니다 — 걸음보다 빠릅니다.');
+    if (x.pushA) s.push('첫 횡단보도를 자전거에서 내려 끌고 건너는 사람도 있습니다.');
+    if (x.rideC) s.push('우회전해서 나가는 횡단보도 옆에도 자전거횡단도가 있어 자전거가 타고 건넙니다.');
+    if (x.pushC) s.push('우회전해서 나가는 횡단보도를 자전거에서 내려 끌고 건너는 사람도 있습니다.');
+    if (x.pedS) s.push('진입로 보호구역 횡단보도에도 아이가 서 있습니다.');
+  }
   if (t.lead !== 'none' && hasPeds(t)) s.push('앞차가 지나간 뒤에도 횡단보도를 보세요.');
   if (t.lead === 'lawful') s.push('앞차가 먼저 우회전합니다.');
   if (t.lead === 'rolling') s.push('앞차가 먼저 우회전하려 합니다. 앞차를 잘 보세요.');
@@ -951,13 +1080,13 @@ function teachesOf(t: LibraryTags): string {
     자전거가 오고(제15조의2 제3항 일시정지), 없으면 내려서 끌고 건너는 사람이 오며 그 사람은 보행자다
     (제13조의2 제6항 · 제2조 제17호).
   */
-  if (t.a === 'bikeRide') {
+  if (t.a === 'bikeRide' || extrasOf(t).rideA || extrasOf(t).rideC) {
     s.push(
       '횡단보도 옆의 붉은 띠에 자전거 표시가 있으면 자전거횡단도입니다 — 자전거가 타고 건널 수 있는 곳이고, 그 앞에서 일시정지해야 합니다(제15조의2 제3항).',
     );
     s.push('타고 건너는 자전거는 걸어오는 사람보다 두 배 넘게 빠릅니다 — 멀리 있다고 먼저 지나가지 마세요.');
   }
-  if (t.a === 'bikePush') {
+  if (t.a === 'bikePush' || extrasOf(t).pushA || extrasOf(t).pushC) {
     s.push(
       '자전거횡단도가 없는 횡단보도에서는 자전거에서 내려 끌고 건너야 합니다(제13조의2 제6항). 그렇게 끌고 가는 사람은 보행자입니다(제2조 제17호) — 보행자 보호 의무가 그대로 걸립니다.',
     );
@@ -1035,8 +1164,14 @@ function targetsOf(t: LibraryTags): ViolationCode[] {
     **타고 건너는 자전거는 보행자가 아니다** — 그 판이 시험하는 것은 `BIKE_BLOCKED` 다 (제15조의2 제3항).
     끌고 건너는 사람은 보행자이므로 `PEDESTRIAN_BLOCKED` 그대로다 (제2조 제17호).
   */
-  if (t.a === 'bikeRide') out.add('BIKE_BLOCKED');
-  else if (hasPeds(t) || hasApproachPed(t)) out.add('PEDESTRIAN_BLOCKED');
+  const x = extrasOf(t);
+  /*
+    **덧붙인 자전거는 첫 횡단보도가 비었을 때만 시험한다.** 걷는 사람과 함께 선 자전거는 그 사람에게 가려 — 안 보는 운전자는
+    사람 앞에서 먼저 걸리고 자전거는 그 뒤에 나선다 — 판이 자전거 위반을 잡지 못했다 (플레이테스트가 잡았다: 시험못함).
+    시험하지 못하는 위반을 적어 두면 그 판 몇 번으로 습관이 '고쳐졌다' 가 된다.
+  */
+  if (t.a === 'bikeRide' || (x.rideA && t.a === 'none')) out.add('BIKE_BLOCKED');
+  if ((t.a !== 'bikeRide' && hasPeds(t)) || hasApproachPed(t) || x.pushA || x.pushC || x.pedS) out.add('PEDESTRIAN_BLOCKED');
   if ((t.zone === 'yes' && (t.sigA === 'no' || t.sigC === 'no')) || t.approach === 'noSignal') out.add('SCHOOL_ZONE_NO_STOP');
   if (t.approach === 'signal' && t.lead === 'none') out.add('SCHOOL_ZONE_RED');
   if (t.lead === 'rolling') out.add('RED_NO_STOP');
@@ -1062,7 +1197,11 @@ export function buildLibrarySpec(t: LibraryTags): ScenarioSpec {
       **자전거횡단도는 타고 건너는 판에만 그린다.** 끌고 건너는 판에 그려 두면 판의 글이 거짓말이 된다 —
       거기서는 타고 건너도 되는데 굳이 내려서 끄는 셈이 되기 때문이다 (제13조의2 제6항).
     */
-    ...(t.a === 'bikeRide' ? { bikeLane: 'A' as const } : {}),
+    ...(t.a === 'bikeRide' || extrasOf(t).rideA
+      ? { bikeLane: 'A' as const }
+      : extrasOf(t).rideC
+        ? { bikeLane: 'C' as const }
+        : {}),
     ...(hasArrow(t) ? { rightArrowInstalled: true } : {}),
     ...(t.approach === 'signal'
       ? {
@@ -1126,15 +1265,23 @@ export function conceptStage(t: LibraryTags): number {
   if (t.zone === 'yes' || t.approach !== 'none' || t.c === 'maybe') up(2);
   if (t.lead === 'lawful' || t.lead === 'straight' || t.jam === 'jam') up(4);
   if (t.lead === 'rolling') up(5);
-  if (severalPeople(t)) up(6);
+  if (severalPeople(t) || t.extra !== 'none') up(6);
   /*
     **한 횡단보도에 둘 이상**은 '보행자 여럿' 의 맨 끝이다 — 양쪽에서 동시에, 또는 한쪽에서 셋이 차례로.
     여럿을 이미 겪은 뒤에 만나야 하므로 그 위의 단계에 둔다. (이 단계에는 `LEVEL_CONCEPTS` 의 열쇠가 없다 —
     새로 여는 개념이 아니라 **같은 개념의 가장 어려운 모습**이라, 레벨 안내에 한 줄 더 적을 것이 없다.)
   */
-  if (manyAtOneCrosswalk(t)) up(7);
+  /*
+    **덧붙인 사람이 둘 이상**(rideApushC · rideCpushC · pedSrideCpushC — 타는 자전거와 끄는 사람, 거기에 진입로 어린이)도
+    같은 자리다 — 기본 판의 어느 장면보다 사람이 많다(다섯~일곱). 덧붙인 판을 모두 6 에 두었더니 줄을 세우는 key 가 같아
+    일곱 사람 판(M10519)이 세 사람 판(M09020)과 같은 레벨 후보가 되었다.
+  */
+  if (manyAtOneCrosswalk(t) || extraCount(t) >= 2) up(7);
   return s;
 }
+
+/** 덧붙인 사람의 수 — 타는 자전거 · 끄는 사람 · 진입로 어린이를 하나씩 센다 (0~3) */
+const extraCount = (t: LibraryTags): number => Object.values(extrasOf(t)).filter(Boolean).length;
 
 /** 보행자 여럿 — 한 판에서 누가 나설지 가려 봐야 하는 판 (여럿 · 돌 때 뛰어듦 · 양쪽 · 신호 지키는 사람 + 무단횡단) */
 const severalPeople = (t: LibraryTags): boolean =>
@@ -1159,6 +1306,8 @@ export function layersOf(t: LibraryTags): number {
     severalPeople(t),
     t.env !== 'day',
     t.pressure === 'honk',
+    // 덧붙인 사람들은 한 겹 더 — 같은 개념의 가장 복잡한 모습이라 뒤에 선다
+    t.extra !== 'none',
   ].filter(Boolean).length;
 }
 
@@ -1214,7 +1363,6 @@ function assignLevels(entries: LibraryEntry[]): void {
   };
   const sorted = [...entries].sort(byKey);
   const total = Object.values(LEVEL_SHARE).reduce((n, x) => n + x, 0);
-  const share = (level: number) => (entries.length * LEVEL_SHARE[level as Difficulty]) / total;
 
   /*
     **L1 — 줄의 맨 앞 몫에서 야간 판만 뺀다** (L1_EXCLUDES). 빈자리를 다음 차례의 판으로 채우지 않는다 — 채웠더니 쉬운
@@ -1227,12 +1375,25 @@ function assignLevels(entries: LibraryEntry[]): void {
     보행자 축에 값을 더해 판이 8,958 → 11,154 로 늘자 보호구역이 L2 가 아니라 L1 에서 열렸다.
     개념으로 막아 두면 판 수가 얼마가 되든 여는 차례가 흔들리지 않는다.
   */
-  const l1Count = Math.round(share(1));
+  /*
+    **L1 의 몫은 기본 판(덧붙인 사람 없음)으로 잰다.** 덧붙인 판(EXTRAS)은 모두 어려운 판이라 줄의 뒤에 서는데, 그 수만큼
+    L1 의 몫을 키우면 줄 앞쪽의 기본 개념 판을 더 깊이 퍼 가 **한 레벨 위(L2)의 판보다 어려운 판이 L1 에 든다**
+    (tests/library.test.ts 가 레벨 사이의 어려움 순서로 못 박는다). 그래서 L1 은 덧붙인 판이 없던 때와 같은 수다.
+  */
+  /*
+    **덧붙인 판(EXTRAS)은 정원 밖의 덤이다.** 기본 판만으로 지금까지와 똑같이 레벨을 매기고(정원 · 야간 비율 · 개념 차례가
+    그대로다), 덧붙인 판은 그 어려움(key)이 드는 레벨에 얹는다 — 레벨의 key 범위는 기본 판이 만든 것이라 "한 레벨 위의
+    판이 더 어렵거나 같다" 가 그대로 지켜진다. 처음에 덧붙인 판을 기본 판과 함께 줄 세워 정원대로 잘랐더니, 덤의 수만큼
+    아래 레벨의 몫이 커져 '보행자 여럿' 이 L7 이 아니라 L6 에서 열렸다 (tests/recommend.test.ts 가 잡았다).
+  */
+  const base = entries.filter((e) => e.tags.extra === 'none');
+  const extras = entries.filter((e) => e.tags.extra !== 'none');
+  const l1Count = Math.round((base.length * LEVEL_SHARE[1]) / total);
+  const sortedBase = sorted.filter((e) => e.tags.extra === 'none');
   const l1 = new Set(
-    sorted.slice(0, l1Count).filter((e) => !L1_EXCLUDES(e.tags) && conceptStage(e.tags) <= 1),
+    sortedBase.slice(0, l1Count).filter((e) => !L1_EXCLUDES(e.tags) && conceptStage(e.tags) <= 1),
   );
   for (const e of l1) e.level = 1;
-
   /*
     **L2 ~ L10 — 야간 판을 같은 비율로 나눠 담는다.** 사용자가 "야간 판을 레벨 2 ~ 레벨 10 까지 고르게 분포시켜 줘" 라고
     했다. 한 줄로 세우면 밤이 겹친 조건 하나(+1)로 세어져 레벨마다 야간 비율이 23%(L7) ~ 44%(L10)로 들쭉날쭉했고, L1 에서
@@ -1240,7 +1401,7 @@ function assignLevels(entries: LibraryEntry[]): void {
     — 야간 2,986판 ÷ L2 ~ L10 8,805판)로 떠서 담는다. 줄마다 쉬운 판이 앞에 서므로, 같은 환경끼리는 쉬운 판이 낮은 레벨에
     서는 원칙이 그대로다. 레벨의 판 수는 L1 이 덜어 낸 만큼을 L2 ~ L10 이 정원 비율대로 나눠 받는다.
   */
-  const rest = sorted.filter((e) => !l1.has(e));
+  const rest = sortedBase.filter((e) => !l1.has(e));
   const nights = rest.filter((e) => L1_EXCLUDES(e.tags));
   const others = rest.filter((e) => !L1_EXCLUDES(e.tags));
   const upper = [2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -1257,6 +1418,46 @@ function assignLevels(entries: LibraryEntry[]): void {
     for (; takenNight < nightTo; takenNight++) nights[takenNight].level = level;
     for (; takenOther < otherTo; takenOther++) others[takenOther].level = level;
   }
+  /*
+    **덧붙인 판(EXTRAS) — '보행자 여럿' 이 열린 레벨부터, 어려움 차례로, 정원 비율로 얹는다.**
+
+    덧붙인 판은 모두 사람이 더 선 판이라 '보행자 여럿'(conceptStage 6)이 열리기 전에는 나오지 않는다 — 처음에는 key
+    범위만 보고 L6 에도 여덟 판을 두었는데, L6 은 아직 여럿을 열지 않은 레벨이다.
+
+    같은 key 안에서는 **난이도 점수(cost) 순**으로 아래 레벨부터 채운다. 처음에는 key 가 같은 판을 정원이 덜 찬 레벨에
+    번갈아 넣었는데, 그러면 같은 key(16)인 판 중 사람 셋 · 13점(M09020)이 L9 에, 사람 일곱 · 21점(M10519)이 L7 에 서는
+    식으로 **어려운 판이 쉬운 판보다 낮은 레벨에** 갔다 — 사용자가 "난이도에 맞는 맵을 전체적으로 재검토" 하라고 했다.
+    기본 판이 줄을 서는 기준([key, cost, id])과 같은 차례로 세우고, 정원(LEVEL_SHARE)만큼 차면 다음 레벨로 넘어간다.
+
+    다만 **레벨의 key 범위를 벗어나지 않는다** — 범위는 맑은 낮 줄의 기본 판(위 others)이 만든 것이고, tests/library.test.ts
+    가 "한 레벨 위의 판은 더 어렵거나 같다" 를 모든 판으로 잰다. 그래서 판마다 key 가 드는 레벨들(여럿을 연 레벨 이상)
+    가운데 정원이 남은 가장 낮은 레벨에 두고, 모두 찼으면 그중 가장 높은 레벨에 둔다. 범위 밖(더 어려운) 것은 L10 에 간다.
+  */
+  const keyOf = (e: LibraryEntry): number => conceptStage(e.tags) * 2 + layersOf(e.tags);
+  const range = new Map<number, { min: number; max: number }>();
+  for (const e of others) {
+    const k = keyOf(e);
+    const r = range.get(e.level) ?? { min: k, max: k };
+    range.set(e.level, { min: Math.min(r.min, k), max: Math.max(r.max, k) });
+  }
+  // 여럿이 처음 서는 레벨 — 기본 판 가운데 conceptStage 6 이상(보행자 여럿)이 처음 나오는 레벨 (levelGuide 의 'several' 은 몫이 OPENS_SHARE 를 넘는 레벨이라 한 칸 뒤일 수 있다)
+  const firstSeveral = Math.min(...others.filter((e) => conceptStage(e.tags) >= 6).map((e) => e.level));
+  const extraLevels = upper.filter((l) => l >= firstSeveral);
+  const extraShare = extraLevels.reduce((n, l) => n + LEVEL_SHARE[l], 0);
+  const quota = new Map(extraLevels.map((l) => [l, (extras.length * LEVEL_SHARE[l]) / extraShare]));
+  const given = new Map<number, number>();
+  for (const e of [...extras].sort(byKey)) {
+    const k = keyOf(e);
+    const fits = extraLevels.filter((l) => {
+      const r = range.get(l);
+      return r !== undefined && k >= r.min && k <= r.max;
+    });
+    const open = fits.filter((l) => (given.get(l) ?? 0) < (quota.get(l) ?? 0));
+    const pick = open.length ? open[0] : fits.length ? fits[fits.length - 1] : k > (range.get(10)?.max ?? 0) ? 10 : firstSeveral;
+    given.set(pick, (given.get(pick) ?? 0) + 1);
+    e.level = pick as Difficulty;
+  }
+  void base;
 }
 
 /**
@@ -1555,10 +1756,8 @@ export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
  * ④ 우회전 + 사람 둘(양쪽에서) ⑤ 보호구역 + 사람 둘(양쪽에서) ⑥ 우회전+보호구역 중급(사람 둘) ⑦ 상급(사람 둘 + 자전거)
  * ⑧ 최상급(사람 셋 + 자전거 둘) ⑨ 최상급2(보호구역 진입로 뒤 교차로 · 사람 넷 + 자전거 둘) ⑩ 최상급3(같은 길 · 사람 다섯 + 자전거 둘).
  *
- * **라이브러리에 있는 것으로 가장 가깝게 맞췄다.** 없는 것은 셋이다 — 자전거와 다른 사람이 한 판에 서는 판(자전거 판은 첫
- * 횡단보도 하나로 끝낸다, combinationAllowed), 타는 자전거와 끄는 자전거가 함께 있는 판(A 축은 값 하나다), 다섯 사람(가장
- * 많은 판이 넷 — 첫 횡단보도 둘(mixed) + 우회전 후 둘(group)). 그래서 ⑦은 자전거 한 대(사람 없음), ⑧은 사람 셋(자전거 없음),
- * ⑨ · ⑩은 사람 넷이다. 사용자에게 그렇게 알렸다 (CHANGELOG).
+ * 처음에는 라이브러리에 없는 것(자전거 + 사람 · 타는 자전거 + 끄는 자전거 · 다섯 사람)을 가장 가까운 판으로 맞췄는데, 사용자가
+ * "라이브러리에 새 축을 더해줘" 라고 해 열셋째 축(EXTRAS)을 두었다 — 이제 ⑦~⑩ 이 정한 그대로다.
  *
  * 밤 · 비 · 재촉 · 앞차는 넣지 않는다 — 보여 줄 것은 판단이지 시야가 아니다. **차례는 여기 적힌 순서다** (사용자가 정한 차례).
  */
@@ -1571,20 +1770,20 @@ const DEMO: readonly Partial<LibraryTags>[] = [
   { signal: 'green', c: 'group' },
   // ⑥ 중급 — 어린이보호구역 교차로 · 우회전 후 양방향 어린이 둘 (M00625)
   { signal: 'green', zone: 'yes', c: 'group', kind: 'child' },
-  // ⑦ 상급 — 보호구역 첫 횡단보도 무신호 · 자전거횡단도를 타고 건너는 어린이 (M08413). 사람은 함께 둘 수 없다
-  { signal: 'green', zone: 'yes', sigA: 'no', a: 'bikeRide', kind: 'child' },
-  // ⑧ 최상급 — 첫 횡단보도에 신호 지키는 사람 + 무단횡단 어린이, 우회전 후 건너는 사람: 셋이 저마다 다른 쪽에서 (M05401)
-  { signal: 'green', zone: 'yes', a: 'mixed', c: 'crossing', kind: 'child' },
-  // ⑨ 최상급2 — 진입로 보호구역 무신호 횡단보도를 지나 교차로 · 사람 넷(첫 횡단보도 둘 + 우회전 후 양방향 둘) (M05179)
-  { signal: 'green', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child' },
-  // ⑩ 최상급3 — 같은 길에 우회전 신호등 적색까지 · 사람 넷 (M06763, 가장 어려운 판)
-  { signal: 'arrowRed', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child' },
+  // ⑦ 상급 — 보호구역 · 우회전 후 양방향 어린이 둘 + 첫 횡단보도(무신호) 자전거횡단도를 타고 건너는 어린이 자전거 (EXTRAS)
+  { signal: 'green', zone: 'yes', sigA: 'no', c: 'group', kind: 'child', extra: 'rideA' },
+  // ⑧ 최상급 — 첫 횡단보도 건너는 아이 + 우회전 후 양방향 둘(셋이 저마다 다른 쪽) + 타는 자전거(A) + 끌고 가는 사람(C)
+  { signal: 'green', zone: 'yes', sigA: 'no', a: 'crossing', c: 'group', kind: 'child', extra: 'rideApushC' },
+  // ⑨ 최상급2 — 진입로 보호구역 무신호 횡단보도를 지나 교차로 · 사람 넷(첫 횡단보도 둘 + 우회전 후 양방향 둘) + 우회전 후 자전거 둘(타고 · 끌고)
+  { signal: 'green', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child', extra: 'rideCpushC' },
+  // ⑩ 최상급3 — 같은 길 · 진입로 횡단보도의 아이까지 다섯 사람 + 자전거 둘
+  { signal: 'green', approach: 'noSignal', a: 'mixed', c: 'group', kind: 'child', extra: 'pedSrideCpushC' },
 ];
 
 /** 시범 코스 — 맑은 낮 · 재촉 없음 · 나머지는 가장 단순한 값으로 채운 판. **DEMO 에 적힌 차례 그대로** */
 export function demoCourses(): LibraryEntry[] {
   const plain: Partial<LibraryTags> = {
-    zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
+    extra: 'none', zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
     approach: 'none', lead: 'none', pressure: 'calm', env: 'day', jam: 'none',
   };
   return DEMO.map((want) => {

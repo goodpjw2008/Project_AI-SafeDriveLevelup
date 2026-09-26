@@ -253,11 +253,18 @@ export const BIKE_LANE_WIDTH = 2.0;
  */
 export const bikeLaneCenter = (at: 'S' | 'A' | 'B' | 'C'): number => {
   const h = BIKE_LANE_WIDTH / 2;
-  // S · A 는 z 가 큰 쪽에서, B 는 z 가 큰 쪽에서(INNER 가 가깝다), C 는 x 가 작은 쪽에서 만난다
+  // S · A 는 z 가 큰 쪽에서, B 는 z 가 큰 쪽에서(INNER 가 가깝다) 만난다
   if (at === 'S') return CROSSWALK_S_OUTER + h;
   if (at === 'A') return CROSSWALK_OUTER + h;
   if (at === 'B') return CROSSWALK_B_INNER + h;
-  return CROSSWALK_INNER - h;
+  /*
+    **C 만 지나고 만나는 가장자리(x 가 큰 쪽)에 붙인다.** S · A · B 는 정지선과 횡단보도 사이에 띠가 놓여 정지선에 선 차가
+    띠를 밟지 않는데, 우회전 후 횡단보도(C)에는 정지선이 없어 운전자(AutoDriver · driveSim · playSim)가 **횡단보도 가장자리
+    1m 앞**에 선다 — 먼저 만나는 쪽(12.8~14.8)에 띠를 두었더니 그 자리가 곧 띠 위라, 규정대로 선 차를 타고 건너는 자전거가
+    들이받았다 (우회전 후 자전거횡단도 판 84개가 전수 검증에서 PEDESTRIAN_HIT). 판정은 자전거의 자리가 아니라 상태
+    (intendsToCross · onConflictPath)로 보므로 띠가 건너편에 있어도 "자전거가 다 건널 때까지 선다" 는 그대로다.
+  */
+  return CROSSWALK_OUTER + h;
 };
 
 /**

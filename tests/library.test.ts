@@ -34,7 +34,7 @@ import { XP_PER_CLEAN_RUN, xpToNext, type Difficulty } from '../src/scenarios/cu
 
 const lib = scenarioLibrary();
 const base: LibraryTags = {
-  signal: 'green',
+  extra: 'none', signal: 'green',
   zone: 'no',
   sigA: 'yes',
   sigC: 'yes',
@@ -183,34 +183,40 @@ describe('AI 자율 주행 시범 코스', () => {
       'L00001', // ② 우회전 녹색 · 사람 없음
       'L00091', // ④ 우회전 + 사람 둘(양쪽에서)
       'M00625', // ⑥ 중급 — 보호구역 교차로 · 우회전 후 양방향 어린이 둘
-      'M08413', // ⑦ 상급 — 보호구역 첫 횡단보도 무신호 · 타고 건너는 어린이 자전거
-      'M05401', // ⑧ 최상급 — 첫 횡단보도 둘(지키는 사람 · 무단횡단 어린이) + 우회전 후 하나
-      'M05179', // ⑨ 최상급2 — 진입로 보호구역 무신호 뒤 교차로 · 사람 넷
-      'M06763', // ⑩ 최상급3 — 같은 길 + 우회전 신호등 적색 · 사람 넷
+      'M09020', // ⑦ 상급 — 보호구역 · 우회전 후 양방향 어린이 둘 + 첫 횡단보도 타고 건너는 어린이 자전거 (EXTRAS rideA)
+      'M10168', // ⑧ 최상급 — 첫 횡단보도 아이 + 우회전 후 둘 + 타는 자전거(A) + 끌고 가는 사람(C) (EXTRAS rideApushC)
+      'M10266', // ⑨ 최상급2 — 진입로 보호구역 무신호 뒤 교차로 · 사람 넷 + 우회전 후 자전거 둘 (EXTRAS rideCpushC)
+      'M10519', // ⑩ 최상급3 — 같은 길 · 진입로 어린이까지 다섯 + 자전거 둘 (EXTRAS pedSrideCpushC)
     ]);
     const all = new Set(demo.flatMap((e) => e.targets));
-    for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP', 'BIKE_BLOCKED'] as const) {
+    // 사용자의 열 판에 우회전 신호등 판은 없다 — 정한 대로 둔다
+    for (const code of ['RED_NO_STOP', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP', 'BIKE_BLOCKED'] as const) {
       expect(all.has(code), code).toBe(true);
     }
     expect(demo.every((e) => e.tags.env === 'day' && e.tags.pressure === 'calm' && e.tags.jam === 'none' && e.tags.lead === 'none')).toBe(true);
   });
 
-  it('사람 수와 오는 쪽이 사용자가 정한 것에 가장 가깝다 — 둘 · 둘 · 자전거 · 셋 · 넷 · 넷', () => {
+  it('사람 수와 오는 쪽이 사용자가 정한 그대로다 — 둘 · 둘 · 둘+자전거 · 셋+자전거 둘 · 넷+자전거 둘 · 다섯+자전거 둘', () => {
     const walkers = (e: { spec: { pedestrians: Array<{ bike?: string; crosswalk: string; from: string }> } }) =>
       e.spec.pedestrians.filter((p) => !p.bike);
     const dirs = (e: Parameters<typeof walkers>[0]) => new Set(walkers(e).map((p) => `${p.crosswalk}:${p.from}`)).size;
-    const [red, green, two, mid, bike, three, four, four2] = demoCourses();
+    const bikes = (e: Parameters<typeof walkers>[0]) => [
+      e.spec.pedestrians.filter((p) => p.bike === 'ride').length,
+      e.spec.pedestrians.filter((p) => p.bike === 'push').length,
+    ];
+    const [red, green, two, mid, bike, three, four, five] = demoCourses();
     expect(walkers(red)).toHaveLength(0);
     expect(walkers(green)).toHaveLength(0);
     expect([walkers(two).length, dirs(two)]).toEqual([2, 2]);
     expect([walkers(mid).length, dirs(mid)]).toEqual([2, 2]);
-    expect(bike.spec.pedestrians.filter((p) => p.bike === 'ride')).toHaveLength(1);
-    expect([walkers(three).length, dirs(three)]).toEqual([3, 3]);
-    expect([walkers(four).length, dirs(four)]).toEqual([4, 4]);
-    expect([walkers(four2).length, dirs(four2)]).toEqual([4, 4]);
-    // ⑨ · ⑩ 은 진입로 보호구역을 지나 교차로에 닿는 길이다
+    expect([walkers(bike).length, dirs(bike), ...bikes(bike)]).toEqual([2, 2, 1, 0]);
+    expect([walkers(three).length, dirs(three), ...bikes(three)]).toEqual([3, 3, 1, 1]);
+    expect([walkers(four).length, dirs(four), ...bikes(four)]).toEqual([4, 4, 1, 1]);
+    expect([walkers(five).length, dirs(five), ...bikes(five)]).toEqual([5, 5, 1, 1]);
+    // ⑨ · ⑩ 은 진입로 보호구역을 지나 교차로에 닿는 길이고, ⑩ 은 그 횡단보도에도 아이가 선다
     expect(four.spec.approachSchoolZone).toBeTruthy();
-    expect(four2.spec.approachSchoolZone).toBeTruthy();
+    expect(five.spec.approachSchoolZone).toBeTruthy();
+    expect(five.spec.pedestrians.some((p) => p.crosswalk === 'S')).toBe(true);
   });
 });
 
@@ -222,7 +228,8 @@ describe('AI 자율 주행 시범 코스', () => {
 */
 describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
   it('레벨마다 정원만큼 — 오래 머무는 레벨일수록 많다', () => {
-    const lib = scenarioLibrary();
+    // 덧붙인 판(EXTRAS)은 정원 밖의 덤이라 기본 판으로 잰다 (library.ts 의 assignLevels)
+    const lib = scenarioLibrary().filter((e) => e.tags.extra === 'none');
     const count = (l: number) => lib.filter((e) => e.level === l).length;
     const total = Object.values(LEVEL_SHARE).reduce((n, x) => n + x, 0);
     // L1 은 정원에서 야간 판을 뺀 만큼이고(L1_EXCLUDES), 덜어 낸 만큼을 L2 ~ L10 이 정원 비율대로 나눠 받는다
@@ -276,7 +283,8 @@ describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
     판으로 채우지 않고 야간 판만 L2 로 옮긴다(채웠더니 보호구역 판이 끌려와 보호구역이 L1 에서 열렸다).
   */
   it('L1 에는 야간 판이 없다 — 비는 둔다, 보호구역은 여전히 L2 에서 연다', () => {
-    const lib = scenarioLibrary();
+    // 덧붙인 판(EXTRAS)은 맑은 낮뿐이라 기본 판으로 잰다
+    const lib = scenarioLibrary().filter((e) => e.tags.extra === 'none');
     const l1 = lib.filter((e) => e.level === 1);
     expect(l1.some((e) => e.tags.env === 'night')).toBe(false);
     expect(l1.some((e) => e.tags.env === 'rain'), '비는 둔다').toBe(true);
@@ -290,7 +298,8 @@ describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
     판 수가 다르므로(L2 220 · L10 2,201) 개수가 아니라 **비율**을 같게 둔다. 한 줄로 세우던 때는 23%(L7) ~ 44%(L10) 였다.
   */
   it('L2 ~ L10 의 야간 비율이 모두 같다 (1%p 안)', () => {
-    const lib = scenarioLibrary();
+    // 덧붙인 판(EXTRAS)은 맑은 낮뿐이라 기본 판으로 잰다 (library.ts 의 assignLevels)
+    const lib = scenarioLibrary().filter((e) => e.tags.extra === 'none');
     const upper = lib.filter((e) => e.level >= 2);
     const overall = upper.filter((e) => e.tags.env === 'night').length / upper.length;
     for (let l = 2; l <= 10; l++) {
@@ -306,7 +315,8 @@ describe('레벨별 판 수 — 경험치 곡선을 따른다', () => {
     보호구역이 열리는 L2 부터 본다 (L1 의 보호구역 판은 몇 개뿐이라 비율이 뜻이 없다).
   */
   it('보호구역 판 중 신호기 없는 판의 비율이 L2 ~ L10 에서 고르다', () => {
-    const lib = scenarioLibrary();
+    // 덧붙인 판(EXTRAS)은 첫 횡단보도 자전거가 무신호에서만 서서 무신호 쪽으로 기울어 있다 — 고름은 기본 판으로 잰다
+    const lib = scenarioLibrary().filter((e) => e.tags.extra === 'none');
     const ratios: number[] = [];
     for (let l = 2; l <= 10; l++) {
       const zone = lib.filter((e) => e.level === l && zoneKindOf(e.tags) !== 'none');
@@ -375,7 +385,8 @@ describe('보행자가 오는 쪽', () => {
       const n = { l2r: 0, r2l: 0, both: 0 };
       const count = new Map<number, number>();
       for (const e of lib) {
-        const ps = e.spec.pedestrians.filter((p) => p.crosswalk === id);
+        // 타는 자전거는 자전거횡단도 위라 횡단보도의 인원으로 세지 않는다 (덧붙이는 사람들, library.ts 의 EXTRAS)
+        const ps = e.spec.pedestrians.filter((p) => p.crosswalk === id && p.bike !== 'ride');
         if (!ps.length) continue;
         count.set(ps.length, (count.get(ps.length) ?? 0) + 1);
         const sides = new Set(ps.map((p) => p.from));
@@ -388,7 +399,7 @@ describe('보행자가 오는 쪽', () => {
     for (const id of ['A', 'C'] as const) {
       const { n, count } = shape(id);
       for (const [k, v] of Object.entries(n)) expect(v, `${id} ${k}`).toBeGreaterThan(500);
-      // 한 횡단보도에 하나 · 둘 · 셋이 모두 있다 (넷 이상은 두지 않는다 — 길이 사람으로 막힌다)
+      // 한 횡단보도에 하나 · 둘 · 셋이 모두 있다 (걷는 사람은 넷 이상 두지 않는다 — 길이 사람으로 막힌다)
       for (const c of [1, 2, 3]) expect(count.get(c) ?? 0, `${id} ${c}명`).toBeGreaterThan(300);
       expect([...count.keys()].every((c) => c <= 3), `${id} 인원`).toBe(true);
     }

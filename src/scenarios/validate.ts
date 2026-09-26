@@ -201,7 +201,8 @@ export function checkSchema(spec: unknown): Issue[] {
   if (!Array.isArray(s.pedestrians)) {
     push('pedestrians 가 배열이 아닙니다');
   } else {
-    if (s.pedestrians.length > 6) push('보행자가 6명을 넘습니다');
+    // 덧붙이는 사람들(library.ts 의 EXTRAS)까지 다섯 사람 + 자전거 둘 = 7 이 가장 많다
+    if (s.pedestrians.length > 8) push('보행자가 8명을 넘습니다');
     s.pedestrians.forEach((raw, i) => {
       const p = raw as Record<string, unknown>;
       const at = (m: string): string => `보행자[${i}] ${m}`;
