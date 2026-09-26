@@ -66,7 +66,7 @@ import {
 } from './carModel';
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer } from './renderer';
-import { Pedestrian } from './Pedestrian';
+import { Pedestrian, setPedestrianAlertOcclusion } from './Pedestrian';
 import { StopMarkers, type StopTarget } from './StopMarkers';
 import {
   PED_SIGNAL_HALF_HEIGHT,
@@ -458,6 +458,8 @@ export class Game {
     // 시점은 조용히 맞춘다 (토스트 없이). 거울·시야 창은 운전석에서만 켜야 한다.
     this.rig.setMode(startView);
     this.setOverlaysVisible(startView);
+    // 손에 든 가로 화면에서는 느낌표가 신호등 뒤로 가려진다 — 보행자를 만들기 전에 정한다 (Pedestrian 의 주석)
+    setPedestrianAlertOcclusion(this.handheldLandscape?.matches === true);
 
     /*
       3D 차량 모델이 있으면 절차적 차체를 대체한다 (없으면 그대로 둔다).

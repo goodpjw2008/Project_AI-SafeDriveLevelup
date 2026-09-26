@@ -142,6 +142,19 @@ export function setPedestrianAlerts(on: boolean): void {
   alertsEnabled = on;
 }
 
+/**
+ * **느낌표가 앞의 물체에 가려지는가.**
+ *
+ * 기본은 가려지지 않는다 — 이 표시는 "저기 사람이 있다" 를 말하는 것이라 차 · 기둥 뒤에서도 보인다. 손에 든
+ * 가로 화면에서는 반대로 둔다 (사용자가 정했다: *"신호등이 앞에 있으면 신호등이 보이고, 신호등 뒤에 보행자가
+ * 있으면 신호등 뒤쪽에 느낌표가 표시되게"*) — 낮은 화면이라 느낌표가 신호등을 통째로 덮었다. 깊이 검사만 켜면
+ * 물리대로 앞의 것이 앞에 온다. 판을 만들기 전에 정한다 — 느낌표의 재질은 처음 필요할 때 한 번 만든다.
+ */
+let alertOccluded = false;
+export function setPedestrianAlertOcclusion(on: boolean): void {
+  alertOccluded = on;
+}
+
 
 let alertTextures: { intending: THREE.DataTexture; crossing: THREE.DataTexture } | null = null;
 
@@ -607,8 +620,9 @@ export class Pedestrian {
           new THREE.MeshBasicMaterial({
             transparent: true,
             depthWrite: false,
-            // 앞의 차·기둥에 가려져도 보이게 — 이 표시는 "저기 사람이 있다" 를 말하는 것이다
-            depthTest: false,
+            // 앞의 차·기둥에 가려져도 보이게 — 이 표시는 "저기 사람이 있다" 를 말하는 것이다.
+            // 손에 든 가로 화면만 예외다 (setPedestrianAlertOcclusion)
+            depthTest: alertOccluded,
             toneMapped: false,
           }),
         ),

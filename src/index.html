@@ -1316,8 +1316,9 @@
         border-color: rgba(76, 141, 255, 0.5);
         color: var(--text);
       }
-      /* 짧은 꼴('다음 판 자동')은 손에 든 가로 화면에서만 — 결과 화면의 back-short 와 같은 짝이다 (아래 가로 규칙) */
-      .auto-next-short {
+      /* 짧은 꼴('자동넘김' · '다음 L4까지 100 XP')은 손에 든 가로 화면에서만 — 결과 화면의 back-short 와 같은 짝이다 (아래 가로 규칙) */
+      .auto-next-short,
+      .next-short {
         display: none;
       }
 
@@ -5695,11 +5696,13 @@
           padding-left: 12px;
           padding-right: 12px;
         }
-        /* '다음 판 자동 넘어가기' → '다음 판 자동' (Screens 의 autoShort) */
-        #screen-debrief .auto-next-long {
+        /* '다음 판 자동 넘어가기' → '자동넘김', '다음 판 · Level4까지 100 XP' → '다음 L4까지 100 XP' (Screens 의 autoShort · nextShort) */
+        #screen-debrief .auto-next-long,
+        #screen-debrief .next-long {
           display: none;
         }
-        #screen-debrief .auto-next-short {
+        #screen-debrief .auto-next-short,
+        #screen-debrief .next-short {
           display: inline;
         }
         /* 레벨 칸도 좁은 칸에 맞게 — 뱃지와 사이 여백을 줄여 가로를 아낀다. 넘치면 오른쪽 코칭 상자를 파고든다 */

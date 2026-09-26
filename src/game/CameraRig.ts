@@ -331,8 +331,15 @@ export class CameraRig {
         dims.height * 0.7,
         vehicle.z + f.z * aim - right.z * pan,
       );
+      /*
+        **손에 든 가로 화면은 조금 당겨 본다** (사용자가 정했다: *"가로모드여서 줌인을 조금 더 해도 전체가
+        보일 것 같아"*). 가로 휴대폰은 비율이 2.4~2.7 이라 세로 화각 66° 가 **가로 120°** 로 벌어진다 —
+        PC(98°)보다 훨씬 넓어 멀리 있는 신호등과 사람이 그만큼 작다. 세로 화각을 1/1.2 로 조이면 가로
+        약 105° 가 되어 교차로 양 끝은 그대로 들어오면서 멀리 있는 것이 20% 커진다. PC · 세로는 그대로다.
+      */
+      const zoom = !portrait && isHandheldLandscape() ? CHASE_ZOOM_LANDSCAPE : 1;
       fov = fitHorizontal(
-        66 + Math.min(12, vehicle.speedKmh * 0.11),
+        (66 + Math.min(12, vehicle.speedKmh * 0.11)) / zoom,
         this.camera.aspect,
         portrait
           ? CHASE_MIN_HFOV_PORTRAIT + rise * (CHASE_NEAR_HFOV_PORTRAIT - CHASE_MIN_HFOV_PORTRAIT)
@@ -418,6 +425,20 @@ export class CameraRig {
 export const PORTRAIT_MAX_FOV = 108;
 /** 후방 시점이 적어도 담아야 할 가로 화각 (°) */
 const CHASE_MIN_HFOV = 72;
+/** 손에 든 가로 화면의 후방 시점을 당겨 보는 배율 — 세로 화각을 이만큼 나눈다 (위 chase 주석). "조금만" 이라 1.2 */
+const CHASE_ZOOM_LANDSCAPE = 1.2;
+
+/** 손에 든 가로 화면인가 — 화면 규칙(index.html 의 '손에 든 가로 화면')과 같은 조건이다. 프레임마다 보므로 한 번만 만든다 */
+let handheldLandscapeQuery: MediaQueryList | null | undefined;
+function isHandheldLandscape(): boolean {
+  if (handheldLandscapeQuery === undefined) {
+    handheldLandscapeQuery =
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(orientation: landscape) and (pointer: coarse) and (max-height: 540px)')
+        : null;
+  }
+  return handheldLandscapeQuery?.matches === true;
+}
 /**
  * 세로 화면의 후방 시점 가로 화각 하한 — **달릴 때**.
  *
