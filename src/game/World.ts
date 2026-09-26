@@ -107,6 +107,8 @@ export class World {
      * 설정을 들고 다니지 않는 곳에서 그대로 쓴다.
      */
     private graphics: GraphicsSettings = defaultGraphics(),
+    /** 손에 든 화면인가 — 비 방울을 화면 크기로 키우지 않는다 (buildRain). 첫 화면 · 좌석 화면은 비가 없어 넘기지 않는다 */
+    private handheld = false,
   ) {
     const p = PALETTES[timeOfDay];
     this.isNight = timeOfDay === 'night';
@@ -226,7 +228,15 @@ export class World {
   }
 
   private buildRain(): void {
-    const COUNT = 4500;
+    /*
+      **손에 든 화면에서는 방울을 화면 픽셀 크기로 그린다** (sizeAttenuation 을 끈다).
+
+      방울은 카메라 둘레 ±55m 에 흩어져 매 프레임 떨어지는데, 거리에 비례해 키우면 **카메라 코앞을 지나는 방울 하나가
+      화면만 한 사각형**이 된다 — 잘라 내기도 끈 점(Points)이라 늘 그려진다. 타일 방식의 휴대폰 GPU 는 그런 원시
+      도형에 약하다(보행자 느낌표 판에서 같은 일을 겪었다). 픽셀 크기로 고정하면 가장 큰 방울도 점 하나다.
+      방울 수도 절반으로 — 낮은 화면이라 절반이어도 빗줄기로 읽힌다. PC 는 그대로다.
+    */
+    const COUNT = this.handheld ? 2200 : 4500;
     const positions = new Float32Array(COUNT * 3);
     this.rainVelocity = new Float32Array(COUNT);
     for (let i = 0; i < COUNT; i++) {
@@ -240,7 +250,8 @@ export class World {
     const mat = this.track(
       new THREE.PointsMaterial({
         color: 0xaac4dd,
-        size: 0.12,
+        size: this.handheld ? 2 : 0.12,
+        sizeAttenuation: !this.handheld,
         transparent: true,
         opacity: 0.5,
         depthWrite: false,

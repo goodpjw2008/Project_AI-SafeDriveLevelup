@@ -1622,12 +1622,12 @@ export class Screens {
     /*
       **짧은 꼴은 손에 든 가로 화면에서만 보인다** (index.html 의 가로 규칙 — 결과 화면의 back-short 와 같은 짝).
       가로 화면은 왼쪽 반 칸에 버튼 넷이 두 줄로 서는데, 이 글이 길면 그 칸이 넓어져 오른쪽의 AI 주행결과
-      분석이 좁아진다. 사용자가 두 번 줄였다: "다음 판 · Level4까지 100 XP → 다음 L4까지 100 XP",
+      분석이 좁아진다. 사용자가 두 번 줄였다: "다음 판 · Level4까지 100 XP → L4까지 100 XP",
       "다음 판 자동 넘어가기 → 다음 판 자동 → 자동넘김". 경험치를 모으는 줄만 짧은 꼴이 따로 있고 나머지는 같다.
     */
     const nextShort =
       !options.demo && course && course.clean && !course.habits.length && !course.mastered && course.level === course.prevLevel
-        ? `다음 ${course.level >= MAX_LEVEL ? 'M' : `L${course.level + 1}`}까지 ${Math.max(0, course.xp.need - course.xp.after)} XP`
+        ? `${course.level >= MAX_LEVEL ? 'M' : `L${course.level + 1}`}까지 ${Math.max(0, course.xp.need - course.xp.after)} XP`
         : nextLabel;
     const autoLabel = course
       ? '다음 판 자동 넘어가기'

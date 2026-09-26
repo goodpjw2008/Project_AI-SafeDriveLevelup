@@ -110,6 +110,20 @@ const PED_STOP_GAP = 1.6;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
+/**
+ * **앞차 · 뒷차까지 가벼운 모델로 그릴 것인가** — 손에 든 화면(세로 · 가로)에서만 켠다 (Game 이 판을 만들기 전에 정한다).
+ *
+ * 레벨 5 부터는 앞차 · 뒷차 · 교차 차량이 함께 나오는 판이 늘어난다(curriculum.ts 의 budget). 앞차와 뒷차는 원본
+ * 모델이라 한 대가 GPU 텍스처 100MB 를 넘기도 하는데(SL63 104MB · 코롤라 115MB), 배경 차의 가벼운 모델과 내 차까지
+ * 더하면 **한 판 안에서** 휴대폰 GPU 가 다시 검은 줄을 냈다 — 판 사이에 캐시를 비워도 판 안의 몫은 그대로였다
+ * (사용자가 짚었다: *"레벨이 5 이상 되면 다시 화면이 깨진다"*). 가벼운 모델은 텍스처가 1/4(512²)이고 면이 1/10 이라
+ * 두 대 합쳐도 60MB 를 넘지 않는다. 휴대폰 화면에서는 2cm 남짓한 단순화 자국이 보이지 않는다. PC 는 원본 그대로다.
+ */
+let nearCarLod = false;
+export function setNearCarLod(on: boolean): void {
+  nearCarLod = on;
+}
+
 export class TrafficCar {
   readonly group: THREE.Group;
   /**
@@ -174,7 +188,7 @@ export class TrafficCar {
       뒷차는 **후방 시야 창에 늘 떠 있다**(사용자가 짚었다: "뒤차도 눈에 가장 많이 띄는 부분이야"). 둘 다 단순화로
       생긴 차체의 잔 찌그러짐이 보이는 거리다. 두 대라 값도 크지 않다.
     */
-    const near = role === 'leader' || role === 'follower';
+    const near = (role === 'leader' || role === 'follower') && !nearCarLod;
     this.ready = loadCarModel(spec, { forPlayer: false, lod: !near })
       .then(async (model) => {
         if (!model) return;

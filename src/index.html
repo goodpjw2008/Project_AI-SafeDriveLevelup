@@ -5640,8 +5640,8 @@
           grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
           align-items: start;
           column-gap: 12px;
-          row-gap: 8px;
-          padding: 6px 14px 12px;
+          row-gap: 6px;
+          padding: 4px 14px 10px;
         }
         /* 자리를 주지 않은 것은 폭을 다 쓰며 맨 아래로 — 새 칸이 생겨도 두 칸을 흐트러뜨리지 않는다 */
         #screen-debrief .screen-inner > * {
@@ -5653,10 +5653,22 @@
           margin-bottom: 0;
           align-items: center;
         }
+        /*
+          **위아래를 조인다** (사용자가 정했다: "레벨 부분의 위아래 여백을 줄여서 한 화면에서 볼 수 있게").
+          가로 휴대폰은 높이가 300px 남짓이라 레벨 칸 · 버튼 두 줄이 한 화면에 들어오려면 칸 사이 · 칸 안쪽 여백이
+          모두 몫을 내야 한다 — 칸 사이 12 → 6, 레벨 상자 안쪽 10/12 → 6/8, 이름과 막대 사이 8 → 4.
+        */
         #screen-debrief .debrief-top {
           grid-column: 1;
           grid-row: 2;
           margin: 0;
+          gap: 6px;
+        }
+        #screen-debrief .debrief-top > .player-box {
+          padding: 6px 12px 8px;
+        }
+        #screen-debrief .debrief-top .player.md .player-body {
+          gap: 4px;
         }
         #screen-debrief .verdict {
           grid-column: 2;
@@ -5676,8 +5688,8 @@
         #screen-debrief .debrief-top:not(.solo) .btn-row {
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
-          gap: 8px;
-          margin-top: 10px;
+          gap: 6px;
+          margin-top: 4px;
         }
         #screen-debrief .debrief-top:not(.solo) #btn-next {
           grid-area: 1 / 1;
@@ -5750,7 +5762,7 @@
           display: none;
         }
         #screen-debrief .btn-row {
-          margin-top: 8px;
+          margin-top: 4px;
         }
       }
       /*

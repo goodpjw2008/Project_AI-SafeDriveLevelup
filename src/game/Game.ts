@@ -85,7 +85,7 @@ import {
   ZONE_SIGNAL_SCALE,
   makeSignalPole,
 } from './TrafficLight';
-import { TrafficCar } from './TrafficCar';
+import { TrafficCar, setNearCarLod } from './TrafficCar';
 import { LeadDrive } from './leadDrive';
 import { PlayerMarker } from './PlayerMarker';
 import { pedCueAt, type PedCue } from './pedCue';
@@ -104,6 +104,14 @@ const RUN_TIMEOUT = 100;
  * (pickNpcRoster 가 새 얼굴을 하나만 넣는다) 몇 판 지나면 그마저 없다.
  */
 const NPC_ROSTER_SIZE = 3;
+/**
+ * 손에 든 화면의 배역표 크기 — 배경 차가 **두 종류**만 나온다.
+ *
+ * 종류마다 모델 한 벌(가벼운 것도 8~33MB)이 GPU 에 오르므로, 종류 수가 곧 한 판의 메모리다. 레벨 5 부터 교차
+ * 차량이 늘어 휴대폰이 판 안에서 다시 검은 줄을 냈다 (TrafficCar 의 setNearCarLod 주석). 배경 차는 지나가는
+ * 배경이라 차종이 겹쳐도 판정은 같다. PC 는 셋 그대로다.
+ */
+const NPC_ROSTER_SIZE_HANDHELD = 2;
 
 /**
  * 방향지시등 한 주기(켜짐 + 꺼짐)의 길이 (초).
@@ -401,7 +409,8 @@ export class Game {
     this.renderer = sharedRenderer(canvas);
     this.renderScale = startScale(this.graphics.resolution);
 
-    this.world = new World(scenario.timeOfDay, scenario.weather, this.graphics);
+    // 손에 든 화면이면 비 방울을 화면 크기로 그리지 않는다 (World 의 buildRain)
+    this.world = new World(scenario.timeOfDay, scenario.weather, this.graphics, this.smallScreen?.matches === true);
     /*
       HDRI 환경광 — **첫 프레임 전에** 건다. 메뉴에 있는 동안 세 시간대를 다 구워 두므로
       (main.ts 의 boot) 보통은 캐시에서 꺼내는 것으로 끝난다. 굽지 못했으면 도착한 뒤에
@@ -460,6 +469,8 @@ export class Game {
     this.setOverlaysVisible(startView);
     // 손에 든 가로 화면에서는 느낌표가 신호등 뒤로 가려진다 — 보행자를 만들기 전에 정한다 (Pedestrian 의 주석)
     setPedestrianAlertOcclusion(this.handheldLandscape?.matches === true);
+    // 손에 든 화면(세로 · 가로)이면 앞차 · 뒷차도 가벼운 모델로 — 차를 만들기 전에 정한다 (TrafficCar 의 주석)
+    setNearCarLod(this.smallScreen?.matches === true);
 
     /*
       3D 차량 모델이 있으면 절차적 차체를 대체한다 (없으면 그대로 둔다).
@@ -1154,7 +1165,11 @@ export class Game {
     */
     // 어린이보호구역이면 배경 차도 30km/h 이하로 다닌다 (제12조 제1항)
     const speedLimit = this.scenario.isSchoolZone ? SCHOOL_ZONE_KMH / 3.6 : Infinity;
-    const roster = pickNpcRoster(this.carSpec.id, loadedCarIds(), NPC_ROSTER_SIZE);
+    const roster = pickNpcRoster(
+      this.carSpec.id,
+      loadedCarIds(),
+      this.smallScreen?.matches ? NPC_ROSTER_SIZE_HANDHELD : NPC_ROSTER_SIZE,
+    );
     const cast = (): CarSpec => roster[Math.floor(Math.random() * roster.length)];
 
     const warm = (m: THREE.Object3D): Promise<void> => this.warmUp(m);

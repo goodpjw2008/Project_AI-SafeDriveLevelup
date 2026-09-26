@@ -363,12 +363,16 @@ const lastUsed = new Map<string, number>();
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 /**
- * 기기별 상한. **손가락 화면(휴대폰 · 태블릿)은 160MB** — 내 차 원본(30~104MB)과 배경 차 두어 대가 든다.
+ * 기기별 상한. **손가락 화면(휴대폰 · 태블릿)은 128MB** — 내 차 원본(8~104MB)과 배경 차 한두 대가 든다.
  * 넘는 만큼 판 사이에 내리고, 다음 판의 새 얼굴은 다시 받는다. PC 는 800MB 로 사실상 카탈로그 전체가 들어간다.
+ *
+ * 160 에서 128 로 내렸다 (2026-09-26): 레벨 5 부터 앞차 · 뒷차 · 교차 차량이 함께 나오는 판이 늘어, 판 **안에서**
+ * 받는 모델까지 더하면 휴대폰이 다시 검은 줄을 냈다. 판 안의 몫은 TrafficCar 의 setNearCarLod 와 Game 의 배역표
+ * 크기(NPC_ROSTER_SIZE_HANDHELD)로 줄이고, 판 사이의 몫은 여기서 줄인다.
  */
 export function modelCacheBudget(): number {
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  return (coarse ? 160 : 800) * MB;
+  return (coarse ? 128 : 800) * MB;
 }
 
 /** 지금 캐시가 차지하는 GPU 메모리(추정, 바이트) */
