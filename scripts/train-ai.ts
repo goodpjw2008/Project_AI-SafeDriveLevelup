@@ -1,7 +1,7 @@
 /**
  * **AI 모델 학습 — 빌드 때 시뮬레이터로.**
  *
- *   npx vite-node scripts/train-ai.ts            # 기본: 판 ~700 × 운전자 12 = 8,000판 남짓, 2~4분
+ *   npx vite-node scripts/train-ai.ts            # 기본: 라이브러리의 1/18 을 레벨마다 무작위로 (~760판) × 운전자 18 + 가상 학습자 12, 8분 남짓
  *   npx vite-node scripts/train-ai.ts --step 40  # 판을 덜 뽑아 빨리 (검증용)
  *
  * 시뮬레이터(src/scenarios/playSim.ts)의 **사람 운전자**를 반응 시간 × 브레이크 세기(난이도 설정)로 열두 가지 능력으로
@@ -33,6 +33,7 @@ import { habitsTestedBy, scenarioLibrary } from '../src/scenarios/library';
 import { playScenario } from '../src/scenarios/playSim';
 import type { ScenarioSpec } from '../src/scenarios/scenarios';
 import { zoneCourses } from '../src/scenarios/zoneCourse';
+import { stratifiedSample } from '../src/ai/sample';
 
 const args = process.argv.slice(2);
 const arg = (name: string, def: number): number => {
@@ -44,7 +45,7 @@ const EPOCHS = arg('epochs', 600);
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../src/ai/models');
 
-// ── 판 표본 — 레벨이 고루 섞이게 일정 간격으로 뽑는다 ──
+// ── 판 표본 — 레벨마다 비율대로, 씨앗을 고정한 무작위 (src/ai/sample.ts 의 까닭 참고: 일정 간격은 환경 축이 통째로 빠졌다) ──
 interface Item {
   spec: ScenarioSpec;
   targets: string[];
@@ -52,15 +53,15 @@ interface Item {
   level: number;
 }
 const lib = scenarioLibrary();
-const items: Item[] = [];
-for (let i = 0; i < lib.length; i += STEP) {
-  const e = lib[i];
-  items.push({ spec: e.spec, targets: e.targets, cost: e.cost, level: e.level });
-}
 const zone = zoneCourses();
-for (let i = 0; i < zone.length; i += Math.max(1, Math.round(STEP / 4))) {
-  const spec = zone[i];
-  items.push({ spec, targets: [...habitsTestedBy(spec)], cost: costOf(spec).total, level: 0 });
+const all: Item[] = [
+  ...lib.map((e) => ({ spec: e.spec, targets: e.targets, cost: e.cost, level: e.level })),
+  ...zone.map((spec) => ({ spec, targets: [...habitsTestedBy(spec)], cost: costOf(spec).total, level: 0 })),
+];
+const items: Item[] = stratifiedSample(all, { share: 1 / STEP, min: 40 });
+{
+  const env = (k: string) => items.filter((it) => (it.spec.timeOfDay === 'night' ? 'night' : it.spec.weather !== 'clear' ? 'rain' : 'day') === k).length;
+  console.log(`표본 ${items.length}판 (라이브러리 ${lib.length} + 보호구역 ${zone.length}) · 낮 ${env('day')} · 밤 ${env('night')} · 비 ${env('rain')}`);
 }
 
 // ── 운전자 — 사람(반응 시간 × 난이도 설정) 열둘 + 규칙을 모르는 사람 여섯 ──
