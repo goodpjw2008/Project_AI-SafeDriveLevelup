@@ -3691,6 +3691,13 @@
           animation: none;
         }
       }
+      /* 두 줄로 세운다 — 굵은 첫 줄과 흐린 둘째 줄 (마크업 주석). 점(.dot)은 두 줄의 가운데에 선다 */
+      .hud-auto .hud-auto-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.2;
+      }
       .hud-auto .sub {
         font-size: 14px;
         font-weight: 600;
@@ -3704,8 +3711,9 @@
           padding: 10px 14px;
           bottom: 196px;
         }
+        /* 둘째 줄도 남긴다 — 세로 휴대폰에서 첫 줄만 뜨던 것을 사용자가 짚었다. 글자만 한 단계 작게 */
         .hud-auto .sub {
-          display: none;
+          font-size: 12px;
         }
       }
 
@@ -6563,9 +6571,16 @@
           **조작 안내(keyhints)가 있던 자리에 대신 뜬다.** 그 안내는 "←→ 좌우 ↑출발" 인데
           자율 주행 중에는 눌러도 아무 일이 없다 — 거짓말이 되는 안내를 띄워 둘 수는 없다.
         -->
+        <!--
+          **두 줄** — '자율 주행 중' / '안전규정 준수 주행 중' (사용자가 정했다: 한 줄로 길게 두면 차를 가린다,
+          AI 가 아니라 규정 주행이므로 'AI' 는 뺀다). PC · 세로 · 가로 모두 같다.
+        -->
         <div class="hud-auto" id="hud-auto">
-          <i class="dot"></i>AI 자율 주행 중
-          <span class="sub">규정대로 도는 모습을 보여 줍니다</span>
+          <i class="dot"></i>
+          <span class="hud-auto-text">
+            <b>자율 주행 중</b>
+            <span class="sub">안전규정 준수 주행 중</span>
+          </span>
         </div>
 
         <!-- 계기판 — 3D 대시보드가 아니라 화면 우측 하단에 둔다.
