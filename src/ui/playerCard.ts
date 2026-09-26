@@ -66,7 +66,13 @@ const esc = (s: string): string =>
  * 그대로 두고 **보이는 꼴만** 줄이는 것이라, 읽어 주는 글과 저장된 값은 바뀌지 않는다.
  */
 const branded = (text: string): string =>
-  esc(text).replace(/Level(?=\d)/g, 'L<span class="lv-word">evel</span>');
+  esc(text)
+    .replace(/Level(?=\d)/g, 'L<span class="lv-word">evel</span>')
+    /*
+      **'안전운전' 의 '운전' 도 감쌀 수 있게** — 손에 든 가로 화면은 네 칸이라 레벨 칸의 폭이 곧 온라인 연습 칸의
+      폭이다. 그 줄에서만 감춰 **`안전 L2`** 로 줄인다 (index.html 의 .name-word). 값은 그대로다.
+    */
+    .replace(/안전운전(?= L)/g, '안전<span class="name-word">운전</span>');
 
 /**
  * 막대 아래 한 줄 — 다음 레벨까지 얼마나 남았는가.

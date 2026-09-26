@@ -20,8 +20,9 @@ describe('플레이어 칸', () => {
         그 줄에서만 **`안전운전 L6`** 으로 줄이기 때문이다 (index.html 의 .lv-word).
         **글자는 그대로 남는다** — 감추는 것은 화면 규칙이고, 낭독기가 읽는 aria-label 도 그대로다.
       */
+      // '운전' 도 따로 감싼다 — 손에 든 가로 화면에서만 감춰 `안전 L6` 이 된다 (index.html 의 .name-word). 글자는 그대로다
       expect(html).toContain(
-        '<span class="player-name">안전운전 L<span class="lv-word">evel</span>6</span>',
+        '<span class="player-name">안전<span class="name-word">운전</span> L<span class="lv-word">evel</span>6</span>',
       );
       expect(html).toContain('aria-label="안전운전 Level6 · 경험치 150 / 400"');
       expect(html).not.toContain('brand-');

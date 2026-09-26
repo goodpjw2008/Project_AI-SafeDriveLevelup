@@ -1106,7 +1106,8 @@ export class Screens {
             <div class="ai-course-actions">${button}</div>
           </div>
           <div class="mode-group">
-            <p class="mode-label">${icon('users')}<b>오프라인 교육 활용</b></p>
+            <!-- 손에 든 가로 화면에서는 짧은 꼴 '오프라인 교육' (index.html 의 .lbl-short) — 칸이 좁아 폭을 온라인 연습에 내준다 -->
+            <p class="mode-label">${icon('users')}<b><span class="lbl-long">오프라인 교육 활용</span><span class="lbl-short">오프라인 교육</span></b></p>
             <div class="ai-course-actions">
               <button class="btn" id="btn-ai-drive" title="AI 가 규정대로 모는 것을 함께 봅니다">${icon(
                 'auto',

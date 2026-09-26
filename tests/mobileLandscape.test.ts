@@ -154,7 +154,8 @@ describe('가로 휴대폰의 첫 화면', () => {
     const r = rules();
     expect(r).toMatch(/#screen-menu \.ai-course \{[^}]*display:\s*grid/);
     // 네 칸 — 연습 칸 하나가 쓰던 폭을 온라인 연습 · 안전운전 교육 둘로 나눈다 (사용자가 정했다)
-    expect(r).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\) auto minmax\(0, \d+px\) minmax\(0, \d+px\)/);
+    // 레벨 칸은 제 글만큼(max-content), 남는 폭은 온라인 연습(1fr), 오프라인 교육은 상한(px) — 사용자가 정했다
+    expect(r).toMatch(/grid-template-columns:\s*max-content auto minmax\(0, 1fr\) minmax\(0, \d+px\)/);
     expect(r).toMatch(/#screen-menu \.ai-course > \.player \{[^}]*grid-column:\s*1/);
     expect(r).toMatch(/#screen-menu \.ai-split \{[^}]*grid-column:\s*2/);
     expect(r).toMatch(/#screen-menu \.mode-split \{[^}]*grid-column:\s*3/);
@@ -209,9 +210,8 @@ describe('가로 휴대폰의 첫 화면', () => {
     받게 해 두면, 모자라는 몫은 연습 칸에서 먼저 나온다.
   */
   it('레벨 칸은 글이 다 들어가는 만큼은 받는다', () => {
-    expect(rules()).toMatch(
-      /#screen-menu \.ai-course \{[^}]*grid-template-columns:\s*minmax\(max-content, 1fr\)/,
-    );
+    // 제 글만큼(max-content)은 늘 받는다 — 남는 폭은 이제 온라인 연습 칸의 몫이라 1fr 을 붙이지 않는다 (사용자가 정했다)
+    expect(rules()).toMatch(/#screen-menu \.ai-course \{[^}]*grid-template-columns:\s*max-content auto/);
   });
 
   /*
@@ -300,7 +300,7 @@ describe('가로 휴대폰의 첫 화면', () => {
     // 칸을 줄여야 들어간다 — 기본 크기(30px) 그대로면 옆 칸으로 비어져 나간다
     expect(rules()).toMatch(/#screen-menu \.player-foot \.level-step \{[^}]*width:\s*\d+px/);
     // 레벨 칸이 길 한 줄만큼은 받아야 'M' 하나만 다음 줄에 남지 않는다
-    expect(rules()).toMatch(/grid-template-columns:\s*minmax\(max-content, 1fr\)/);
+    expect(rules()).toMatch(/grid-template-columns:\s*max-content auto/);
   });
 
   /*

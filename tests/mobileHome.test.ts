@@ -153,7 +153,14 @@ describe('세로 휴대폰의 첫 화면', () => {
       첫 화면(`#screen-menu`) 규칙만 모아서 본다 — 결과 화면은 글자를 한 단계 줄이는 것이
       바로 그 일이라(제목을 한 줄에 세운다) 함께 재면 늘 걸린다.
     */
-    const homeRules = [...block.matchAll(/#screen-menu[^{]*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
+    /*
+      오프라인 교육 칸(`.mode-group + .mode-group`)만 예외다 — 사용자가 그 칸의 글자 · 높이 · 여백을 줄여 온라인 연습에
+      자리를 주라고 정했다. 나머지는 여전히 여백만 줄인다.
+    */
+    const homeRules = [...block.matchAll(/#screen-menu[^{]*\{[^}]*\}/g)]
+      .map((m) => m[0])
+      .filter((r) => !r.includes('.mode-group + .mode-group'))
+      .join('\n');
     /*
       고정 px 로 적은 글자 크기가 없어야 한다. 전체 화면에서 **키우는** 규칙(`font-size: max(21px, 3dvh)` — 주소창이
       있을 때보다 작아지지 않는다)은 깎는 것이 아니라 허용한다.
