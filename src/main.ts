@@ -15,6 +15,7 @@ import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
 import { loadCarModel, trimCarModelCache } from './game/carModel';
 import { isHandheld } from './game/handheld';
+import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { setMsaaPreference, sharedRenderer } from './game/renderer';
 import { presetGraphics, usesLampLights } from './game/quality';
@@ -504,6 +505,40 @@ if (window.matchMedia('(pointer: coarse)').matches) {
   document.body.classList.add('touch');
 }
 
+/*
+  ── 전체 화면 토글 (휴대폰) ──────────────────────────────────────────────
+
+  브라우저의 주소창이 작은 화면을 더 좁힌다 (사용자가 짚었다: *"모바일 화면은 URL 주소 부분이 있어서 작은 화면을 보는 데
+  효율적이지 못하다"*). 첫 화면 윗줄과 주행 HUD 에 **같은 버튼**이 하나씩 있다 — 누르면 전체 화면, 전체 화면에서는
+  '주소창 보기' 가 되어 되돌아온다. 전체 화면은 화면을 오가도 유지되므로 첫 화면에서 켜고 달리면 그대로다.
+
+  상태는 `fullscreenchange` 로 맞춘다 — 뒤로 제스처로 나가도 버튼 글이 따라간다. API 가 없는 브라우저(아이폰
+  사파리)에서는 body 에 표시를 붙여 CSS 가 버튼을 감춘다 (index.html 의 .fs-toggle).
+*/
+function fullscreenSupported(): boolean {
+  return typeof document.documentElement.requestFullscreen === 'function' && document.fullscreenEnabled !== false;
+}
+function toggleFullscreen(): void {
+  if (document.fullscreenElement) {
+    void document.exitFullscreen().catch(() => undefined);
+  } else {
+    void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
+  }
+}
+function syncFullscreenButtons(): void {
+  const on = !!document.fullscreenElement;
+  const label = on ? '주소창 보기' : '전체 화면';
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.fs-toggle')) {
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    if (b.classList.contains('hud-fullscreen')) b.textContent = label;
+    else b.innerHTML = icon(on ? 'fullscreenExit' : 'fullscreen');
+  }
+}
+if (!fullscreenSupported()) document.body.classList.add('no-fullscreen-api');
+document.addEventListener('fullscreenchange', syncFullscreenButtons);
+document.getElementById('btn-hud-fullscreen')?.addEventListener('click', toggleFullscreen);
+
 const controls = new Controls(canvas, {
   // 손에 든 화면은 시점을 바꾸지 않는다 — 후방 시점 고정 (아래 startViewOfRun)
   onToggleView: () => {
@@ -639,6 +674,7 @@ function renderMenu(): void {
     onCredits: () => nav.go({ name: 'credits', enter: renderCredits }),
     onAbout: () => nav.go({ name: 'about', enter: renderAbout }),
     onSettings: () => nav.go({ name: 'settings', enter: renderSettings }),
+    onFullscreen: toggleFullscreen,
     onReport: () => nav.go({ name: 'report', enter: renderReport }),
     // 마스터면 L10 코스를 무작위로 이어 달린다 (makeAiScenario 의 마스터 운행)
     onGenerate: () => void makeAiScenario(),
@@ -671,6 +707,8 @@ function showSiteStatsOnMenu(): void {
   void loadSiteStats().then((s) => {
     if (s && nav.current === 'menu') screens.showSiteStats(s);
   });
+  // 첫 화면을 다시 그릴 때마다 전체 화면 버튼의 글을 지금 상태에 맞춘다
+  syncFullscreenButtons();
 }
 
 /**

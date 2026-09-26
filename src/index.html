@@ -4105,6 +4105,23 @@
         display: none;
       }
       /*
+        ── 전체 화면 토글 (휴대폰만) ─────────────────────────────────────────
+        브라우저의 주소창이 작은 화면을 더 좁힌다 (사용자가 짚었다). 손가락 화면에서만 보이고, 전체 화면 API 가
+        없는 브라우저(아이폰 사파리)에서는 main.ts 가 body 에 no-fullscreen-api 를 붙여 감춘다 — 눌러도 아무 일도
+        없는 버튼은 두지 않는다. 주행 HUD 의 것은 홈으로 알약을 그대로 쓰되 **왼쪽 위**에 둔다 — 세로 · 가로 모두
+        그 자리가 비어 있다 (제목 상자는 가운데, 홈으로는 왼쪽 아래).
+      */
+      /* !important — 첫 화면 윗줄의 버튼 규칙(#screen-menu .menu-links button.icon …)이 더 구체적이라 그냥 두면 PC 에서도 보인다 */
+      body:not(.touch) .fs-toggle,
+      body.no-fullscreen-api .fs-toggle {
+        display: none !important;
+      }
+      body.touch .hud-fullscreen {
+        left: max(12px, env(safe-area-inset-left));
+        top: max(12px, env(safe-area-inset-top));
+        bottom: auto;
+      }
+      /*
         **휴대폰에서는 주행 중 레벨 칸을 감춘다** (사용자 요청) — 가로 · 세로 모두. 작은 화면에서는 도로를 가려
         시야를 방해했다. 레벨과 경험치는 첫 화면과 결과 화면에서 같은 모양(playerCard)으로 본다.
       */
@@ -5661,11 +5678,12 @@
         #screen-debrief .screen-inner {
           display: grid;
           /*
-            **왼쪽 45 · 오른쪽 55** — 반반으로 두었더니 AI 주행결과 분석이 낱말마다 꺾였다 (사용자가 사진으로
-            짚었다: "AI 주행결과 분석의 비중을 조금 크게"). 왼쪽 칸이 좁아지는 만큼은 레벨 칸의 뱃지 · 사이 여백,
-            '다시 운행' 의 안쪽 여백, '다음 판 자동 넘어가기' 의 짧은 꼴로 벌어 둔다 (아래).
+            **왼쪽 35 · 오른쪽 65** — 반반으로 두었더니 AI 주행결과 분석이 낱말마다 꺾였다 (사용자가 사진으로
+            짚었다: "AI 주행결과 분석의 비중을 조금 크게"). 45 · 55 로 한 뒤 다시 짚어 더 좁혔다 — 왼쪽 칸이
+            좁아지는 만큼은 레벨 칸의 뱃지 · 사이 여백, '다시 운행' 의 안쪽 여백, 짧은 글, 레벨업 배너의 크기로
+            벌어 둔다 (아래).
           */
-          grid-template-columns: minmax(0, 9fr) minmax(0, 11fr);
+          grid-template-columns: minmax(0, 7fr) minmax(0, 13fr);
           align-items: start;
           column-gap: 12px;
           row-gap: 6px;
@@ -5761,8 +5779,18 @@
         #screen-debrief .debrief-top .player.md .player-xp b {
           font-size: 15px;
         }
+        /* 레벨업 배너도 좁은 칸에 맞게 — 글자 · 뱃지 · 여백을 한 단계씩 줄인다 */
         #screen-debrief .debrief-top .level-change {
-          margin: 0 0 8px;
+          margin: 0 0 4px;
+          padding: 6px 10px;
+          gap: 8px;
+        }
+        #screen-debrief .debrief-top .level-change-title {
+          font-size: 20px;
+        }
+        #screen-debrief .debrief-top .level-change .level-badge-wrap {
+          width: 40px;
+          height: 40px;
         }
         /* 머리는 한 줄로 — 판 번호까지만 둔다 (세로 화면과 같은 기준) */
         #screen-debrief .screen-head h1 .head-title {
@@ -6336,6 +6364,8 @@
 
         <!-- 주행을 그만두고 첫 화면으로. HUD 는 pointer-events:none 이라 버튼만 auto 로 켠다 -->
         <button class="hud-home" id="btn-hud-home">홈으로</button>
+        <!-- 전체 화면 ↔ 주소창 (휴대폰만 — .fs-toggle). 첫 화면의 토글과 같은 일을 한다 (main.ts 의 toggleFullscreen) -->
+        <button class="hud-home hud-fullscreen fs-toggle" id="btn-hud-fullscreen">전체 화면</button>
 
         <!--
           fps 표시. 설정에서 켰을 때만 뜬다 — 화질 손잡이를 내렸을 때 숫자가 실제로

@@ -711,6 +711,8 @@ export class Screens {
       /** 이 작품을 만든 이유 — 만든 사람의 글 (renderAbout) */
       onAbout(): void;
       onSettings(): void;
+      /** 전체 화면 ↔ 주소창 (휴대폰) — main.ts 의 toggleFullscreen */
+      onFullscreen(): void;
       /** 습관 리포트 — 판이 MIN_RUNS 이상 쌓였을 때만 버튼이 뜬다 */
       onReport(): void;
       /** 약점에 맞춘 판을 새로 만든다 (AI 절의 버튼) */
@@ -814,6 +816,14 @@ export class Screens {
           'gear',
         )}</button>
         <!--
+          **전체 화면 (휴대폰만)** — 브라우저의 주소창이 작은 화면을 더 좁힌다. 누르면 전체 화면으로,
+          전체 화면에서는 같은 자리의 버튼이 '주소창 보기' 가 된다 (main.ts 의 toggleFullscreen · 주행 HUD 에도 하나 있다).
+          PC 와 전체 화면을 못 쓰는 브라우저에서는 CSS 가 감춘다 (.fs-toggle).
+        -->
+        <button class="icon ghost fs-toggle" id="btn-fullscreen" title="전체 화면" aria-label="전체 화면">${icon(
+          'fullscreen',
+        )}</button>
+        <!--
           **운전 점수는 두지 않는다.** 한때 여기에 "내 운전점수" 를 띄웠다 — 차를 점수로 사던 때의 지갑이었다.
           차가 레벨로 열리고 레벨이 경험치로 오르게 되자(curriculum.ts 의 XP_TO_NEXT) 점수는 쓰이는 곳 없이 숫자만
           늘어, 경험치 바와 두 가지 숫자가 나란히 "얼마나 잘했나" 를 말했다. 사용자가 없애자고 했다.
@@ -839,6 +849,7 @@ export class Screens {
     $('btn-credits').addEventListener('click', handlers.onCredits);
     $('btn-about').addEventListener('click', handlers.onAbout);
     $('btn-settings').addEventListener('click', handlers.onSettings);
+    $('btn-fullscreen').addEventListener('click', handlers.onFullscreen);
     // 판이 모자라면 버튼 자체가 없다 — getElementById 로 찾아 있을 때만 묶는다
     document.getElementById('btn-report')?.addEventListener('click', handlers.onReport);
 
