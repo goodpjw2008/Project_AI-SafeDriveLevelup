@@ -60,6 +60,7 @@ import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, 
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer, contextLossCount, gpuName } from './renderer';
 import { CopyPass } from './CopyPass';
+import { activeExperiments, experiment } from './experiments';
 import { Pedestrian, setPedestrianAlertOcclusion } from './Pedestrian';
 import { StopMarkers, type StopTarget } from './StopMarkers';
 import {
@@ -327,6 +328,11 @@ export class Game {
   private diagLast = '';
   private diagBuf: Uint8Array | null = null;
   private diagFrame = 0;
+  /** 실험 `shadowlag` — 그림자 맵 두 장과, 그림자 패스만 돌리는 데 쓰는 빈 카메라 · 4×4 타깃 (renderShadowsLagged) */
+  private shadowMaps: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null = null;
+  private shadowFrame = 0;
+  private shadowTiny: THREE.WebGLRenderTarget | null = null;
+  private readonly shadowDummyCam = new THREE.PerspectiveCamera(1, 1, 0.01, 0.02);
   /** 배율을 낮췄을 때의 그리기 길 — 처음 필요할 때 만든다 (loop) */
   private copyPass: CopyPass | null = null;
   private diagGpu = '';
@@ -427,9 +433,11 @@ export class Game {
     // 판마다 새로 만들지 않는다 — 모델의 텍스처·셰이더가 그대로 남는다 (renderer.ts)
     this.renderer = sharedRenderer(canvas);
     this.renderScale = startScale(this.graphics.resolution);
+    if (experiment('noscale')) this.renderScale = 1;
 
     // 손에 든 화면이면 비 방울을 화면 크기로 그리지 않는다 (World 의 buildRain)
     this.world = new World(scenario.timeOfDay, scenario.weather, this.graphics, this.smallScreen?.matches === true);
+    if (experiment('noshadow')) this.world.sun.castShadow = false;
     /*
       HDRI 환경광 — **첫 프레임 전에** 건다. 메뉴에 있는 동안 세 시간대를 다 구워 두므로
       (main.ts 의 boot) 보통은 캐시에서 꺼내는 것으로 끝난다. 굽지 못했으면 도착한 뒤에
@@ -1343,7 +1351,7 @@ export class Game {
     this.audio.engineStart();
     this.running = true;
     // 해상도 '자동' — 재는 것은 판이 실제로 시작된 뒤부터다 (준비하는 동안의 느림은 모델 읽기 때문이다)
-    if (this.graphics.resolution === 'auto') {
+    if (this.graphics.resolution === 'auto' && !experiment('noscale')) {
       const target = this.graphics.frameCap > 0 ? this.graphics.frameCap : 60;
       this.autoRes = new AutoResolution(target, this.renderScale, performance.now());
     }
@@ -1486,7 +1494,8 @@ export class Game {
       this.pendingResize = false;
       this.resize();
     }
-    this.renderer.shadowMap.needsUpdate = true;
+    if (experiment('shadowlag')) this.renderShadowsLagged();
+    else this.renderer.shadowMap.needsUpdate = true;
     this.periph.renderTargets(this.renderer);
     const scaled = this.renderScale < 1;
     if (scaled) {
@@ -1503,6 +1512,8 @@ export class Game {
     }
     if (scaled) this.copyPass!.present(this.renderer);
     this.periph.renderOverlay(this.renderer);
+    // 실험 `finish` — 화면에 올리기 전에 GPU 가 이 프레임을 다 그릴 때까지 CPU 가 기다린다 (experiments.ts)
+    if (experiment('finish')) this.renderer.getContext().finish();
     // 진단 읽기는 GPU 를 기다리게 하므로 두 프레임에 한 번만 — 자동 해상도 조절이 진단 때문에 움직이는 것을 줄인다
     if (this.graphics.showFps && (this.diagFrame++ & 1) === 0) this.sampleDiag(now);
 
@@ -2359,6 +2370,58 @@ export class Game {
   }
 
   /**
+   * 실험 `shadowlag` — 그림자 맵을 **두 장 번갈아** 굽고, 메인 화면은 **지난 프레임에 구운 장**을 읽는다.
+   *
+   * 보통은 한 프레임 안에서 그림자 맵을 굽고 곧바로 그 맵을 읽으며 메인 화면을 그린다 — 렌더 타깃에 쓰고 바로 읽는
+   * 의존이 프레임마다 하나 있다. 사용자 휴대폰(삼성 Xclipse 940)에서는 이런 의존이 하나 늘 때(배율 렌더 타깃)
+   * 검은 띠가 세 배로 늘었다. 그래서 의존을 없애 본다: 이번 프레임에 구운 장은 다음 프레임에 읽는다. 그림자가
+   * 한 프레임(1/60초) 늦을 뿐이라 눈에는 보이지 않는다.
+   *
+   * three 의 그림자 패스(WebGLShadowMap.render)는 `renderer.render` 안에서만 돈다 — 밖에서 부르면 렌더 상태가
+   * 없어 터진다. 그래서 **아무것도 안 보이는 카메라**(near 0.01 · far 0.02, 하늘 위)로 4×4 타깃에 한 번 render 한다:
+   * 그림자 패스는 자기 카메라(태양)로 돌아 맵을 온전히 굽고, 메인 그리기는 절두체에 아무것도 없어 거의 비어 있다.
+   * 그다음 맵을 지난 장으로 바꿔 끼우고 진짜 render 를 한다 — autoUpdate 가 꺼져 있고 needsUpdate 는 방금 굽기가
+   * false 로 되돌려서 그림자를 다시 굽지 않는다. 맵의 크기 · 필터는 three 가 만드는 것과 같다.
+   */
+  private renderShadowsLagged(): void {
+    const sun = this.world.sun;
+    if (!sun.castShadow) return;
+    if (!this.shadowMaps) {
+      const make = () => {
+        const rt = new THREE.WebGLRenderTarget(sun.shadow.mapSize.x, sun.shadow.mapSize.y, {
+          minFilter: THREE.NearestFilter,
+          magFilter: THREE.NearestFilter,
+        });
+        rt.texture.name = 'sun.shadowMap';
+        return rt;
+      };
+      this.shadowMaps = [make(), make()];
+      this.shadowTiny = new THREE.WebGLRenderTarget(4, 4);
+      sun.shadow.camera.updateProjectionMatrix();
+      this.shadowDummyCam.position.set(0, 5000, 0);
+      this.shadowDummyCam.lookAt(0, 6000, 0);
+      // 첫 프레임은 읽을 지난 장이 없다 — 미리 한 장 굽는다
+      this.bakeShadow(this.shadowMaps[1]);
+    }
+    const write = this.shadowMaps[this.shadowFrame & 1];
+    const read = this.shadowMaps[(this.shadowFrame + 1) & 1];
+    this.shadowFrame++;
+    this.bakeShadow(write);
+    sun.shadow.map = read;
+  }
+
+  /** 그림자 맵 한 장을 굽는다 — 위 renderShadowsLagged 의 빈 카메라 render */
+  private bakeShadow(target: THREE.WebGLRenderTarget): void {
+    const sun = this.world.sun;
+    sun.shadow.map = target;
+    this.renderer.shadowMap.needsUpdate = true;
+    const prev = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(this.shadowTiny);
+    this.renderer.render(this.world.scene, this.shadowDummyCam);
+    this.renderer.setRenderTarget(prev);
+  }
+
+  /**
    * 그린 뒤 **그림 버퍼를 통째로 읽어** 순검정(0,0,0) 띠를 찾는다 (위 diag 필드 주석). 네 줄마다 한 줄을 훑어 한 줄에서
    * **이어진** 검정이 35% 를 넘으면 그 줄이 띠에 든 것으로 보고, 띠의 세로 범위(위에서부터 %) · 가로 범위 · 가장 긴
    * 비율과 그 순간의 정황(몇 초 · 크기 바꾼 지 얼마나 됐는지 · fps · 삼각형 수)을 남긴다. 그린 픽셀은 조명 · 안개 ·
@@ -2432,7 +2495,8 @@ export class Game {
         (this.renderScale < 1 && this.copyPass
           ? `타깃 ${this.copyPass.size.width}×${this.copyPass.size.height} → 캔버스`
           : '캔버스 직접'),
-      `GPU ${this.diagGpu || '?'}`,
+      `GPU ${this.diagGpu || '?'} · Chrome ${/Chrome\/(\d+)/.exec(navigator.userAgent)?.[1] ?? '?'} · ` +
+        `실험 ${activeExperiments().join('+') || '없음'}`,
       `검은 프레임 ${this.diagBlackFrames}${this.diagLast ? ` (${this.diagLast})` : ''} · 컨텍스트 잃음 ${loss.lost}/복구 ${loss.restored}`,
     ].join('\n');
   }
@@ -2491,6 +2555,13 @@ export class Game {
     cancelAnimationFrame(this.rafId);
     this.copyPass?.dispose();
     this.copyPass = null;
+    if (this.shadowMaps) {
+      this.world.sun.shadow.map = null;
+      for (const rt of this.shadowMaps) rt.dispose();
+      this.shadowMaps = null;
+      this.shadowTiny?.dispose();
+      this.shadowTiny = null;
+    }
     for (const p of this.pedestrians) p.dispose();
     for (const n of this.npcs) n.dispose();
     this.vehicleSignal.dispose();
