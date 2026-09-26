@@ -16,6 +16,14 @@ describe('추천 카드의 한 줄', () => {
     expect(line).toContain('골라 줬어요');
   });
 
+  it('최종 후보 수를 주면 "최종 후보 10개 중" 이라고 말한다 — 규칙 N개 → 최종 10개 → 하나 (사용자가 헷갈렸다)', () => {
+    expect(pickedByCard('gemini', 'gemini-3.1-flash-lite', 10)).toContain('최종 후보 10개 중 운전자에 맞는 맵을 골라 줬어요');
+    expect(pickedByCard('rule', undefined, 10)).toContain('최종 후보 10개 중');
+    expect(pickedByCard('quota', undefined, 10)).toContain('프로그램으로 추천했어요 (최종 후보 10개 중)');
+    // 후보가 없는 무작위 마스터 운행은 그대로
+    expect(pickedByCard('random', undefined, 0)).not.toContain('최종 후보');
+  });
+
   it('한도를 다 썼으면 그렇게 말한다 — 모델 이름은 쓰지 않는다', () => {
     const line = pickedByCard('quota');
     expect(line).toContain('일일 사용량이 초과됐어요');

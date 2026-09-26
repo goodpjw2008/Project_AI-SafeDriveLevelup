@@ -52,6 +52,9 @@ export interface PickResult {
   success?: number;
   /** 결과 예측 모델이 센 **어길 확률이 높은 개념** (ai/outcome.ts) — 있으면 같은 줄에 잇는다 */
   predict?: { code: string; p: number }[];
+  /** 규칙이 추린 후보 수 → 모델 점수로 고른 최종 후보 수 (scenarios/recommend.ts 의 onCandidates) — 카드가 "몇 개 중" 을 말한다 */
+  candidates?: number;
+  courses?: number;
 }
 
 export class AiPickOverlay {
@@ -159,7 +162,7 @@ export class AiPickOverlay {
     this.run++;
     this.img.src = robotCaution;
     // 누가 골랐는지 먼저 말한다 — 주행 화면 첫 줄과 같은 규칙이다 (ui/pickedBy.ts)
-    $('ai-pick-picked').innerHTML = pickedByCard(r.picker, r.model);
+    $('ai-pick-picked').innerHTML = pickedByCard(r.picker, r.model, r.courses);
     $('ai-pick-name').innerHTML =
       `「${esc(r.title)}」${r.code !== undefined ? ` - ${esc(r.code)}` : ''}`;
     // "… 3131번을" — 번호가 없으면 제목이 」 로 끝나 받침을 알 수 없다
@@ -180,6 +183,8 @@ export class AiPickOverlay {
     // 예상 성공률 — 학습자의 능력과 판의 난이도로 센 값. 근접 발달 영역(열에 일곱쯤)을 고른 근거가 여기서 보인다
     const success = $('ai-pick-success');
     const parts: string[] = [];
+    // 후보가 어떻게 줄었는지 — 규칙 N개 → 모델 점수 최종 10개 (사용자가 "최종 10개라는 말이 없어 헷갈렸다" 고 했다)
+    if (r.candidates && r.courses) parts.push(`후보 · 규칙으로 ${r.candidates.toLocaleString()}개 → 모델 점수로 최종 ${r.courses}개`);
     if (r.success !== undefined) parts.push(`AI 난이도 모델 · 예상 성공률 ${r.success}%`);
     if (r.predict?.length) {
       parts.push(`결과 예측 모델 · ${r.predict.map((x) => `${SKILL_SHORT[x.code as ViolationCode] ?? x.code} ${x.p}%`).join(' · ')}`);

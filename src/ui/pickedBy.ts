@@ -31,13 +31,21 @@ const chip = (picker: Picker): string =>
 /** 모델 이름 — AI 가 고른 판에만 있다 */
 const modelName = (model: string): string => `<span class="picker-model">${esc(model)}</span>`;
 
-/** 추천 카드의 한 줄 — 고르는 순간 */
-export function pickedByCard(picker?: Picker, model?: string): string {
+/**
+ * 추천 카드의 한 줄 — 고르는 순간.
+ *
+ * `courses` 는 **최종 후보 수**(모델 점수로 추린 10개 안팎, scenarios/recommend.ts 의 SHORTLIST_SIZE). 사용자가 짚었다
+ * (2026-09-27): "화면에 최종 10개라는 말이 없어서 헷갈렸어 — 후보 몇 개 중 최종 10개를 골랐다는 말과, 그 10개 중
+ * Gemini 나 Groq 가 이것을 골랐다는 것을 알 수 있게 해 줘." 분석 화면의 단계 글이 "규칙 N개 → 최종 10개" 를 말하고,
+ * 이 줄이 "그 10개 중 누가 골랐나" 를 말한다. 무작위 마스터 운행처럼 후보가 없으면 예전 문장 그대로다.
+ */
+export function pickedByCard(picker?: Picker, model?: string, courses?: number): string {
   if (!picker) return '';
-  if (picker === 'quota') return `${chip(picker)} 일일 사용량이 초과됐어요. 아쉽지만 프로그램으로 추천했어요.`;
-  if (picker === 'rule') return `${chip(picker)}이 운전자에 맞는 맵을 골라 줬어요!`;
+  const among = courses && courses > 0 ? `최종 후보 ${courses}개 중 ` : '';
+  if (picker === 'quota') return `${chip(picker)} 일일 사용량이 초과됐어요. 아쉽지만 프로그램으로 추천했어요${among ? ` (${among.trim()})` : ''}.`;
+  if (picker === 'rule') return `${chip(picker)}이 ${among}운전자에 맞는 맵을 골라 줬어요!`;
   if (picker === 'random') return `${chip(picker)}가 운전자에 맞는 맵을 골라 줬어요!`;
-  return `${chip(picker)}${model ? ` ${modelName(model)} 모델이` : '이'} 운전자에 맞는 맵을 골라 줬어요!`;
+  return `${chip(picker)}${model ? ` ${modelName(model)} 모델이` : '이'} ${among}운전자에 맞는 맵을 골라 줬어요!`;
 }
 
 /**

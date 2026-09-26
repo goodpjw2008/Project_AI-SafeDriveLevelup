@@ -319,19 +319,24 @@ async function makeAiScenario(): Promise<void> {
       [
         history.length ? `주행 기록 ${history.length}판을 읽는 중` : '첫 주행입니다 — 기본 판단부터 확인하는 중',
         `나쁜 운전 습관 분석 — ${habitsText}`,
+        /*
+          **후보가 줄어드는 세 단계를 숫자로 말한다** — 규칙이 추린 N개 → 모델 점수로 고른 최종 10개 → AI 가 그중 하나.
+          사용자가 짚었다 (2026-09-27): "화면에 최종 10개라는 말이 없어서 헷갈렸어. 후보 몇 개 중 최종 10개를 골랐다는
+          말도 나오게 해 줘." 규칙이 추린 수는 습관 · 레벨 · 차례에 따라 열 개에서 이천 개까지 오르내린다.
+        */
         () =>
           many
-            ? `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개 추리기`
-            : `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
+            ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개`
+            : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
         // 결과 예측 모델(ai/outcome.ts) — 후보마다 어길 확률과 표를 붙인다. 학습자 모델이 시험된 개념이 없는 첫 판에도 돈다
         () =>
           OUTCOME_MODEL
-            ? `결과 예측 모델 — 후보 ${counts.courses}개마다 어길 확률과 표(약점 시험 · 근접 발달 · 복습 · 새로움)를 붙이는 중`
-            : `난이도 모델 — 후보 ${counts.courses}개마다 예상 성공률을 세는 중`,
+            ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
+            : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
         () =>
           many
-            ? `AI 가 먼저 고칠 습관을 정하고 후보 ${counts.courses}개 중 코스를 고르는 중`
-            : `AI 가 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+            ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`
+            : `AI 가 최종 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
       ],
       picking,
     );
@@ -349,6 +354,9 @@ async function makeAiScenario(): Promise<void> {
       habitByAi: rec.habitBy === 'ai',
       success: rec.scenario.success,
       predict: rec.scenario.predict,
+      // 규칙 N개 → 최종 10개 — 카드가 "최종 후보 10개 중" 이라고 말한다 (ui/pickedBy.ts)
+      candidates: counts.candidates,
+      courses: counts.courses,
     });
     outcome = { scenario: rec.scenario, tries: 1, rejected: [], reason: 'ok' };
   } catch (e) {
