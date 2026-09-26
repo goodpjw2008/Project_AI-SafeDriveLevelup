@@ -552,7 +552,10 @@ function syncFullscreenButtons(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.fs-toggle')) {
     b.title = label;
     b.setAttribute('aria-label', label);
-    if (b.classList.contains('hud-fullscreen')) b.textContent = label;
+    // HUD 알약은 두 조각으로 — 세로 화면에서 두 줄('주소창' / '보기')로 세운다 (index.html 의 세로 규칙). 가로는 한 줄 그대로
+    if (b.classList.contains('hud-fullscreen')) {
+      b.innerHTML = on ? '<span>주소창</span> <span>보기</span>' : '<span>전체</span> <span>화면</span>';
+    }
     else b.innerHTML = icon(on ? 'fullscreenExit' : 'fullscreen');
   }
 }

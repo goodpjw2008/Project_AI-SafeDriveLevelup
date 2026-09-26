@@ -335,7 +335,8 @@ function siteFooter(): string {
       <span class="dot" aria-hidden="true">·</span>
       <a href="mailto:${esc(APP_CONTACT)}">${esc(mailName)}<span class="mail-host">@${esc(mailHost)}</span></a>
       <span class="dot" aria-hidden="true">·</span>
-      <span class="usage-long">${esc(APP_USAGE)}</span>
+      <!-- PC 도 짧은 꼴이다 (사용자가 정했다: "Copyright © 2026 · goodpjw2008@gmail.com · 비영리 목적 사용"). 긴 꼴은 About 창에 남는다 -->
+      <span class="usage-long">${esc(APP_USAGE_SHORT)}</span>
       <span class="usage-short">${esc(APP_USAGE_SHORT)}</span>
     </footer>`;
 }

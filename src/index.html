@@ -6002,6 +6002,18 @@
         body.touch #cluster {
           width: min(30.7vw, 160px);
         }
+        /*
+          전체 화면 알약은 두 줄 · 가운데 정렬 — '주소창' / '보기' (사용자가 정했다). 가로는 한 줄 그대로다.
+          알약이 inline-flex 라 span 에 block 을 줘도 한 줄로 늘어선다 — 세로로 쌓으려면 flex 방향을 바꿔야 한다.
+        */
+        body.touch .hud-home.hud-fullscreen {
+          flex-direction: column;
+          align-items: center;
+          gap: 0;
+          text-align: center;
+          line-height: 1.15;
+          padding: 7px 14px;
+        }
         body.touch .hud-home {
           bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(30.7vw, 160px) * 0.332 + 10px);
         }

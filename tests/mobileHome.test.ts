@@ -198,7 +198,7 @@ describe('세로 휴대폰의 첫 화면', () => {
     키보드보다 뭉툭해 같은 판이 휴대폰에서 훨씬 어려웠다. 판을 쉽게 만드는 대신 시간을 늦춘다 —
     보고 판단할 틈은 벌어지되 **무엇이 위반인지는 그대로다.**
 
-    늦추는 정도는 사용자가 직접 몰아 보며 두 번 올렸다 (0.5 → 2/3 → 0.8). 너무 느리면
+    늦추는 정도는 사용자가 직접 몰아 보며 세 번 올렸다 (0.5 → 2/3 → 0.8 → 0.9). 너무 느리면
     그것대로 실제 도로와 멀어진다.
 
     한 곳(`dt`)에서만 곱해야 차 · 보행자 · 앞차 · 신호 · 제한시간이 **같은 비율로** 느려진다.
@@ -207,7 +207,7 @@ describe('세로 휴대폰의 첫 화면', () => {
   it('세로 휴대폰에서는 판이 조금 천천히 흐른다 — 조건은 화면 규칙과 같다', () => {
     const game = readFileSync(fileURLToPath(new URL('../src/game/Game.ts', import.meta.url)), 'utf8');
     expect(game).toContain('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)');
-    expect(game).toMatch(/matches \? 0\.8 : 1/);
+    expect(game).toMatch(/matches \? 0\.9 : 1/);
     // dt 한 곳에서만 곱한다 — 두 곳에서 곱하면 판정이 어긋난다
     expect([...game.matchAll(/paceScale\(\)/g)].length).toBe(2);
   });
@@ -244,7 +244,7 @@ describe('세로 휴대폰의 첫 화면', () => {
     expect(block).toContain('(orientation: portrait) and (pointer: coarse) and (max-width: 720px)');
     expect(block).toContain('(orientation: landscape) and (pointer: coarse) and (max-height: 540px)');
     // 판이 흐르는 속도는 세로에서만 늦춘다 — 가로까지 늦추면 사용자가 정하지 않은 난이도가 바뀐다
-    expect(game).toMatch(/this\.handheld\?\.matches \? 0\.8 : 1/);
+    expect(game).toMatch(/this\.handheld\?\.matches \? 0\.9 : 1/);
   });
 
   /*
