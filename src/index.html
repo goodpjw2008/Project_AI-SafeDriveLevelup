@@ -776,6 +776,10 @@
       .modal-actions button {
         min-width: 92px;
       }
+      /* 알림 창(Screens.confirm 의 single)은 취소를 감춘다 — button 의 display 규칙이 hidden 속성을 이기므로 따로 적는다 */
+      .modal-actions button[hidden] {
+        display: none;
+      }
 
       /*
         ── AI 가 코스를 고르는 장면 (ui/AiPick.ts) ─────────────────
