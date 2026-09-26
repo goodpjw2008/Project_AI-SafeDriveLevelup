@@ -208,6 +208,12 @@ export interface PedWalkContext {
   leadInWay?: boolean;
   /** 내 차 속도 (m/s) — 설 수 있는 거리인지 잰다 */
   carSpeedMs?: number;
+  /**
+   * 설 수 있는 거리를 셀 때 쓰는 **가장 무른 브레이크** (m/s²). 비우면 마른 길의 값(AFTER_LEAD_BRAKE)이다.
+   * 빗길은 브레이크가 0.7 배라(scenarios/conditions.ts 의 afterLeadBrake) 같은 거리에서 나서면 마른 길에서 설 수 있던
+   * 사람이 서지 못한다 — 빗길 · 앞차 뒤 뛰어드는 사람 판 76개에서 1초 늦게 보는 운전자가 걸렸다 (전수 검증이 잡았다).
+   */
+  brakeDecel?: number;
 }
 
 export type PedState = 'waiting' | 'crossing' | 'done';
@@ -413,7 +419,7 @@ export class PedWalk {
       */
       if (this.startWithin !== null && d > this.startWithin) return;
       const v = ctx.carSpeedMs ?? 0;
-      const canStop = d >= v * AFTER_LEAD_REACTION + (v * v) / (2 * AFTER_LEAD_BRAKE) + AFTER_LEAD_MARGIN;
+      const canStop = d >= v * AFTER_LEAD_REACTION + (v * v) / (2 * (ctx.brakeDecel ?? AFTER_LEAD_BRAKE)) + AFTER_LEAD_MARGIN;
       /*
         서 있는 차 앞으로는 나선다. 이미 코앞이면(설 수 없다) **나를 다 보낸 뒤에** 건넌다 — 내 차가 횡단보도에
         걸쳐 있는 동안 뜻을 드러내면, 설 수 없던 나를 "통행하려는 사람을 두고 지나갔다" 로 잡게 된다.
@@ -437,7 +443,7 @@ export class PedWalk {
         const signalLetsGo = !this.obeysSignal || signal === null || signal === 'green';
         const d = this.playerDistance(carFront);
         const v = ctx.carSpeedMs ?? 0;
-        const canStop = d >= v * AFTER_LEAD_REACTION + (v * v) / (2 * AFTER_LEAD_BRAKE) + AFTER_LEAD_MARGIN;
+        const canStop = d >= v * AFTER_LEAD_REACTION + (v * v) / (2 * (ctx.brakeDecel ?? AFTER_LEAD_BRAKE)) + AFTER_LEAD_MARGIN;
         if (signalLetsGo && !canStop) {
           // 뜻도 발도 거둔다 — 차를 보낸 뒤 다시 본다
           this.intending = false;

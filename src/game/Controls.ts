@@ -104,9 +104,10 @@ export class Controls {
   private touch = { steer: 0 };
 
   /**
-   * 우측 방향지시등. 우회전 시나리오이므로 처음부터 켜진 상태로 시작한다.
-   * 이 게임의 목적은 신호 준수와 상황 판단이지 깜빡이 조작 숙달이 아니다.
-   * (Q 로 끌 수는 있고, 끈 채로 교차로에 들어가면 제38조 위반으로 잡힌다)
+   * 우측 방향지시등. 우회전 시나리오이므로 처음부터 켜진 상태로 시작하고 **끌 수 없다**.
+   * 이 게임의 목적은 신호 준수와 상황 판단이지 깜빡이 조작 숙달이 아니다. 한때 Q 로 끌 수 있었고 끈 채로
+   * 들어가면 제38조 위반으로 잡았는데, 사용자가 "휴대폰에서 제어하므로 깜빡이까지 조작하기는 힘들다 — 고정하고
+   * 변수에서 빼 달라" 고 정했다 (2026-09-27). 판정 코드(NO_TURN_SIGNAL)는 남아 있지만 사람이 몰 때는 일어나지 않는다.
    *
    * **직진 코스에서는 꺼진 채로 시작한다** — 돌지 않으므로 켤 의무가 없고, 켜면 오히려
    * 틀린 신호다. 판정도 직진에서는 지시등을 묻지 않는다 (rules/lawRules.ts).
@@ -193,12 +194,6 @@ export class Controls {
       */
       if (leaveToBrowser(e)) return;
 
-      if (e.code === 'KeyQ') {
-        e.preventDefault();
-        this.rightSignal = !this.rightSignal;
-        this.cb.onToggleSignal();
-        return;
-      }
       if (e.code === 'KeyC') {
         e.preventDefault();
         this.cb.onToggleView();

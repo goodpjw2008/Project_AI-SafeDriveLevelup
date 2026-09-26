@@ -202,7 +202,7 @@ export function parseReply(text, ids, habitOk = () => false) {
 }
 
 /** 늘 시험되는 위반 (src/scenarios/library.ts 의 `ALWAYS_TESTED`) — 어느 코스에서나 그 습관을 고칠 수 있다 */
-const ALWAYS_TESTED = ['NO_TURN_SIGNAL', 'NO_SLOW_DOWN', 'WIDE_TURN'];
+const ALWAYS_TESTED = ['NO_SLOW_DOWN', 'WIDE_TURN']; // 방향지시등은 저절로 켜져 시험하지 않는다 (src/scenarios/library.ts)
 
 /**
  * @param {unknown} body 브라우저가 보낸 JSON (src/scenarios/recommend.ts 의 recommendPayload)

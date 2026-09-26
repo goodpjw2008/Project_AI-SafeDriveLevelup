@@ -34,7 +34,7 @@ import { XP_PER_CLEAN_RUN, xpToNext, type Difficulty } from '../src/scenarios/cu
 
 const lib = scenarioLibrary();
 const base: LibraryTags = {
-  extra: 'none', signal: 'green',
+  side: 'auto', extra: 'none', signal: 'green',
   zone: 'no',
   sigA: 'yes',
   sigC: 'yes',
@@ -158,7 +158,9 @@ describe('이 판이 무엇을 시험했는가 — habitsTestedBy', () => {
     const green = lib.find((e) => e.tags.signal === 'green' && e.tags.a === 'none' && e.tags.c === 'none')!;
     expect(habitsTestedBy(red.spec).has('RED_NO_STOP')).toBe(true);
     expect(habitsTestedBy(green.spec).has('RED_NO_STOP'), '녹색 판은 적색 습관을 시험하지 않는다').toBe(false);
-    expect(habitsTestedBy(green.spec).has('NO_TURN_SIGNAL')).toBe(true);
+    expect(habitsTestedBy(green.spec).has('NO_SLOW_DOWN')).toBe(true);
+    // 방향지시등은 저절로 켜져 시험하지 않는다 (ALWAYS_TESTED)
+    expect(habitsTestedBy(green.spec).has('NO_TURN_SIGNAL')).toBe(false);
   });
 
   it('손으로 쓴 판도 같은 기준으로 읽는다', () => {

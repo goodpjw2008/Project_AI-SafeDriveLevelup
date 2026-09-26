@@ -673,8 +673,8 @@ describe('레벨 — Level1 에서 안전운전 마스터까지', () => {
    - 마스터도 습관이 하나도 없을 때만이다
 */
 describe('학습 루프 — 습관을 고쳐야 올라간다', () => {
-  const RED = new Set<ViolationCode>(['RED_NO_STOP', 'NO_TURN_SIGNAL', 'NO_SLOW_DOWN', 'WIDE_TURN']);
-  const GREEN = new Set<ViolationCode>(['NO_TURN_SIGNAL', 'NO_SLOW_DOWN', 'WIDE_TURN']);
+  const RED = new Set<ViolationCode>(['RED_NO_STOP', 'NO_SLOW_DOWN', 'WIDE_TURN']);
+  const GREEN = new Set<ViolationCode>(['NO_SLOW_DOWN', 'WIDE_TURN']);
   const step = (s: CurriculumState, r: JudgeResult, tested?: ReadonlySet<ViolationCode>) =>
     advance(s, r, tested).next;
 

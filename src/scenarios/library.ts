@@ -140,6 +140,13 @@ export const EXTRAS = [
   'rideCpushC',
   'pedS',
   'pedSrideCpushC',
+  /*
+    **같은 쪽에서 한 사람 더** (사용자가 변수 설계를 다시 보며 정했다, 2026-09-27: "보행자가 2명일 경우 — 좌→우 1방향,
+    우→좌 1방향, 양방향"). 한 사람이 서는 판(건너려는 · 건너는 · 무단횡단 · 무단횡단하려는)에 **같은 보도에서** 한 사람이
+    더 차례로 나선다 — 양방향(`bothWays` · `group`)과 한쪽 셋(`crowd`) 사이의 빈자리다. 첫 횡단보도에 한 사람이 있으면
+    거기에, 아니면 우회전 후 횡단보도에 붙는다. EXTRAS 의 열 번째 값이라 이 축은 이제 꽉 찼다.
+  */
+  'pair',
 ] as const;
 
 /** `extra` 값을 풀어 읽는다 — 어디에 무엇을 덧붙이는가 */
@@ -149,6 +156,7 @@ export function extrasOf(t: { extra: (typeof EXTRAS)[number] }): {
   rideC: boolean;
   pushC: boolean;
   pedS: boolean;
+  pair: boolean;
 } {
   const x = t.extra;
   return {
@@ -157,6 +165,7 @@ export function extrasOf(t: { extra: (typeof EXTRAS)[number] }): {
     rideC: x === 'rideC' || x === 'rideCpushC' || x === 'pedSrideCpushC',
     pushC: x === 'pushC' || x === 'rideApushC' || x === 'rideCpushC' || x === 'pedSrideCpushC',
     pedS: x === 'pedS' || x === 'pedSrideCpushC',
+    pair: x === 'pair',
   };
 }
 export const APPROACHES = ['none', 'signal', 'noSignal'] as const;
@@ -180,12 +189,31 @@ const ADDED_LATER: ReadonlyArray<{ [K in keyof LibraryTags]?: ReadonlySet<string
   { a: new Set(['bothWays', 'crowd']), c: new Set(['crowd']) },
   // 3세대 — 자전거 (타고 건넘 · 끌고 건넘)
   { a: new Set(['bikeRide', 'bikePush']) },
-  // 4세대 — 덧붙이는 사람들 (EXTRAS)
+  // 4세대 — 덧붙이는 사람들 (EXTRAS). 'pair' 는 값 목록의 끝이라 같은 세대 안에서 뒤에 선다
   { extra: new Set(EXTRAS.filter((v) => v !== 'none')) },
+  // 5세대 — 건너는 방향의 거울상 (SIDES)
+  { side: new Set(['flip']) },
 ];
 export const KINDS = ['adult', 'child', 'elder'] as const;
+
+/*
+  **건너는 방향 — 열넷째 축** (사용자가 정했다, 2026-09-27: "방향(좌→우 · 우→좌 · 양방향)을 축으로 올릴지 → 꼭 필요함").
+
+  예전에는 사람이 어느 보도에서 오는지를 판 번호의 해시로 정했다 — 같은 모양은 늘 같은 쪽이었고, 반대쪽은 다른 모양의
+  판에서나 만났다. 이제는 같은 모양을 **두 방향으로 다 겪는다**: `auto` 는 지금까지 그대로(해시가 정한 쪽), `flip` 은 그 판의
+  **모든 사람을 반대쪽 보도로** 옮긴 거울상이다. 사람마다 새로 뽑지 않고 거울로 뒤집는 까닭은, 두 판이 방향 말고는 정확히
+  같아야 "방향만 다르면 무엇이 달라지는가" 를 비교할 수 있기 때문이다 (환경 · 교차 차량도 쌍둥이 판의 값을 그대로 쓴다).
+
+  **id 의 맨 앞자리다** — 'auto' 가 0 이라 이미 있던 판의 id 는 그대로이고, 번호는 ADDED_LATER 의 마지막 세대(5)라 맨 뒤에 선다.
+  거울로 뒤집어도 같은 장면(사람이 없거나, 양쪽에 같은 사람이 서는 판)은 `flip` 을 만들지 않는다 (allCombinations 의 flipMatters)
+  — 같은 판이 둘이면 판만 늘고 배우는 것은 늘지 않는다. 제목에는 실제 방향을 적는다 (titleOf 의 sidePhrases).
+*/
+export const SIDES = ['auto', 'flip'] as const;
+
 export interface LibraryTags {
-  /** 덧붙이는 사람들 — id 의 맨 앞자리 (EXTRAS 주석) */
+  /** 건너는 방향 — id 의 맨 앞자리 (SIDES 주석) */
+  side: (typeof SIDES)[number];
+  /** 덧붙이는 사람들 — id 의 둘째 자리 (EXTRAS 주석) */
   extra: (typeof EXTRAS)[number];
   signal: (typeof SIGNALS)[number];
   zone: (typeof ZONES)[number];
@@ -203,7 +231,9 @@ export interface LibraryTags {
 
 /** 축 이름 → 값 목록. **id 의 자리 순서이기도 하다** — 순서를 바꾸면 id 가 바뀐다 */
 export const AXES: { [K in keyof LibraryTags]: readonly LibraryTags[K][] } = {
-  // 맨 앞자리 — 'none' 이 0 이라 이미 있던 열두 자리 id 가 그대로다
+  // 맨 앞자리 — 'auto' 가 0 이라 이미 있던 열세 자리 id 가 그대로다
+  side: SIDES,
+  // 둘째 자리 — 'none' 이 0 이라 이미 있던 열두 자리 id 가 그대로다
   extra: EXTRAS,
   signal: SIGNALS,
   zone: ZONES,
@@ -393,9 +423,17 @@ export function combinationAllowed(t: LibraryTags): boolean {
       if (x.pushC && t.c === 'crowd') return false;
     }
     if (x.pedS && (t.approach !== 'noSignal' || t.a === 'none')) return false;
+    // 같은 쪽에서 한 사람 더 — 한 사람이 걸어서 서는 판에만 (첫 횡단보도든 우회전 후든)
+    if (x.pair && !singleWalker(t.a) && !singleWalker(t.c)) return false;
   }
   return true;
 }
+
+/** 한 사람이 **걸어서** 서는 값인가 — 같은 쪽 동행(EXTRAS 의 pair)을 붙일 수 있는 자리 */
+const singleWalker = (v: string): boolean => v === 'waiting' || v === 'crossing' || v === 'jaywalk' || v === 'jaywalkWait';
+
+/** 반대쪽 보도 */
+const mirrorSide = (s: 'left' | 'right'): 'left' | 'right' => (s === 'left' ? 'right' : 'left');
 
 /**
  * **플레이테스트로 뺀 조합** — 법규 · 신호 구조로는 성립하지만, 실제 차로 달려 보니 운전자에게 가르칠 것이 없거나
@@ -438,7 +476,9 @@ export function playtestExcluded(t: LibraryTags): boolean {
 }
 
 /** 라이브러리에 실리는 조합인가 — 성립하고(combinationAllowed), 플레이테스트로 빼지 않았다 */
-export const inLibrary = (t: LibraryTags): boolean => combinationAllowed(t) && !playtestExcluded(t);
+/** 이 조합의 판이 라이브러리에 있는가 — 성립하고, 빼지 않았고, 거울상이라면 뒤집을 사람이 있어야 한다 (flipMatters) */
+export const inLibrary = (t: LibraryTags): boolean =>
+  combinationAllowed(t) && !playtestExcluded(t) && (t.side !== 'flip' || flipMatters(t));
 
 // ── 판 만들기 ────────────────────────────────────────────────────────────────
 
@@ -543,6 +583,31 @@ const hasApproachPed = (t: LibraryTags): boolean =>
   t.approach === 'noSignal' && t.a === 'none' && t.lead === 'none' && !hasArrow(t);
 
 function pedestriansOf(t: LibraryTags, seed: number): PedSpawn[] {
+  const auto = pedestriansAuto(t, seed);
+  if (t.side !== 'flip') return auto;
+  // 거울상 — 쌍둥이(auto) 판의 사람들 가운데 **한쪽에서만 오는 횡단보도**의 사람들을 반대쪽 보도로 옮긴다 (SIDES 주석)
+  const cws: ReadonlySet<string> = mirrorableCrosswalks(t, auto);
+  return auto.map((p) => (cws.has(p.crosswalk) ? { ...p, from: mirrorSide(p.from) } : p));
+}
+
+/**
+ * **거울로 뒤집는 횡단보도** — 사람들이 한쪽에서만 오는 횡단보도. 양쪽에서 오는 판(`bothWays` · `group` · `mixed`)은 이미
+ * 양방향이라 뒤집을 것이 없고, 뒤집으면 "건너편이 먼저 나선다" 같은 시각 설계까지 뒤집힌다. 쪽이 설계로 박힌 사람도 두지
+ * 않는다 — 돌자마자 뛰어드는 사람(`late`)은 가까운 쪽이어야 장면이 성립하고, 나올까 말까(`maybe`)는 07번 판을 그대로 재현한다.
+ * 제목의 방향 글귀(sidePhrases)도 같은 횡단보도만 적는다.
+ */
+function mirrorableCrosswalks(t: LibraryTags, peds: readonly PedSpawn[]): Set<'S' | 'A' | 'C'> {
+  const out = new Set<'S' | 'A' | 'C'>();
+  for (const cw of ['S', 'A', 'C'] as const) {
+    if (cw === 'C' && (t.c === 'late' || t.c === 'maybe')) continue;
+    const sides = new Set(peds.filter((p) => p.crosswalk === cw).map((p) => p.from));
+    if (sides.size === 1) out.add(cw);
+  }
+  return out;
+}
+
+/** 방향을 뒤집기 전의 사람들 — 해시가 정한 쪽 그대로 */
+function pedestriansAuto(t: LibraryTags, seed: number): PedSpawn[] {
   const alone = pedestriansAlone(t, seed);
   const out = t.lead === 'none' ? alone : behindLead(alone, t);
   if (!hasApproachPed(t)) return out;
@@ -592,7 +657,20 @@ function behindLead(alone: PedSpawn[], t: LibraryTags): PedSpawn[] {
       버린다 — 앞차가 서고 진입로 신호가 나를 더 붙잡는 판에서 36판이 그렇게 역할을 잃었다. 이 사람의 장면은
       "돌 때 코앞에서 뛰어든다" 라, 앞차가 지나간 뒤에도 **내가 가까이 와야** 나선다.
     */
-    if (p.crosswalk === 'C' && t.c === 'late') return { ...p, at: 0, afterLead: true, obeysSignal: false };
+    /*
+      **빗길에는 12m 에서 나선다** — 브레이크가 0.7 배라(scenarios/conditions.ts) 15km/h 로 돌면서 1초 늦게 본 사람은 9m 안에서
+      서지 못한다 (제동 3.3m + 반응 4.2m + 횡단보도 앞 여유). 환경을 물리로 바꾸자 이 모양 124판에서 그 운전자가 걸렸다
+      (전수 검증이 잡았다). 다른 앞차 뒤 사람과 같은 거리(AFTER_LEAD_TRIGGER)라 "앞차가 가린 자리에서 나온다" 는 그대로다.
+
+      **보호구역의 신호기 없는 우회전 후 횡단보도는 9m 그대로다** — 거기서는 사람이 없어도 서야 하므로(제27조 제7항) 늦게 본
+      사람도 이미 서는 중이라 걸리지 않았고(124판에 하나도 없다), 12m 로 당기면 보행자를 안 보는 운전자가 의무 정지를 하는 동안
+      사람이 다 건너 버려 역할을 잃었다 (12판, 전수 검증이 잡았다).
+    */
+    if (p.crosswalk === 'C' && t.c === 'late') {
+      const mustStopAtC = t.zone === 'yes' && t.sigC === 'no';
+      const within = t.env === 'rain' && !mustStopAtC ? AFTER_LEAD_TRIGGER : p.startWithin;
+      return { ...p, at: 0, startWithin: within, afterLead: true, obeysSignal: false };
+    }
     /*
       **타고 건너는 자전거도 제 방아쇠(6m)를 지킨다.** 걸음보다 빨라서(pedWalk.ts) 앞차 뒤 사람의
       방아쇠(12m)로 나서면 **내가 닿기 전에 다 건너** 버린다 — 앞차가 일시정지를 건너뛰는 판 넷이
@@ -933,6 +1011,21 @@ function pedestriansAlone(t: LibraryTags, seed: number): PedSpawn[] {
     );
   }
   if (x.pedS) out.push({ crosswalk: 'S', at: 0, startWithin: 14, from: side(45), obeysSignal: false, kind: 'child' });
+  /*
+    **같은 쪽에서 한 사람 더** — 첫 횡단보도(있으면) 아니면 우회전 후 횡단보도의 그 사람과 같은 보도에서, 조금 뒤에 나선다.
+    거리로 나서는 사람은 4m 뒤에, 시각으로 나서는 사람은 1.5초 뒤에 — `crowd`(한쪽 셋)의 간격과 같은 사고다.
+  */
+  if (x.pair) {
+    const at = singleWalker(t.a) ? 'A' : 'C';
+    const first = out.find((p) => p.crosswalk === at && !p.bike && p.chance === undefined);
+    if (first) {
+      const follow: PedSpawn =
+        first.startWithin !== undefined
+          ? { ...first, startWithin: Math.max(3, first.startWithin - 4), kind: companion(t) }
+          : { ...first, at: first.at + 1.5, kind: companion(t) };
+      out.push(follow);
+    }
+  }
   return out;
 }
 
@@ -953,7 +1046,7 @@ const SIGNAL_TITLE: Record<LibraryTags['signal'], string> = {
 };
 const KIND_WORD: Record<LibraryTags['kind'], string> = { adult: '보행자', child: '어린이', elder: '노인' };
 
-function titleOf(t: LibraryTags): string {
+function titleOf(t: LibraryTags, peds: readonly PedSpawn[] = []): string {
   const who = KIND_WORD[t.kind];
   const parts: string[] = [];
   if (t.zone === 'yes') {
@@ -1001,7 +1094,10 @@ function titleOf(t: LibraryTags): string {
     if (x.pushA) parts.push('첫 횡단보도 자전거 끌고 건너는 사람 함께');
     if (x.rideC) parts.push(`우회전 후 자전거횡단도 · 타고 건너는 ${rider} 자전거`);
     if (x.pushC) parts.push('우회전 후 자전거 끌고 건너는 사람');
+    if (x.pair) parts.push('같은 쪽에서 한 사람 더');
   }
+  // 건너는 방향 — 판의 실제 사람들에서 읽는다 (SIDES 축이 같은 모양을 두 방향으로 만든다)
+  parts.push(...sidePhrases(t, peds));
   if (t.lead === 'lawful') parts.push('앞차 우회전');
   if (t.lead === 'rolling') parts.push('앞차 일시정지 무시');
   if (t.lead === 'straight') parts.push('앞차 직진 대기');
@@ -1011,6 +1107,20 @@ function titleOf(t: LibraryTags): string {
   if (t.env === 'night') parts.push('야간');
   if (t.env === 'rain') parts.push('빗길');
   return `${SIGNAL_TITLE[t.signal]} - ${[...(hasSubject ? [] : ['보행자 없음']), ...parts].join(' · ')}`;
+}
+
+/**
+ * 횡단보도마다 사람들이 **한쪽에서만** 오면 그 쪽을 적는다 — 운전자 기준 왼쪽(맞은편 보도) · 오른쪽(내 차 쪽 보도).
+ * 양쪽에서 오면 제목이 이미 '양방향' 이라고 말하므로 적지 않는다.
+ */
+function sidePhrases(t: LibraryTags, peds: readonly PedSpawn[]): string[] {
+  const name = { S: '진입로', A: '첫 횡단보도', C: '우회전 후' } as const;
+  const out: string[] = [];
+  for (const cw of mirrorableCrosswalks(t, peds)) {
+    const from = peds.find((p) => p.crosswalk === cw)!.from;
+    out.push(`${name[cw]} ${from === 'left' ? '왼쪽' : '오른쪽'}에서`);
+  }
+  return out;
 }
 
 function briefOf(t: LibraryTags): string {
@@ -1061,6 +1171,7 @@ function briefOf(t: LibraryTags): string {
     if (x.rideC) s.push('우회전해서 나가는 횡단보도 옆에도 자전거횡단도가 있어 자전거가 타고 건넙니다.');
     if (x.pushC) s.push('우회전해서 나가는 횡단보도를 자전거에서 내려 끌고 건너는 사람도 있습니다.');
     if (x.pedS) s.push('진입로 보호구역 횡단보도에도 아이가 서 있습니다.');
+    if (x.pair) s.push('같은 보도에서 두 사람이 차례로 건넙니다 — 앞사람이 지나갔다고 끝이 아닙니다.');
   }
   if (t.lead !== 'none' && hasPeds(t)) s.push('앞차가 지나간 뒤에도 횡단보도를 보세요.');
   if (t.lead === 'lawful') s.push('앞차가 먼저 우회전합니다.');
@@ -1171,7 +1282,7 @@ function targetsOf(t: LibraryTags): ViolationCode[] {
     시험하지 못하는 위반을 적어 두면 그 판 몇 번으로 습관이 '고쳐졌다' 가 된다.
   */
   if (t.a === 'bikeRide' || (x.rideA && t.a === 'none')) out.add('BIKE_BLOCKED');
-  if ((t.a !== 'bikeRide' && hasPeds(t)) || hasApproachPed(t) || x.pushA || x.pushC || x.pedS) out.add('PEDESTRIAN_BLOCKED');
+  if ((t.a !== 'bikeRide' && hasPeds(t)) || hasApproachPed(t) || x.pushA || x.pushC || x.pedS || x.pair) out.add('PEDESTRIAN_BLOCKED');
   if ((t.zone === 'yes' && (t.sigA === 'no' || t.sigC === 'no')) || t.approach === 'noSignal') out.add('SCHOOL_ZONE_NO_STOP');
   if (t.approach === 'signal' && t.lead === 'none') out.add('SCHOOL_ZONE_RED');
   if (t.lead === 'rolling') out.add('RED_NO_STOP');
@@ -1184,11 +1295,14 @@ function targetsOf(t: LibraryTags): ViolationCode[] {
 /** 태그 → 판. 조합 규칙을 통과한 것만 부른다 */
 export function buildLibrarySpec(t: LibraryTags): ScenarioSpec {
   const id = libraryId(t);
-  const env = environmentOf(t, id);
+  // 거울상 판은 환경 · 교차 차량 · 사람의 종류와 시각을 쌍둥이(auto) 판에서 그대로 가져온다 — 방향만 다르다 (SIDES 주석)
+  const seed = t.side === 'flip' ? libraryId({ ...t, side: 'auto' }) : id;
+  const env = environmentOf(t, seed);
   const leadKind: LeadPlan | null = t.lead === 'none' ? null : t.lead;
+  const pedestrians = pedestriansOf(t, seed);
   const spec: ScenarioSpec = {
     id,
-    title: titleOf(t),
+    title: titleOf(t, pedestrians),
     brief: briefOf(t),
     teaches: teachesOf(t),
     ...startOf(t),
@@ -1220,7 +1334,7 @@ export function buildLibrarySpec(t: LibraryTags): ScenarioSpec {
       (서행에서 6~7m)이면 규정대로 모는 사람도 설 수 없는 거리라 그 사람이 끝내 나서지 못했다.
     */
     ...(leadKind ? { leadCar: leadSpecFor(leadKind, hasPeds(t) ? 4.0 : leadKind === 'rolling' ? 1.6 : 2.0) } : {}),
-    pedestrians: pedestriansOf(t, id),
+    pedestrians,
     rearHonk: t.pressure === 'honk',
     crossTraffic: env.crossTraffic,
     exitBlocked: t.jam === 'jam',
@@ -1588,17 +1702,29 @@ export function isCombinedLevel(level: number): boolean {
 /** 조합 규칙을 통과하는 **모든** 태그 — 검증 전 후보다 */
 export function allCombinations(): LibraryTags[] {
   const out: LibraryTags[] = [];
+  /*
+    **방향(side)은 곱하지 않고 뒤에 붙인다.** 열세 축을 곱한 조합마다 성립하면 `auto` 를 넣고, 거울로 뒤집어 다른 장면이
+    되면 `flip` 을 바로 뒤에 넣는다 — 축을 곱하면 성립 검사가 두 배가 되고, 뒤집어도 같은 판(사람 없음 · 양쪽 대칭)까지 생긴다.
+  */
+  const keys = AXIS_KEYS.filter((k) => k !== 'side');
   const walk = (i: number, acc: Partial<LibraryTags>): void => {
-    if (i === AXIS_KEYS.length) {
-      const t = acc as LibraryTags;
-      if (combinationAllowed(t)) out.push({ ...t });
+    if (i === keys.length) {
+      const t = { ...acc, side: 'auto' } as LibraryTags;
+      if (!combinationAllowed(t)) return;
+      out.push(t);
+      if (flipMatters(t)) out.push({ ...t, side: 'flip' });
       return;
     }
-    const k = AXIS_KEYS[i];
+    const k = keys[i];
     for (const v of AXES[k]) walk(i + 1, { ...acc, [k]: v });
   };
   walk(0, {});
   return out;
+}
+
+/** 거울로 뒤집으면 **다른 장면**이 되는가 — 한쪽에서만 오는 횡단보도가 하나라도 있을 때 (mirrorableCrosswalks) */
+function flipMatters(t: LibraryTags): boolean {
+  return mirrorableCrosswalks(t, pedestriansAuto(t, libraryId(t))).size > 0;
 }
 
 export function entryFor(t: LibraryTags): LibraryEntry {
@@ -1686,7 +1812,12 @@ export function libraryEntry(id: number): LibraryEntry | undefined {
 /**
  * **어느 판에서든 시험되는 습관** — 우회전은 매 판 하기 때문이다 (지시등 · 서행 · 우측 가장자리).
  */
-export const ALWAYS_TESTED: readonly ViolationCode[] = ['NO_TURN_SIGNAL', 'NO_SLOW_DOWN', 'WIDE_TURN'];
+/*
+  **방향지시등은 더 이상 시험하지 않는다.** 판을 시작하면 저절로 켜지고 끌 수 없다 (game/Controls.ts) — 사용자가 "휴대폰에서
+  제어하므로 깜빡이까지 조작하기는 힘들다, 고정하고 변수에서 빼 달라" 고 정했다. 판정 코드는 남아 있지만 일어날 수 없으므로
+  '시험하는 위반' 에서 뺀다 — 넣어 두면 학습자 모델이 매 판 '지켰다' 를 배워 아무 뜻 없는 숙달이 된다.
+*/
+export const ALWAYS_TESTED: readonly ViolationCode[] = ['NO_SLOW_DOWN', 'WIDE_TURN'];
 
 /**
  * 이 판에서 **그 위반이 일어날 수 있었는가** — 습관이 "고쳐졌는지" 는 이런 판에서만 센다.
@@ -1783,7 +1914,7 @@ const DEMO: readonly Partial<LibraryTags>[] = [
 /** 시범 코스 — 맑은 낮 · 재촉 없음 · 나머지는 가장 단순한 값으로 채운 판. **DEMO 에 적힌 차례 그대로** */
 export function demoCourses(): LibraryEntry[] {
   const plain: Partial<LibraryTags> = {
-    extra: 'none', zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
+    side: 'auto', extra: 'none', zone: 'no', sigA: 'yes', sigC: 'yes', a: 'none', c: 'none', kind: 'adult',
     approach: 'none', lead: 'none', pressure: 'calm', env: 'day', jam: 'none',
   };
   return DEMO.map((want) => {

@@ -76,6 +76,8 @@ export const C_CUE_FROM_Z = STOP_LINE + 12;
 export function pedCueAt(
   s: Pick<WorldSample, 'frontX' | 'frontZ' | 'pedestrians'>,
   hasApproachZone: boolean,
+  /** 알리는 거리 — 낮에는 PED_CUE_RANGE, 밤에는 전조등 범위(scenarios/conditions.ts 의 sightRange)로 줄어든다 */
+  range: number = PED_CUE_RANGE,
 ): PedCue | null {
   const ahead: { id: CrosswalkId; distance: number }[] = [];
   if (hasApproachZone && s.frontZ > CROSSWALK_S_INNER) {
@@ -103,7 +105,7 @@ export function pedCueAt(
   }
 
   for (const { id, distance } of ahead) {
-    if (distance > PED_CUE_RANGE) continue;
+    if (distance > range) continue;
     /*
       **`active` 는 보지 않는다.** 그 값은 등장 시각(`at`)이 지나야 켜지는 결과 지도용이라,
       연석에 나와 건널 뜻을 보이는 동안(pedWalk 의 INTENT_LEAD)에는 꺼져 있다. 그걸 거르면

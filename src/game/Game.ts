@@ -86,7 +86,9 @@ import { LeadDrive } from './leadDrive';
 import { PlayerMarker } from './PlayerMarker';
 import { pedCueAt, type PedCue } from './pedCue';
 import { pickNpcRoster } from './npcVehicles';
-import { SCHOOL_ZONE_KMH, Vehicle } from './Vehicle';
+import { DEFAULT_PACE, SCHOOL_ZONE_KMH, Vehicle } from './Vehicle';
+import { afterLeadBrake, paceFor, seenPedestrians, sightRange } from '../scenarios/conditions';
+import { PED_CUE_RANGE } from './pedCue';
 import type { DrivePace } from '../scenarios/challenge';
 import { World } from './World';
 
@@ -440,8 +442,10 @@ export class Game {
       둔다. 사용자가 "후방에서 볼 때 정지선을 조금 넘는 느낌" 이라 짚어 확인한 자리다 — 실제 정지 자리는 정지선 앞 1.8m 이고,
       느낌은 높고 뒤에 있는 후방 카메라의 시차(범퍼가 노면 2m 쯤 앞을 덮어 보인다)에서 온다 (CameraRig.ts).
     */
+    // 환경이 물리를 바꾼다 — 빗길은 브레이크가 무르다 (scenarios/conditions.ts). 차와 운전자가 같은 값을 본다
+    const pace = paceFor(opts.pace ?? DEFAULT_PACE, scenario.weather);
     if (opts.autoDrive) {
-      this.auto = new AutoDriver(carSpec.dims.length * 0.58, opts.pace?.brakeDecel, scenario.drive ?? 'rightTurn');
+      this.auto = new AutoDriver(carSpec.dims.length * 0.58, pace.brakeDecel, scenario.drive ?? 'rightTurn');
     }
     // 판마다 새로 만들지 않는다 — 모델의 텍스처·셰이더가 그대로 남는다 (renderer.ts)
     this.renderer = sharedRenderer(canvas);
@@ -476,13 +480,13 @@ export class Game {
     this.world.scene.add(this.intersection.group);
     this.world.scene.add(this.stopMarkers.group);
 
-    this.pace = opts.pace;
+    this.pace = pace;
     this.vehicle = new Vehicle(
       carSpec.dims.length,
       scenario.isSchoolZone,
       Boolean(scenario.approachSchoolZone),
       spawnZ(scenario),
-      opts.pace,
+      pace,
       scenario.drive === 'zoneOnly',
     );
     this.carModel = buildCar(carSpec, { isPlayer: true });
@@ -1588,7 +1592,8 @@ export class Game {
             ) as Partial<Record<CrosswalkId, LightColor>>,
           }
         : {}),
-      pedestrians: this.pedestrians.map((p) => p.sample()),
+      // 밤에는 전조등 범위 안의 사람만 알아본다 (scenarios/conditions.ts) — 시뮬레이터의 운전자와 같은 눈
+      pedestrians: seenPedestrians(this.pedestrians.map((p) => p.sample()), front, this.scenario.timeOfDay),
       exitBlocked,
       isSchoolZone: this.scenario.isSchoolZone,
       lead:
@@ -1744,6 +1749,7 @@ export class Game {
       p.update(this.elapsed, dt, signal, front, carMoving, trafficBusy, {
         leadInWay: this.lead?.inWayOf(p.crosswalk) ?? false,
         carSpeedMs: this.vehicle.speedKmh / 3.6,
+        brakeDecel: afterLeadBrake(this.scenario.weather),
       });
     }
 
@@ -2135,7 +2141,8 @@ export class Game {
 
   /** 내 앞 횡단보도의 보행자 움직임 — 판단은 pedCue.ts 가 한다 (화면 없이 테스트하려고 떼어 냈다) */
   private pedCue(s: WorldSample): GameSnapshot['pedCue'] {
-    return pedCueAt(s, this.scenario.approachSchoolZone !== undefined);
+    // 밤에는 느낌표 안내도 전조등 범위 안에서만 — 운전자가 보는 것과 같은 거리 (scenarios/conditions.ts)
+    return pedCueAt(s, this.scenario.approachSchoolZone !== undefined, Math.min(PED_CUE_RANGE, sightRange(this.scenario.timeOfDay)));
   }
 
   /**

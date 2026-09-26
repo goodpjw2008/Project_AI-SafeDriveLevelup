@@ -529,7 +529,7 @@ export function zoneEntries(): LibraryEntry[] {
       const spec = zoneCourses()[i];
       const libTags: LibraryTags = {
         // 교차로가 없는 길이라 '정면 신호' 도 없다 — 추천이 모양을 가르는 데만 쓰는 값이다
-        extra: 'none', signal: 'green',
+        side: 'auto', extra: 'none', signal: 'green',
         zone: 'yes',
         sigA: hasSignal(t, 'A') ? 'yes' : 'no',
         sigC: hasSignal(t, 'B') ? 'yes' : 'no',
