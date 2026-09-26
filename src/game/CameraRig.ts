@@ -185,15 +185,28 @@ export class CameraRig {
     return clamp((vertical * 180) / Math.PI, 74, this.camera.aspect < 1 ? PORTRAIT_MAX_FOV : 90);
   }
 
+  /**
+   * **운전자 시점을 쓰는가** — 설정(save.ts 의 settings.driverView)이 정한다. 끄면 C 로 돌 때 운전석을 건너뛰고,
+   * 운전석으로 놓으라는 요청은 후방으로 받는다. 시점을 도는 곳이 여기 하나라 여기서 막으면 어디서도 열리지 않는다.
+   */
+  private driverView = true;
+
+  setDriverView(on: boolean): void {
+    this.driverView = on;
+    if (!on && this.mode === 'driver') this.setMode('chase');
+  }
+
   cycle(): ViewMode {
-    const i = VIEW_ORDER.indexOf(this.mode);
-    this.mode = VIEW_ORDER[(i + 1) % VIEW_ORDER.length];
+    const order = this.driverView ? VIEW_ORDER : VIEW_ORDER.filter((v) => v !== 'driver');
+    const i = order.indexOf(this.mode);
+    this.mode = order[(i + 1) % order.length];
     this.initialized = false;
     this.applyLayers();
     return this.mode;
   }
 
   setMode(mode: ViewMode): void {
+    if (!this.driverView && mode === 'driver') mode = 'chase';
     if (this.mode === mode) return;
     this.mode = mode;
     this.initialized = false;

@@ -379,6 +379,8 @@ export class Game {
        * 때문이다 — 주행을 시작할 때마다 "후방 시점" 이 뜨면 안내 문구를 덮는다.
        */
       startView?: ViewMode;
+      /** 운전자 시점을 쓰는가 (save.ts 의 settings.driverView). 안 쓰면 시야 창을 만들지 않고 C 로 돌 때 운전석을 건너뛴다 */
+      driverView?: boolean;
       /**
        * AI 자율 주행 — 사람 입력 대신 AutoDriver 가 운전한다.
        *
@@ -394,7 +396,7 @@ export class Game {
       stopZone?: number;
     } = {},
   ) {
-    const { seatOffset = 0, startView = 'driver' } = opts;
+    const { seatOffset = 0, startView = 'driver', driverView = false } = opts;
     /*
       **이 판을 어떻게 빠져나가는가** (scenarios.ts 의 `drive`). 판정 · 완주선 · 조작이 모두 이 값을 본다.
       한 번 정해지면 판이 끝날 때까지 바뀌지 않으므로 필드에 담아 둔다.
@@ -452,8 +454,9 @@ export class Game {
     this.world.scene.add(this.carModel.group);
 
     this.rig = new CameraRig(canvas.clientWidth / canvas.clientHeight, carSpec);
+    this.rig.setDriverView(driverView);
     // 횡단보도 양 끝은 화면 화각 밖(좌 78°·우 67°)이라 주변시야 창으로 보완한다
-    this.periph = new PeripheralView(this.world.scene, carSpec);
+    this.periph = new PeripheralView(this.world.scene, carSpec, { driverView });
     /*
       **시야 창도 같은 값을 안다** — 진입로 보호구역 횡단보도가 있는 판에서는 그 앞에서도
       창이 떠올라야 한다 (PeripheralView 의 setApproachZone). 장면을 지을 때 쓴 값과 같은
@@ -466,7 +469,8 @@ export class Game {
     this.setSeatOffset(seatOffset);
     // 시점은 조용히 맞춘다 (토스트 없이). 거울·시야 창은 운전석에서만 켜야 한다.
     this.rig.setMode(startView);
-    this.setOverlaysVisible(startView);
+    // 운전자 시점을 안 쓰면 rig 가 운전석 요청을 후방으로 받는다 — 실제로 놓인 시점을 따른다
+    this.setOverlaysVisible(this.rig.mode);
     // 손에 든 가로 화면에서는 느낌표가 신호등 뒤로 가려진다 — 보행자를 만들기 전에 정한다 (Pedestrian 의 주석)
     setPedestrianAlertOcclusion(this.handheldLandscape?.matches === true);
     // 손에 든 화면(세로 · 가로)이면 앞차 · 뒷차도 가벼운 모델로 — 차를 만들기 전에 정한다 (TrafficCar 의 주석)

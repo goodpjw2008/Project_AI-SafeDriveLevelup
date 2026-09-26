@@ -1316,6 +1316,8 @@ export class Screens {
     save: SaveData,
     handlers: {
       onStartView(view: ViewMode): void;
+      /** 운전자 시점 사용/미사용 (save.ts 의 settings.driverView) */
+      onDriverView(on: boolean): void;
       /** 난이도 설정 1~5 (scenarios/challenge.ts) */
       onDifficulty(c: Challenge): void;
       /** 무엇을 연습할지 (scenarios/tracks.ts) — '자동' 이면 AI 가 고른다 */
@@ -1381,6 +1383,26 @@ export class Screens {
           )}
           ${
             /*
+              **운전자 시점 사용/미사용** — 기본은 미사용이다. 미사용이면 운전석에 관한 것이 처음부터 빠진다
+              (save.ts 의 driverView 주석). 휴대폰은 늘 빠지므로 이 줄 자체를 두지 않는다.
+            */
+            isHandheld()
+              ? ''
+              : this.optionRow(
+                  'drv',
+                  '운전자 시점',
+                  [
+                    ['on', '사용'],
+                    ['off', '미사용 ·기본'],
+                  ],
+                  save.settings.driverView ? 'on' : 'off',
+                  {
+                    note: '미사용이면 운전석 시점 · 좌·우·후방 시야 창 · 좌석 맞추기를 처음부터 만들지 않습니다 — 저사양 PC 에 권합니다',
+                  },
+                )
+          }
+          ${
+            /*
               **휴대폰에서는 고르지 않는다** — 시점이 후방으로 고정이다 (main.ts 의 startViewOfRun). 고를 수 없는
               것을 버튼으로 두면 눌러도 안 바뀌는 고장으로 읽히므로, 왜 없는지를 한 줄로 적는다.
             */
@@ -1397,7 +1419,7 @@ export class Screens {
               <span class="opt-hint">주행을 시작할 때의 시점 (주행 중 C 로 바꿈)</span>
             </div>
             <div class="opt-choices">
-              ${START_VIEWS.map(
+              ${START_VIEWS.filter((v) => save.settings.driverView || v.id !== 'driver').map(
                 (v) =>
                   `<button class="opt ${v.id === current ? 'on' : ''}" id="view-${v.id}">${esc(v.name)}${
                     v.isDefault ? ' ·기본' : ''
@@ -1436,7 +1458,10 @@ export class Screens {
             note: '약한 그래픽 카드에서 가장 잘 듣습니다 · 자동은 느릴 때만 낮춤',
           })}
           ${this.optionRow('gq-peripheral', '좌·우·후방 시야 창', Object.entries(PERIPHERAL_LABEL), g.peripheral, {
-            note: '드로우콜 −10% 남짓',
+            // 운전자 시점을 안 쓰면 창 자체가 없다 — 값은 남겨 두되 지금은 뜻이 없다고 적는다
+            note: save.settings.driverView
+              ? '드로우콜 −10% 남짓'
+              : '운전자 시점 미사용 중에는 뜨지 않습니다 (연습 → 운전자 시점)',
           })}
           ${this.optionRow('gq-shadow', '그림자 품질', Object.entries(TIER_LABEL), g.shadow, {
             note: '끄면 드로우콜 −10~19%',
@@ -1491,6 +1516,7 @@ export class Screens {
       document.getElementById(`view-${v.id}`)?.addEventListener('click', () => handlers.onStartView(v.id));
     }
     this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
+    this.bindOptions('drv', ['on', 'off'], (v) => handlers.onDriverView(v === 'on'));
 
     for (const t of ['ultra', 'high', 'medium', 'low'] as const) {
       $(`gq-preset-${t}`).addEventListener('click', () => handlers.onGraphicsPreset(t));
@@ -2390,9 +2416,14 @@ export class Screens {
               ? `<button class="running" disabled>운행 중</button>`
               : `<button id="use-${esc(c.id)}">이 차로 운행</button>`
           }
-          <button class="icon" id="seat-${esc(c.id)}"
+          ${
+            // 좌석 맞추기는 운전자 시점을 쓸 때만 — 미사용(기본)이면 운전석에 앉을 일이 없다 (save.ts 의 driverView)
+            save.settings.driverView
+              ? `<button class="icon" id="seat-${esc(c.id)}"
                   title="운전석 좌석 맞추기"
-                  aria-label="운전석 좌석 맞추기">${icon('gear')}</button>
+                  aria-label="운전석 좌석 맞추기">${icon('gear')}</button>`
+              : ''
+          }
         </div>
         ${
           CAN_UPLOAD_PHOTO

@@ -156,6 +156,14 @@ export interface SaveData {
      */
     startView: ViewMode;
     /**
+     * **운전자 시점을 쓰는가.** 기본은 **미사용** (사용자가 정했다: "기본값을 운전자 시점 미사용으로").
+     *
+     * 미사용이면 운전석에 관한 것이 **처음부터 빠진다** — 좌·우·후방 시야 창(렌더 타깃 세 장과 프레임마다의 패스),
+     * C 로 도는 시점 순서의 운전석, 시작 시점의 운전석, 차고의 좌석 맞추기. 저사양 PC 에서 가장 무거운 짐이
+     * 운전석 시점이 끌고 오는 것들이라(사용자가 짚었다), 켜는 사람만 값을 치른다. 휴대폰은 설정과 무관하게 늘 빠진다.
+     */
+    driverView: boolean;
+    /**
      * 판이 끝나면 다음 Stage 로 **자동으로 넘어가는가.**
      *
      * **기본은 켜짐이다.** 여덟 판을 이어 달리는 것이 이 게임의 기본 흐름이라, 판마다
@@ -241,6 +249,7 @@ export function defaultSave(): SaveData {
     seatOffsets: {},
     settings: {
       startView: 'chase',
+      driverView: false,
       autoNextStage: true,
       difficulty: DEFAULT_CHALLENGE,
       track: 'auto',

@@ -827,6 +827,13 @@ function renderSettings(): void {
       commit();
       renderSettings();
     },
+    // 운전자 시점 사용/미사용 — 끄면 시작 시점이 운전석이어도 후방으로 되돌린다 (고를 수 없는 값이 남지 않게)
+    onDriverView: (on) => {
+      saveData.settings.driverView = on;
+      if (!on && saveData.settings.startView === 'driver') saveData.settings.startView = 'chase';
+      commit();
+      renderSettings();
+    },
     /*
       **무엇을 연습할지 고른다** (scenarios/tracks.ts). 고른 값은 설정에 저장한다 — 초기화 버튼으로
       지워지지 않는 자리다(economy/save.ts). 기본은 '자동' 이고, 그러면 AI 가 고른다 (trackPick.ts).
@@ -1034,7 +1041,8 @@ function handleSelectCar(id: string, opts: { adjust?: boolean } = {}): void {
   commit();
   // 고른 차의 모델을 미리 받아 둔다 — 출발을 누른 첫 프레임부터 차가 자리에 있게
   void loadCarModel(getCar(id)).catch(() => undefined);
-  if (opts.adjust) nav.go({ name: 'seat', enter: () => renderSeatPreview(id) });
+  // 좌석 맞추기는 운전자 시점을 쓸 때만 뜻이 있다 (전시관이 버튼을 감추지만, 여기서도 막는다)
+  if (opts.adjust && saveData.settings.driverView) nav.go({ name: 'seat', enter: () => renderSeatPreview(id) });
   else renderShop();
 }
 
@@ -1262,7 +1270,10 @@ async function startRun(id: number): Promise<void> {
     끌고 오는 것(좌·우·후방 시야 창의 렌더 타깃과 그 패스)은 휴대폰에 가장 무거운 짐이라, 시점을 고정하면
     그것을 아예 만들지 않을 수 있다 (PeripheralView). 설정의 시작 시점은 PC 에서만 뜻이 있다.
   */
-  const startViewOfRun: ViewMode = aiDriving || isHandheld() ? 'chase' : saveData.settings.startView;
+  const startViewOfRun: ViewMode =
+    aiDriving || isHandheld() || (!saveData.settings.driverView && saveData.settings.startView === 'driver')
+      ? 'chase'
+      : saveData.settings.startView;
   markView(startViewOfRun);
   game = new Game(canvas, currentScenario, carSpec, controls, audio, {
     onSnapshot: (s: GameSnapshot) => {
@@ -1290,6 +1301,8 @@ async function startRun(id: number): Promise<void> {
       것은 그대로 되므로, 운전석에서 보고 싶으면 그때 돌리면 된다.
     */
     startView: startViewOfRun,
+    // 운전자 시점 미사용(기본)이면 시야 창을 만들지 않고 C 로 돌 때 운전석을 건너뛴다 (save.ts 의 driverView)
+    driverView: saveData.settings.driverView,
     autoDrive: aiDriving,
     graphics: saveData.settings.graphics,
     // 난이도가 오르면 더 빨리 다가가고 브레이크가 무르며, 정지선에 더 붙여 서야 한다 (challenge.ts)

@@ -240,7 +240,10 @@ export class PeripheralView {
   constructor(
     private scene: THREE.Scene,
     spec: CarSpec,
+    /** 운전자 시점을 쓰는가 (save.ts 의 settings.driverView) — 안 쓰면 창을 아예 두지 않는다 (아래) */
+    opts: { driverView?: boolean } = {},
   ) {
+    const driverView = opts.driverView ?? true;
     this.eye = driverEyeLocal(spec);
     this.baseEyeZ = this.eye.z;
     /*
@@ -267,8 +270,10 @@ export class PeripheralView {
       쓰지 않는다. 운전석이 가장 큰 부하를 줄 텐데 모바일에는 가지고 오지 않아도 된다."*). 시점이 후방으로
       고정이라(main.ts 의 startViewOfRun) 운전석의 좌·우·후방 창이 뜰 일이 없다 — 창이 없으면 렌더 타깃 세 장,
       프레임마다 한 장씩 굽던 패스, 미리 굽기가 통째로 빠진다. 가로 휴대폰도 같다.
+
+      **PC 도 설정으로 같은 길을 간다** — '운전자 시점 미사용'(기본)이면 창을 두지 않는다 (save.ts 의 driverView).
     */
-    if (!isHandheld()) {
+    if (driverView && !isHandheld()) {
       this.addUnit(-1, '◀ 좌측 시야');
       this.addUnit(1, '우측 시야 ▶');
       // 후방은 거울을 대신하므로 좌우를 뒤집는다. 뜨는 시점은 좌·우 창과 같다
