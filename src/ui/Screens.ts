@@ -618,10 +618,16 @@ export class Screens {
     lines: Array<string | Array<string | { em: string }>>;
     /** 진행 버튼 글자 (기본 '계속') */
     ok?: string;
+    /**
+     * **알림 창** — 취소 버튼 없이 확인 하나만 둔다. 물음이 아니라 알림이라(예: 오프라인 교육이 다 끝났다)
+     * 어느 길로 닫든(버튼 · Esc · 바깥 클릭) 답은 `true` 하나다. 처음 놓이는 손가락도 확인 쪽이다.
+     */
+    single?: boolean;
   }): Promise<boolean> {
     const root = $('modal') as HTMLElement;
     const okBtn = $('modal-ok') as HTMLButtonElement;
     const cancelBtn = $('modal-cancel') as HTMLButtonElement;
+    const single = opts.single === true;
 
     $('modal-title').textContent = opts.title;
     const line = (l: string | Array<string | { em: string }>): string =>
@@ -630,13 +636,16 @@ export class Screens {
         : l.map((seg) => (typeof seg === 'string' ? esc(seg) : `<b class="danger">${esc(seg.em)}</b>`)).join('');
     $('modal-body').innerHTML = opts.lines.map((l) => `<div>${line(l)}</div>`).join('');
     okBtn.textContent = opts.ok ?? '계속';
+    cancelBtn.hidden = single;
 
     root.hidden = false;
-    cancelBtn.focus();
+    if (single) okBtn.focus();
+    else cancelBtn.focus();
 
     return new Promise<boolean>((resolve) => {
       const close = (answer: boolean): void => {
         root.hidden = true;
+        cancelBtn.hidden = false;
         okBtn.removeEventListener('click', onOk);
         cancelBtn.removeEventListener('click', onCancel);
         root.removeEventListener('mousedown', onOutside);
@@ -644,13 +653,14 @@ export class Screens {
         resolve(answer);
       };
       const onOk = (): void => close(true);
-      const onCancel = (): void => close(false);
+      // 알림 창은 어느 길로 닫든 확인이다 (위 `single`)
+      const onCancel = (): void => close(single);
       /*
         바깥(어두운 배경)을 누르면 취소다. `e.target === root` 로 거르는 이유는 창
         안쪽에서 올라온 클릭이 버블링으로 여기까지 오기 때문이다 — 시트와 같은 규칙.
       */
       const onOutside = (e: MouseEvent): void => {
-        if (e.target === root) close(false);
+        if (e.target === root) close(single);
       };
       /*
         `capture` 로 잡아 **뒤 화면까지 내려가지 않게 한다.** 확인 창이 떠 있는 동안
@@ -659,7 +669,7 @@ export class Screens {
       const onKey = (e: KeyboardEvent): void => {
         if (e.key !== 'Escape') return;
         e.stopPropagation();
-        close(false);
+        close(single);
       };
 
       okBtn.addEventListener('click', onOk);
