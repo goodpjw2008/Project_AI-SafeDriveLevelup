@@ -24,7 +24,7 @@ import { INTERSECTION_HALF, PLAYER_APPROACH_X, STOP_LINE } from '../layout';
 import { buildCar, type CarModel } from './CarMesh';
 import { Intersection } from './Intersection';
 import { World } from './World';
-import { loadCarModel } from './carModel';
+import { loadCarModel, playerLod } from './carModel';
 import { sharedRenderer } from './renderer';
 
 /** 차를 세워 두는 자리 — 정지선 바로 앞. 신호등과 횡단보도가 한 화면에 들어온다. */
@@ -74,7 +74,7 @@ export class MenuScene {
       없으면 받아 온다 — 메뉴에서 새로 받기 시작하면 곧 누를 '출발'이 그만큼 늦어진다.
       늦게 도착해도 그때 갈아 끼우면 되고, 안 와도 절차적 차체가 그대로 서 있다.
     */
-    void loadCarModel(spec)
+    void loadCarModel(spec, { lod: playerLod() })
       .then((model) => {
         if (this.disposed || !model) return;
         this.car.useModel(model);

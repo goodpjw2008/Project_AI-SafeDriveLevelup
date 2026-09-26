@@ -72,5 +72,32 @@ export function sharedRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
 
   shared = renderer;
   sharedCanvas = canvas;
+  /*
+    **컨텍스트를 잃은 횟수를 센다** — 휴대폰에서 화면이 검게 깨지는 문제의 진단 줄(Game 의 diag)에 적는다.
+    three 가 'webglcontextlost' 에 preventDefault 를 걸어 복구가 가능하게 해 두므로 여기서는 세기만 한다.
+  */
+  canvas.addEventListener('webglcontextlost', () => {
+    contextLost++;
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    contextRestored++;
+  });
   return renderer;
+}
+
+let contextLost = 0;
+let contextRestored = 0;
+/** 이 캔버스가 WebGL 컨텍스트를 잃은 · 되찾은 횟수 (진단 줄) */
+export const contextLossCount = (): { lost: number; restored: number } => ({ lost: contextLost, restored: contextRestored });
+
+/** GPU 이름 — 브라우저가 알려 주는 렌더러 문자열 (진단 줄). 못 얻으면 빈 글 */
+export function gpuName(renderer: THREE.WebGLRenderer): string {
+  try {
+    const gl = renderer.getContext();
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = info ? (gl.getParameter(info.UNMASKED_RENDERER_WEBGL) as string) : (gl.getParameter(gl.RENDERER) as string);
+    return String(name ?? '');
+  } catch {
+    return '';
+  }
 }

@@ -3739,9 +3739,20 @@
       .fps.on {
         display: block;
       }
+      /* 진단 줄은 세 줄이다 (Game 의 diagText) — 줄바꿈을 살리고 왼쪽 정렬, 폭은 화면의 3/5 까지 */
+      .fps {
+        white-space: pre-line;
+        text-align: left;
+        max-width: 60vw;
+        line-height: 1.35;
+      }
       /* 30 아래로 떨어지면 색으로 알린다 — 숫자를 읽지 않아도 보인다 */
       .fps.slow {
         color: var(--amber);
+      }
+      /* 검은 프레임이 잡혔다 — 붉게 */
+      .fps.alert {
+        color: #ff6b62;
       }
 
       .keyhints kbd {

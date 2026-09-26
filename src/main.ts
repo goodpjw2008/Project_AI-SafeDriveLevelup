@@ -13,7 +13,7 @@ import { setClusterStopCue } from './game/ClusterPanel';
 import { AUTO_DRIVE_RULE, challengeRule } from './scenarios/challenge';
 import { MenuScene } from './game/MenuScene';
 import { SeatPreview } from './game/SeatPreview';
-import { loadCarModel, trimCarModelCache } from './game/carModel';
+import { loadCarModel, trimCarModelCache, playerLod } from './game/carModel';
 import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
@@ -1116,7 +1116,7 @@ function handleSelectCar(id: string, opts: { adjust?: boolean } = {}): void {
   saveData.activeCarId = id;
   commit();
   // 고른 차의 모델을 미리 받아 둔다 — 출발을 누른 첫 프레임부터 차가 자리에 있게
-  void loadCarModel(getCar(id)).catch(() => undefined);
+  void loadCarModel(getCar(id), { lod: playerLod() }).catch(() => undefined);
   // 좌석 맞추기는 운전자 시점을 쓸 때만 뜻이 있다 (전시관이 버튼을 감추지만, 여기서도 막는다)
   if (opts.adjust && saveData.settings.driverView) nav.go({ name: 'seat', enter: () => renderSeatPreview(id) });
   else renderShop();
@@ -1600,7 +1600,7 @@ function finishRun(result: JudgeResult): void {
     const car = next.bestLevel > before.bestLevel ? carForLevel(next.bestLevel) : undefined;
     if (car && car.id !== carForLevel(before.bestLevel)?.id) {
       saveData.activeCarId = car.id;
-      void loadCarModel(car).catch(() => undefined);
+      void loadCarModel(car, { lod: playerLod() }).catch(() => undefined);
       courseStep.unlockedCar = { id: car.id, name: car.name, level: car.level };
     }
   } else {
@@ -1840,7 +1840,8 @@ function boot(): void {
 
     실패해도 그냥 넘어간다 — 주행 시작 때 다시 시도하고, 그때도 없으면 절차적 차체로 간다.
   */
-  void loadCarModel(getCar(saveData.activeCarId)).catch(() => undefined);
+  // 휴대폰은 주행이 쓰는 가벼운 모델을 받아 둔다 — 원본을 받으면 쓰지도 않을 것이 캐시에 남는다 (carModel.ts 의 playerLod)
+  void loadCarModel(getCar(saveData.activeCarId), { lod: playerLod() }).catch(() => undefined);
   void prewarm();
 
   /*
@@ -1879,7 +1880,8 @@ async function prewarm(): Promise<void> {
   }
   // 배경 차는 가벼운 모델(LOD), 앞차는 원본으로 그리므로 둘 다 데워 둔다 (TrafficCar · carModel.ts 의 loadCarModel)
   await loadCarModel(getCar(NPC_PREWARM_CAR_ID), { forPlayer: false, lod: true }).catch(() => undefined);
-  await loadCarModel(getCar(NPC_PREWARM_CAR_ID), { forPlayer: false }).catch(() => undefined);
+  // 휴대폰은 앞차 · 뒷차도 가벼운 모델이라(Game 의 setNearCarLod) 원본을 받을 일이 없다
+  if (!isHandheld()) await loadCarModel(getCar(NPC_PREWARM_CAR_ID), { forPlayer: false }).catch(() => undefined);
 }
 
 /*

@@ -56,16 +56,9 @@ import { CameraRig, type ViewMode } from './CameraRig';
 import { Controls } from './Controls';
 import { Intersection } from './Intersection';
 import { ClusterPanel } from './ClusterPanel';
-import {
-  SEAT_RANGE,
-  dressCarEnv,
-  loadCarModel,
-  loadedCarIds,
-  seatForwardLimit,
-  type CarModelAnchors,
-} from './carModel';
+import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, type CarModelAnchors, playerLod } from './carModel';
 import { PeripheralView } from './PeripheralView';
-import { sharedRenderer } from './renderer';
+import { sharedRenderer, contextLossCount, gpuName } from './renderer';
 import { Pedestrian, setPedestrianAlertOcclusion } from './Pedestrian';
 import { StopMarkers, type StopTarget } from './StopMarkers';
 import {
@@ -254,6 +247,8 @@ export interface GameSnapshot {
   fps: number;
   /** 렌더 해상도 배율 (1 = 100%) — fps 옆에 함께 띄운다 */
   renderScale: number;
+  /** 진단 줄 — fps 표시를 켰을 때만 채운다 (Game 의 sampleDiag). GPU 이름 · 삼각형 수 · 검은 프레임 횟수 */
+  diag: string;
 }
 
 export interface GameCallbacks {
@@ -320,6 +315,20 @@ export class Game {
   private autoRes: AutoResolution | null = null;
   /** 캔버스 크기를 다음 그리기 직전에 바꾼다 — 그린 뒤에 바꾸면 빈 버퍼가 화면에 올라간다 (loop 의 주석) */
   private pendingResize = false;
+  /*
+    ── 진단 (fps 표시를 켰을 때만) ──
+    휴대폰에서 화면 일부가 순간 검게 깨지는 문제의 원인을 가리려고, 그린 뒤 **그림 버퍼의 가로줄 셋을 읽어**
+    검은 픽셀의 비율을 잰다. 검은 줄이 버퍼 안에 있으면 그리기(우리 코드 · GPU 드라이버) 쪽이고, 버퍼는
+    멀쩡한데 화면에 보이면 브라우저 합성 쪽이다 — 이것을 갈라야 다음 손을 댈 곳이 정해진다.
+    readPixels 는 GPU 를 기다리게 하므로 fps 표시를 켠 동안만 한다.
+  */
+  private diagBlackFrames = 0;
+  private diagLast = '';
+  private diagRow: Uint8Array | null = null;
+  private diagGpu = '';
+  private diagTris = 0;
+  private diagCalls = 0;
+  private lastResizeAt = -1;
   /** 루프가 돌고 있는가 — 돌고 있으면 크기 바꾸기를 그리기 직전으로 미룬다 (requestResize) */
   private looping = false;
 
@@ -499,7 +508,11 @@ export class Game {
 
   /** 3D 모델이 오면 절차적 차체를 대체한다 (위 생성자 주석 참고) */
   private async attachPlayerModel(carSpec: CarSpec): Promise<void> {
-    const model = await loadCarModel(carSpec);
+    /*
+      **휴대폰은 내 차도 가벼운 모델(LOD)로 그린다** (carModel.ts 의 playerLod — 원본은 한 프레임에 정점 60만~200만 개,
+      아반떼 61만 · 쏘렌토 135만 · SL63 197만, 그림자 패스에서 한 번 더). PC 는 원본 그대로다.
+    */
+    const model = await loadCarModel(carSpec, { lod: playerLod() });
     /*
       **데우기 전에 환경맵을 건다** — 재질을 나중에 고치면 그 재질의 셰이더가 다시 컴파일되고, 그게 주행 중
       멈칫함이다 (warmUp 주석과 같은 이유). 화질을 낮춰도 내 차는 비친다 (carModel.ts 의 dressCarEnv).
@@ -1472,7 +1485,13 @@ export class Game {
     this.renderer.shadowMap.needsUpdate = true;
     this.periph.renderTargets(this.renderer);
     this.renderer.render(this.world.scene, this.rig.camera);
+    // 삼각형 · 호출 수는 **메인 화면을 그린 직후**에 적는다 — 뒤의 오버레이 렌더가 three 의 계수기를 0 으로 되돌린다
+    if (this.graphics.showFps) {
+      this.diagTris = this.renderer.info.render.triangles;
+      this.diagCalls = this.renderer.info.render.calls;
+    }
     this.periph.renderOverlay(this.renderer);
+    if (this.graphics.showFps) this.sampleDiag(now);
 
     // 해상도 '자동' — 느린 것이 이어지면 한 단계 낮춘다 (그린 프레임으로 잰다)
     const next = this.autoRes?.frame(now);
@@ -2049,6 +2068,7 @@ export class Game {
       leadCue: this.leadCue(),
       fps: this.fps.fps,
       renderScale: this.renderScale,
+      diag: this.diagText(),
     };
   }
 
@@ -2326,7 +2346,68 @@ export class Game {
     this.rig.setGlance(dir);
   }
 
+  /**
+   * 그림 버퍼의 가로줄 셋(25 · 50 · 75%)을 읽어 **검은 픽셀의 비율**을 잰다 (위 diag 필드 주석).
+   * 한 줄에서 **이어진** 완전한 검정(0,0,0)이 35% 를 넘으면 '검은 프레임' 으로 세고, 그 순간의 정황(줄 · 비율 ·
+   * 크기 바꾼 지 얼마나 됐는지 · fps · 삼각형 수)을 남긴다. 그린 픽셀은 조명 · 안개 · 톤매핑을 거쳐 완전한 0 이
+   * 거의 없고, 밤 장면의 어두운 픽셀이 있어도 흩어져 있어 이어진 구간은 짧다.
+   */
+  private sampleDiag(now: number): void {
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    if (w <= 0 || h <= 0) return;
+    if (!this.diagRow || this.diagRow.length !== w * 4) this.diagRow = new Uint8Array(w * 4);
+    if (!this.diagGpu) this.diagGpu = gpuName(this.renderer);
+    let worst = 0;
+    let worstRow = 0;
+    for (const f of [0.25, 0.5, 0.75]) {
+      const y = Math.floor(h * f);
+      try {
+        gl.readPixels(0, y, w, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.diagRow);
+      } catch {
+        return;
+      }
+      // **이어진** 검은 픽셀의 가장 긴 구간을 잰다 — 타일이 빠진 띠는 이어져 있고, 밤 장면의 어두운 픽셀은 흩어져 있다
+      let run = 0;
+      let longest = 0;
+      const row = this.diagRow;
+      for (let i = 0; i < w * 4; i += 4) {
+        if (row[i] === 0 && row[i + 1] === 0 && row[i + 2] === 0) {
+          run++;
+          if (run > longest) longest = run;
+        } else run = 0;
+      }
+      const frac = longest / w;
+      if (frac > worst) {
+        worst = frac;
+        worstRow = Math.round(f * 100);
+      }
+    }
+    if (worst > 0.35) {
+      this.diagBlackFrames++;
+      const since = this.lastResizeAt < 0 ? '없음' : `${((now - this.lastResizeAt) / 1000).toFixed(1)}초 전`;
+      this.diagLast =
+        `${(this.elapsed).toFixed(1)}s 줄${worstRow}% 검정 ${Math.round(worst * 100)}% · 크기변경 ${since} · ` +
+        `${this.fps.fps}fps · tri ${Math.round(this.diagTris / 1000)}k`;
+    }
+  }
+
+  /** 진단 줄 — fps 표시를 켰을 때 HUD 가 fps 자리에 띄운다 */
+  private diagText(): string {
+    if (!this.graphics.showFps) return '';
+    const gl = this.renderer.getContext();
+    const loss = contextLossCount();
+    return [
+      `${this.fps.fps} fps · 해상도 ${Math.round(this.renderScale * 100)}% · ${gl.drawingBufferWidth}×${gl.drawingBufferHeight} · ` +
+        `tri ${Math.round(this.diagTris / 1000)}k · call ${this.diagCalls} · ${document.fullscreenElement ? '전체화면' : '주소창'}`,
+      `GPU ${this.diagGpu || '?'}`,
+      `검은 프레임 ${this.diagBlackFrames}${this.diagLast ? ` (${this.diagLast})` : ''} · 컨텍스트 잃음 ${loss.lost}/복구 ${loss.restored}`,
+    ].join('\n');
+  }
+
   resize(): void {
+    this.lastResizeAt = performance.now();
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
     // 화면 배율(최대 2) × 렌더 해상도 — 창을 옮기면(외장 모니터 ↔ 노트북) 화면 배율이 달라지므로 매번 다시 잰다

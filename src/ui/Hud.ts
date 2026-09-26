@@ -213,9 +213,13 @@ export class Hud {
     // 진행 판단 보조
     if (this.showFps) {
       // 해상도를 낮춰 그리고 있으면 함께 적는다 — 흐려진 이유를 알 수 있게 (설정의 '렌더 해상도')
-      this.fpsEl.textContent = `${s.fps} fps${s.renderScale < 1 ? ` · 해상도 ${Math.round(s.renderScale * 100)}%` : ''}`;
+      // 진단 줄이 있으면 그것을 — fps · 해상도 · GPU · 삼각형 수 · 검은 프레임 (Game 의 diagText)
+      this.fpsEl.textContent =
+        s.diag || `${s.fps} fps${s.renderScale < 1 ? ` · 해상도 ${Math.round(s.renderScale * 100)}%` : ''}`;
       // 30 아래면 색을 바꾼다 — 숫자를 읽지 않아도 느려졌다는 것이 보인다
       this.fpsEl.classList.toggle('slow', s.fps > 0 && s.fps < 30);
+      // 검은 프레임이 한 번이라도 잡혔으면 붉게 — 사진을 찍어 보내 달라는 뜻이다
+      this.fpsEl.classList.toggle('alert', /검은 프레임 [1-9]/.test(s.diag));
     }
     const mood = robotMood(s);
     // 주의 얼굴이면 테두리도 노랑 — 얼굴과 테두리가 다른 말을 하면 안 된다

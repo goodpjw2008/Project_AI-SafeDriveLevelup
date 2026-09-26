@@ -19,6 +19,7 @@
  */
 
 import * as THREE from 'three';
+import { isHandheld } from './handheld';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneModel } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -335,6 +336,18 @@ const cache = new Map<string, THREE.Group | null>();
  * 아홉 대다) 동시에 만들면 **같은 파일을 그 수만큼 따로 받아 따로 푼다.** SL63(7.6MB)
  * 처럼 큰 모델에서는 그것만으로 몇 초가 날아간다. 받는 중인 약속을 나눠 쓰면 한 번만 푼다.
  */
+/**
+ * **내 차를 가벼운 모델(LOD)로 그릴 기기인가 — 휴대폰이면 그렇다.**
+ *
+ * 휴대폰은 시점이 후방으로 고정이라(main.ts) 실내를 볼 일이 없는데, 원본은 한 프레임에 정점 60만~200만 개를
+ * 그리고 그림자 패스에서 한 번 더 그린다 — 휴대폰 GPU 에는 그 자체가 큰 짐이고, 화면이 검게 깨지는 문제의
+ * 후보이기도 하다(Game 의 진단 줄). 가벼운 모델은 정점 1/7 · 텍스처 1/4 이고 후방 시점 거리에서는 차이가 없다.
+ *
+ * 주행(Game) · 미리 받기(main) · 첫 화면 배경(MenuScene)이 **같은 답**을 봐야 한다 — 캐시 키가 갈리면 미리 받은
+ * 것이 헛되고, 휴대폰이 쓰지도 않을 원본까지 받아 쥔다.
+ */
+export const playerLod = (): boolean => isHandheld();
+
 const inflight = new Map<string, Promise<THREE.Group | null>>();
 
 /** 캐시 키 — 배경 차용 가벼운 모델(LOD)은 원본과 따로 둔다 */
