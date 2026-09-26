@@ -6696,10 +6696,10 @@
       <canvas id="scene"></canvas>
       <!-- 전체 화면 안내 (휴대폰) — main.ts 의 showFullscreenNotice. 크롬의 흰 안내 상자와 별개다 -->
       <div class="fs-notice" id="fs-notice" role="status" aria-live="polite"></div>
-      <!-- 크롬 151~153 + 삼성 Xclipse 안내 — 그 조합에서만 뜬다 (main.ts 의 maybeShowGpuNotice · game/browserQuirk.ts) -->
+      <!-- 문제 크롬 빌드(151 전부 · 152.0.7977.64 앞) + 삼성 Xclipse 안내 — 그 조합에서만 뜬다 (main.ts 의 maybeShowGpuNotice · game/browserQuirk.ts) -->
       <div class="gpu-notice" id="gpu-notice" role="alertdialog" aria-live="polite" aria-labelledby="gpu-notice-title">
         <b id="gpu-notice-title">지금 쓰는 크롬 버전에서는 주행 화면에 검은 띠가 번쩍일 수 있습니다</b>
-        <p id="gpu-notice-text">크롬 151~153 의 알려진 문제로, 크롬 154 부터 고쳐졌습니다. 플레이 스토어에서 크롬을 업데이트해 주세요.</p>
+        <p id="gpu-notice-text">지금 크롬의 알려진 문제로, 크롬 152.0.7977.64 부터 고쳐졌습니다. 플레이 스토어에서 크롬을 업데이트해 주세요.</p>
         <div class="gpu-notice-actions">
           <a class="btn primary" id="gpu-notice-update" href="https://play.google.com/store/apps/details?id=com.android.chrome" target="_blank" rel="noopener">크롬 업데이트</a>
           <button class="btn ghost" id="gpu-notice-close" type="button">닫기</button>
