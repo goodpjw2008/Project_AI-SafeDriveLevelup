@@ -622,7 +622,8 @@ for (const [id, stop] of [
 document.getElementById('btn-hud-home')?.addEventListener('click', () => goHome());
 
 window.addEventListener('resize', () => {
-  game?.resize();
+  // 주행 중이면 다음 그리기 직전으로 미룬다 — 그린 뒤에 캔버스를 바꾸면 빈 버퍼가 화면에 올라간다 (Game 의 requestResize)
+  game?.requestResize();
   menuScene?.resize();
 });
 

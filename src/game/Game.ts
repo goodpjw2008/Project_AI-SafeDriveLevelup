@@ -318,6 +318,10 @@ export class Game {
    */
   private renderScale = 1;
   private autoRes: AutoResolution | null = null;
+  /** 캔버스 크기를 다음 그리기 직전에 바꾼다 — 그린 뒤에 바꾸면 빈 버퍼가 화면에 올라간다 (loop 의 주석) */
+  private pendingResize = false;
+  /** 루프가 돌고 있는가 — 돌고 있으면 크기 바꾸기를 그리기 직전으로 미룬다 (requestResize) */
+  private looping = false;
 
   private pedestrians: Pedestrian[] = [];
   private npcs: TrafficCar[] = [];
@@ -1327,7 +1331,17 @@ export class Game {
       this.autoRes = new AutoResolution(target, this.renderScale, performance.now());
     }
     this.lastFrame = performance.now();
+    this.looping = true;
     this.loop();
+  }
+
+  /**
+   * 창이 바뀌었을 때 부른다 (main.ts 의 resize 이벤트). 루프가 돌고 있으면 **다음 그리기 직전**으로 미룬다 —
+   * 그린 뒤에 캔버스를 바꾸면 방금 그린 프레임이 버려져 빈 버퍼가 화면에 올라간다 (loop 의 주석). 루프 전에는 바로 한다.
+   */
+  requestResize(): void {
+    if (this.looping && !this.disposed) this.pendingResize = true;
+    else this.resize();
   }
 
   pause(): void {
@@ -1450,6 +1464,11 @@ export class Game {
       프레임의 첫 렌더에서 한 번 굽고, 나머지 렌더는 그것을 그대로 쓴다.
       (autoUpdate 를 끄고 needsUpdate 로 직접 정한다. 켜 두면 render 마다 다시 굽는다)
     */
+    // 캔버스 크기 바꾸기는 **그리기 직전**에 — 바꾼 버퍼에 이 프레임을 통째로 그려 넣어야 빈 버퍼가 화면에 올라가지 않는다
+    if (this.pendingResize) {
+      this.pendingResize = false;
+      this.resize();
+    }
     this.renderer.shadowMap.needsUpdate = true;
     this.periph.renderTargets(this.renderer);
     this.renderer.render(this.world.scene, this.rig.camera);
@@ -1459,7 +1478,16 @@ export class Game {
     const next = this.autoRes?.frame(now);
     if (next != null && next !== this.renderScale) {
       this.renderScale = next;
-      this.resize();
+      /*
+        **여기서 바로 캔버스를 바꾸지 않는다** — 다음 프레임의 그리기 **직전**에 바꾼다 (아래 pendingResize).
+
+        예전에는 방금 그린 프레임 뒤에서 곧바로 `resize()` 를 불렀다. 캔버스의 크기를 바꾸면 브라우저는 그림 버퍼를
+        새로 만들고 **방금 그린 그림을 버린다** — 이 프레임 콜백이 끝나면 합성기는 빈(또는 절반만 그려진) 버퍼를 화면에
+        올린다. 휴대폰의 타일 GPU 에서는 그것이 **가로로 곧게 잘린 검은 띠**로 보였다 (사용자가 사진으로 짚었다: 낮은
+        레벨에서는 안 나다가 판이 무거워질수록 난다 — 프레임이 떨어져야 자동 조절이 움직이기 때문이다. PC 는 프레임이
+        넉넉해 조절 자체가 일어나지 않는다).
+      */
+      this.pendingResize = true;
     }
   };
 
