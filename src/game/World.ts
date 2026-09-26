@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { TONE_MAPPING_EXPOSURE } from './renderer';
 import { applyEnvironment, cachedEnvironment, nearCarEnv as bakeNearCarEnv, setEnvironment } from './environment';
 import {
   defaultGraphics,
@@ -87,6 +88,47 @@ function makeSkyTexture(top: number, bottom: number): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * three 의 ACES 필름 톤매핑을 그대로 옮긴 것 (ShaderChunk/tonemapping_pars_fragment — 행렬은 열 순서로 적혀 있다).
+ * 선형 색을 받아 선형 색을 돌려준다. 바탕색을 하늘과 같은 빛으로 맞추는 데만 쓴다 (아래 생성자).
+ */
+export function acesToneMapped(linear: THREE.Color, exposure: number): THREE.Color {
+  const e = exposure / 0.6;
+  const r = linear.r * e;
+  const g = linear.g * e;
+  const b = linear.b * e;
+  const r1 = 0.59719 * r + 0.35458 * g + 0.04823 * b;
+  const g1 = 0.076 * r + 0.90834 * g + 0.01566 * b;
+  const b1 = 0.0284 * r + 0.13383 * g + 0.83777 * b;
+  const fit = (v: number) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081);
+  const r2 = fit(r1);
+  const g2 = fit(g1);
+  const b2 = fit(b1);
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  return new THREE.Color(
+    clamp(1.60475 * r2 - 0.53108 * g2 - 0.07367 * b2),
+    clamp(-0.10208 * r2 + 1.10813 * g2 - 0.00605 * b2),
+    clamp(-0.00327 * r2 - 0.07276 * g2 + 1.07602 * b2),
+  );
+}
+
+/**
+ * 하늘 텍스처의 **어느 고도의 색** — makeSkyTexture 의 그라데이션과 같은 셈이다. 캔버스 그라데이션은 sRGB 에서
+ * 직선 보간하고, 위(skyTop)에서 0.62 지점까지 내려오며 skyBottom 이 된다. 구의 v 는 위 극이 1 · 지평선이 0.5 · 아래
+ * 극이 0 이고(SphereGeometry 의 uv, 캔버스 텍스처는 flipY), 캔버스의 세로 위치는 1 - v 다. 그래서 눈에 보이는
+ * 하늘(지평선 위)은 **skyBottom 이 아니라** 그 위쪽의 섞인 색이다 — 지평선에서 81%, 20° 위에서 65% 쯤 skyBottom 쪽.
+ */
+export function skyColorAt(top: number, bottom: number, elevationDeg: number): THREE.Color {
+  const v = 0.5 + elevationDeg / 180;
+  const t = Math.min(1, Math.max(0, (1 - v) / 0.62));
+  const ch = (hex: number, shift: number) => (hex >> shift) & 0xff;
+  const mix = (shift: number) => (ch(top, shift) + (ch(bottom, shift) - ch(top, shift)) * t) / 255;
+  return new THREE.Color().setRGB(mix(16), mix(8), mix(0), THREE.SRGBColorSpace);
+}
+
+/** 바탕색이 맞추는 고도 — 눈에 보이는 하늘(지평선 ~ 20°)의 가운데쯤 (아래 생성자의 바탕색 주석) */
+export const BACKGROUND_SKY_ELEVATION_DEG = 10;
+
 export class World {
   readonly scene = new THREE.Scene();
   readonly sun: THREE.DirectionalLight;
@@ -124,6 +166,21 @@ export class World {
       new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false }),
     );
     this.scene.add(new THREE.Mesh(skyGeo, skyMat));
+    /*
+      **바탕색은 하늘의 아랫빛 — 검정이 아니다.**
+
+      three 는 그리기 전에 바탕색으로 지우는데 기본이 검정이다. 하늘 구가 화면을 다 덮으니 정상이라면 바탕색이 보일
+      일이 없다. 그런데 사용자 휴대폰(삼성 Xclipse 940 · ANGLE-Vulkan)에서는 드라이버가 프레임의 한 구역을 통째로
+      빠뜨린다 — 진단 줄이 그림 버퍼 안의 순검정 띠로 잡았다(CHANGELOG). 구역이 빠지면 바탕색이 드러나므로,
+      바탕색을 눈에 보이는 하늘빛으로 두면 그 띠가 하늘색에 가까워 훨씬 덜 보인다. 눈에 보이는 하늘은 지평선부터
+      20° 남짓까지의 그라데이션이라 한 색으로 다 맞출 수는 없고, 그 가운데(10°)의 색을 잡는다(skyColorAt). 하늘 구는
+      톤매핑을 거치지만 three 는 바탕색을 톤매핑하지 않으므로(WebGLBackground), 같은 톤매핑을 미리 거친 값을 준다 —
+      헤드리스로 하늘을 감추고 잰 바탕이 10° 언저리의 하늘과 같았다.
+    */
+    this.scene.background = acesToneMapped(
+      skyColorAt(p.skyTop, p.skyBottom, BACKGROUND_SKY_ELEVATION_DEG),
+      TONE_MAPPING_EXPOSURE,
+    );
 
     this.sun = new THREE.DirectionalLight(p.sun, p.sunIntensity);
     this.sun.position.set(...p.sunPosition);

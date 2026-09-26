@@ -34,6 +34,16 @@ export function setMsaaPreference(on: boolean): void {
   msaaWanted = on;
 }
 
+/** 그림 버퍼 유지 — 설정 '화면 깨짐 대응 · 버퍼 유지' (quality.ts 의 GlitchGuard). MSAA 처럼 첫 렌더러 전에 정한다 */
+let preserveWanted = false;
+
+export function setPreserveDrawingBuffer(on: boolean): void {
+  preserveWanted = on;
+}
+
+/** 톤매핑 노출 — World 가 바탕색을 같은 톤매핑으로 미리 거치는 데 쓴다 */
+export const TONE_MAPPING_EXPOSURE = 1.05;
+
 export function sharedRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   if (shared && sharedCanvas === canvas) {
     // 화면 배율은 창을 옮기면 달라진다 (외장 모니터 ↔ 노트북)
@@ -50,6 +60,7 @@ export function sharedRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
     */
     antialias: msaaWanted && window.devicePixelRatio < 2,
     powerPreference: 'high-performance',
+    preserveDrawingBuffer: preserveWanted,
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -67,7 +78,7 @@ export function sharedRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = TONE_MAPPING_EXPOSURE;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   shared = renderer;

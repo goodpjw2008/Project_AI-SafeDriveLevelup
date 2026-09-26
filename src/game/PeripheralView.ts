@@ -723,7 +723,8 @@ export class PeripheralView {
    * 없어서 값이 사실상 0 이고, 막아 두면 떠오르는 순간 렌더 호출이 하나 늘어난다.
    */
   renderOverlay(renderer: THREE.WebGLRenderer): void {
-    if (!this.enabled) return;
+    // 창이 하나도 없으면(휴대폰 · 운전자 시점 미사용) 캔버스에 빈 렌더 패스를 하나 더 열지 않는다
+    if (!this.enabled || this.units.length === 0) return;
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
     renderer.render(this.overlayScene, this.overlayCamera);

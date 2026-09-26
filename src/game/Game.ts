@@ -51,7 +51,7 @@ import { GameAudio } from './Audio';
 import { buildCar, type CarModel } from './CarMesh';
 import { AutoDriver, type AutoDriveState } from './AutoDriver';
 import { FpsMeter } from './FpsMeter';
-import { AutoResolution, defaultGraphics, startScale, type GraphicsSettings } from './quality';
+import { AutoResolution, defaultGraphics, startScale, type GraphicsSettings, GLITCH_GUARD_LABEL } from './quality';
 import { CameraRig, type ViewMode } from './CameraRig';
 import { Controls } from './Controls';
 import { Intersection } from './Intersection';
@@ -59,6 +59,7 @@ import { ClusterPanel } from './ClusterPanel';
 import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, type CarModelAnchors, playerLod } from './carModel';
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer, contextLossCount, gpuName } from './renderer';
+import { CopyPass } from './CopyPass';
 import { Pedestrian, setPedestrianAlertOcclusion } from './Pedestrian';
 import { StopMarkers, type StopTarget } from './StopMarkers';
 import {
@@ -324,7 +325,9 @@ export class Game {
   */
   private diagBlackFrames = 0;
   private diagLast = '';
-  private diagRow: Uint8Array | null = null;
+  private diagBuf: Uint8Array | null = null;
+  /** 설정 '화면 깨짐 대응 · 복사' 의 그리기 길 — 처음 그릴 때 만든다 (loop) */
+  private copyPass: CopyPass | null = null;
   private diagGpu = '';
   private diagTris = 0;
   private diagCalls = 0;
@@ -1484,7 +1487,13 @@ export class Game {
     }
     this.renderer.shadowMap.needsUpdate = true;
     this.periph.renderTargets(this.renderer);
-    this.renderer.render(this.world.scene, this.rig.camera);
+    if (this.graphics.glitchGuard === 'copy') {
+      // 설정 '화면 깨짐 대응 · 복사' — 렌더 타깃에 그린 뒤 캔버스에 한 장으로 옮긴다 (CopyPass)
+      this.copyPass ??= new CopyPass();
+      this.copyPass.render(this.renderer, this.world.scene, this.rig.camera);
+    } else {
+      this.renderer.render(this.world.scene, this.rig.camera);
+    }
     // 삼각형 · 호출 수는 **메인 화면을 그린 직후**에 적는다 — 뒤의 오버레이 렌더가 three 의 계수기를 0 으로 되돌린다
     if (this.graphics.showFps) {
       this.diagTris = this.renderer.info.render.triangles;
@@ -2347,48 +2356,63 @@ export class Game {
   }
 
   /**
-   * 그림 버퍼의 가로줄 셋(25 · 50 · 75%)을 읽어 **검은 픽셀의 비율**을 잰다 (위 diag 필드 주석).
-   * 한 줄에서 **이어진** 완전한 검정(0,0,0)이 35% 를 넘으면 '검은 프레임' 으로 세고, 그 순간의 정황(줄 · 비율 ·
-   * 크기 바꾼 지 얼마나 됐는지 · fps · 삼각형 수)을 남긴다. 그린 픽셀은 조명 · 안개 · 톤매핑을 거쳐 완전한 0 이
-   * 거의 없고, 밤 장면의 어두운 픽셀이 있어도 흩어져 있어 이어진 구간은 짧다.
+   * 그린 뒤 **그림 버퍼를 통째로 읽어** 순검정(0,0,0) 띠를 찾는다 (위 diag 필드 주석). 네 줄마다 한 줄을 훑어 한 줄에서
+   * **이어진** 검정이 35% 를 넘으면 그 줄이 띠에 든 것으로 보고, 띠의 세로 범위(위에서부터 %) · 가로 범위 · 가장 긴
+   * 비율과 그 순간의 정황(몇 초 · 크기 바꾼 지 얼마나 됐는지 · fps · 삼각형 수)을 남긴다. 그린 픽셀은 조명 · 안개 ·
+   * 톤매핑을 거쳐 완전한 0 이 거의 없고, 밤 장면의 어두운 픽셀이 있어도 흩어져 있어 이어진 구간은 짧다.
+   * 바탕색이 하늘빛이 된 뒤(World)에는 '지우기는 됐는데 그리기가 빠진' 구역은 하늘색이라 여기 잡히지 않는다 —
+   * 그래도 잡히는 검정은 **지우기까지 빠진** 구역이다. 그래서 이 수는 대응 설정(quality.ts 의 GlitchGuard)이 듣는지 가른다.
    */
   private sampleDiag(now: number): void {
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
     if (w <= 0 || h <= 0) return;
-    if (!this.diagRow || this.diagRow.length !== w * 4) this.diagRow = new Uint8Array(w * 4);
+    if (!this.diagBuf || this.diagBuf.length !== w * h * 4) this.diagBuf = new Uint8Array(w * h * 4);
     if (!this.diagGpu) this.diagGpu = gpuName(this.renderer);
+    try {
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.diagBuf);
+    } catch {
+      return;
+    }
+    const buf = this.diagBuf;
+    const STEP = 4; // 네 줄마다 한 줄 — 띠는 수십 픽셀 높이라 놓치지 않는다
+    let top = -1; // GL 좌표 — y = 0 이 화면 아래
+    let bottom = -1;
+    let left = w;
+    let right = -1;
     let worst = 0;
-    let worstRow = 0;
-    for (const f of [0.25, 0.5, 0.75]) {
-      const y = Math.floor(h * f);
-      try {
-        gl.readPixels(0, y, w, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.diagRow);
-      } catch {
-        return;
-      }
-      // **이어진** 검은 픽셀의 가장 긴 구간을 잰다 — 타일이 빠진 띠는 이어져 있고, 밤 장면의 어두운 픽셀은 흩어져 있다
+    for (let y = 0; y < h; y += STEP) {
       let run = 0;
       let longest = 0;
-      const row = this.diagRow;
-      for (let i = 0; i < w * 4; i += 4) {
-        if (row[i] === 0 && row[i + 1] === 0 && row[i + 2] === 0) {
+      let longestEnd = 0;
+      const base = y * w * 4;
+      for (let x = 0; x < w; x++) {
+        const i = base + x * 4;
+        if (buf[i] === 0 && buf[i + 1] === 0 && buf[i + 2] === 0) {
           run++;
-          if (run > longest) longest = run;
+          if (run > longest) {
+            longest = run;
+            longestEnd = x;
+          }
         } else run = 0;
       }
-      const frac = longest / w;
-      if (frac > worst) {
-        worst = frac;
-        worstRow = Math.round(f * 100);
+      if (longest / w > 0.35) {
+        if (bottom < 0) bottom = y;
+        top = y;
+        left = Math.min(left, longestEnd - longest + 1);
+        right = Math.max(right, longestEnd);
+        worst = Math.max(worst, longest / w);
       }
     }
-    if (worst > 0.35) {
+    if (worst > 0) {
       this.diagBlackFrames++;
       const since = this.lastResizeAt < 0 ? '없음' : `${((now - this.lastResizeAt) / 1000).toFixed(1)}초 전`;
+      // 사진과 같은 방향으로 — 위에서부터의 비율
+      const fromTop = (y: number) => Math.round((1 - y / h) * 100);
       this.diagLast =
-        `${(this.elapsed).toFixed(1)}s 줄${worstRow}% 검정 ${Math.round(worst * 100)}% · 크기변경 ${since} · ` +
+        `${this.elapsed.toFixed(1)}s 위 ${fromTop(top)}~${fromTop(bottom)}% · 가로 ${Math.round((left / w) * 100)}~` +
+        `${Math.round((right / w) * 100)}% · 검정 ${Math.round(worst * 100)}% · 크기변경 ${since} · ` +
         `${this.fps.fps}fps · tri ${Math.round(this.diagTris / 1000)}k`;
     }
   }
@@ -2400,7 +2424,8 @@ export class Game {
     const loss = contextLossCount();
     return [
       `${this.fps.fps} fps · 해상도 ${Math.round(this.renderScale * 100)}% · ${gl.drawingBufferWidth}×${gl.drawingBufferHeight} · ` +
-        `tri ${Math.round(this.diagTris / 1000)}k · call ${this.diagCalls} · ${document.fullscreenElement ? '전체화면' : '주소창'}`,
+        `tri ${Math.round(this.diagTris / 1000)}k · call ${this.diagCalls} · ${document.fullscreenElement ? '전체화면' : '주소창'} · ` +
+        `대응 ${GLITCH_GUARD_LABEL[this.graphics.glitchGuard]}`,
       `GPU ${this.diagGpu || '?'}`,
       `검은 프레임 ${this.diagBlackFrames}${this.diagLast ? ` (${this.diagLast})` : ''} · 컨텍스트 잃음 ${loss.lost}/복구 ${loss.restored}`,
     ].join('\n');
@@ -2457,6 +2482,8 @@ export class Game {
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.rafId);
+    this.copyPass?.dispose();
+    this.copyPass = null;
     for (const p of this.pedestrians) p.dispose();
     for (const n of this.npcs) n.dispose();
     this.vehicleSignal.dispose();
