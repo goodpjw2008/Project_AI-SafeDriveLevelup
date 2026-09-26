@@ -25,6 +25,7 @@
  */
 
 import { RunTelemetry } from '../ai/telemetry';
+import type { ViolationCode } from '../rules/violations';
 import { AutoDriver, type AutoDriveState } from '../game/AutoDriver';
 import { LeadDrive } from '../game/leadDrive';
 import { CURB, PedWalk } from '../game/pedWalk';
@@ -81,6 +82,11 @@ const CROSSWALK_S_CENTER = (CROSSWALK_S_INNER + CROSSWALK_S_OUTER) / 2;
 const CROSSWALK_B_CENTER = (CROSSWALK_B_INNER + CROSSWALK_B_OUTER) / 2;
 /** 막 모는 사람이 핸들을 감는 정도 — 규정대로의 이만큼만 감아 바깥 차로로 크게 돈다 */
 const RECKLESS_STEER = 0.6;
+/**
+ * 우측 통행을 모르는 가상 학습자의 조향 — 대회전 판정(WIDE_TURN, 안쪽 코너에서 7m)에 걸릴 만큼 덜 감는다 (PlayOptions.blind).
+ * 0.24 는 6m 라 안 걸리고, 0.18 부터 7.5m 로 걸린다 — 그만큼 크게 돌면 도로도 벗어난다(완주 실패). 크게 도는 사람은 그렇다.
+ */
+const WIDE_STEER = 0.18;
 /** 같은 보도에 선 사람끼리의 자리 (Pedestrian.ts 의 WAIT_SLOTS) */
 const WAIT_SLOTS = [0, -1.15, 1.15, -1.8, 1.8];
 
@@ -110,6 +116,14 @@ export interface PlayOptions {
   trace?: boolean;
   /** 주행 결과 데이터(ai/telemetry.ts)를 함께 만드는가 — 위험도 · 난이도 모델 학습(scripts/train-ai.ts)이 켠다. 기본 false */
   telemetry?: boolean;
+  /**
+   * **개념마다 모르는 운전자** — 이 개념(위반 코드)의 규칙을 모르는 것처럼 본다. `pedBlind` · `signalBlind` 를 개념 단위로
+   * 잘게 나눈 것으로, 결과 예측 모델(ai/outcome.ts)의 가상 학습자가 쓴다: 숙달 m_c 인 학습자는 확률 1−m_c 로 그 개념을
+   * 모르는 채 달린다. 보행자 양보 → 사람을 못 봄, 적색 일시정지 → 적색을 녹색으로 봄, 보호구역 정지 → 신호기 없는
+   * 횡단보도를 녹색으로 봄, 방향지시등 → 안 켬, 우측 통행 → 크게 돎, 정지선 → 정지선이 앞에 있다고 착각해 넘어 섬, 꼬리물기 → 정체를 못 봄.
+   * 교차로 서행은 속도를 차가 알아서 줄여 흉내 낼 수 없다.
+   */
+  blind?: ReadonlySet<ViolationCode>;
 }
 
 /** 타임라인 한 줄 */
@@ -271,6 +285,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     pace,
     spec.drive === 'zoneOnly',
   );
+  const blind: ReadonlySet<ViolationCode> = opts.blind ?? new Set();
   const driver = new AutoDriver(CAR_LENGTH * 0.58, pace.brakeDecel, spec.drive ?? 'rightTurn');
   const lead = spec.leadCar
     ? new LeadDrive(spec.leadCar, {
@@ -421,7 +436,10 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       // 앞차 간격은 몸이 느끼는 것이라 늦게 보더라도 지금 값에 가깝다 — 추돌만은 피하게 둔다
       lead: now.lead,
     };
-    let input = driver.decide(state);
+    let input = driver.decide(blind.size ? blindView(state, blind) : state);
+    if (blind.has('NO_TURN_SIGNAL')) input = { ...input, rightSignal: false };
+    // 크게 도는 운전자 — 막 모는 운전자(RECKLESS_STEER)보다 더 덜 감는다. 그만큼이어야 판정의 대회전에 걸린다
+    if (blind.has('WIDE_TURN')) input = { ...input, steer: input.steer * WIDE_STEER };
     if (persona === 'reckless') {
       /*
         아무 데서도 서지 않는다 — **앞차만은 피한다.** 앞차를 들이받게 두면 그 판의 다른 위반이 모두 추돌 하나에
@@ -620,6 +638,40 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
     events.sort((a, b) => a.t - b.t);
   }
   return { persona, result, elapsed: t, stops, peds: summaries, events };
+}
+
+/**
+ * **개념을 모르는 운전자가 보는 세계** (PlayOptions.blind) — 규칙을 모르는 것을 "그 상황을 못 보는 것" 으로 흉내 낸다.
+ * `signalBlind` · `pedBlind` 와 같은 수법을 개념마다 잘게 나눈 것이다.
+ */
+function blindView(s: AutoDriveState, blind: ReadonlySet<ViolationCode>): AutoDriveState {
+  const out: AutoDriveState = { ...s, pedSignal: { ...s.pedSignal } };
+  if (blind.has('PEDESTRIAN_BLOCKED')) out.pedestrians = out.pedestrians.filter((p) => p.bike === 'ride');
+  if (blind.has('BIKE_BLOCKED')) out.pedestrians = out.pedestrians.filter((p) => p.bike !== 'ride');
+  if (blind.has('RED_NO_STOP') || blind.has('STRAIGHT_RED')) out.vehicleLight = 'green';
+  // 적색 직진을 모르는 운전자 — 보호구역 전용 도로의 신호기 있는 횡단보도도 녹색으로 본다
+  if (blind.has('STRAIGHT_RED') && out.zoneLights) out.zoneLights = { S: 'green', A: 'green', B: 'green' };
+  if (blind.has('RIGHT_ARROW_RED') && out.rightArrow !== null) out.rightArrow = 'greenArrow';
+  if (blind.has('SCHOOL_ZONE_NO_STOP')) {
+    // 신호기 없는 횡단보도의 의무 정지를 모른다 — 신호기가 있고 녹색인 것처럼 본다
+    if (out.approachZone && out.approachZone.light === null) out.approachZone = { light: 'green' };
+    out.isSchoolZone = false;
+    if (out.zoneLights) out.zoneLights = { S: 'green', A: 'green', B: 'green', ...out.zoneLights };
+  }
+  if (blind.has('SCHOOL_ZONE_RED')) {
+    if (out.approachZone && out.approachZone.light !== null) out.approachZone = { light: 'green' };
+    if (out.zoneLights) out.zoneLights = { S: 'green', A: 'green', B: 'green' };
+  }
+  if (blind.has('BLOCKING_INTERSECTION')) out.exitBlocked = false;
+  /*
+    **정지선을 모르는 운전자** — 정지선이 실제보다 앞에 있다고 본다(앞범퍼가 3m 뒤에 있다고 착각). 규정대로 서는 셈은
+    그대로라(정지선 1.8m 앞에 서는 운전자) 정지선을 1.2m 넘어 횡단보도 앞에 선다 — 판정의 정지선 위반(OVER_STOP_LINE, 0.5m 까지는 봐줌)에 걸린다.
+  */
+  if (blind.has('OVER_STOP_LINE')) {
+    out.frontZ = s.frontZ + 3.0;
+    out.z = s.z + 3.0;
+  }
+  return out;
 }
 
 /** AutoDriver 가 보는 세계 가운데 **눈으로 알아차리는** 부분 — `human` 은 이것을 늦게 본다 */

@@ -33,6 +33,7 @@ import type { ViolationCode } from '../rules/violations';
 import type { JudgeResult } from '../rules/lawRules';
 import { heldBy, SKILL_ORDER, updateKnowledge, type Knowledge } from '../ai/knowledge';
 import { updateAbility } from '../ai/difficulty';
+import { calibrateOutcome, type OutcomeBias } from '../ai/outcome';
 import type { ScenarioSpec } from './scenarios';
 import {
   checkBudget,
@@ -355,6 +356,8 @@ export interface CurriculumState {
   skills?: Knowledge;
   /** **능력 θ** — 난이도 모델(ai/difficulty.ts)의 Elo 값. 없으면 그 레벨의 평균 난이도에서 시작한다 (main.ts) */
   ability?: number;
+  /** **결과 예측 모델의 보정** (ai/outcome.ts) — 레이블별 절편, 판마다 예측과 실제의 차로 움직인다 */
+  outcomeBias?: OutcomeBias;
 }
 
 export const freshCurriculum = (): CurriculumState => ({
@@ -430,6 +433,10 @@ export function advance(
     기준을 넘으므로 습관 기준(HABIT_CLEARED_AFTER)보다 느슨하지만, **위험했던 판**은 넘지 못한다 — 그때만 한 판 더 본다.
   */
   const heldSkills = heldBy(skills, testedCodes);
+  // 결과 예측 모델의 온라인 보정 — 판 전에 낸 예측(opts.predicted)과 실제 위반의 차만큼 절편을 옮긴다 (ai/outcome.ts)
+  const outcomeBias = opts.predicted
+    ? calibrateOutcome(state.outcomeBias ?? {}, opts.predicted, testedCodes, codes)
+    : state.outcomeBias;
 
   const needBefore = xpToNext(state.level, rule);
   const before = Math.min(state.xp ?? 0, needBefore);
@@ -459,6 +466,7 @@ export function advance(
     missStreak: clean ? 0 : state.missStreak + 1,
     skills,
     ...(ability === undefined ? {} : { ability }),
+    ...(outcomeBias === undefined ? {} : { outcomeBias }),
   };
 
   const full = filled >= needBefore;
@@ -508,6 +516,8 @@ export interface AdvanceOptions {
   difficulty?: number;
   /** 능력이 아직 없을 때의 처음 값 — 그 레벨의 평균 난이도 (main.ts) */
   abilityPrior?: number;
+  /** 판을 시작하기 전에 결과 예측 모델이 낸 개념별 위반 확률 (ai/outcome.ts) — 주면 보정한다 */
+  predicted?: Record<ViolationCode, number> | null;
 }
 
 /**
@@ -543,16 +553,19 @@ export function recordHabits(
   state: CurriculumState,
   result: JudgeResult,
   tested?: ReadonlySet<ViolationCode>,
-  opts: Pick<AdvanceOptions, 'risk' | 'now'> = {},
+  opts: Pick<AdvanceOptions, 'risk' | 'now' | 'predicted'> = {},
 ): CurriculumState {
   const codes = result.violations.map((v) => v.code as ViolationCode);
   const { habits } = updateHabits(state.badHabits, codes, state.runs, tested, result.failReason !== null);
+  const outcomeBias = opts.predicted
+    ? calibrateOutcome(state.outcomeBias ?? {}, opts.predicted, tested ? [...tested] : SKILL_ORDER, codes)
+    : state.outcomeBias;
   // 학습자 모델도 어느 판에서든 배운다 — 습관과 같은 까닭이다. 능력(레벨의 자)은 AI 과정의 판에서만 움직인다
   const skills = updateKnowledge(state.skills ?? {}, tested ? [...tested] : SKILL_ORDER, codes, {
     risk: opts.risk,
     now: opts.now,
   });
-  return { ...state, badHabits: habits, skills };
+  return { ...state, badHabits: habits, skills, ...(outcomeBias === undefined ? {} : { outcomeBias }) };
 }
 
 /**

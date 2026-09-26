@@ -28,7 +28,11 @@ const LIMIT = {
   /** 학습자 모델의 개념 수 · 복습 개념 수 */
   mastery: 12,
   review: 6,
+  /** 후보 한 줄의 결과 예측 수 */
+  predict: 3,
 };
+/** 후보에 붙는 표 (src/ai/outcome.ts 의 CandidateLabel) */
+const LABELS = ['weak', 'zpd', 'review', 'novel'];
 
 const CODES = [
   'RED_NO_STOP',
@@ -90,6 +94,12 @@ export function sanitize(body) {
     habit: c?.habit == null ? null : oneOf(c.habit, CODES, 'courses.habit'),
     // **예상 성공률** 0~100 (src/ai/difficulty.ts) — 없으면 null (난이도 모델을 못 쓴 판)
     success: c?.success == null ? null : Math.min(100, Math.max(0, Math.round(num(c.success, 'courses.success')))),
+    // **결과 예측** (src/ai/outcome.ts) — 이 학습자가 이 판에서 어길 확률이 높은 개념(0~100)과 후보에 붙은 표
+    predict: (Array.isArray(c?.predict) ? c.predict : [])
+      .filter((x) => x && CODES.includes(x.code))
+      .slice(0, LIMIT.predict)
+      .map((x) => ({ code: x.code, p: Math.min(100, Math.max(0, Math.round(num(x.p, 'courses.predict.p')))) })),
+    labels: (Array.isArray(c?.labels) ? c.labels : []).filter((v) => LABELS.includes(v)),
   }));
   if (!courses.length) throw new BadInput('courses: 후보가 없음');
 

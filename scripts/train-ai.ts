@@ -11,6 +11,8 @@
  *     반응이 0.4초만 늦었어도 위반이었을 판* (같은 판을 한 단계 느린 운전자로 달린 결과가 그것을 말해 준다).
  *  2. **난이도 모델** (src/ai/models/difficulty.json) — 판의 특징 → 난이도 b (로짓). 운전자 능력 a 와 함께 맞춘다:
  *     logit P(통과) = a_운전자 − (w·x_판 + b0). 배포되는 것은 w · b0 뿐이다.
+ *  3. **결과 예측 모델** (src/ai/models/outcome.json) — 판 × 학습자(개념별 숙달) → 어느 위반이 날까, 개념마다 로지스틱
+ *     (다중 레이블). 숙달 벡터를 뽑은 가상 학습자가 개념을 모르는 채(playSim 의 blind) 달린 결과로 맞춘다.
  *
  * 둘 다 로지스틱 회귀이고 여기서 경사하강으로 맞춘다 — 의존이 없다. 결과 파일은 저장소에 커밋한다 (브라우저는 학습하지
  * 않고 읽기만 한다). 순수 함수만 부르므로 화면 없이 돈다.
@@ -20,6 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 import { DIFFICULTY_FEATURES, scenarioFeatures } from '../src/ai/difficulty';
+import { SKILL_ORDER } from '../src/ai/knowledge';
+import { OUTCOME_FEATURES, outcomeFeatures } from '../src/ai/outcome';
+import type { ViolationCode } from '../src/rules/violations';
 import { featureVector } from '../src/ai/risk';
 import type { RunFeatures } from '../src/ai/telemetry';
 import { challengeRule } from '../src/scenarios/challenge';
@@ -249,6 +254,73 @@ const holdout = (i: number): boolean => i % 5 === 0;
           drivers: Object.fromEntries(configs.map((c, j) => [c.id, +m.a[j].toFixed(3)])),
           levelMean: levels,
         },
+      },
+      null,
+      1,
+    ),
+  );
+}
+// ── 3. 결과 예측 모델 — 가상 학습자(숙달 벡터)로 다중 레이블 분류 ──
+{
+  /*
+    **가상 학습자**: 개념마다 숙달 m_c 를 뽑고, 확률 1−m_c 로 그 개념을 모르는 채(playSim 의 blind) 달린다. 반응 시간과
+    난이도 설정도 섞는다. 입력은 판의 특징 · 시험 개념 · 숙달 · 시험 개념의 미숙달 · 반응 시간, 레이블은 실제로 난 위반이다.
+    씨앗을 고정해 다시 돌려도 같은 파일이 나오게 한다.
+  */
+  let seed = 20260926;
+  const rand = (): number => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const LEARNERS_PER_ITEM = 12;
+  const REACT = [0.6, 1.0, 1.4];
+  const SIMULABLE = SKILL_ORDER.filter((c) => c !== 'NO_SLOW_DOWN');
+  const X: number[][] = [];
+  const Y: number[][] = [];
+  const t1 = Date.now();
+  items.forEach((it, i) => {
+    for (let k = 0; k < LEARNERS_PER_ITEM; k++) {
+      const mastery = {} as Record<ViolationCode, number>;
+      for (const c of SKILL_ORDER) mastery[c] = 0.05 + 0.93 * rand();
+      const blind = new Set<ViolationCode>();
+      for (const c of SIMULABLE) if (rand() > mastery[c]) blind.add(c);
+      const reaction = REACT[Math.floor(rand() * REACT.length)];
+      const diff = DIFFS[Math.floor(rand() * DIFFS.length)];
+      const rule = challengeRule(diff);
+      const r = playScenario(it.spec, { persona: 'human', reaction, pace: rule.pace, stopZone: rule.stopZone, trace: false, blind });
+      const got = new Set(r.result.violations.map((v) => v.code));
+      X.push(outcomeFeatures({ spec: it.spec, targets: it.targets as ViolationCode[], cost: it.cost }, { mastery, reaction }));
+      Y.push(SKILL_ORDER.map((c) => (got.has(c) ? 1 : 0)));
+    }
+    if ((i + 1) % 150 === 0) console.log(`  학습자 ${i + 1}/${items.length} · ${((Date.now() - t1) / 1000).toFixed(0)}s`);
+  });
+  console.log(`가상 학습자: ${X.length}판 · ${((Date.now() - t1) / 1000).toFixed(0)}초`);
+  const { mean, std, Z } = standardize(X);
+  const train = Z.map((_, i) => i).filter((i) => !holdout(Math.floor(i / LEARNERS_PER_ITEM)));
+  const test = Z.map((_, i) => i).filter((i) => holdout(Math.floor(i / LEARNERS_PER_ITEM)));
+  const labels = SKILL_ORDER.map((code, li) => {
+    const y = Y.map((row) => row[li]);
+    const positives = y.reduce((s, v) => s + v, 0);
+    const base = positives / y.length;
+    if (positives < 30 || !SIMULABLE.includes(code)) {
+      console.log(`  ${code}: 양성 ${positives} — 기본율 ${(base * 100).toFixed(1)}% 만`);
+      return { code, w: [], b: 0, base: +base.toFixed(4), trained: false, auc: null };
+    }
+    const m = fitLogistic(train.map((i) => Z[i]), train.map((i) => y[i]), { lr: 0.2, l2: 2e-3 });
+    const score = (i: number): number => sigmoid(m.b + Z[i].reduce((s, v, k) => s + m.w[k] * v, 0));
+    const a = auc(test.map(score), test.map((i) => y[i]));
+    console.log(`  ${code}: 양성 ${positives} (${(base * 100).toFixed(1)}%) · AUC ${Number.isFinite(a) ? a.toFixed(3) : '-'}`);
+    return { code, w: m.w.map((v) => +v.toFixed(4)), b: +m.b.toFixed(4), base: +base.toFixed(4), trained: true, auc: Number.isFinite(a) ? +a.toFixed(3) : null };
+  });
+  writeFileSync(
+    resolve(OUT, 'outcome.json'),
+    JSON.stringify(
+      {
+        names: [...OUTCOME_FEATURES],
+        mean: mean.map((v) => +v.toFixed(4)),
+        std: std.map((v) => +v.toFixed(4)),
+        labels,
+        meta: { trained: true, samples: X.length, date: new Date().toISOString().slice(0, 10), learnersPerScenario: LEARNERS_PER_ITEM },
       },
       null,
       1,

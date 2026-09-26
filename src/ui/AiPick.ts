@@ -12,6 +12,8 @@
  * 화면(DOM)만 다룬다. 언제 무엇을 띄울지는 main.ts 가 정한다.
  */
 
+import { SKILL_SHORT } from '../ai/knowledge';
+import type { ViolationCode } from '../rules/violations';
 import robotCaution from '../assets/airobot/yello.webp';
 import { type Picker } from '../scenarios/recommend';
 import { analyzingBy, pickedByCard } from './pickedBy';
@@ -48,6 +50,8 @@ export interface PickResult {
   habitByAi?: boolean;
   /** 난이도 모델이 센 **예상 성공률** 0~100 (ai/difficulty.ts) — 없으면 그 줄을 감춘다 */
   success?: number;
+  /** 결과 예측 모델이 센 **어길 확률이 높은 개념** (ai/outcome.ts) — 있으면 같은 줄에 잇는다 */
+  predict?: { code: string; p: number }[];
 }
 
 export class AiPickOverlay {
@@ -175,8 +179,13 @@ export class AiPickOverlay {
     focus.hidden = !r.focus;
     // 예상 성공률 — 학습자의 능력과 판의 난이도로 센 값. 근접 발달 영역(열에 일곱쯤)을 고른 근거가 여기서 보인다
     const success = $('ai-pick-success');
-    success.textContent = r.success !== undefined ? `AI 난이도 모델 · 예상 성공률 ${r.success}%` : '';
-    success.hidden = r.success === undefined;
+    const parts: string[] = [];
+    if (r.success !== undefined) parts.push(`AI 난이도 모델 · 예상 성공률 ${r.success}%`);
+    if (r.predict?.length) {
+      parts.push(`결과 예측 모델 · ${r.predict.map((x) => `${SKILL_SHORT[x.code as ViolationCode] ?? x.code} ${x.p}%`).join(' · ')}`);
+    }
+    success.textContent = parts.join('  |  ');
+    success.hidden = parts.length === 0;
     $('ai-pick-status').textContent = '맵을 준비하고 있습니다';
     // 준비 중 — 점 셋이 차례로 튄다 (index.html 의 .ai-pick-status)
     $('ai-pick-statusbox').classList.remove('go');

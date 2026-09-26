@@ -22,6 +22,7 @@
  */
 
 import type { Knowledge } from '../ai/knowledge';
+import type { OutcomeBias } from '../ai/outcome';
 import {
   GENERATED_ID_BASE,
   fitRightArrowStart,
@@ -87,6 +88,10 @@ export interface GeneratedScenario extends ScenarioSpec {
   focus?: string;
   /** **예상 성공률** 0~100 (ai/difficulty.ts 의 successProbability) — 난이도 모델이 있을 때만 */
   success?: number;
+  /** **결과 예측** — 이 판에서 어길 확률이 높은 개념 (ai/outcome.ts 의 topPredictions), 0~100 */
+  predict?: { code: ViolationCode; p: number }[];
+  /** 후보에 붙은 표 — 약점 시험 · 근접 발달 · 복습 · 새로움 (ai/outcome.ts 의 CandidateLabel) */
+  labels?: string[];
 }
 
 /** 생성 과정에서 무슨 일이 있었는지 — 개발 중 확인과 화면의 안내에 쓴다 */
@@ -498,6 +503,8 @@ export interface Plan {
   skills?: Knowledge;
   /** **능력 θ** (ai/difficulty.ts) — 후보마다 예상 성공률을 셈하는 데 쓴다. 없으면 성공률을 세지 않는다 */
   ability?: number;
+  /** 결과 예측 모델의 학습자별 보정 (ai/outcome.ts) */
+  outcomeBias?: OutcomeBias;
   /** 지금 레벨에서 모은 경험치와 다음 레벨까지 필요한 양 (curriculum.ts) — AI 가 "얼마 남았는지" 를 말할 때 쓴다 */
   xp?: number;
   xpNeed?: number;

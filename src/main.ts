@@ -68,6 +68,7 @@ import { advance, currentTarget, levelLabel, recordHabits, xpToNext } from './sc
 import { abilityPriorFor, difficultyOf } from './ai/difficulty';
 import { riskOf } from './ai/risk';
 import { modelStep } from './ai/report';
+import { OUTCOME_MODEL, learnerVector, predictOutcome } from './ai/outcome';
 import { costOf } from './scenarios/difficulty';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
@@ -253,6 +254,7 @@ async function makeAiScenario(): Promise<void> {
     // 학습자 모델 · 능력 (ai/knowledge.ts · ai/difficulty.ts) — 후보 점수와 AI 프롬프트가 읽는다
     skills: c.skills ?? {},
     ability: c.ability ?? abilityPriorFor(c.level),
+    outcomeBias: c.outcomeBias,
   };
   /*
     **AI 가 시나리오 라이브러리에서 고른다** (scenarios/recommend.ts).
@@ -321,6 +323,11 @@ async function makeAiScenario(): Promise<void> {
           many
             ? `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개 추리기`
             : `시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개 추리기`,
+        // 결과 예측 모델(ai/outcome.ts) — 후보마다 어길 확률과 표를 붙인다. 학습자 모델이 시험된 개념이 없는 첫 판에도 돈다
+        () =>
+          OUTCOME_MODEL
+            ? `결과 예측 모델 — 후보 ${counts.courses}개마다 어길 확률과 표(약점 시험 · 근접 발달 · 복습 · 새로움)를 붙이는 중`
+            : `난이도 모델 — 후보 ${counts.courses}개마다 예상 성공률을 세는 중`,
         () =>
           many
             ? `AI 가 먼저 고칠 습관을 정하고 후보 ${counts.courses}개 중 코스를 고르는 중`
@@ -341,6 +348,7 @@ async function makeAiScenario(): Promise<void> {
       habit: rec.habit ? habitTitle(rec.habit) : undefined,
       habitByAi: rec.habitBy === 'ai',
       success: rec.scenario.success,
+      predict: rec.scenario.predict,
     });
     outcome = { scenario: rec.scenario, tries: 1, rejected: [], reason: 'ok' };
   } catch (e) {
@@ -1357,6 +1365,7 @@ async function startRun(id: number): Promise<void> {
         picker: rec.picker as Picker | undefined,
         model: rec.pickerModel,
         success: rec.success,
+        predict: rec.predict,
       });
     }
   } else {
@@ -1585,6 +1594,12 @@ function finishRun(result: JudgeResult): void {
   const tested = habitsTestedBy(sc);
   const risk = result.features ? riskOf(result.features) : undefined;
   const now = Date.now();
+  // 결과 예측 모델이 **판 전의** 학습자로 낸 예측 — 실제와의 차로 학습자 안의 절편을 보정한다 (ai/outcome.ts)
+  const predicted = predictOutcome(
+    { spec: sc, targets: [...tested], cost: costOf(sc).total },
+    learnerVector(saveData.curriculum.skills ?? {}, now),
+    saveData.curriculum.outcomeBias ?? {},
+  );
 
   /*
     **AI 주행이면 여기서 단계가 움직인다.**
@@ -1614,6 +1629,7 @@ function finishRun(result: JudgeResult): void {
       now,
       difficulty: difficultyOf({ spec: sc, targets: [...tested], cost: costOf(sc).total }),
       abilityPrior: abilityPriorFor(before.level),
+      predicted,
     });
     // 이 판으로 마스터가 됐다 — 결과 화면 위에 엔딩을 띄운다 (showEnding)
     justMastered = !before.mastered && next.mastered;
@@ -1659,7 +1675,7 @@ function finishRun(result: JudgeResult): void {
     }
   } else {
     // 수동 주행 — 레벨·판 수는 그대로 두고 습관 기록만 갱신한다
-    saveData.curriculum = recordHabits(saveData.curriculum, result, tested, { risk, now });
+    saveData.curriculum = recordHabits(saveData.curriculum, result, tested, { risk, now, predicted });
     aiTraining.curriculum = saveData.curriculum;
   }
 

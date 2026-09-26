@@ -49,6 +49,7 @@ import { challengeRule } from './challenge';
 import { difficultyOf, successProbability } from '../ai/difficulty';
 import { reviewDue } from '../ai/forgetting';
 import { SKILL_ORDER, SKILL_SHORT, effectiveMastery, wasTested, weakSkills, type Knowledge } from '../ai/knowledge';
+import { judgeCandidate, topPredictions, type CandidateVerdict } from '../ai/outcome';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
@@ -132,6 +133,31 @@ export const ZPD_WIDTH = 0.32;
 export const ZPD_GAIN = 2.5;
 /** 약한 개념을 시험하는 판의 보너스 — 실효 숙달이 0 이면 이만큼, 1 이면 0 */
 export const SKILL_GAIN = 2.0;
+/**
+ * **결과 예측 모델의 불확실성 보너스** (ai/outcome.ts 의 info) — 약한 개념의 위반 확률이 반 근처인 판, 즉 결과가 가장
+ * 불확실해 **가장 많이 배우는** 판을 좋게 친다 (능동 학습의 불확실성 표집). 이미 어길 게 뻔한 판(90%)이나 지킬 게 뻔한
+ * 판(5%)은 새로 알려 주는 것이 적다.
+ */
+export const INFO_GAIN = 2.0;
+
+/**
+ * 후보에 붙인 표와 예측 — 한 추천 안에서 판마다 한 번만 센다 (scoreOf 가 같은 판을 여러 번 묻는다).
+ * 표 · 예측 · 불확실성은 학습자(plan)에 따라 다르므로 plan 마다 새로 만든다.
+ */
+export function verdictsFor(plan: Plan, cover: Coverage = NO_COVER): (e: LibraryEntry) => CandidateVerdict | null {
+  if (!plan.skills) return () => null;
+  const cache = new Map<number, CandidateVerdict>();
+  const now = Date.now();
+  return (e) => {
+    let v = cache.get(e.spec.id);
+    if (!v) {
+      const success = plan.ability === undefined ? undefined : successProbability(plan.ability, difficultyOf(e));
+      v = judgeCandidate(e, plan.skills!, { now, bias: plan.outcomeBias, success, novel: freshAxesFor([e], cover)[0].length > 0 });
+      cache.set(e.spec.id, v);
+    }
+    return v;
+  };
+}
 
 /**
  * **'두 번째 횡단보도에 사람 없음' 은 두 배로 깎는다.**
@@ -592,8 +618,9 @@ export function shortlist(
   /** 담을 수 — 습관이 여럿일 때는 습관마다 조금씩 담는다 (`coursesByHabit`) */
   size: number = SHORTLIST_SIZE,
 ): LibraryEntry[] {
+  const verdict = verdictsFor(plan, cover);
   const scored = candidates
-    .map((e) => ({ e, s: scoreOf(plan, e, seen, cover) + random() * 1.5 }))
+    .map((e) => ({ e, s: scoreOf(plan, e, seen, cover, verdict) + random() * 1.5 }))
     .sort((x, y) => y.s - x.s);
   const out: LibraryEntry[] = [];
   const shapes = new Set<string>();
@@ -703,6 +730,8 @@ function scoreOf(
   e: LibraryEntry,
   seen: SeenShapes = NO_SHAPES,
   cover: Coverage = NO_COVER,
+  /** 결과 예측 모델의 표 · 불확실성 (위 verdictsFor) — 없으면 그 보너스는 없다 */
+  verdict?: (e: LibraryEntry) => CandidateVerdict | null,
 ): number {
   const habits = new Set(plan.badHabits.map((h) => h.code));
   let s = 0;
@@ -750,6 +779,9 @@ function scoreOf(
     const k = plan.skills;
     const gap = Math.max(0, ...e.targets.map((c) => (wasTested(k, c) ? 1 - effectiveMastery(k, c) : 0)));
     s += SKILL_GAIN * gap;
+    // 결과 예측 모델 — 약한 개념에서 결과가 불확실한(가장 많이 배우는) 판 (위 INFO_GAIN)
+    const v = verdict?.(e);
+    if (v) s += INFO_GAIN * v.info;
   }
   /*
     **이 레벨에서 아직 안 겪어 본 것을 좋게 친다** (위 NEW_BONUS).
@@ -774,8 +806,9 @@ export function rulePick(
 ): LibraryEntry {
   let best = candidates[0];
   let bestScore = -Infinity;
+  const verdict = verdictsFor(plan, cover);
   for (const e of candidates) {
-    const s = scoreOf(plan, e, seen, cover) + random() * 1.5;
+    const s = scoreOf(plan, e, seen, cover, verdict) + random() * 1.5;
     if (s > bestScore) {
       best = e;
       bestScore = s;
@@ -873,6 +906,7 @@ export function recommendPayload(
 ) {
   const fresh = freshAxesFor(courses, cover);
   const priority = new Set(habitOf.values()).size >= 2;
+  const verdictOf = plan.skills ? verdictsFor(plan, cover) : null;
   return {
     level: plan.level,
     tier: levelTier(plan.level),
@@ -933,7 +967,33 @@ export function recommendPayload(
       ...(priority && habitOf.has(e.spec.id) ? { habit: habitOf.get(e.spec.id) } : {}),
       // **예상 성공률** (ai/difficulty.ts) — 학습자의 능력 대비 이 판의 난이도. 근접 발달 영역을 고르는 근거다
       ...(plan.ability !== undefined ? { success: successPercent(plan, e) } : {}),
+      /*
+        **결과 예측과 표** (ai/outcome.ts) — 이 학습자가 이 판에서 어길 확률이 높은 개념(0~100)과, 후보에 붙은 표(약점 시험 ·
+        근접 발달 · 복습 · 새로움). 전통적인 분류 모델이 브라우저에서 후보를 추리고 표를 붙이면, 생성형 AI 가 그것을 읽고
+        하나를 고른다.
+      */
+      ...(verdictOf ? courseVerdict(verdictOf(e), e, plan.skills) : {}),
     })),
+  };
+}
+
+/**
+ * 후보 한 줄에 붙는 예측 · 표 (위 recommendPayload).
+ *
+ * **예측은 시험된 적 있는 개념만 적는다.** 한 번도 시험되지 않은 개념은 학습자 모델의 처음 값(L0 30%)으로 세어 "어길 확률
+ * 88%" 처럼 나오는데, 그것은 이 사람에 대해 아는 것이 없다는 뜻이지 어길 것 같다는 뜻이 아니다 — 첫 판의 학습자에게
+ * 그렇게 말하면 거짓말이다. 표(약점 시험)도 같은 규칙으로 시험된 개념만 본다 (ai/outcome.ts 의 judgeCandidate).
+ */
+function courseVerdict(
+  v: CandidateVerdict | null,
+  e: LibraryEntry,
+  skills: Knowledge | undefined,
+): { predict?: { code: ViolationCode; p: number }[]; labels?: string[] } {
+  if (!v) return {};
+  const known = e.targets.filter((c) => skills && wasTested(skills, c));
+  return {
+    predict: topPredictions(v.predict, known).map((x) => ({ code: x.code, p: Math.round(x.p * 100) })),
+    labels: v.labels,
   };
 }
 
@@ -979,6 +1039,14 @@ export async function recommendScenario(
   // **고른 번호가 후보에 있을 때만** 받는다 — 모델이 지어낸 번호는 버리고 코드가 고른다
   const answer = reply && reply !== 'no-server' && reply !== 'quota' ? reply : null;
   const chosen = answer ? courses.find((e) => e.spec.id === answer.id) : undefined;
+  const verdictOf = verdictsFor(plan, cover);
+  /** 고른 판에 결과 예측과 표를 싣는다 — 추천 카드가 "결과 예측: 보행자 양보 42%" 를 보여 준다 (ai/outcome.ts) */
+  const withVerdict = (sc: GeneratedScenario, e: LibraryEntry): GeneratedScenario => {
+    const v = verdictOf(e);
+    if (!v) return sc;
+    const { predict, labels } = courseVerdict(v, e, plan.skills);
+    return { ...sc, ...(predict && predict.length ? { predict } : {}), ...(labels && labels.length ? { labels } : {}) };
+  };
   if (chosen && answer) {
     /*
       **AI 가 정한 습관은 두 가지를 확인한 뒤에만 받는다** — 학습자에게 실제로 있는 습관인가, 고른 코스가 그
@@ -990,15 +1058,18 @@ export async function recommendScenario(
       priority && told && priorityHabits(plan).includes(told) && coursesTest(chosen, told) ? told : undefined;
     const habit = aiHabit ?? habitOf.get(chosen.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
     return {
-      scenario: toScenario(
+      scenario: withVerdict(
+        toScenario(
+          chosen,
+          plan.level,
+          answer.why || ruleWhy(plan, chosen),
+          answer.focus,
+          'ai',
+          answer.picker,
+          answer.model,
+          successPercent(plan, chosen),
+        ),
         chosen,
-        plan.level,
-        answer.why || ruleWhy(plan, chosen),
-        answer.focus,
-        'ai',
-        answer.picker,
-        answer.model,
-        successPercent(plan, chosen),
       ),
       source: 'ai',
       picker: answer.picker,
@@ -1011,7 +1082,10 @@ export async function recommendScenario(
   // 한도를 다 써서 코드가 고른 판은 그렇게 말한다 (위 Picker 주석)
   const why: Picker = reply === 'quota' ? 'quota' : 'rule';
   return {
-    scenario: toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why, undefined, successPercent(plan, entry)),
+    scenario: withVerdict(
+      toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why, undefined, successPercent(plan, entry)),
+      entry,
+    ),
     source: 'rule',
     picker: why,
     // AI 가 답하지 않았다 — 코드가 고른 코스의 묶음 습관 (rulePick 은 가장 많이 한 습관의 코스를 좋게 친다)
