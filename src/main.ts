@@ -544,14 +544,11 @@ function maybeShowGpuNotice(): void {
   if (!el) return;
   gpuNoticeDecided = true;
   const gpu = gpuName(sharedRenderer(canvas));
-  // **임시 — 테스트용 강제 표시** (사용자가 "테스트를 위해 무조건 나오게 해줘", 2026-09-26). 확인이 끝나면 false 로 되돌린다.
-  const FORCE_GPU_NOTICE = true;
-  if (!FORCE_GPU_NOTICE && !needsChromeUpdateNotice(gpu, navigator.userAgent)) return;
+  if (!needsChromeUpdateNotice(gpu, navigator.userAgent)) return;
   const update = document.getElementById('gpu-notice-update') as HTMLAnchorElement | null;
   if (update) update.href = CHROME_PLAY_STORE_URL;
   const text = document.getElementById('gpu-notice-text');
-  // 강제 표시일 때 문제 버전이 아니면 기본 문구(크롬 151~153)를 그대로 둔다
-  if (text && needsChromeUpdateNotice(gpu, navigator.userAgent)) {
+  if (text) {
     text.textContent =
       `지금 크롬(${chromeMajor(navigator.userAgent)})의 알려진 문제로, 크롬 ${CHROME_WITH_XCLIPSE_FIX} 부터 고쳐졌습니다. ` +
       '플레이 스토어에서 크롬을 업데이트해 주세요.';
@@ -809,9 +806,10 @@ async function handleResetCourse(): Promise<void> {
   // 판을 만드는 중이면 덮개 뒤에서 눌린 것이다 — 만들던 것이 끝난 뒤 다시 누르면 된다
   if (aiTraining.busy) return;
 
+  // 레벨이 사라진다는 것을 붉게 짚는다 (사용자가 정했다, 2026-09-26)
   const ok = await screens.confirm({
     title: '처음부터 다시 시작합니다.',
-    lines: ['기존의 운전 습관이 초기화 됩니다.', '계속하시겠습니까?'],
+    lines: [[{ em: '기존 레벨이 초기화' }, '되고 운전 습관이 초기화 됩니다.'], '정말 계속하시겠습니까?'],
   });
   if (!ok) return;
 

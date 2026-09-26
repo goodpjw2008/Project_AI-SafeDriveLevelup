@@ -611,8 +611,11 @@ export class Screens {
   confirm(opts: {
     /** 첫 줄 — 무엇을 하려는지 */
     title: string;
-    /** 그 아래 줄들. 한 줄에 한 문장씩 놓인다 */
-    lines: string[];
+    /**
+     * 그 아래 줄들. 한 줄에 한 문장씩 놓인다. 줄은 글 하나이거나 조각의 배열이다 — `{ em: '…' }` 조각은
+     * **붉은 굵은 글**로 선다 (되돌릴 수 없는 것을 짚을 때, 예: '기존 레벨이 초기화'). 글은 모두 이스케이프한다.
+     */
+    lines: Array<string | Array<string | { em: string }>>;
     /** 진행 버튼 글자 (기본 '계속') */
     ok?: string;
   }): Promise<boolean> {
@@ -621,7 +624,11 @@ export class Screens {
     const cancelBtn = $('modal-cancel') as HTMLButtonElement;
 
     $('modal-title').textContent = opts.title;
-    $('modal-body').innerHTML = opts.lines.map((l) => `<div>${esc(l)}</div>`).join('');
+    const line = (l: string | Array<string | { em: string }>): string =>
+      typeof l === 'string'
+        ? esc(l)
+        : l.map((seg) => (typeof seg === 'string' ? esc(seg) : `<b class="danger">${esc(seg.em)}</b>`)).join('');
+    $('modal-body').innerHTML = opts.lines.map((l) => `<div>${line(l)}</div>`).join('');
     okBtn.textContent = opts.ok ?? '계속';
 
     root.hidden = false;
