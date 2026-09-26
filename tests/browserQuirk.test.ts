@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { samsungInternetIntent, vulkanXclipseChrome } from '../src/game/browserQuirk';
+import { CHROME_WITH_XCLIPSE_FIX, chromeMajor, samsungInternetIntent, vulkanXclipseChrome } from '../src/game/browserQuirk';
 
 const GPU_VULKAN =
   'ANGLE (Samsung Electronics Co. Ltd., ANGLE ((Samsung Xclipse 940) on Vulkan 1.3.279), OpenGL ES 3.2)';
@@ -33,5 +33,16 @@ describe('크롬 · Xclipse · Vulkan 조합 판별', () => {
     expect(link.startsWith('intent://safedrive.ai.kr/?x=off#Intent;scheme=https;')).toBe(true);
     expect(link).toContain('package=com.sec.android.app.sbrowser;');
     expect(link).toContain(`S.browser_fallback_url=${encodeURIComponent('https://safedrive.ai.kr/?x=off')};end`);
+  });
+});
+
+describe('크롬 버전 — 151 회귀와 154 의 완화', () => {
+  it('UA 에서 주 버전을 읽고, 모르면 0', () => {
+    expect(chromeMajor(CHROME)).toBe(140);
+    expect(chromeMajor(SAMSUNG)).toBe(130);
+    expect(chromeMajor('Mozilla/5.0 (iPhone) Safari/604.1')).toBe(0);
+  });
+  it('완화가 들어간 크롬은 154 부터다', () => {
+    expect(CHROME_WITH_XCLIPSE_FIX).toBe(154);
   });
 });

@@ -18,7 +18,7 @@ import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { gpuName, setMsaaPreference, sharedRenderer } from './game/renderer';
-import { samsungInternetIntent, vulkanXclipseChrome } from './game/browserQuirk';
+import { CHROME_PLAY_STORE_URL, CHROME_WITH_XCLIPSE_FIX, chromeMajor, samsungInternetIntent, vulkanXclipseChrome } from './game/browserQuirk';
 import { presetGraphics, usesLampLights } from './game/quality';
 import { setLampLights } from './game/TrafficLight';
 import { bakeEnvironment } from './game/environment';
@@ -546,6 +546,21 @@ function maybeShowGpuNotice(): void {
   if (!vulkanXclipseChrome(gpu, navigator.userAgent)) return;
   const open = document.getElementById('gpu-notice-open') as HTMLAnchorElement | null;
   if (open) open.href = samsungInternetIntent(new URL(window.location.href));
+  // 크롬 151 회귀 — 완화가 들어간 154 미만이면 업데이트 버튼과 문구를 더한다 (browserQuirk.ts 의 chromeMajor)
+  const major = chromeMajor(navigator.userAgent);
+  if (major > 0 && major < CHROME_WITH_XCLIPSE_FIX) {
+    const update = document.getElementById('gpu-notice-update') as HTMLAnchorElement | null;
+    if (update) {
+      update.href = CHROME_PLAY_STORE_URL;
+      update.hidden = false;
+    }
+    const text = document.getElementById('gpu-notice-text');
+    if (text) {
+      text.textContent =
+        `지금 크롬(${major})에 알려진 문제로, 크롬 ${CHROME_WITH_XCLIPSE_FIX} 부터 관련 수정이 들어갔습니다. ` +
+        '크롬을 업데이트하거나, 같은 휴대폰의 삼성 인터넷으로 열면 정상입니다.';
+    }
+  }
   document.getElementById('gpu-notice-close')?.addEventListener('click', () => el.classList.remove('show'));
   el.classList.add('show');
 }

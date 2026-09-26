@@ -12,6 +12,22 @@
  * on Vulkan 1.3.279), OpenGL ES 3.2)". 판별은 이 문자열 + 크롬 앱의 UA(삼성 인터넷 · WebView 제외)로 한다.
  */
 
+/**
+ * 크롬 주 버전 — UA 의 `Chrome/151.0…` 에서. 모르면 0.
+ * 검은 띠는 크롬 151 에서 시작된 회귀로 크로미움에 등록돼 있고(crbug 547065826), ANGLE 의 완화가 크롬 154 부터 들어갔다
+ * (ANGLE 6cac303f "disable robust buffer access on Xclipse GPUs", 크로미움 154.0.8014.0 롤). 그래서 154 미만이면 업데이트를 권한다.
+ */
+export function chromeMajor(userAgent: string): number {
+  const m = /Chrome\/(\d+)/.exec(userAgent);
+  return m ? Number(m[1]) : 0;
+}
+
+/** ANGLE 의 Xclipse 완화가 들어간 첫 크롬 */
+export const CHROME_WITH_XCLIPSE_FIX = 154;
+
+/** 플레이 스토어의 크롬 — 업데이트 버튼이 여는 곳 */
+export const CHROME_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.android.chrome';
+
 /** 이 브라우저 · GPU 조합이 검은 띠가 나는 조합인가 — 삼성 인터넷 · 안드로이드 WebView 안에서는 아니다 */
 export function vulkanXclipseChrome(gpu: string, userAgent: string): boolean {
   if (!/Xclipse/i.test(gpu) || !/on Vulkan/i.test(gpu)) return false;
