@@ -5414,9 +5414,15 @@
         #screen-menu .menu-links button:not(.icon) svg {
           display: none;
         }
-        /* 그림뿐인 버튼(설정 톱니 · 전체 화면)은 줄 맨 앞에 — 우회전 앞이다 (사용자가 정했다). 아이디 없이 고른다 */
-        #screen-menu .menu-links button.icon {
+        /*
+          차례는 **전체 화면 · 우회전 · 어린이보호구역 · 내 습관 · 설정** (사용자가 정했다). 아이디 없이 고른다 —
+          전체 화면 토글은 .fs-toggle, 설정 톱니는 그 밖의 그림뿐인 버튼이다.
+        */
+        #screen-menu .menu-links .fs-toggle {
           order: -1;
+        }
+        #screen-menu .menu-links button.icon:not(.fs-toggle) {
+          order: 99;
         }
         /*
           **성공 · 실패 알약과 같은 키로** (사용자가 정했다). 그 알약은 `5px 12px · 13px` 이라
@@ -6002,7 +6008,9 @@
         }
         /* 그 자리만큼 연습 버튼을 키운다 — 손가락으로 누르는 화면에서 가장 큰 과녁이어야 한다 */
         #screen-menu .mode-split .ai-course-actions button {
-          min-height: 76px;
+          /* 전체 화면에서는 높이와 글자가 같이 자란다 (아래 .ai-course 주석) */
+          min-height: max(76px, 10.9dvh);
+          font-size: max(20px, 2.85dvh);
         }
 
         /* AI 가 맵을 고르는 창의 '추천 사유' — 좁은 화면에서 카드가 두 배로 길어지던 줄이다 */
@@ -6041,9 +6049,15 @@
         #screen-menu .menu-links button:not(.icon) svg {
           display: none;
         }
-        /* 그림뿐인 버튼(설정 톱니 · 전체 화면)은 줄 맨 앞에 — 우회전 앞이다 (사용자가 정했다). 아이디 없이 고른다 */
-        #screen-menu .menu-links button.icon {
+        /*
+          차례는 **전체 화면 · 우회전 · 어린이보호구역 · 내 습관 · 설정** (사용자가 정했다). 아이디 없이 고른다 —
+          전체 화면 토글은 .fs-toggle, 설정 톱니는 그 밖의 그림뿐인 버튼이다.
+        */
+        #screen-menu .menu-links .fs-toggle {
           order: -1;
+        }
+        #screen-menu .menu-links button.icon:not(.fs-toggle) {
+          order: 99;
         }
 
         /* 이름과 부제를 가운데로 — 좁은 폭에서 왼쪽에 붙으면 오른쪽이 휑하다 */
@@ -6090,6 +6104,25 @@
           display: flex;
           flex-direction: column;
           justify-content: space-evenly;
+        }
+        /*
+          **전체 화면에서는 안의 것도 같이 자란다** (사용자가 정했다: "레벨 부분, 자동차 사진 부분, AI 안전운전 연습
+          버튼 부분도 같이 커져서 자연스럽게"). 화면 높이(dvh — 주소창이 걷히면 커진다)에 비례하되, 주소창이 있을
+          때의 값(px)보다 작아지지는 않는다(max). 기준은 높이 700px 남짓의 세로 화면 — 그때가 지금 값이고, 전체
+          화면(780~915px)에서 11~30% 자란다. 남는 높이는 위의 space-evenly 가 고르게 나눈다.
+        */
+        #screen-menu .player.lg .level-badge-wrap {
+          width: max(76px, 10.9dvh);
+          height: max(76px, 10.9dvh);
+        }
+        #screen-menu .player.lg .player-name {
+          font-size: max(21px, 3dvh);
+        }
+        #screen-menu .player.lg .player-xp b {
+          font-size: max(20px, 2.85dvh);
+        }
+        #screen-menu .ai-car-photo {
+          max-width: max(200px, 28.5dvh);
         }
         #screen-menu .site-stats {
           margin-bottom: 6px;

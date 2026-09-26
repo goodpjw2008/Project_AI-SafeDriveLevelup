@@ -818,9 +818,10 @@ export class Screens {
         <!--
           **전체 화면 (휴대폰만)** — 브라우저의 주소창이 작은 화면을 더 좁힌다. 누르면 전체 화면으로,
           전체 화면에서는 같은 자리의 버튼이 '주소창 보기' 가 된다 (main.ts 의 toggleFullscreen · 주행 HUD 에도 하나 있다).
-          PC 와 전체 화면을 못 쓰는 브라우저에서는 CSS 가 감춘다 (.fs-toggle).
+          PC 와 전체 화면을 못 쓰는 브라우저에서는 CSS 가 감춘다 (.fs-toggle). 바탕은 우회전 · 어린이보호구역과
+          같다(ghost 아님) — 설정 톱니만 흐린 바탕을 지킨다 (사용자가 정했다).
         -->
-        <button class="icon ghost fs-toggle" id="btn-fullscreen" title="전체 화면" aria-label="전체 화면">${icon(
+        <button class="icon fs-toggle" id="btn-fullscreen" title="전체 화면" aria-label="전체 화면">${icon(
           'fullscreen',
         )}</button>
         <!--

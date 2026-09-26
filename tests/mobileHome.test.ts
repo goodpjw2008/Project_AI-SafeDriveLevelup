@@ -73,7 +73,8 @@ describe('세로 휴대폰의 첫 화면', () => {
   */
   it('차 그림과 온라인 연습은 남긴다', () => {
     const block = rulesOnly();
-    expect(block).not.toContain('.ai-car');
+    // 차 그림을 **감추는** 규칙이 없어야 한다 — 전체 화면에서 키우는 규칙(max-width)은 남기는 쪽이라 괜찮다
+    expect(block).not.toMatch(/\.ai-car[^{]*\{[^}]*display:\s*none/);
     expect(block).not.toContain('nth-child(1)');
   });
 
@@ -152,7 +153,11 @@ describe('세로 휴대폰의 첫 화면', () => {
       바로 그 일이라(제목을 한 줄에 세운다) 함께 재면 늘 걸린다.
     */
     const homeRules = [...block.matchAll(/#screen-menu[^{]*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
-    expect(homeRules).not.toContain('font-size');
+    /*
+      고정 px 로 적은 글자 크기가 없어야 한다. 전체 화면에서 **키우는** 규칙(`font-size: max(21px, 3dvh)` — 주소창이
+      있을 때보다 작아지지 않는다)은 깎는 것이 아니라 허용한다.
+    */
+    expect(homeRules).not.toMatch(/font-size:\s*[0-9]/);
     expect(homeRules).not.toContain('transform: scale');
   });
 
