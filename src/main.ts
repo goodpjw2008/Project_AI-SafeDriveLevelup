@@ -625,7 +625,7 @@ const controls = new Controls(canvas, {
   onToggleView: () => {
     if (!isHandheld()) game?.cycleView();
   },
-  // 깜빡이는 판을 시작할 때 저절로 켜진다 — 키보드(Q)로만 끄고 켤 수 있고, 휴대폰에는 버튼을 두지 않는다
+  // 깜빡이는 판을 시작할 때 저절로 켜지고 끄는 조작이 없다 — 휴대폰으로 하는 게임이라 변수에서 뺐다 (사용자 결정 2026-09-27)
   onToggleSignal: () => void audio.resume(),
   onRestart: () => {
     if (seatPreview) return; // 좌석 맞추기 중에는 R 이 '기본 자리로'다
@@ -1935,6 +1935,24 @@ function boot(): void {
     빈 전시관이나 남의 결과 화면이 뜬다.
   */
   nav.reset({ name: 'menu', enter: renderMenu });
+
+  /*
+    **검증용 — 주소의 `?ai=번호` 로 그 판을 자율 주행으로 바로 달린다** (예 `?ai=M02601` · `?ai=110005203020`).
+    판의 사람 · 앞차 움직임을 고친 뒤 브라우저에서도 시뮬레이터와 같은지 볼 때 쓴다 — 오프라인 교육은 정해진 열 판만 돌아
+    다른 판을 자율 주행으로 볼 길이 없었다 (2026-09-27, 빗길 앞차 뒤 뛰어드는 사람의 방아쇠를 고치며). 오프라인 교육과 같은
+    길을 타되 한 판만 달리고, 끝나면 그 안내창으로 첫 화면에 돌아온다. 저장본에는 여느 자율 주행처럼 남는다.
+  */
+  const aiParam = new URLSearchParams(location.search).get('ai');
+  if (aiParam) {
+    const id = Number(aiParam);
+    const spec = scenarioByCode(aiParam) ?? (Number.isInteger(id) ? (libraryEntry(id)?.spec ?? zoneCourse(id)) : undefined);
+    if (spec) {
+      aiDriving = true;
+      aiCourse = false;
+      demoQueue = [spec.id];
+      goRun(spec.id);
+    }
+  }
 }
 
 /**

@@ -57,6 +57,7 @@ import {
   type WorldSample,
 } from '../rules/lawRules';
 import type { DrivePace } from './challenge';
+import { afterLeadBrake, paceFor, seenPedestrians } from './conditions';
 import {
   JAM_CLEAR_SECONDS,
   SCHOOL_ZONE_PROGRAM,
@@ -258,7 +259,8 @@ const word = (v: string | null | undefined): string => (v == null ? '없음' : (
 export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult {
   const persona = opts.persona;
   const reaction = persona === 'human' ? (opts.reaction ?? 1.0) : 0;
-  const pace = opts.pace ?? DEFAULT_PACE;
+  // 환경이 물리를 바꾼다 — 빗길은 브레이크가 무르고, 밤에는 보행자가 가까이 와서야 보인다 (scenarios/conditions.ts)
+  const pace = paceFor(opts.pace ?? DEFAULT_PACE, spec.weather);
   const traceOn = opts.trace ?? true;
   const events: PlayEvent[] = [];
   const log = (t: number, kind: PlayEvent['kind'], text: string): void => {
@@ -398,7 +400,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       pedSignal,
       approachZone: spec.approachSchoolZone ? { light: zone?.vehicle ?? null } : null,
       zoneLights,
-      pedestrians: walkers.map((w) => w.sample()),
+      pedestrians: seenPedestrians(walkers.map((w) => w.sample()), front, spec.timeOfDay),
       exitBlocked,
       lead: lead && !lead.gone ? { gap: lead.gapFrom(front.x, front.z), speedKmh: lead.speedKmh } : null,
     };
@@ -463,6 +465,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       w.update(t, DT, pedSignal[w.crosswalk], f, carMoving, busy, {
         leadInWay: lead?.inWayOf(w.crosswalk) ?? false,
         carSpeedMs: vehicle.speedKmh / 3.6,
+        brakeDecel: afterLeadBrake(spec.weather),
       });
       const s = w.sample();
       const sum = summaries[i];

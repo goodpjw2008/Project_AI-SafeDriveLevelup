@@ -372,13 +372,17 @@ describe('난이도 설정', () => {
     expect(normal).toBeLessThan(hard);
   });
 
+  /*
+    L7 에서 잰다 — 앞차 차례가 아닌 이 계획(lead: null)은 앞차 없는 판만 받는데, 방향 축을 더한 뒤로 L6 은 전부 앞차 판이라
+    (앞차 판이 여는 레벨) L4 에서 두 레벨 위를 재면 L6 이 비어 L5 로 보인다. L7 ~ L10 에는 레벨마다 앞차 없는 판이 있다.
+  */
   it('보통은 한 레벨, 4 는 두 레벨, 5 는 세 레벨 위의 개념까지 후보에 넣는다', () => {
     const lv = (challenge: 1 | 3 | 4 | 5) =>
-      Math.max(...candidatesFor(plan({ level: 4, target: null, badHabits: [], challenge }), []).map((e) => e.level));
-    expect(lv(1)).toBe(4);
-    expect(lv(3)).toBe(5);
-    expect(lv(4)).toBe(6);
-    expect(lv(5)).toBe(7);
+      Math.max(...candidatesFor(plan({ level: 7, target: null, badHabits: [], challenge }), []).map((e) => e.level));
+    expect(lv(1)).toBe(7);
+    expect(lv(3)).toBe(8);
+    expect(lv(4)).toBe(9);
+    expect(lv(5)).toBe(10);
   });
 
   it('4 부터 주행 중 도움을 걷는다 — 보통까지는 할 일 한마디 · 느낌표 · 정지 구역 띠를 남긴다', () => {

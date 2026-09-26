@@ -44,9 +44,9 @@ describe('베이즈 지식 추적', () => {
   });
 
   it('한 판의 결과를 통째로 넣는다 — 시험한 개념마다 지킴 · 어김', () => {
-    const k = updateKnowledge({}, ['RED_NO_STOP', 'NO_TURN_SIGNAL'], ['RED_NO_STOP'], { now: 5 });
+    const k = updateKnowledge({}, ['RED_NO_STOP', 'NO_SLOW_DOWN'], ['RED_NO_STOP'], { now: 5 });
     expect(mastery(k, 'RED_NO_STOP')).toBeLessThan(0.5);
-    expect(mastery(k, 'NO_TURN_SIGNAL')).toBeGreaterThan(0.7);
+    expect(mastery(k, 'NO_SLOW_DOWN')).toBeGreaterThan(0.7);
     expect(mastery(k, 'WIDE_TURN')).toBe(BKT.L0); // 시험하지 않은 개념은 그대로
   });
 

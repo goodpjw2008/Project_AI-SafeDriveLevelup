@@ -41,7 +41,11 @@ const arg = (name: string, def: number): number => {
   return i >= 0 ? Number(args[i + 1]) : def;
 };
 const STEP = arg('step', 18);
-const EPOCHS = arg('epochs', 600);
+/*
+  2,000 회 — 600 회로는 결과 예측 모델이 덜 수렴해 숙달 0.95 인 학습자의 보행자 양보 위반 확률이 0.30 으로 나왔다(참값은 0.05 근처).
+  2,000 회면 그 값이 기준 아래로 내려오고 위험도의 무위반 AUC 도 0.983 → 0.987 로 오른다. 학습 시간은 20초쯤 더 든다 (2026-09-27).
+*/
+const EPOCHS = arg('epochs', 2000);
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../src/ai/models');
 

@@ -28,6 +28,7 @@
  * 나중에 고민하게 되고, 그 사이에 이상한 판이 사람에게 간다.
  */
 
+import { afterLeadBrake } from './conditions';
 import { LEAD_HALF_LENGTH_MAX, LEAD_HEADWAY_MAX, LEAD_HEADWAY_MIN, LeadDrive } from '../game/leadDrive';
 import { PedWalk } from '../game/pedWalk';
 import { CAR_HALF_LENGTH } from './turnPath';
@@ -427,6 +428,7 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
           w.update(t, DT, zonePedAt(t, w.crosswalk), { x: car.frontX, z: car.frontZ }, ctx.speedKmh > 0.5, busyZone, {
             leadInWay: lead?.inWayOf(w.crosswalk) ?? false,
             carSpeedMs: ctx.speedKmh / 3.6,
+            brakeDecel: afterLeadBrake(spec.weather),
           });
           return { ...w.sample(), id: i };
         }
@@ -445,6 +447,7 @@ function toWorld(spec: ScenarioSpec, peds: PedSpawn[]): WorldConfig {
         w.update(t, DT, signal, { x: car.frontX, z: car.frontZ }, ctx.speedKmh > 0.5, busy, {
           leadInWay: lead?.inWayOf(w.crosswalk) ?? false,
           carSpeedMs: ctx.speedKmh / 3.6,
+          brakeDecel: afterLeadBrake(spec.weather),
         });
         return { ...w.sample(), id: i };
       });

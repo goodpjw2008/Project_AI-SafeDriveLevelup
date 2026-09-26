@@ -41,9 +41,9 @@ describe('학습자 모델과 진급', () => {
   });
 
   it('수동 주행도 숙달을 배운다 — 레벨은 그대로', () => {
-    const s = recordHabits(freshCurriculum(), run(['RED_NO_STOP']), new Set(['RED_NO_STOP', 'NO_TURN_SIGNAL']), { now: 3 });
+    const s = recordHabits(freshCurriculum(), run(['RED_NO_STOP']), new Set(['RED_NO_STOP', 'NO_SLOW_DOWN']), { now: 3 });
     expect(mastery(s.skills ?? {}, 'RED_NO_STOP')).toBeLessThan(0.5);
-    expect(mastery(s.skills ?? {}, 'NO_TURN_SIGNAL')).toBeGreaterThan(0.7);
+    expect(mastery(s.skills ?? {}, 'NO_SLOW_DOWN')).toBeGreaterThan(0.7);
     expect(s.level).toBe(1);
     expect(s.runs).toBe(0);
   });

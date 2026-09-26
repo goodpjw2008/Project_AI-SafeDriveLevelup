@@ -57,14 +57,16 @@ export const MASTERY_GATE = 0.7;
 /** 위험도가 관측을 누그러뜨리는 최대치 — 위험해도 위반은 아니었으므로 반보다 조금 넘게만 */
 const RISK_BLEND_MAX = 0.6;
 
-/** 화면과 프롬프트가 쓰는 개념 순서 — 레이더 차트의 축이기도 하다 */
+/**
+ * 화면과 프롬프트가 쓰는 개념 순서 — 레이더 차트의 축이기도 하다.
+ * 방향지시등(NO_TURN_SIGNAL)은 없다 — 판을 시작하면 저절로 켜져 끌 수 없으므로 배울 것이 없다 (game/Controls.ts).
+ */
 export const SKILL_ORDER: readonly ViolationCode[] = [
   'RED_NO_STOP',
   'PEDESTRIAN_BLOCKED',
   'SCHOOL_ZONE_NO_STOP',
   'OVER_STOP_LINE',
   'NO_SLOW_DOWN',
-  'NO_TURN_SIGNAL',
   'BIKE_BLOCKED',
   'BLOCKING_INTERSECTION',
   'SCHOOL_ZONE_RED',
