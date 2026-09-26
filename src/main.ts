@@ -65,6 +65,10 @@ import {
   type RecentRun,
 } from './scenarios/recommend';
 import { advance, currentTarget, levelLabel, recordHabits, xpToNext } from './scenarios/curriculum';
+import { abilityPriorFor, difficultyOf } from './ai/difficulty';
+import { riskOf } from './ai/risk';
+import { modelStep } from './ai/report';
+import { costOf } from './scenarios/difficulty';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
 import { Screens, type AiTrainingState, type CourseStep } from './ui/Screens';
@@ -246,6 +250,9 @@ async function makeAiScenario(): Promise<void> {
     xpNeed: xpToNext(c.level, challengeRule(saveData.settings.difficulty)),
     cleanStreak: c.cleanStreak,
     missStreak: c.missStreak,
+    // 학습자 모델 · 능력 (ai/knowledge.ts · ai/difficulty.ts) — 후보 점수와 AI 프롬프트가 읽는다
+    skills: c.skills ?? {},
+    ability: c.ability ?? abilityPriorFor(c.level),
   };
   /*
     **AI 가 시나리오 라이브러리에서 고른다** (scenarios/recommend.ts).
@@ -263,7 +270,8 @@ async function makeAiScenario(): Promise<void> {
   */
   if (c.mastered) {
     const recentIds = [...saveData.history.map((r) => r.st), ...aiTraining.made.map((s) => s.id)];
-    const pick = masterPick(recentIds);
+    // 마스터 운행 — 학습자 모델이 가장 옅어진 개념을 시험하는 코스에서 고른다 (recommend.ts)
+    const pick = masterPick(recentIds, Math.random, c.skills);
     aiTraining.busy = false;
     aiTraining.made.push(pick.scenario);
     aiCourse = true;
@@ -332,6 +340,7 @@ async function makeAiScenario(): Promise<void> {
       model: rec.model,
       habit: rec.habit ? habitTitle(rec.habit) : undefined,
       habitByAi: rec.habitBy === 'ai',
+      success: rec.scenario.success,
     });
     outcome = { scenario: rec.scenario, tries: 1, rejected: [], reason: 'ok' };
   } catch (e) {
@@ -1347,6 +1356,7 @@ async function startRun(id: number): Promise<void> {
         focus: rec.focus,
         picker: rec.picker as Picker | undefined,
         model: rec.pickerModel,
+        success: rec.success,
       });
     }
   } else {
@@ -1565,7 +1575,16 @@ function finishRun(result: JudgeResult): void {
     sc: result.stats.stopBeforeC,
     sp: result.stats.maxSpeedInIntersection,
     sg: result.stats.signalAt30m,
+    // 주행 결과 데이터 — 요약 한 줄 (ai/telemetry.ts). 학습자 모델 · 위험도 모델 · AI 코치의 재료다
+    f: result.features,
   });
+  /*
+    **모델에 넣을 값** — 이 판의 위험도(ai/risk.ts, 무위반이어도 아슬아슬했으면 높다), 난이도(ai/difficulty.ts), 시각(망각 모델).
+    시험한 개념은 습관과 같은 표(library.ts 의 habitsTestedBy)다.
+  */
+  const tested = habitsTestedBy(sc);
+  const risk = result.features ? riskOf(result.features) : undefined;
+  const now = Date.now();
 
   /*
     **AI 주행이면 여기서 단계가 움직인다.**
@@ -1589,7 +1608,13 @@ function finishRun(result: JudgeResult): void {
     // 이 판이 무엇을 시험했는가 — 습관은 시험한 판에서만 '고쳤다' 고 센다 (library.ts)
     // 몇 판을 이어야 오르고 몇 번 틀리면 내려가는가 — 난이도 설정이 정한다 (challenge.ts)
     const rule = challengeRule(saveData.settings.difficulty);
-    const { next, change, xp } = advance(before, result, habitsTestedBy(sc), rule, { replay: clearedBefore });
+    const { next, change, xp } = advance(before, result, tested, rule, {
+      replay: clearedBefore,
+      risk,
+      now,
+      difficulty: difficultyOf({ spec: sc, targets: [...tested], cost: costOf(sc).total }),
+      abilityPrior: abilityPriorFor(before.level),
+    });
     // 이 판으로 마스터가 됐다 — 결과 화면 위에 엔딩을 띄운다 (showEnding)
     justMastered = !before.mastered && next.mastered;
     saveData.curriculum = next;
@@ -1604,6 +1629,8 @@ function finishRun(result: JudgeResult): void {
       habits: next.badHabits,
       change,
       unlockedCar: null,
+      // 학습자 모델이 이 판으로 어떻게 움직였는가 · 위험했던 순간 · 반사실 (ai/report.ts) — 결과 화면이 보여 준다
+      model: modelStep(before.skills ?? {}, next.skills ?? {}, tested, result),
     };
 
     /*
@@ -1632,7 +1659,7 @@ function finishRun(result: JudgeResult): void {
     }
   } else {
     // 수동 주행 — 레벨·판 수는 그대로 두고 습관 기록만 갱신한다
-    saveData.curriculum = recordHabits(saveData.curriculum, result, habitsTestedBy(sc));
+    saveData.curriculum = recordHabits(saveData.curriculum, result, tested, { risk, now });
     aiTraining.curriculum = saveData.curriculum;
   }
 

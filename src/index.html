@@ -718,6 +718,122 @@
         뒤 화면이 비쳐 어디서 열었는지가 보여야 하지만 확인 창은 "답할 것이 하나뿐인 곳"
         이라 다른 데로 눈이 가면 안 되기 때문이다.
       */
+      /*
+        ── AI 학습자 모델 (ui/skillRadar.ts · Screens.skillCard · Screens.modelCard) ──
+        첫 화면의 습관 칸 아래 레이더, 결과 화면의 AI 평가 아래 '이 판으로 움직인 것'. 약한 개념(70% 미만)은 붉게.
+      */
+      .skill-card,
+      .model-card {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .skill-title,
+      .model-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 800;
+        font-size: 14px;
+      }
+      .skill-sub {
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .skill-body {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 18px;
+        margin-top: 6px;
+      }
+      .skill-radar {
+        width: min(360px, 100%);
+        height: auto;
+        flex: 0 0 auto;
+      }
+      .radar-ring {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.12);
+        stroke-width: 1;
+      }
+      .radar-ring.gate {
+        stroke: rgba(255, 214, 10, 0.35);
+        stroke-dasharray: 3 3;
+      }
+      .radar-spoke {
+        stroke: rgba(255, 255, 255, 0.08);
+        stroke-width: 1;
+      }
+      .radar-area {
+        fill: rgba(46, 224, 106, 0.22);
+        stroke: var(--green);
+        stroke-width: 2;
+        stroke-linejoin: round;
+      }
+      .radar-dot {
+        fill: var(--green);
+      }
+      .radar-dot.weak {
+        fill: #ff5c5c;
+      }
+      .radar-label {
+        fill: var(--muted);
+        font-size: 9.5px;
+        font-weight: 700;
+      }
+      .radar-label.weak {
+        fill: #ff8a8a;
+      }
+      .skill-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .skill-list span,
+      .skill-move {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .skill-list span.weak {
+        color: #ff8a8a;
+      }
+      .skill-note {
+        flex: 1 1 200px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .model-moves {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .skill-move.up b {
+        color: var(--green);
+      }
+      .skill-move.down b {
+        color: #ff8a8a;
+      }
+      .model-lines {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--text);
+      }
+      .ai-pick-success {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
       .modal {
         position: fixed;
         inset: 0;
@@ -6969,6 +7085,7 @@
           <p class="ai-pick-habit" id="ai-pick-habit" hidden></p>
           <p class="ai-pick-why"><b>추천 사유</b> : <span id="ai-pick-why"></span></p>
           <p class="ai-pick-focus" id="ai-pick-focus"></p>
+          <p class="ai-pick-success" id="ai-pick-success" hidden></p>
           <p class="ai-pick-status" id="ai-pick-statusbox">
             <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span
             ><span id="ai-pick-status"></span>

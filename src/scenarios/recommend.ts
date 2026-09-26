@@ -46,6 +46,9 @@ import {
 import { inTrack } from './tracks';
 import { zoneEntries } from './zoneCourse';
 import { challengeRule } from './challenge';
+import { difficultyOf, successProbability } from '../ai/difficulty';
+import { reviewDue } from '../ai/forgetting';
+import { SKILL_ORDER, SKILL_SHORT, effectiveMastery, wasTested, weakSkills, type Knowledge } from '../ai/knowledge';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
@@ -118,6 +121,17 @@ const axisValue = (e: LibraryEntry, axis: string): string =>
 
 /** 모양을 세는 구간 — 최근 이만큼의 판을 본다 (판 번호를 피하는 `RECENT_EXCLUDE` 와는 다른 자다) */
 const REPEAT_WINDOW = 10;
+
+/**
+ * **근접 발달 영역** — 예상 성공률이 이 값에 가까울수록 좋게 친다 (ai/difficulty.ts). 열에 일곱쯤 통과하는 판이
+ * 배우기에 맞다는 교육학의 경험칙이다. 폭(ZPD_WIDTH) 밖이면 보너스가 없다. 크기(ZPD_GAIN)는 '이 레벨의 판' 보너스(3)와
+ * 같은 급 — 레벨 안에서 판을 가르되 레벨 밖의 판을 끌어오지는 않게.
+ */
+export const ZPD_TARGET = 0.68;
+export const ZPD_WIDTH = 0.32;
+export const ZPD_GAIN = 2.5;
+/** 약한 개념을 시험하는 판의 보너스 — 실효 숙달이 0 이면 이만큼, 1 이면 0 */
+export const SKILL_GAIN = 2.0;
 
 /**
  * **'두 번째 횡단보도에 사람 없음' 은 두 배로 깎는다.**
@@ -721,6 +735,23 @@ function scoreOf(
   */
   if (e.tags.a !== 'none' || e.tags.c !== 'none') s += 2;
   /*
+    **학습자 모델 · 난이도 모델** (ai/knowledge.ts · ai/difficulty.ts).
+
+    - **근접 발달 영역**: 예상 성공률이 ZPD_TARGET 근처인 판을 좋게 친다 — 너무 쉬우면 배울 게 없고 너무 어려우면
+      함정이다. 성공률은 학습자의 능력 θ 와 판의 난이도 b 로 센다.
+    - **약한 개념**: 이 판이 시험하는 개념 가운데 실효 숙달(숙달 × 회상)이 낮은 것이 있으면 그만큼 더 좋게 친다 —
+      고칠 습관이 없어도 모델이 아직 확신하지 못하는 개념을 먼저 다시 만나게.
+  */
+  if (plan.ability !== undefined) {
+    const p = successProbability(plan.ability, difficultyOf(e));
+    s += ZPD_GAIN * Math.max(0, 1 - Math.abs(p - ZPD_TARGET) / ZPD_WIDTH);
+  }
+  if (plan.skills) {
+    const k = plan.skills;
+    const gap = Math.max(0, ...e.targets.map((c) => (wasTested(k, c) ? 1 - effectiveMastery(k, c) : 0)));
+    s += SKILL_GAIN * gap;
+  }
+  /*
     **이 레벨에서 아직 안 겪어 본 것을 좋게 친다** (위 NEW_BONUS).
 
     되풀이 감점은 최근 10판만 보므로 "열한 판 전에 겪은 값" 을 다시 안 주는 데 그친다 — **한 번도 안
@@ -869,6 +900,18 @@ export function recommendPayload(
     // **먼저 고칠 습관을 AI 가 정하는 판인가** — 습관마다 후보를 따로 추렸을 때만
     priority,
     /*
+      **학습자 모델의 수치** (ai/knowledge.ts · ai/forgetting.ts) — 개념별 실효 숙달 가운데 시험된 것과, 기억이 옅어져 복습이
+      필요한 것. 모델은 이것을 근거로 고르고 이유에 숫자를 쓴다. 시험된 적 없는 개념은 보내지 않는다 — 모르는 것을 약하다고
+      말하면 거짓이다.
+    */
+    mastery: plan.skills
+      ? SKILL_ORDER.filter((c) => wasTested(plan.skills!, c)).map((code) => ({
+          code,
+          p: Math.round(effectiveMastery(plan.skills!, code) * 100),
+        }))
+      : [],
+    review: plan.skills ? reviewDue(plan.skills).map((r) => r.code) : [],
+    /*
       **후보마다 구조화된 메타를 함께 보낸다.** 예전에는 제목 · 시험 · 레벨 셋뿐이라, 모델이 코스에 대해
       아는 모든 것이 한국어 제목 문자열 안에 압축돼 있었다 — 그래서 시스템 프롬프트가 40줄 중 17줄을
       "제목 읽는 법" 사전에 썼다. 제목에도 태그에도 없는 값(보행자가 오는 쪽)은 아예 알 길이 없었다.
@@ -888,8 +931,16 @@ export function recommendPayload(
       sideC: sideOf(e.spec, 'C'),
       fresh: fresh[i].slice(0, 3),
       ...(priority && habitOf.has(e.spec.id) ? { habit: habitOf.get(e.spec.id) } : {}),
+      // **예상 성공률** (ai/difficulty.ts) — 학습자의 능력 대비 이 판의 난이도. 근접 발달 영역을 고르는 근거다
+      ...(plan.ability !== undefined ? { success: successPercent(plan, e) } : {}),
     })),
   };
+}
+
+/** 이 학습자가 이 판을 통과할 예상 확률 (0~100). 능력이 없으면 undefined */
+export function successPercent(plan: Pick<Plan, 'ability'>, e: LibraryEntry): number | undefined {
+  if (plan.ability === undefined) return undefined;
+  return Math.round(successProbability(plan.ability, difficultyOf(e)) * 100);
 }
 
 // ── 전체 ────────────────────────────────────────────────────────────────────
@@ -947,6 +998,7 @@ export async function recommendScenario(
         'ai',
         answer.picker,
         answer.model,
+        successPercent(plan, chosen),
       ),
       source: 'ai',
       picker: answer.picker,
@@ -959,7 +1011,7 @@ export async function recommendScenario(
   // 한도를 다 써서 코드가 고른 판은 그렇게 말한다 (위 Picker 주석)
   const why: Picker = reply === 'quota' ? 'quota' : 'rule';
   return {
-    scenario: toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why),
+    scenario: toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why, undefined, successPercent(plan, entry)),
     source: 'rule',
     picker: why,
     // AI 가 답하지 않았다 — 코드가 고른 코스의 묶음 습관 (rulePick 은 가장 많이 한 습관의 코스를 좋게 친다)
@@ -975,13 +1027,28 @@ export async function recommendScenario(
  * 계속 돌아가게 해 줘" 라고 했다. 마스터에게는 고칠 습관도 오를 레벨도 없으므로 AI 에게 고르게 하지 않고, L10 코스
  * 전체에서 **고르게 무작위로** 뽑는다(최근에 탄 판은 뺀다 — 같은 판이 곧바로 다시 나오지 않게).
  */
-export function masterPick(recentIds: readonly number[], random: () => number = Math.random): RecommendOutcome {
+export function masterPick(
+  recentIds: readonly number[],
+  random: () => number = Math.random,
+  /** 학습자 모델 (ai/knowledge.ts) — 있으면 **기억이 가장 옅어진 개념**을 시험하는 코스에서 고른다 */
+  skills?: Knowledge,
+  now = Date.now(),
+): RecommendOutcome {
   const pool = scenarioLibrary().filter((e) => e.level === MAX_LEVEL);
   const recent = new Set(recentIds.slice(-RECENT_EXCLUDE));
   const fresh = pool.filter((e) => !recent.has(e.spec.id));
-  const from = fresh.length ? fresh : pool;
+  /*
+    **마스터 운행도 모델이 고른다** — 무작위 대신, 실효 숙달(숙달 × 회상 확률)이 가장 낮은 개념을 시험하는 코스.
+    마스터는 고칠 습관이 없으므로 남은 것은 **잊지 않게 하는 것**이다 (ai/forgetting.ts). 시험된 개념이 없으면 무작위다.
+  */
+  const weakest = skills ? weakSkills(skills, now, 1)[0] : undefined;
+  const targeted = weakest ? fresh.filter((e) => e.targets.includes(weakest.code)) : [];
+  const from = targeted.length ? targeted : fresh.length ? fresh : pool;
   const entry = from[Math.min(from.length - 1, Math.floor(random() * from.length))];
-  const why = `안전운전 마스터 — ${levelLabel(MAX_LEVEL)} 코스 ${pool.length.toLocaleString()}개 중에서 무작위로 골랐습니다.`;
+  const why =
+    weakest && targeted.length
+      ? `안전운전 마스터 — 학습자 모델이 가장 옅어진 개념 '${SKILL_SHORT[weakest.code]}'(실효 숙달 ${Math.round(weakest.p * 100)}%)을 다시 시험하는 ${levelLabel(MAX_LEVEL)} 코스입니다.`
+      : `안전운전 마스터 — ${levelLabel(MAX_LEVEL)} 코스 ${pool.length.toLocaleString()}개 중에서 무작위로 골랐습니다.`;
   return {
     scenario: toScenario(entry, MAX_LEVEL, why, '처음부터 다시 시작하기 전까지 마스터 운행이 이어집니다', 'rule', 'random'),
     source: 'rule',
@@ -999,6 +1066,7 @@ function toScenario(
   source: 'ai' | 'rule',
   picker: Picker,
   model?: string,
+  success?: number,
 ): GeneratedScenario {
   return {
     ...structuredClone(e.spec),
@@ -1010,6 +1078,7 @@ function toScenario(
     picker,
     ...(model ? { pickerModel: model } : {}),
     ...(focus ? { focus } : {}),
+    ...(success !== undefined ? { success } : {}),
   };
 }
 

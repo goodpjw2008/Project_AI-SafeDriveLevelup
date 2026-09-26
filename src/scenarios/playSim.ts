@@ -24,6 +24,7 @@
  * - 보행자와의 충돌은 차체 사각형과 보행자 위치로 잰다 (게임과 같은 식). 앞차와의 추돌은 경로상 간격으로 잰다.
  */
 
+import { RunTelemetry } from '../ai/telemetry';
 import { AutoDriver, type AutoDriveState } from '../game/AutoDriver';
 import { LeadDrive } from '../game/leadDrive';
 import { CURB, PedWalk } from '../game/pedWalk';
@@ -107,6 +108,8 @@ export interface PlayOptions {
   chanceAppears?: boolean;
   /** 타임라인을 남기는가. 기본 true */
   trace?: boolean;
+  /** 주행 결과 데이터(ai/telemetry.ts)를 함께 만드는가 — 위험도 · 난이도 모델 학습(scripts/train-ai.ts)이 켠다. 기본 false */
+  telemetry?: boolean;
 }
 
 /** 타임라인 한 줄 */
@@ -287,6 +290,8 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
   /** 곧게 가는 코스인가 — 교차로 직진 통과와 사거리 없는 보호구역 도로 */
   const goesStraight = drive !== 'rightTurn';
   const judge = new RightTurnJudge(opts.stopZone ?? STOP_ZONE_DEPTH, drive);
+  // 게임(Game.ts)과 같은 요약 — 위험도 모델은 여기서 만든 숫자로 학습하고 실제 판의 숫자로 예측한다
+  const tele = opts.telemetry ? new RunTelemetry(drive, spec.approachSchoolZone !== undefined) : null;
 
   const summaries: PedSummary[] = spawns.map((p, i) => ({
     label: labels[i],
@@ -544,6 +549,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       queuedBehind: lead?.queuesAhead(f.x, f.z) ?? false,
     };
     judge.update(sample, DT);
+    tele?.update(sample, DT, input.stop);
 
     // ── 충돌 · 끝 ── (Game.checkCollisions · checkEnd)
     walkers.forEach((w, i) => {
@@ -608,6 +614,7 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
   finishStop(t);
 
   const result = judge.finish();
+  if (tele) result.features = tele.finish(result);
   if (traceOn) {
     for (const e of result.log) events.push({ t: e.t, kind: 'judge', text: `[${e.level}] ${e.text}` });
     events.sort((a, b) => a.t - b.t);

@@ -8,6 +8,7 @@
  * 판정 근거는 전부 src/rules/lawCitations.ts 의 조문 원문과 1:1로 대응된다.
  */
 
+import type { RunFeatures } from '../ai/telemetry';
 import {
   CROSSWALK_B_INNER,
   CROSSWALK_B_OUTER,
@@ -343,6 +344,11 @@ export interface JudgeResult {
    * 읽는 자리다.
    */
   lead?: LeadReport;
+  /**
+   * **주행 결과 데이터** — 이 판의 요약 한 줄 (ai/telemetry.ts). 판정 엔진이 채우지 않는다 — 게임(Game.end)과
+   * 시뮬레이터(playSim)가 판이 끝날 때 붙인다. 학습자 모델 · 위험도 모델 · AI 코치가 읽는다.
+   */
+  features?: RunFeatures;
 }
 
 export interface LeadReport {

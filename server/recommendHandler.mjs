@@ -25,6 +25,9 @@ const LIMIT = {
   outputTokens: 300,
   why: 200,
   focus: 100,
+  /** 학습자 모델의 개념 수 · 복습 개념 수 */
+  mastery: 12,
+  review: 6,
 };
 
 const CODES = [
@@ -85,6 +88,8 @@ export function sanitize(body) {
     fresh: (Array.isArray(c?.fresh) ? c.fresh : []).filter((v) => COVER_AXES.includes(v)).slice(0, LIMIT.fresh),
     // 이 후보가 **어느 습관을 고치려고 추린 것인가** (src/scenarios/recommend.ts 의 coursesByHabit)
     habit: c?.habit == null ? null : oneOf(c.habit, CODES, 'courses.habit'),
+    // **예상 성공률** 0~100 (src/ai/difficulty.ts) — 없으면 null (난이도 모델을 못 쓴 판)
+    success: c?.success == null ? null : Math.min(100, Math.max(0, Math.round(num(c.success, 'courses.success')))),
   }));
   if (!courses.length) throw new BadInput('courses: 후보가 없음');
 
@@ -138,6 +143,14 @@ export function sanitize(body) {
       schoolZone: Boolean(turn.schoolZone),
       lead: turn.lead == null ? null : oneOf(turn.lead, LEAD_TURNS, 'turn.lead'),
     },
+    /*
+      **학습자 모델** (src/ai/knowledge.ts) — 개념별 실효 숙달(0~100)과 복습이 필요한 개념. 모델이 이유에 숫자를 쓰는 근거다.
+    */
+    mastery: (Array.isArray(body.mastery) ? body.mastery : []).slice(0, LIMIT.mastery).map((m) => ({
+      code: oneOf(m?.code, CODES, 'mastery.code'),
+      p: Math.min(100, Math.max(0, Math.round(num(m?.p, 'mastery.p')))),
+    })),
+    review: (Array.isArray(body.review) ? body.review : []).filter((v) => CODES.includes(v)).slice(0, LIMIT.review),
     // 먼저 고칠 습관을 정하지 않는 판에서는 묶음 표시를 지운다 — 모델이 쓰지도 않는 코드가 줄마다 붙지 않게
     courses: priority ? courses : courses.map((c) => ({ ...c, habit: null })),
   };

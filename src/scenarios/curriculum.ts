@@ -31,6 +31,8 @@ import {
 } from '../coach/badHabits';
 import type { ViolationCode } from '../rules/violations';
 import type { JudgeResult } from '../rules/lawRules';
+import { heldBy, SKILL_ORDER, updateKnowledge, type Knowledge } from '../ai/knowledge';
+import { updateAbility } from '../ai/difficulty';
 import type { ScenarioSpec } from './scenarios';
 import {
   checkBudget,
@@ -149,6 +151,8 @@ export interface XpStep {
   leveledUp: boolean;
   /** 막대는 찼는데 나쁜 습관이 남아 오르지 못했는가 */
   heldByHabits: boolean;
+  /** 막대도 찼고 습관도 없는데 **학습자 모델이 아직 확신하지 못하는 개념** 때문에 오르지 못했는가 — 그 개념들 (ai/knowledge.ts) */
+  heldByModel: ViolationCode[];
   /** 이미 통과한 맵을 다시 통과해 절반(XP_REPLAY)만 받았는가 */
   replay: boolean;
 }
@@ -344,6 +348,13 @@ export interface CurriculumState {
    * 일이 아니고, 차를 잃지 않으려고 쉬운 판만 고르게 만들 이유도 없다.
    */
   bestLevel: Difficulty;
+  /**
+   * **학습자 모델** — 개념마다 익혔을 확률 (ai/knowledge.ts 의 BKT). 판마다 시험한 개념의 관측으로 갱신된다.
+   * 옛 저장본에는 없다 — 없으면 빈 것으로 본다.
+   */
+  skills?: Knowledge;
+  /** **능력 θ** — 난이도 모델(ai/difficulty.ts)의 Elo 값. 없으면 그 레벨의 평균 난이도에서 시작한다 (main.ts) */
+  ability?: number;
 }
 
 export const freshCurriculum = (): CurriculumState => ({
@@ -354,6 +365,7 @@ export const freshCurriculum = (): CurriculumState => ({
   missStreak: 0,
   badHabits: [],
   mastered: false,
+  skills: {},
   /*
     **차는 시작 레벨을 따라오지 않는다.** 5레벨에서 시작하는 것은 주어진 자리이지 얻은
     자리가 아니므로, 여기서 5로 두면 아무것도 안 하고 다섯 대가 열린다. 1에서 시작해
@@ -388,7 +400,7 @@ export function advance(
   /** 경험치 규칙 — 난이도 설정이 정한다 (challenge.ts). 생략하면 보통의 곡선 · 틀려도 잃지 않음 */
   rule: ProgressRule = DEFAULT_PROGRESS,
   /** 이 맵을 이미 무위반으로 통과한 적이 있는가 — 있으면 무위반 경험치가 절반이다 (XP_REPLAY) */
-  opts: { replay?: boolean } = {},
+  opts: AdvanceOptions = {},
 ): { next: CurriculumState; change: HabitChange; xp: XpStep } {
   const clean = result.violations.length === 0 && !result.failReason;
   const runs = state.runs + 1;
@@ -400,6 +412,24 @@ export function advance(
   const codes = result.violations.map((v) => v.code as ViolationCode);
   const { habits, change } = updateHabits(state.badHabits, codes, runs, tested, result.failReason !== null);
   const habitsLeft = habits.length > 0;
+
+  /*
+    **학습자 모델의 관측** (ai/knowledge.ts) — 이 판이 시험한 개념마다 지켰는가를 넣는다. 지킨 개념도 이 판의
+    위험도(opts.risk)가 높았으면 반쯤 지킨 것으로 본다 (위반이 난 판의 나머지 개념도 같은 위험도로 본다 — 위반 하나로
+    나머지를 다 어긴 것처럼 세지 않는다). 그리고 **능력 θ** (ai/difficulty.ts) — 이 판의 난이도 대비
+    결과로 Elo 처럼 움직인다.
+  */
+  const testedCodes: readonly ViolationCode[] = tested ? [...tested] : SKILL_ORDER;
+  const skills = updateKnowledge(state.skills ?? {}, testedCodes, codes, { risk: opts.risk, now: opts.now });
+  const ability =
+    opts.difficulty === undefined
+      ? state.ability
+      : updateAbility(state.ability ?? opts.abilityPrior ?? 0, opts.difficulty, clean);
+  /*
+    **모델이 붙잡는 개념** — 이 판이 시험한 개념 가운데 익혔을 확률이 기준(MASTERY_GATE)에 못 미친 것. 한 판 지키면
+    기준을 넘으므로 습관 기준(HABIT_CLEARED_AFTER)보다 느슨하지만, **위험했던 판**은 넘지 못한다 — 그때만 한 판 더 본다.
+  */
+  const heldSkills = heldBy(skills, testedCodes);
 
   const needBefore = xpToNext(state.level, rule);
   const before = Math.min(state.xp ?? 0, needBefore);
@@ -427,11 +457,13 @@ export function advance(
     xp: filled,
     cleanStreak: clean ? state.cleanStreak + 1 : 0,
     missStreak: clean ? 0 : state.missStreak + 1,
+    skills,
+    ...(ability === undefined ? {} : { ability }),
   };
 
   const full = filled >= needBefore;
   let leveledUp = false;
-  if (full && !habitsLeft && !state.mastered) {
+  if (full && !habitsLeft && !heldSkills.length && !state.mastered) {
     leveledUp = true;
     if (state.level < MAX_LEVEL) {
       next.level = (state.level + 1) as Difficulty;
@@ -458,9 +490,24 @@ export function advance(
     need: xpToNext(next.level, rule),
     leveledUp,
     heldByHabits: full && habitsLeft,
+    heldByModel: full && !habitsLeft && !state.mastered ? heldSkills : [],
     replay,
   };
   return { next, change, xp };
+}
+
+/** `advance` 의 선택 인자 */
+export interface AdvanceOptions {
+  /** 이 맵을 이미 무위반으로 통과한 적이 있는가 — 있으면 무위반 경험치가 절반이다 (XP_REPLAY) */
+  replay?: boolean;
+  /** 이 판의 위험도 0~1 (ai/risk.ts) — 무위반이어도 높으면 학습자 모델이 반쯤 지킨 것으로 본다 */
+  risk?: number;
+  /** 지금 시각 (ms) — 망각 모델이 마지막 연습 때를 적는다 */
+  now?: number;
+  /** 이 판의 난이도 b (ai/difficulty.ts) — 주면 능력 θ 를 갱신한다 */
+  difficulty?: number;
+  /** 능력이 아직 없을 때의 처음 값 — 그 레벨의 평균 난이도 (main.ts) */
+  abilityPrior?: number;
 }
 
 /**
@@ -496,10 +543,16 @@ export function recordHabits(
   state: CurriculumState,
   result: JudgeResult,
   tested?: ReadonlySet<ViolationCode>,
+  opts: Pick<AdvanceOptions, 'risk' | 'now'> = {},
 ): CurriculumState {
   const codes = result.violations.map((v) => v.code as ViolationCode);
   const { habits } = updateHabits(state.badHabits, codes, state.runs, tested, result.failReason !== null);
-  return { ...state, badHabits: habits };
+  // 학습자 모델도 어느 판에서든 배운다 — 습관과 같은 까닭이다. 능력(레벨의 자)은 AI 과정의 판에서만 움직인다
+  const skills = updateKnowledge(state.skills ?? {}, tested ? [...tested] : SKILL_ORDER, codes, {
+    risk: opts.risk,
+    now: opts.now,
+  });
+  return { ...state, badHabits: habits, skills };
 }
 
 /**

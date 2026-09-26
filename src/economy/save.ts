@@ -3,6 +3,7 @@
  * 스키마가 바뀔 가능성이 있으므로 version을 두고, 읽을 때 기본값과 병합한다.
  */
 
+import type { RunFeatures } from '../ai/telemetry';
 import { CARS, isCarUnlocked, STARTER_CAR_ID } from './cars';
 import { SCENARIOS } from '../scenarios/scenarios';
 import type { ViewMode } from '../game/CameraRig';
@@ -99,16 +100,21 @@ export interface RunRecord {
   sp: number;
   /** 30m 전 방향지시등이 켜져 있었는가 */
   sg: boolean;
+  /**
+   * **주행 결과 데이터** — 요약 한 줄 (ai/telemetry.ts). 제동 시작 거리 · 보행자 반응 시간 · 시간 여유 같은,
+   * 위반 여부보다 앞선 숫자다. 위험도 모델과 AI 코치가 읽는다. 옛 기록에는 없다.
+   */
+  f?: RunFeatures;
 }
 
 /**
  * 남겨 두는 주행 수.
  *
- * 60판이면 8판짜리 한 바퀴를 일곱 번 넘게 담는다 — 습관을 보기에 충분하고,
- * 한 판이 100바이트 남짓이라 저장 용량에도 부담이 없다.
+ * 한때 60판이었다. 주행 결과 데이터(한 판 250바이트 남짓)가 붙으면서 120판으로 늘렸다 — 학습자 모델과 위험도 모델의
+ * 재료라 많을수록 좋고, 120판이어도 30KB 라 localStorage(5MB 안팎)에 부담이 없다.
  * 넘치면 **오래된 것부터 버린다** — 최근 습관이 지금의 습관이다.
  */
-export const HISTORY_LIMIT = 60;
+export const HISTORY_LIMIT = 120;
 
 export interface SaveData {
   version: number;

@@ -65,6 +65,9 @@ import {
 } from '../scenarios/curriculum';
 import { levelBadge, masterBadge } from './badges';
 import { playerCard } from './playerCard';
+import { skillRadar } from './skillRadar';
+import { skillProfile, weakSkills, SKILL_SHORT, type Knowledge } from '../ai/knowledge';
+import { pct, type ModelStep } from '../ai/report';
 import { badgeCollection, badgeStrip, badgeSummary } from './badgeArt';
 import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
@@ -359,6 +362,8 @@ export interface CourseStep {
    * 그때 "같은 난이도 다시" 라고 적으면 잘하고 있는 사람에게 제자리라고 말하게 된다.
    */
   clean: boolean;
+  /** 학습자 모델 · 위험도 · 반사실 — 이 판이 모델들을 어떻게 움직였는가 (ai/report.ts). 없으면 그 칸을 그리지 않는다 */
+  model?: ModelStep;
 }
 
 /** 첫 화면의 두 갈래 — AI 가 기본이다 */
@@ -1072,7 +1077,7 @@ export class Screens {
         -->
         <div class="ai-split">
           ${this.activeCarStrip(save)}
-          ${this.habitList(c.badHabits, c.level, c.mastered)}
+          ${this.habitList(c.badHabits, c.level, c.mastered, c.skills ?? {})}
         </div>
 
         <!--
@@ -1277,11 +1282,62 @@ export class Screens {
    * 제목 없는 문단 하나만 놓이면 오른쪽 칸이 무엇을 말하는 자리인지 알 수 없다 —
    * 습관이 없는 것은 이 칸의 **한 상태**이지 이 칸이 없다는 뜻이 아니다.
    */
-  private habitList(habits: BadHabit[], level: Difficulty, mastered = false): string {
+  /**
+   * **AI 학습자 모델** — 개념별 숙달 레이더 (ai/knowledge.ts · ui/skillRadar.ts). 습관 목록이 '장부' 라면 이것은 확률이다.
+   * 시험된 개념이 셋보다 적으면 그림 대신 줄로 적고, 하나도 없으면 아무것도 그리지 않는다.
+   */
+  private skillCard(skills: Knowledge): string {
+    const profile = skillProfile(skills);
+    const shown = profile.filter((a) => a.p !== null);
+    if (!shown.length) return '';
+    const weak = weakSkills(skills);
+    const radar = skillRadar(profile);
+    const list = radar
+      ? ''
+      : `<div class="skill-list">${shown.map((a) => `<span class="${(a.p ?? 1) < 0.7 ? 'weak' : ''}">${esc(a.label)} ${pct(a.p ?? 0)}</span>`).join('')}</div>`;
+    const note = weak.length
+      ? `아직 확신하지 못하는 개념: <b>${weak.map((w) => esc(SKILL_SHORT[w.code])).join(', ')}</b> — 다음 판이 다시 시험합니다.`
+      : '시험된 개념을 모두 익힌 것으로 봅니다. 위험했던 판은 반쯤 지킨 것으로 세고, 오래 안 본 개념은 다시 시험합니다.';
+    return `<div class="skill-card">
+        <div class="skill-title">${icon('guide')}AI 학습자 모델 <span class="skill-sub">개념별 숙달 · 베이즈 지식 추적</span></div>
+        <div class="skill-body">${radar}${list}<div class="skill-note">${note}</div></div>
+      </div>`;
+  }
+
+  /**
+   * **이 판이 모델을 어떻게 움직였는가** (ai/report.ts) — 결과 화면의 AI 평가 아래. 시험한 개념의 숙달 변화, 위험도,
+   * 위험했던 순간, 위반의 반사실("0.6초만 일찍 제동했으면"). 모델이 레벨업을 붙잡았으면 그 까닭도 여기서 말한다.
+   */
+  private modelCard(course: CourseStep | null): string {
+    const m = course?.model;
+    if (!m || !m.measured) return '';
+    const moves = m.skills
+      .map((s) => {
+        const dir = s.after > s.before + 0.005 ? 'up' : s.after < s.before - 0.005 ? 'down' : 'flat';
+        return `<span class="skill-move ${dir}">${esc(s.label)} ${pct(s.before)} → <b>${pct(s.after)}</b></span>`;
+      })
+      .join('');
+    const held = course?.xp.heldByModel ?? [];
+    const lines: string[] = [];
+    if (held.length) {
+      lines.push(`<b>레벨은 한 판 더 확인한 뒤 오릅니다</b> — 학습자 모델이 ${held.map((c) => esc(SKILL_SHORT[c])).join(', ')}을(를) 아직 확신하지 못합니다.`);
+    }
+    if (m.risky) lines.push(`<b>위반은 없었지만 위험했던 판입니다</b> (위험도 ${pct(m.risk)}) — 학습자 모델은 이 판을 반쯤 지킨 것으로 셉니다.`);
+    for (const n of m.notes) lines.push(esc(n));
+    for (const c of m.counterfactuals) lines.push(`<b>${esc(SKILL_SHORT[c.code])}</b> — ${esc(c.text)}`);
+    return `<div class="model-card">
+        <div class="model-title">${icon('guide')}AI 학습자 모델 <span class="skill-sub">이 판으로 움직인 것</span></div>
+        <div class="model-moves">${moves || '<span class="skill-move flat">시험한 개념 없음</span>'}</div>
+        ${lines.length ? `<ul class="model-lines">${lines.map((l) => `<li>${l}</li>`).join('')}</ul>` : ''}
+      </div>`;
+  }
+
+  private habitList(habits: BadHabit[], level: Difficulty, mastered = false, skills: Knowledge = {}): string {
     const wrap = (body: string): string => `
       <div class="ai-habits">
         <div class="ai-habits-title">${icon('clipboard')}AI 가 기록한 나쁜 운전 습관</div>
         ${body}
+        ${this.skillCard(skills)}
       </div>`;
 
     // 마스터 — 오를 레벨은 없고, L10 코스가 무작위로 이어진다 (마스터 운행). 새로 생긴 습관은 아래처럼 그대로 보인다
@@ -1873,6 +1929,7 @@ export class Screens {
             </div>`
             : ''
       }
+      ${this.modelCard(course)}
 
       <!--
         **뱃지 줄 — AI 평가 바로 아래** (ui/badgeArt.ts). 이 판에서 얻은 뱃지와 잃은 뱃지를 까닭과 함께 보여 준다. 사용자가

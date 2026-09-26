@@ -19,7 +19,8 @@
     "fix:view": "node scripts/remove-view-blockers.mjs",
     "fix:windshield": "node scripts/clear-windshield.mjs",
     "sounds": "node scripts/build-sounds.mjs",
-    "airobot": "node scripts/build-airobot.mjs"
+    "airobot": "node scripts/build-airobot.mjs",
+    "train:ai": "vite-node scripts/train-ai.ts"
   },
   "dependencies": {
     "three": "^0.169.0"

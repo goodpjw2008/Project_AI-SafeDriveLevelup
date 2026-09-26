@@ -26,6 +26,21 @@ const VIOLATION_TEXT = {
   STRAIGHT_RED: '적색에 교차로 직진 통과 (보호구역 연습편)',
 };
 
+/** 개념(=위반 코드가 지키는 규칙)의 짧은 이름 — 학습자 모델 줄에 쓴다 (src/ai/knowledge.ts 의 SKILL_SHORT 와 같다) */
+const SKILL_TEXT = {
+  RED_NO_STOP: '적색 일시정지',
+  RIGHT_ARROW_RED: '우회전 신호등',
+  PEDESTRIAN_BLOCKED: '보행자 양보',
+  BIKE_BLOCKED: '자전거 양보',
+  SCHOOL_ZONE_NO_STOP: '보호구역 정지',
+  NO_SLOW_DOWN: '교차로 서행',
+  WIDE_TURN: '우측 통행',
+  BLOCKING_INTERSECTION: '꼬리물기',
+  NO_TURN_SIGNAL: '방향지시등',
+  OVER_STOP_LINE: '정지선 준수',
+  SCHOOL_ZONE_RED: '보호구역 신호',
+  STRAIGHT_RED: '적색 직진',
+};
 export const SYSTEM_PROMPT = [
   '당신은 한국 도로교통법의 **우회전과 어린이보호구역 안전운전**을 가르치는 운전 교육 코치입니다.',
   '학습자의 운전 기록을 읽고, 검증된 훈련 코스 후보 중에서 **지금 이 사람에게 가장 필요한 코스 하나**를 고릅니다.',
@@ -39,6 +54,10 @@ export const SYSTEM_PROMPT = [
   '- `A우`·`C좌` 는 보행자가 **어느 보도에서 오는가**입니다 (우 = 내 차와 같은 쪽, 양 = 양쪽, 없 = 그 횡단보도에 사람 없음).',
   '  최근 주행과 **다른 쪽**을 섞으면 학습자가 한쪽만 보는 버릇이 생기지 않습니다.',
   '- `새:…` 는 **이 학습자가 이 레벨에서 아직 겪지 않은 것**입니다. 나쁜 습관이 없을 때는 이것이 가장 중요한 기준입니다.',
+  '- `성공N%` 는 난이도 모델이 이 학습자의 능력으로 센 **예상 성공률**입니다. 배우기에 맞는 것은 **55~80%** 입니다 —',
+  '  90% 를 넘으면 배울 것이 적고, 40% 아래는 함정입니다. 연달아 틀렸다면 높은 쪽을, 잘하고 있으면 낮은 쪽을 고릅니다.',
+  '- 학습자 모델 줄의 **약한 개념**(숙달 70% 미만)과 **복습 차례**는 습관 목록에 없어도 다시 시험할 개념입니다 —',
+  '  `시험할 위반 코드` 에 그 개념이 있는 코스를 먼저 봅니다.',
   '- 제목은 한국어로 그대로 읽으면 됩니다. "건너려는" 은 보도 끝에서 건너려고 서 있는 사람으로,',
   '  **발을 떼기 전에도 양보 대상**입니다(통행하려는 때 — 제27조 제1항). 어린이는 작고 빠르며 노인은 천천히 건넙니다.',
   '- **레벨은 화면에 적힌 대로 `Level6` 꼴로 씁니다** — 추천 이유에 `L6` 라고 적으면 학습자가 보는 말과 달라집니다.',
@@ -137,6 +156,8 @@ function courseLine(c) {
   ];
   const fresh = (c.fresh ?? []).map((k) => FRESH_TEXT[k]).filter(Boolean);
   if (fresh.length) bits.push(`새:${fresh.join(',')}`);
+  // 예상 성공률 — 난이도 모델(src/ai/difficulty.ts)이 이 학습자의 능력으로 센 값
+  if (c.success != null) bits.push(`성공${c.success}%`);
   // 먼저 고칠 습관을 정하는 판이면 **어느 습관의 묶음인지** 줄 앞에 적는다 (sanitize 가 아닌 판에서는 지운다)
   const group = c.habit ? `[${c.habit}] ` : '';
   return `- ${group}${bits.join(' ')} | ${c.title} | ${c.tests.length ? c.tests.join(',') : '기본 조작'}`;
@@ -185,6 +206,20 @@ export function buildUserPrompt(req) {
   }
   if (req.trend) {
     lines.push(`- 추이: 앞 절반 무위반율 ${Math.round(req.trend.early * 100)}% → 뒤 절반 ${Math.round(req.trend.late * 100)}%`);
+  }
+  /*
+    **학습자 모델** — 개념별 숙달(베이즈 지식 추적)과 복습 차례(망각 모델). 습관 목록이 '장부' 라면 이것은 확률이다.
+    모델은 약한 개념(70% 미만)을 시험하는 코스를 먼저 보고, 이유에 이 숫자를 쓴다.
+  */
+  if (req.mastery?.length) {
+    const weak = req.mastery.filter((m) => m.p < 70);
+    lines.push(
+      `- 학습자 모델(개념별 숙달, 낮을수록 약함): ${req.mastery.map((m) => `${SKILL_TEXT[m.code] ?? m.code} ${m.p}%`).join(' · ')}` +
+        (weak.length ? ` — **약한 개념: ${weak.map((m) => SKILL_TEXT[m.code] ?? m.code).join(', ')}**` : ''),
+    );
+  }
+  if (req.review?.length) {
+    lines.push(`- 복습 차례(기억이 옅어진 개념): ${req.review.map((c) => SKILL_TEXT[c] ?? c).join(', ')} — 이것을 시험하는 코스가 있으면 먼저 봅니다`);
   }
   lines.push('');
   lines.push('## 최근 주행 (오래된 것부터)');

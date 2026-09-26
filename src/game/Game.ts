@@ -35,6 +35,7 @@ import type {
   WorldSample,
 } from '../rules/lawRules';
 import { RightTurnJudge, ZONE_ROAD_EDGES } from '../rules/lawRules';
+import { RunTelemetry } from '../ai/telemetry';
 import { pedSignalFor } from './pedSignalFor';
 import { isSignalWait } from './stopReason';
 import {
@@ -278,6 +279,8 @@ export class Game {
   private vehicle: Vehicle;
   private carModel: CarModel;
   private judge: RightTurnJudge;
+  /** 주행 결과 데이터 — 판정과 같은 표본을 보고 요약 한 줄을 쌓는다 (ai/telemetry.ts) */
+  private telemetry: RunTelemetry;
   /** 곧게 가는 코스인가 (교차로 직진 · 사거리 없는 보호구역 도로) — 우회전과 완주선 · 의무 · 조작이 다르다 */
   private readonly straight: boolean;
   /** 정지 안내를 띄우기 시작하는 거리 — 판정의 정지 구역보다 길면 안내를 보고 선 자리가 인정되지 않는다 */
@@ -426,6 +429,7 @@ export class Game {
     */
     this.straight = scenario.drive !== undefined && scenario.drive !== 'rightTurn';
     this.judge = new RightTurnJudge(opts.stopZone, scenario.drive ?? 'rightTurn');
+    this.telemetry = new RunTelemetry(scenario.drive ?? 'rightTurn', Boolean(scenario.approachSchoolZone));
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
     // 자율 주행도 코스에 맞는 길을 따라간다 — 직진 코스면 돌지 않고 곧장 통과한다 (game/AutoDriver.ts)
@@ -1899,6 +1903,8 @@ export class Game {
       queuedBehind: this.lead?.queuesAhead(front.x, front.z) ?? false,
     };
     this.judge.update(sample, dt);
+    // 같은 표본으로 요약을 쌓는다 — 브레이크는 조작 입력(자율 주행이면 운전자의 정지 결정)이다
+    this.telemetry.update(sample, dt, input.stop);
 
     this.checkCollisions();
     this.checkEnd(front);
@@ -2071,6 +2077,7 @@ export class Game {
     this.running = false;
     this.audio.silenceEngine();
     const result = this.judge.finish();
+    result.features = this.telemetry.finish(result);
     const lead = this.leadReport;
     if (lead) result.lead = lead;
     this.audio.chime(result.grade === 'PERFECT' || result.grade === 'PASS');

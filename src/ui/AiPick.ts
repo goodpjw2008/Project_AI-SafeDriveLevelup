@@ -46,6 +46,8 @@ export interface PickResult {
   habit?: string;
   /** 그 습관을 **AI 가 정했는가** — 습관이 여럿일 때만 AI 가 정한다 (scenarios/recommend.ts 의 habitBy) */
   habitByAi?: boolean;
+  /** 난이도 모델이 센 **예상 성공률** 0~100 (ai/difficulty.ts) — 없으면 그 줄을 감춘다 */
+  success?: number;
 }
 
 export class AiPickOverlay {
@@ -171,6 +173,10 @@ export class AiPickOverlay {
     const focus = $('ai-pick-focus');
     focus.textContent = r.focus ? `👉 ${r.focus}` : '';
     focus.hidden = !r.focus;
+    // 예상 성공률 — 학습자의 능력과 판의 난이도로 센 값. 근접 발달 영역(열에 일곱쯤)을 고른 근거가 여기서 보인다
+    const success = $('ai-pick-success');
+    success.textContent = r.success !== undefined ? `AI 난이도 모델 · 예상 성공률 ${r.success}%` : '';
+    success.hidden = r.success === undefined;
     $('ai-pick-status').textContent = '맵을 준비하고 있습니다';
     // 준비 중 — 점 셋이 차례로 튄다 (index.html 의 .ai-pick-status)
     $('ai-pick-statusbox').classList.remove('go');

@@ -21,6 +21,7 @@
  * 그때는 `null` 이고, 화면은 AI 판 버튼을 감춘다 — 손으로 쓴 11개는 그대로 돌아간다.
  */
 
+import type { Knowledge } from '../ai/knowledge';
 import {
   GENERATED_ID_BASE,
   fitRightArrowStart,
@@ -84,6 +85,8 @@ export interface GeneratedScenario extends ScenarioSpec {
   pickerModel?: string;
   /** AI 가 짚어 준 **이번 판에서 볼 것** 한 줄 (추천받은 판만) */
   focus?: string;
+  /** **예상 성공률** 0~100 (ai/difficulty.ts 의 successProbability) — 난이도 모델이 있을 때만 */
+  success?: number;
 }
 
 /** 생성 과정에서 무슨 일이 있었는지 — 개발 중 확인과 화면의 안내에 쓴다 */
@@ -491,6 +494,10 @@ export interface Plan {
   noSignalZoneDue?: boolean;
   /** 난이도 설정 1~5 (challenge.ts) — 같은 레벨 안에서 얼마나 어려운 코스를 고르는가. 없으면 3 */
   challenge?: 1 | 2 | 3 | 4 | 5;
+  /** **학습자 모델** — 개념별 숙달 (ai/knowledge.ts). 추천이 약한 개념을 시험하는 판을 좋게 치고, AI 에게 근거로 보낸다 */
+  skills?: Knowledge;
+  /** **능력 θ** (ai/difficulty.ts) — 후보마다 예상 성공률을 셈하는 데 쓴다. 없으면 성공률을 세지 않는다 */
+  ability?: number;
   /** 지금 레벨에서 모은 경험치와 다음 레벨까지 필요한 양 (curriculum.ts) — AI 가 "얼마 남았는지" 를 말할 때 쓴다 */
   xp?: number;
   xpNeed?: number;
