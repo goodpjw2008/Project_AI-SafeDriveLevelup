@@ -171,29 +171,32 @@ describe('이 판이 무엇을 시험했는가 — habitsTestedBy', () => {
 });
 
 /*
-  **자율 주행 시범은 열 판** — 사용자가 정했다: "10판 정도로 … 우회전 시 발생할 수 있는 경우의 수 중 대표적인 것,
-  어린이보호구역에서 신호 없는 횡단보도 상황 … 난이도가 낮은 것부터 높은 것으로."
+  **자율 주행 시범은 열 판** — 교차로 아홉 + 보호구역 전용 도로 하나 (zoneCourse.ts 의 zoneDemoCourses).
+  사용자가 정했다: "10판 정도로 … 난이도가 낮은 것부터 높은 것으로", 보호구역이 강화된 뒤에는
+  "우회전 + 어린이보호구역을 10개 시나리오 안에서 교육할 수 있게."
 */
 describe('AI 자율 주행 시범 코스', () => {
-  it('열 판이 모두 라이브러리에 있고, 우회전의 대표 판단을 두루 담는다', () => {
+  it('교차로 아홉 판이 모두 라이브러리에 있고, 우회전 · 보호구역의 대표 판단을 두루 담는다', () => {
     const demo = demoCourses();
-    expect(demo).toHaveLength(10);
+    expect(demo).toHaveLength(9);
     expect(new Set(demo.map((e) => e.spec.id)).size).toBe(demo.length);
     const all = new Set(demo.flatMap((e) => e.targets));
-    for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP'] as const) {
+    for (const code of ['RED_NO_STOP', 'RIGHT_ARROW_RED', 'PEDESTRIAN_BLOCKED', 'SCHOOL_ZONE_NO_STOP', 'BIKE_BLOCKED'] as const) {
       expect(all.has(code), code).toBe(true);
     }
     expect(demo.some((e) => e.tags.lead === 'rolling'), '일시정지를 무시하는 앞차').toBe(true);
+    // 녹색 화살표여도 사람이 있으면 선다 — 보호구역의 무단횡단 어린이로 보여 준다
+    expect(demo.some((e) => e.tags.signal === 'arrowGreen' && e.tags.zone === 'yes' && e.tags.c === 'jaywalk')).toBe(true);
     // 꼬리물기는 앞이 막혔는지가 애매하다고 사용자가 뺀 장면이다
     expect(demo.some((e) => e.tags.jam === 'jam')).toBe(false);
     expect(demo.every((e) => e.tags.env === 'day' && e.tags.pressure === 'calm')).toBe(true);
   });
 
-  it('신호 없는 보호구역 횡단보도가 셋 — 교차로 첫 횡단보도 · 진입로 · 우회전 후', () => {
+  it('신호 없는 보호구역 횡단보도가 셋 — 교차로 첫 횡단보도(사람 없음 · 자전거) · 우회전 후', () => {
     const zone = demoCourses().filter((e) => zoneKindOf(e.tags) === 'noSignal');
     expect(zone).toHaveLength(3);
-    expect(zone.some((e) => e.tags.sigA === 'no')).toBe(true);
-    expect(zone.some((e) => e.tags.approach === 'noSignal')).toBe(true);
+    expect(zone.filter((e) => e.tags.sigA === 'no')).toHaveLength(2);
+    expect(zone.some((e) => e.tags.sigA === 'no' && e.tags.a === 'bikeRide' && e.tags.kind === 'child')).toBe(true);
     expect(zone.some((e) => e.tags.sigC === 'no')).toBe(true);
   });
 

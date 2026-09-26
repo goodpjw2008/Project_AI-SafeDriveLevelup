@@ -693,7 +693,7 @@ function renderMenu(): void {
       aiDriving = true;
       aiCourse = false;
       /*
-        **시범은 두 코스를 한 줄로 이어 보여 준다** — 우회전 열 판 + 보호구역 직진 셋
+        **시범은 두 코스를 한 줄로 이어 보여 준다** — 교차로 아홉 판 + 보호구역 전용 도로 한 판 = **열 판**
         (library.ts 의 demoCourses · scenarios/zoneCourse.ts 의 zoneDemoCourses). 배우는 사람에게는
         '오프라인 교육 한 차례' 이지 두 묶음이 아니라, 쉬운 것부터 이어서 돈다.
       */

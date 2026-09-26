@@ -575,12 +575,13 @@ export function zoneEntry(id: number): LibraryEntry | undefined {
  * 합치는 일은 부르는 쪽이 한다 (main.ts) — 라이브러리와 서로를 부르지 않게.
  */
 export function zoneDemoCourses(): LibraryEntry[] {
+  /*
+    **한 판** — 시범 한 차례는 열 판이고(사용자가 정했다: "10개 시나리오 안에서"), 아홉은 교차로 판이다
+    (library.ts 의 DEMO). 한때 셋이었는데, 사람 없는 두 길이 보여 주는 것(사람이 없어도 선다 · 적색은 기다린다)은
+    이 한 판 안에 다 들어 있다 — 신호 둘을 지키고 **마지막 무신호 횡단보도**에서 양쪽의 아이 둘에게 양보한다.
+    30km/h · 단속 카메라 · 학교 앞 풍경도 이 판이 보여 준다.
+  */
   const want: Partial<ZoneTags>[] = [
-    // 1번 길 — 첫 곳은 사람이 없어도 서고, 다음 둘은 신호를 본다
-    { road: 0, sPed: 'none', aPed: 'none', bPed: 'none' },
-    // 2번 길 — 신호 둘을 지킨 뒤 **마지막 무신호**에서 다시 스스로 선다
-    { road: 1, sPed: 'none', aPed: 'none', bPed: 'none' },
-    // 사람이 있는 길 — 마지막 무신호 횡단보도에 **양쪽에서** 아이 둘이 나선다
     { road: 1, sPed: 'none', aPed: 'none', bPed: 'waiting', kind: 'child', dir: 'both', count: 2 },
   ];
   const tags = allCombinations();
