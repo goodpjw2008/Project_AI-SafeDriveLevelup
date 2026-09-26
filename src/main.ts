@@ -64,7 +64,7 @@ import {
   type Picker,
   type RecentRun,
 } from './scenarios/recommend';
-import { advance, currentTarget, levelLabel, MAX_LEVEL, recordHabits, xpToNext } from './scenarios/curriculum';
+import { advance, currentTarget, levelLabel, recordHabits, xpToNext } from './scenarios/curriculum';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
 import { Screens, type AiTrainingState, type CourseStep } from './ui/Screens';
@@ -1738,19 +1738,16 @@ function finishRun(result: JudgeResult): void {
  * 드러나지 않았다. 사용자가 짚었다: "레벨 10 이후에는 마스터를 하며 게임의 엔딩이 되는 거야. AI 로봇이 normal.webp
  * 이미지를 보여 주면서 축하해 줘. 그리고 게임이 끝나는 거야." 누르면 **엔딩을 마친 첫 화면**으로 돌아가고, 쌓인
  * 화면 기록은 버린다 (거기서 뒤로가기로 결과 화면에 돌아갈 까닭이 없다). 다시 하려면 '처음부터 다시 시작' 이다.
+ *
+ * 글은 index.html 의 #ending 에 고정돼 있다 — 사용자가 정한 세 줄("축하합니다!!! / AI 안전운전 레벨업을 마스터 하셨습니다. /
+ * 우회전과 어린이보호구역의 안전운전 마스터로 임명합니다.")과 확인 버튼. 한때 달린 판 수를 적는 통계 줄이 있었는데 그때 뺐다.
  */
 function showEnding(): void {
   const root = document.getElementById('ending');
   const ok = document.getElementById('ending-ok');
   const robot = document.getElementById('ending-robot') as HTMLImageElement | null;
-  const stats = document.getElementById('ending-stats');
   if (!root || !ok) return;
   if (robot) robot.src = robotNormal;
-  if (stats) {
-    const runs = saveData.curriculum.runs;
-    stats.textContent = `${levelLabel(1)} 부터 ${levelLabel(MAX_LEVEL)} 까지 ${runs.toLocaleString()}판을 달리며 나쁜 운전 습관을 모두 고쳤습니다. 이제 실제 도로에서도 오늘처럼 운전해 주세요.`;
-    // (마스터 운행 안내는 index.html 의 .ending-end 가 한다)
-  }
   stopAutoNext();
   root.hidden = false;
   ok.focus();
