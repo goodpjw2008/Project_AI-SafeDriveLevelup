@@ -18,7 +18,7 @@ import { isHandheld, isHandheldLandscape } from './game/handheld';
 import { icon } from './ui/icons';
 import { NPC_PREWARM_CAR_ID } from './game/npcVehicles';
 import { gpuName, setMsaaPreference, sharedRenderer } from './game/renderer';
-import { CHROME_PLAY_STORE_URL, CHROME_WITH_XCLIPSE_FIX, chromeMajor, samsungInternetIntent, vulkanXclipseChrome } from './game/browserQuirk';
+import { CHROME_PLAY_STORE_URL, CHROME_WITH_XCLIPSE_FIX, chromeMajor, needsChromeUpdateNotice, samsungInternetIntent } from './game/browserQuirk';
 import { presetGraphics, usesLampLights } from './game/quality';
 import { setLampLights } from './game/TrafficLight';
 import { bakeEnvironment } from './game/environment';
@@ -533,7 +533,8 @@ function toggleFullscreen(): void {
  */
 let fsNoticeTimer = 0;
 /*
-  **크롬 + 삼성 Xclipse + Vulkan 안내** — 그 조합(game/browserQuirk.ts)에서만, 세션에 한 번, 첫 화면에 띄운다.
+  **크롬 151~153 + 삼성 Xclipse 안내** — 그 조합(game/browserQuirk.ts 의 needsChromeUpdateNotice)에서만, 세션에 한 번,
+  첫 화면에 띄운다. 크롬을 올리면 사라지는 것을 사용자가 확인했다(2026-09-26). 업데이트가 첫째 손이고 삼성 인터넷은 대안.
   GPU 문자열은 렌더러가 있어야 읽을 수 있다 — 첫 화면의 배경 장면이 렌더러를 만든 뒤(renderMenu) 부른다.
 */
 let gpuNoticeDecided = false;
@@ -543,23 +544,16 @@ function maybeShowGpuNotice(): void {
   if (!el) return;
   gpuNoticeDecided = true;
   const gpu = gpuName(sharedRenderer(canvas));
-  if (!vulkanXclipseChrome(gpu, navigator.userAgent)) return;
+  if (!needsChromeUpdateNotice(gpu, navigator.userAgent)) return;
   const open = document.getElementById('gpu-notice-open') as HTMLAnchorElement | null;
   if (open) open.href = samsungInternetIntent(new URL(window.location.href));
-  // 크롬 151 회귀 — 완화가 들어간 154 미만이면 업데이트 버튼과 문구를 더한다 (browserQuirk.ts 의 chromeMajor)
-  const major = chromeMajor(navigator.userAgent);
-  if (major > 0 && major < CHROME_WITH_XCLIPSE_FIX) {
-    const update = document.getElementById('gpu-notice-update') as HTMLAnchorElement | null;
-    if (update) {
-      update.href = CHROME_PLAY_STORE_URL;
-      update.hidden = false;
-    }
-    const text = document.getElementById('gpu-notice-text');
-    if (text) {
-      text.textContent =
-        `지금 크롬(${major})에 알려진 문제로, 크롬 ${CHROME_WITH_XCLIPSE_FIX} 부터 관련 수정이 들어갔습니다. ` +
-        '크롬을 업데이트하거나, 같은 휴대폰의 삼성 인터넷으로 열면 정상입니다.';
-    }
+  const update = document.getElementById('gpu-notice-update') as HTMLAnchorElement | null;
+  if (update) update.href = CHROME_PLAY_STORE_URL;
+  const text = document.getElementById('gpu-notice-text');
+  if (text) {
+    text.textContent =
+      `지금 크롬(${chromeMajor(navigator.userAgent)})의 알려진 문제로, 크롬 ${CHROME_WITH_XCLIPSE_FIX} 부터 고쳐졌습니다. ` +
+      '플레이 스토어에서 크롬을 업데이트해 주세요. 당장 어려우면 같은 휴대폰의 삼성 인터넷으로 열어도 정상입니다.';
   }
   document.getElementById('gpu-notice-close')?.addEventListener('click', () => el.classList.remove('show'));
   el.classList.add('show');

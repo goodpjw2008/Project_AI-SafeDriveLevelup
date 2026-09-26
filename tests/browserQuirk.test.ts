@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHROME_WITH_XCLIPSE_FIX, chromeMajor, samsungInternetIntent, vulkanXclipseChrome } from '../src/game/browserQuirk';
+import { CHROME_WITH_XCLIPSE_FIX, chromeAffected, chromeMajor, needsChromeUpdateNotice, samsungInternetIntent, vulkanXclipseChrome } from '../src/game/browserQuirk';
 
 const GPU_VULKAN =
   'ANGLE (Samsung Electronics Co. Ltd., ANGLE ((Samsung Xclipse 940) on Vulkan 1.3.279), OpenGL ES 3.2)';
@@ -42,7 +42,20 @@ describe('크롬 버전 — 151 회귀와 154 의 완화', () => {
     expect(chromeMajor(SAMSUNG)).toBe(130);
     expect(chromeMajor('Mozilla/5.0 (iPhone) Safari/604.1')).toBe(0);
   });
-  it('완화가 들어간 크롬은 154 부터다', () => {
+  it('완화가 들어간 크롬은 154 부터다 — 151~153 만 문제 버전이다', () => {
     expect(CHROME_WITH_XCLIPSE_FIX).toBe(154);
+    expect(chromeAffected(150)).toBe(false);
+    expect(chromeAffected(151)).toBe(true);
+    expect(chromeAffected(153)).toBe(true);
+    expect(chromeAffected(154)).toBe(false);
+    expect(chromeAffected(0)).toBe(false);
+  });
+  it('안내는 Xclipse + Vulkan + 크롬 앱 + 151~153 이 전부 맞을 때만 뜬다 — 사용자가 크롬을 올린 뒤에는 뜨지 않는다', () => {
+    const ua = (v: number) => CHROME.replace('Chrome/140', `Chrome/${v}`);
+    expect(needsChromeUpdateNotice(GPU_VULKAN, ua(151))).toBe(true);
+    expect(needsChromeUpdateNotice(GPU_VULKAN, ua(155))).toBe(false);
+    expect(needsChromeUpdateNotice(GPU_VULKAN, ua(140))).toBe(false);
+    expect(needsChromeUpdateNotice(GPU_GLES, ua(151))).toBe(false);
+    expect(needsChromeUpdateNotice(GPU_VULKAN, SAMSUNG)).toBe(false);
   });
 });

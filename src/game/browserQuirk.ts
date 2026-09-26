@@ -15,15 +15,24 @@
 /**
  * 크롬 주 버전 — UA 의 `Chrome/151.0…` 에서. 모르면 0.
  * 검은 띠는 크롬 151 에서 시작된 회귀로 크로미움에 등록돼 있고(crbug 547065826), ANGLE 의 완화가 크롬 154 부터 들어갔다
- * (ANGLE 6cac303f "disable robust buffer access on Xclipse GPUs", 크로미움 154.0.8014.0 롤). 그래서 154 미만이면 업데이트를 권한다.
+ * (ANGLE 6cac303f "disable robust buffer access on Xclipse GPUs", 크로미움 154.0.8014.0 롤). **사용자가 크롬을 올려 사라지는 것을
+ * 확인했다** (2026-09-26, 151 → 최신). 그래서 안내는 151~153 에서만 띄우고, 업데이트를 첫째 손으로 권한다.
  */
 export function chromeMajor(userAgent: string): number {
   const m = /Chrome\/(\d+)/.exec(userAgent);
   return m ? Number(m[1]) : 0;
 }
 
-/** ANGLE 의 Xclipse 완화가 들어간 첫 크롬 */
+/** 회귀가 시작된 크롬 · ANGLE 의 Xclipse 완화가 들어간 첫 크롬 */
+export const CHROME_BUG_FIRST = 151;
 export const CHROME_WITH_XCLIPSE_FIX = 154;
+
+/** 이 크롬 버전이 검은 띠가 나는 버전인가 (151~153) */
+export const chromeAffected = (major: number): boolean => major >= CHROME_BUG_FIRST && major < CHROME_WITH_XCLIPSE_FIX;
+
+/** 안내를 띄울 것인가 — Xclipse GPU + Vulkan + 크롬 앱 + 151~153 (전부 맞아야 한다) */
+export const needsChromeUpdateNotice = (gpu: string, userAgent: string): boolean =>
+  vulkanXclipseChrome(gpu, userAgent) && chromeAffected(chromeMajor(userAgent));
 
 /** 플레이 스토어의 크롬 — 업데이트 버튼이 여는 곳 */
 export const CHROME_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.android.chrome';
