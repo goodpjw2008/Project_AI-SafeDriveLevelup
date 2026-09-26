@@ -5315,6 +5315,9 @@
           padding: 6px 14px 6px;
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
+          /* 화면 높이를 채운다 — 전체 화면에서 아래가 비지 않게. 연습 상자 줄(3)이 남는 높이를 가져간다 (세로와 같은 까닭) */
+          grid-template-rows: auto auto minmax(0, 1fr) auto;
+          min-height: 100%;
           align-items: center;
           row-gap: 6px;
           column-gap: 10px;
@@ -5362,6 +5365,9 @@
         #screen-menu .ai-course {
           grid-row: 3;
           grid-column: 1 / -1;
+          /* 줄이 남는 높이를 가져가므로 상자를 줄에 꽉 채우고 안의 내용은 세로 가운데에 둔다 */
+          align-self: stretch;
+          align-content: center;
         }
         #screen-menu .site-footer {
           grid-row: 4;
@@ -5407,6 +5413,10 @@
         */
         #screen-menu .menu-links button:not(.icon) svg {
           display: none;
+        }
+        /* 그림뿐인 버튼(설정 톱니 · 전체 화면)은 줄 맨 앞에 — 우회전 앞이다 (사용자가 정했다). 아이디 없이 고른다 */
+        #screen-menu .menu-links button.icon {
+          order: -1;
         }
         /*
           **성공 · 실패 알약과 같은 키로** (사용자가 정했다). 그 알약은 `5px 12px · 13px` 이라
@@ -5944,6 +5954,17 @@
         .menu-links #btn-trial {
           display: none;
         }
+        /*
+          **계기판은 3분의 2 로** (사용자가 정했다: "세로 모드에서 계기판의 크기를 지금의 2/3 으로"). 손가락 화면
+          공통 규칙(body.touch #cluster — 46vw · 240px)을 세로에서만 덮는다 — 같은 선택자를 뒤에 두어 이긴다.
+          홈으로 알약은 계기판 바로 위에 붙어 있으니 같은 폭으로 다시 잰다.
+        */
+        body.touch #cluster {
+          width: min(30.7vw, 160px);
+        }
+        body.touch .hud-home {
+          bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(30.7vw, 160px) * 0.332 + 10px);
+        }
         /* 뱃지 요약 — 모아 보는 재미는 큰 화면의 몫이다 */
         .badge-summary {
           display: none;
@@ -6020,6 +6041,10 @@
         #screen-menu .menu-links button:not(.icon) svg {
           display: none;
         }
+        /* 그림뿐인 버튼(설정 톱니 · 전체 화면)은 줄 맨 앞에 — 우회전 앞이다 (사용자가 정했다). 아이디 없이 고른다 */
+        #screen-menu .menu-links button.icon {
+          order: -1;
+        }
 
         /* 이름과 부제를 가운데로 — 좁은 폭에서 왼쪽에 붙으면 오른쪽이 휑하다 */
         #screen-menu .hero {
@@ -6048,9 +6073,23 @@
           화면에서 버튼을 줄이면 못 누르고, 글자를 줄이면 못 읽는다. 아래 여백(60px)이 가장 컸다:
           그 자리는 원래 **스크롤할 때 손이 쉬는 자리**인데, 스크롤이 없어진 화면에서는 빈 칸일 뿐이다.
         */
+        /*
+          **화면 높이를 채운다** (사용자가 짚었다: 전체 화면으로 가면 주소창이 있을 때의 높이로 짠 화면이 그대로라
+          아래가 빈다). 세로 flex 로 세우고 연습 상자(.ai-course)가 남는 높이를 가져간다 — 상자 안에서는 레벨 ·
+          자동차 · 연습 버튼이 고르게 벌어진다(space-evenly). 주소창이 있을 때는 남는 높이가 없어 지금과 같다.
+        */
         #screen-menu .screen-inner {
           padding-top: 16px;
           padding-bottom: 14px;
+          min-height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        #screen-menu .ai-course {
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-evenly;
         }
         #screen-menu .site-stats {
           margin-bottom: 6px;

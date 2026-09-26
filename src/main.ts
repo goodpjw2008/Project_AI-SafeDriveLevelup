@@ -537,6 +537,15 @@ function syncFullscreenButtons(): void {
 }
 if (!fullscreenSupported()) document.body.classList.add('no-fullscreen-api');
 document.addEventListener('fullscreenchange', syncFullscreenButtons);
+/**
+ * **주행을 누르면 저절로 전체 화면** (휴대폰만 — 사용자가 정했다). 전체 화면 요청은 **손가락이 닿은 그 처리 안에서**만
+ * 받아들여지므로, 버튼의 클릭 처리에서 곧바로 부른다 — AI 가 판을 고르는 동안(비동기)을 지나면 늦다. 자동 넘김처럼
+ * 손가락 없이 시작되는 판에서는 요청이 조용히 거절될 뿐이다. 이미 전체 화면이면 아무 일도 하지 않는다.
+ */
+function enterFullscreenOnHandheld(): void {
+  if (!isHandheld() || !fullscreenSupported() || document.fullscreenElement) return;
+  void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
+}
 document.getElementById('btn-hud-fullscreen')?.addEventListener('click', toggleFullscreen);
 
 const controls = new Controls(canvas, {
@@ -677,7 +686,10 @@ function renderMenu(): void {
     onFullscreen: toggleFullscreen,
     onReport: () => nav.go({ name: 'report', enter: renderReport }),
     // 마스터면 L10 코스를 무작위로 이어 달린다 (makeAiScenario 의 마스터 운행)
-    onGenerate: () => void makeAiScenario(),
+    onGenerate: () => {
+      enterFullscreenOnHandheld();
+      void makeAiScenario();
+    },
     onShowEnding: () => showEnding(),
     onResetCourse: () => void handleResetCourse(),
     // 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 창이다 (renderTrial)
@@ -826,6 +838,7 @@ function renderTrial(): void {
       if (!spec) return;
       aiCourse = false;
       mapTrial = true;
+      enterFullscreenOnHandheld();
       goRun(spec.id);
     },
   );
@@ -1136,6 +1149,8 @@ function goHome(): void {
 }
 
 function goRun(id: number, replace = false): void {
+  // 결과 화면의 '다시 운행' · '다음 판' 처럼 손가락으로 시작한 판도 전체 화면으로 (손가락 없이 온 호출은 조용히 거절된다)
+  enterFullscreenOnHandheld();
   const route = { name: 'run', enter: () => void startRun(id) };
   if (replace) nav.replace(route);
   else nav.go(route);
