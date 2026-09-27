@@ -16,6 +16,8 @@ describe('마스터 축하 창(#ending)', () => {
   });
   it('버튼은 확인 하나다', () => {
     expect(ending).toMatch(/id="ending-ok">확인<\/button>/);
+    // 무지개 바탕의 M 뱃지 자리 — showEnding 이 masterBadge 로 채운다 (사용자: "마스터가 되면 무지개 배경의 M 을 화면에")
+    expect(ending).toContain('id="ending-badge"');
     expect(ending).not.toContain('modal-cancel');
   });
   it('축하 글은 무지개 글자다', () => {
@@ -24,10 +26,16 @@ describe('마스터 축하 창(#ending)', () => {
 });
 
 describe('마스터는 무지개로 표시한다', () => {
-  it('M 뱃지의 도형과 글자가 무지개 그라데이션을 가져다 쓴다 — 레벨 길의 M 칸과 플레이어 칸 둘 다', () => {
+  // 사용자가 정했다 (2026-09-27): 장표와 같은 "무지개 배경의 M" — 바탕이 무지개(불투명)이고 글자는 희다. 축하 창의 큰 뱃지도 같은 규칙
+  it('M 뱃지는 무지개 바탕에 흰 글자다 — 레벨 길의 M 칸 · 플레이어 칸 · 축하 창 셋 다', () => {
     expect(html).toContain('<linearGradient id="rainbow-grad"');
-    expect(html).toMatch(/\.level-step\.master\.now \.level-badge-shape,\s*\.player\.mastered \.level-badge-wrap \.level-badge-shape \{[^}]*url\(#rainbow-grad\)/);
-    expect(html).toMatch(/\.level-step\.master\.now \.level-badge-num,\s*\.player\.mastered \.level-badge-wrap \.level-badge-num \{[^}]*url\(#rainbow-grad\)/);
+    const shape = html.match(/\.level-step\.master\.now \.level-badge-shape,\s*\.player\.mastered \.level-badge-wrap \.level-badge-shape,\s*\.ending-badge \.level-badge-shape \{([^}]*)\}/);
+    expect(shape).not.toBeNull();
+    expect(shape![1]).toContain('fill: url(#rainbow-grad)');
+    expect(shape![1]).toContain('fill-opacity: 1');
+    const num = html.match(/\.level-step\.master\.now \.level-badge-num,\s*\.player\.mastered \.level-badge-wrap \.level-badge-num,\s*\.ending-badge \.level-badge-num \{([^}]*)\}/);
+    expect(num).not.toBeNull();
+    expect(num![1]).toContain('fill: #fff');
   });
   it('호칭과 MAX 도 무지개 글자다', () => {
     expect(html).toMatch(/\.player\.mastered \.player-name \{[^}]*var\(--rainbow\)/);

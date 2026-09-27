@@ -54,6 +54,7 @@ import {
 import { zoneCourse } from './scenarios/zoneCourse';
 import { offlineCourses } from './scenarios/offlineCourse';
 import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
+import { masterBadge } from './ui/badges';
 import { practiceTrack } from './scenarios/trackPick';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
@@ -1799,6 +1800,9 @@ function showEnding(): void {
   const robot = document.getElementById('ending-robot') as HTMLImageElement | null;
   if (!root || !ok) return;
   if (robot) robot.src = robotNormal;
+  // 무지개 바탕의 M 뱃지 — 첫 화면 카드의 마스터 뱃지와 같은 것 (사용자: "마스터가 되면 이 무지개 배경의 M 을 화면에")
+  const badge = document.getElementById('ending-badge');
+  if (badge) badge.innerHTML = masterBadge({ labelled: false });
   stopAutoNext();
   root.hidden = false;
   ok.focus();

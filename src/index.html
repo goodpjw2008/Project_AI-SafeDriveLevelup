@@ -1281,6 +1281,21 @@
         letter-spacing: 6px;
         color: #ffd60a;
       }
+      /*
+        **마스터 M 뱃지** — 무지개 바탕에 흰 M. 사용자가 정했다 (2026-09-27): "실제 프로그램에도 마스터가 되면 이 무지개
+        배경의 M 을 화면에 보여줘" — 장표 4장의 M 과 같은 모양이다. 첫 화면 카드 · 레벨 줄의 M 도 같은 규칙을 쓴다 (아래
+        .player.mastered … 규칙).
+      */
+      .ending-badge {
+        display: grid;
+        place-items: center;
+        margin: 6px 0 0;
+      }
+      .ending-badge .level-badge {
+        width: 92px;
+        height: 92px;
+        filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.45));
+      }
       .ending-stage {
         display: flex;
         align-items: center;
@@ -2474,15 +2489,22 @@
       .player.mastered .level-badge-wrap {
         color: #ffe14d; /* 그라데이션을 못 그리는 곳의 대비책 */
       }
+      /* 무지개는 바탕이고 M 은 흰 글자다 — 한때 바탕을 옅게(0.28) 깔고 글자를 무지개로 칠했는데, 사용자가 장표와 같은 "무지개 배경의 M" 으로 정했다 */
       .level-step.master.now .level-badge-shape,
-      .player.mastered .level-badge-wrap .level-badge-shape {
+      .player.mastered .level-badge-wrap .level-badge-shape,
+      .ending-badge .level-badge-shape {
         stroke: url(#rainbow-grad);
         fill: url(#rainbow-grad);
-        fill-opacity: 0.28;
+        fill-opacity: 1;
       }
       .level-step.master.now .level-badge-num,
-      .player.mastered .level-badge-wrap .level-badge-num {
-        fill: url(#rainbow-grad);
+      .player.mastered .level-badge-wrap .level-badge-num,
+      .ending-badge .level-badge-num {
+        fill: #fff;
+        font-weight: 900;
+        paint-order: stroke;
+        stroke: rgba(0, 0, 0, 0.3);
+        stroke-width: 0.5px;
       }
       .level-step.master.now,
       .player.mastered .level-badge-wrap.earned .level-badge {
@@ -7106,6 +7128,8 @@
           <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
         <p class="ending-kicker">MASTER</p>
+        <!-- 무지개 바탕의 M 뱃지 — 스크립트가 채운다 (main.ts 의 showEnding · ui/badges.ts 의 masterBadge) -->
+        <div class="ending-badge" id="ending-badge" aria-hidden="true"></div>
         <div class="ending-stage">
           <img class="ending-robot" id="ending-robot" alt="AI" />
           <div class="ending-bubble">
