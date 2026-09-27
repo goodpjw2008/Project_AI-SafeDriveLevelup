@@ -126,7 +126,10 @@ export interface CarAnchors {
  * 고성능을 지나 슈퍼카로 간다. 한 판 올라갈 때마다 차가 눈에 띄게 달라져야 오른 것이
  * 보인다.
  *
- *   L1 코롤라 · L3 K5 · L5 쏘렌토 · L7 콜벳 C8 · L9 SF90 (L10 까지 이 차)
+ *   L1 K5(중형 세단) · L3 쏘렌토(패밀리 SUV) · L5 코롤라(준중형 세단) · L7 콜벳 C8(오픈 스포츠카) · L9 SF90(슈퍼카, L10 까지)
+ *
+ *   사용자가 정했다 (2026-09-27): "흰색 차가 연속으로 나오니 변하는 것 같지 않아. 국산차가 1번에 나왔으면 좋겠어" —
+ *   K5(검정) → 쏘렌토(흰색) → 코롤라(흰색) 순으로, 국산 두 대가 앞에 서고 색이 번갈아 바뀐다.
  *
  * **홀수 레벨마다 한 대다.** 한때 아홉 대가 레벨마다 한 대였는데, 라이선스 조건이 맞지 않는 네 대(아반떼 N · M5 ·
  * M8 · SL63)를 뺐다 (2026-09-27, 사용자 결정). 짝수 레벨은 타던 차로 오른다.
@@ -148,8 +151,8 @@ export const CARS: CarSpec[] = [
     name: '중형 세단',
     nameEn: 'Kia K5 (Optima)',
     maker: '',
-    level: 3,
-    tagline: '중형 세단. 첫 차보다 길어 우회전 궤적이 더 크게 돈다.',
+    level: 1,
+    tagline: '첫 차. 국산 중형 세단으로 우회전 습관을 만든다.',
     spec: '중형 세단 · 2,000cc',
     engineNote: 112,
     dims: { length: 4.855, width: 1.53, height: 1.465, roofRatio: 0.43, cabinFront: 0.28, cabinRear: 0.8 },
@@ -180,7 +183,7 @@ export const CARS: CarSpec[] = [
     name: '패밀리 SUV',
     nameEn: 'Kia Sorento PHEV',
     maker: '',
-    level: 5,
+    level: 3,
     tagline: 'SUV. 눈높이가 높아 앞차 너머가 보이지만, 우측 사각지대는 그만큼 넓다.',
     spec: '중형 SUV · 1,598cc 하이브리드',
     engineNote: 98,
@@ -202,8 +205,8 @@ export const CARS: CarSpec[] = [
     name: '준중형 세단',
     nameEn: 'Toyota Corolla',
     maker: '',
-    level: 1,
-    tagline: '첫 차. 가장 흔한 준중형 세단으로 우회전 습관을 만든다.',
+    level: 5,
+    tagline: '준중형 세단. 첫 차보다 짧아 우회전 궤적이 작게 돈다.',
     spec: '준중형 세단 · 1,798cc',
     engineNote: 106,
     dims: { length: 4.62, width: 1.46, height: 1.46, roofRatio: 0.47, cabinFront: 0.3, cabinRear: 0.82 },
@@ -266,7 +269,7 @@ export const CARS: CarSpec[] = [
  * 준중형 세단이라 처음 배우는 사람에게 익숙하고, 짧아서 우회전 궤적을 잡기도 쉽다. 한때 아반떼 N 이었는데 그 모델은
  * 라이선스 조건이 맞지 않아 2026-09-27 에 카탈로그에서 뺐다 (사용자 결정) — 남은 차는 모두 CC BY 4.0 이다.
  */
-export const STARTER_CAR_ID = 'corolla';
+export const STARTER_CAR_ID = 'k5';
 
 export function getCar(id: string): CarSpec {
   return CARS.find((c) => c.id === id) ?? CARS.find((c) => c.id === STARTER_CAR_ID) ?? CARS[0];
