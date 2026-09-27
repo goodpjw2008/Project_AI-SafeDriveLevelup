@@ -29,6 +29,7 @@ export interface CarSpec {
   name: string;
   /** 영문 표기 — 이미지 검색 키워드로도 쓰인다 */
   nameEn: string;
+  /** 제조사 — 지금은 빈 문자열. 상표 문제로 차 이름을 일반 이름(준중형 세단 · 슈퍼카 …)으로 바꿨다 (사용자 결정 2026-09-27) */
   maker: string;
   /**
    * 이 차가 **열리는 레벨** (scenarios/curriculum.ts 의 LEVELS).
@@ -144,11 +145,11 @@ export const CARS: CarSpec[] = [
   */
   {
     id: 'k5',
-    name: '기아 K5',
+    name: '중형 세단',
     nameEn: 'Kia K5 (Optima)',
-    maker: '기아',
+    maker: '',
     level: 3,
-    tagline: '국산 중형 세단. 코롤라보다 길어 우회전 궤적이 더 크게 돈다.',
+    tagline: '중형 세단. 첫 차보다 길어 우회전 궤적이 더 크게 돈다.',
     spec: '중형 세단 · 2,000cc',
     engineNote: 112,
     dims: { length: 4.855, width: 1.53, height: 1.465, roofRatio: 0.43, cabinFront: 0.28, cabinRear: 0.8 },
@@ -176,11 +177,11 @@ export const CARS: CarSpec[] = [
   */
   {
     id: 'sorento',
-    name: '기아 쏘렌토',
+    name: '패밀리 SUV',
     nameEn: 'Kia Sorento PHEV',
-    maker: '기아',
+    maker: '',
     level: 5,
-    tagline: '국산 SUV. 눈높이가 높아 앞차 너머가 보이지만, 우측 사각지대는 그만큼 넓다.',
+    tagline: 'SUV. 눈높이가 높아 앞차 너머가 보이지만, 우측 사각지대는 그만큼 넓다.',
     spec: '중형 SUV · 1,598cc 하이브리드',
     engineNote: 98,
     dims: { length: 4.81, width: 1.56, height: 1.695, roofRatio: 0.5, cabinFront: 0.295, cabinRear: 0.96 },
@@ -198,11 +199,11 @@ export const CARS: CarSpec[] = [
   */
   {
     id: 'corolla',
-    name: '토요타 코롤라',
+    name: '준중형 세단',
     nameEn: 'Toyota Corolla',
-    maker: '토요타',
+    maker: '',
     level: 1,
-    tagline: '첫 차. 세계에서 가장 많이 팔린 준중형 세단으로 우회전 습관을 만든다.',
+    tagline: '첫 차. 가장 흔한 준중형 세단으로 우회전 습관을 만든다.',
     spec: '준중형 세단 · 1,798cc',
     engineNote: 106,
     dims: { length: 4.62, width: 1.46, height: 1.46, roofRatio: 0.47, cabinFront: 0.3, cabinRear: 0.82 },
@@ -221,9 +222,9 @@ export const CARS: CarSpec[] = [
   */
   {
     id: 'sf90',
-    name: '페라리 SF90 스파이더',
+    name: '슈퍼카',
     nameEn: 'Ferrari SF90 Spider',
-    maker: '페라리',
+    maker: '',
     level: 9,
     tagline: '슈퍼카. 눈높이가 1m로 가장 낮아 앞차 너머도, 높이 달린 신호등도 보기 어렵다.',
     spec: '미드십 스파이더 · 3,990cc V8 하이브리드',
@@ -242,9 +243,9 @@ export const CARS: CarSpec[] = [
   */
   {
     id: 'corvette',
-    name: '쉐보레 콜벳 C8 컨버터블',
+    name: '오픈 스포츠카',
     nameEn: 'Chevrolet Corvette C8 Stingray Convertible',
-    maker: '쉐보레',
+    maker: '',
     level: 7,
     tagline: '오픈카. 지붕이 없어 시야는 트이지만, 눈높이가 낮아 앞차 너머가 안 보인다.',
     spec: '미드십 컨버터블 · 6,162cc',
