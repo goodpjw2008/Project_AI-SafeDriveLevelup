@@ -300,7 +300,7 @@ const GLASS_UNIFORM = { avante: /WindowInside/i };
  * 그래서 삼각형 단위로, **유리에 바싹 붙어 있고(거리) 유리와 나란한(각도)** 면만 고른다.
  * 두 조건을 모두 걸어야 유리에 스치는 와이퍼·A필러 가장자리가 함께 투명해지지 않는다.
  */
-const GLASS_COINCIDENT_CARS = new Set([]); // 한때 ['avante'] — 비상업 조건이라 카탈로그에서 뺐다 (2026-09-27)
+const GLASS_COINCIDENT_CARS = new Set([]); // 한때 ['avante'] — 라이선스 조건이 맞지 않아 카탈로그에서 뺐다 (2026-09-27)
 
 /** 유리 면에서 이 거리(차 길이 대비) 안에 있으면 '겹쳐 있다'고 본다 — 4.7m 차에서 28mm */
 const COINCIDENT_DIST = 0.006;

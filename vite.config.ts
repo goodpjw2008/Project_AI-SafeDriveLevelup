@@ -95,9 +95,9 @@ const IMAGE_TYPES: Record<string, string> = {
 function portfolioPage(): Plugin {
   const fromRepo = (path: string) => fileURLToPath(new URL(`./${path}`, import.meta.url));
   const readPage = () => readFileSync(fromRepo(PORTFOLIO_PAGE), 'utf8');
-  /** 페이지가 상대 경로로 부르는 저장소 파일 (docs/… · screenshot/…) */
+  /** 페이지가 상대 경로로 부르는 저장소 파일 (docs/…) */
   const imagesOf = (html: string) => [
-    ...new Set([...html.matchAll(/\bsrc="((?:docs|screenshot)\/[^"?#]+)"/g)].map((m) => m[1])),
+    ...new Set([...html.matchAll(/\bsrc="(docs\/[^"?#]+)"/g)].map((m) => m[1])),
   ];
 
   return {
@@ -105,7 +105,7 @@ function portfolioPage(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const path = decodeURIComponent((req.url ?? '').split(/[?#]/)[0]).replace(/^\//, '');
-        if (path !== PORTFOLIO_PAGE && !/^(docs|screenshot)\//.test(path)) return next();
+        if (path !== PORTFOLIO_PAGE && !/^docs\//.test(path)) return next();
         // 페이지는 요청마다 읽는다 — 서버를 띄워 둔 채 고쳐도 새로 고침만 하면 보이게
         const html = readPage();
         if (path === PORTFOLIO_PAGE) {
