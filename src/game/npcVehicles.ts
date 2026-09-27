@@ -20,7 +20,7 @@ import { CARS, type CarSpec } from '../economy/cars';
  *
  * `preferIds` 가 있으면 **그중에서 고른다.** 이미 받아 둔 모델을 다시 쓰라는 뜻이다 —
  * 한 판에 새 모델을 여러 개 받으면 받아 오는 동안 화면이 끊긴다. 무작위 시나리오는 NPC 가
- * 최대 아홉 대라, 배역을 그냥 뽑으면 큰 파일(SL63 7.6MB)이 대여섯 개씩 딸려 온다.
+ * 최대 다섯 대라, 배역을 그냥 뽑으면 큰 파일(콜벳 4.4MB)이 여럿 딸려 온다.
  */
 /**
  * 메뉴에 있는 동안 **NPC 감으로 미리 받아 둘 차** (main.ts 의 prewarm).
@@ -29,11 +29,11 @@ import { CARS, type CarSpec } from '../economy/cars';
  * 미리 받은 것이 없으면 2~5MB 짜리 모델을 주행 중에 받아 풀게 된다. 한 대만 데워 두면
  * roster 가 그것을 집어 새로 받는 것이 없다.
  *
- * m8 을 고른 이유는 **카탈로그에서 가장 가볍기 때문**이다(1.1MB · 7만 9천 면).
- * 메뉴에서 미리 받는 것이니 가벼울수록 좋고, NPC 는 지나가는 배경이라 차종은 상관없다.
- * (기본 차량이 m8 로 바뀌면 이 값도 다른 차로 옮겨야 한다 — 내 차는 NPC 로 뽑히지 않는다)
+ * 쏘렌토를 고른 이유는 **기본 차량(코롤라)이 아닌 것 가운데 LOD 파일이 가장 가볍기 때문**이다(0.55MB). 한때 m8(1.1MB)
+ * 이었는데 비상업 조건이라 뺐다. 메뉴에서 미리 받는 것이니 가벼울수록 좋고, NPC 는 지나가는 배경이라 차종은 상관없다.
+ * (기본 차량이 쏘렌토로 바뀌면 이 값도 다른 차로 옮겨야 한다 — 내 차는 NPC 로 뽑히지 않는다)
  */
-export const NPC_PREWARM_CAR_ID = 'm8';
+export const NPC_PREWARM_CAR_ID = 'sorento';
 
 export function pickNpcCar(excludeId?: string, preferIds: readonly string[] = []): CarSpec {
   const pool = CARS.filter((c) => c.id !== excludeId);

@@ -156,19 +156,13 @@ export const APP_TAGLINE = APP_TAGLINE_PARTS.map((p) => p.text).join('');
  * 한 곳에 두어야 연락처를 바꿀 때 두 자리가 어긋나지 않는다.
  *
  * 한때 이름(`APP_AUTHOR = 'goodpjw2008'`)도 나란히 적었는데 사용자가 뺐다 — 저작권 줄은
- * `Copyright © 2026`, About 은 `만든 사람 :` 으로 시작하고 **누구인지는 이메일이 말한다.**
+ * `Copyright © 2026`, About 은 `만든 사람 :` 으로 시작하고 **누구인지는 이메일이 말한다.** 이용 조건(한때 '비영리 목적 사용')은
+ * 적지 않는다 — 사용자가 정했다 (2026-09-27): "영리 · 비영리 표현을 아예 하지 말아줘."
  * 이름과 메일 앞부분이 같은 글자라 두 번 읽히던 것을 한 번으로 줄였다.
  */
 export const APP_CONTACT = 'goodpjw2008@gmail.com';
 /** 저작권 표기의 해 — 처음 만든 해다 (해마다 올리는 값이 아니다) */
 export const APP_COPYRIGHT_YEAR = 2026;
-/** 이용 조건 한 줄 — 차량 모델에 비상업(NC) 조건이 있어 이 작품 전체가 비영리다 (README '이미지 라이선스') */
-export const APP_USAGE = '비영리 목적으로만 사용합니다';
-/**
- * 같은 말의 **짧은 꼴** — 세로 휴대폰의 저작권 줄이 쓴다 (사용자가 정했다).
- * 손안 화면에서는 이 줄이 셋으로 갈라졌다. 뜻이 같은 채로 줄만 줄인다.
- */
-export const APP_USAGE_SHORT = '비영리 목적 사용';
 
 /** 공개 주소 — 공유 카드(og:url)와 검색 엔진이 대표 주소로 삼는 곳 */
 export const APP_SITE = 'https://safedrive.ai.kr';

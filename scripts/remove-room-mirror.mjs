@@ -50,7 +50,7 @@ import { collectMeshes } from './skinning.mjs';
  * 어느 차에서 무엇이 잘못됐는지 알 수 없다. 확인한 차만 여기에 적는다.
  */
 export const ROOM_MIRROR_CARS = new Set([
-  'corolla', 'k5', 'avante', 'sorento', 'm5', 'm8', 'sf90', 'sl63', 'corvette',
+  'corolla', 'k5', 'sorento', 'sf90', 'corvette',
 ]);
 
 /**

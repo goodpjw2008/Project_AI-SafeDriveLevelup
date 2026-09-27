@@ -328,16 +328,13 @@ describe('세로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **저작권 줄은 짧은 꼴로 두 줄** (사용자가 정했다) — `Copyright © 2026 goodpjw2008` / `비영리 목적 사용`.
-    글은 CSS 로 바꿀 수 없어 두 벌을 두고 화면이 고르게 한다. 메일은 뒷부분만 감추므로
-    **`mailto:` 링크는 그대로다** — 눌러서 메일을 쓸 수 있어야 연락처를 적은 뜻이 산다.
+    **저작권 줄은 짧은 꼴** — `Copyright © 2026 goodpjw2008`. 이용 조건 줄은 없다 (사용자가 정했다, 2026-09-27: 영리 · 비영리
+    표현을 하지 않는다). 메일은 뒷부분만 감추므로 **`mailto:` 링크는 그대로다** — 눌러서 메일을 쓸 수 있어야 연락처를 적은 뜻이 산다.
   */
-  it('저작권 줄은 짧은 꼴로, 늘 두 줄로 선다', () => {
+  it('저작권 줄은 메일 뒷부분만 감춘 짧은 꼴이다', () => {
     const block = rulesOnly();
     expect(block).toContain('#screen-menu .site-footer .mail-host');
-    expect(block).toContain('#screen-menu .site-footer .usage-long');
-    // 둘째 줄을 못 박는 것은 flex-basis 다 — 폭이 넓어져도 한 줄로 붙지 않는다
-    expect(block).toMatch(/\.usage-short \{[^}]*flex-basis: 100%;/);
+    expect(block).not.toContain('usage-short');
   });
 
   /* 링크는 통째로 두 벌 두지 않는다 — 주소가 어긋나면 눌러도 다른 곳으로 간다 */

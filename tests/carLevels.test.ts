@@ -1,8 +1,9 @@
 /**
- * 차가 언제 열리는가 — **레벨 하나에 차 한 대.**
+ * 차가 언제 열리는가 — **홀수 레벨마다 차 한 대.**
  *
- * 이 게임이 주는 유일한 보상이라 규칙이 어긋나면 곧바로 보인다. 지키려는 것은 셋이다.
- *  - 레벨 1~9 에 차가 하나씩, 빠짐없이 겹침 없이 놓인다
+ * 한때 레벨 1~9 에 한 대씩(아홉 대)이었는데, 비상업(CC BY-NC) 조건이던 네 대를 뺐다 (2026-09-27, 사용자: "영리 목적으로
+ * 사용하면 안 되는 부분을 모두 빼줘"). 남은 다섯 대가 L1 · L3 · L5 · L7 · L9 에 선다. 지키려는 것은 셋이다.
+ *  - 시작 차는 L1 이고, 차의 레벨은 서로 겹치지 않고 오름차순으로 벌어진다
  *  - 마지막 레벨(L10)에는 새 차가 없다 — L9 의 차가 거기까지 간다
  *  - 강등돼도 열린 차는 닫히지 않는다 (최고 기록이 기준이다)
  */
@@ -22,17 +23,17 @@ import { MAX_LEVEL, type Difficulty } from '../src/scenarios/curriculum';
 const ALL_LEVELS = Array.from({ length: MAX_LEVEL }, (_, i) => (i + 1) as Difficulty);
 
 describe('차와 레벨의 짝', () => {
-  it('레벨 1부터 차 수만큼, 하나씩 빠짐없이 놓인다', () => {
+  it('홀수 레벨마다 한 대 — L1 · L3 · L5 · L7 · L9', () => {
     const levels = CARS.map((c) => c.level).sort((a, b) => a - b);
-    expect(levels).toEqual(Array.from({ length: CARS.length }, (_, i) => i + 1));
+    expect(levels).toEqual([1, 3, 5, 7, 9]);
   });
 
   it('한 레벨에 두 대가 걸리지 않는다', () => {
     expect(new Set(CARS.map((c) => c.level)).size).toBe(CARS.length);
   });
 
-  it('차는 레벨 수보다 하나 적다 — 마지막 레벨에는 새 차가 없다', () => {
-    expect(CARS.length).toBe(MAX_LEVEL - 1);
+  it('마지막 레벨에는 새 차가 없다', () => {
+    expect(CARS.some((c) => c.level === MAX_LEVEL)).toBe(false);
   });
 
   it('전시관 목록은 레벨 순이다', () => {
@@ -45,6 +46,10 @@ describe('차와 레벨의 짝', () => {
   it('시작 차는 L1 이다', () => {
     expect(getCar(STARTER_CAR_ID).level).toBe(1);
   });
+
+  it('비상업(NC) 조건의 모델은 카탈로그에 없다', () => {
+    for (const id of ['avante', 'm5', 'm8', 'sl63']) expect(CARS.some((c) => c.id === id), id).toBe(false);
+  });
 });
 
 describe('그 레벨에서 내주는 차 — carForLevel', () => {
@@ -52,11 +57,13 @@ describe('그 레벨에서 내주는 차 — carForLevel', () => {
     for (const lv of ALL_LEVELS) expect(carForLevel(lv), `L${lv}`).toBeDefined();
   });
 
-  it('레벨과 같은 번호의 차를 내준다 (마지막 레벨만 빼고)', () => {
+  it('그 레벨까지 열린 차 가운데 가장 높은 차를 내준다 — 새 차가 없는 레벨은 타던 차', () => {
     for (const lv of ALL_LEVELS) {
-      if (lv >= MAX_LEVEL) continue;
-      expect(carForLevel(lv)?.level, `L${lv}`).toBe(lv);
+      const expected = Math.max(...CARS.filter((c) => c.level <= lv).map((c) => c.level));
+      expect(carForLevel(lv)?.level, `L${lv}`).toBe(expected);
     }
+    expect(carForLevel(2)?.id).toBe(carForLevel(1)?.id);
+    expect(carForLevel(3)?.id).not.toBe(carForLevel(2)?.id);
   });
 
   /*
@@ -79,7 +86,7 @@ describe('그 레벨에서 내주는 차 — carForLevel', () => {
 
 describe('탈 수 있는가 — isCarUnlocked', () => {
   it('최고 기록이 그 차의 레벨 이상이면 탈 수 있다', () => {
-    const l5 = CARS_BY_LEVEL[4];
+    const l5 = CARS_BY_LEVEL[2];
     expect(l5.level).toBe(5);
     expect(isCarUnlocked(l5, 4)).toBe(false);
     expect(isCarUnlocked(l5, 5)).toBe(true);
@@ -90,21 +97,17 @@ describe('탈 수 있는가 — isCarUnlocked', () => {
     expect(CARS.filter((c) => isCarUnlocked(c, 1))).toHaveLength(1);
   });
 
-  it('최고 레벨에서는 아홉 대가 모두 열려 있다', () => {
+  it('최고 레벨에서는 다섯 대가 모두 열려 있다', () => {
     expect(CARS.filter((c) => isCarUnlocked(c, MAX_LEVEL))).toHaveLength(CARS.length);
   });
 
   /*
-    **한 판 올라갈 때마다 정확히 한 대씩 는다.** 계급이던 시절에는 세 단계에 한 번만
-    올라, 다섯 단계를 올라가도 차가 안 바뀌는 구간이 있었다 — 그게 이 시스템을 바꾼
-    이유이므로 여기서 못 박아 둔다.
+    **홀수 레벨에 오를 때마다 정확히 한 대씩 는다.** 한때 레벨마다 한 대였는데(아홉 대), 비상업 조건의 네 대를 빼고
+    다섯 대가 L1 · L3 · L5 · L7 · L9 에 선다 — 짝수 레벨은 타던 차로 오르고, 마지막 레벨(L10)에는 새 차가 없다.
   */
-  it('레벨이 하나 오를 때마다 열린 차가 하나 는다 (마지막 레벨만 빼고)', () => {
+  it('홀수 레벨에 오를 때마다 열린 차가 하나 는다', () => {
     const openAt = (lv: Difficulty): number => CARS.filter((c) => isCarUnlocked(c, lv)).length;
-    for (const lv of ALL_LEVELS) {
-      if (lv >= MAX_LEVEL) continue;
-      expect(openAt(lv), `L${lv}`).toBe(lv);
-    }
-    expect(openAt(MAX_LEVEL), '마지막 레벨에는 새 차가 없다').toBe(MAX_LEVEL - 1);
+    for (const lv of ALL_LEVELS) expect(openAt(lv), `L${lv}`).toBe(Math.min(CARS.length, Math.ceil(lv / 2)));
+    expect(openAt(MAX_LEVEL), '마지막 레벨에는 새 차가 없다').toBe(CARS.length);
   });
 });

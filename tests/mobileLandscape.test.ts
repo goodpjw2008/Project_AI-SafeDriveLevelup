@@ -306,15 +306,13 @@ describe('가로 휴대폰의 첫 화면', () => {
   });
 
   /*
-    **저작권 줄은 세로 화면과 같은 글이다** (사용자가 정했다) —
-    `Copyright © 2026 · goodpjw2008 · 비영리 목적 사용`. 메일은 앞부분만 보이지만
-    **링크는 그대로**라 눌러서 메일을 쓸 수 있다.
+    **저작권 줄은 세로 화면과 같은 글이다** — `Copyright © 2026 goodpjw2008`. 메일은 앞부분만 보이지만
+    **링크는 그대로**라 눌러서 메일을 쓸 수 있다. 이용 조건 줄은 없다 (사용자가 정했다, 2026-09-27).
   */
   it('저작권 줄은 세로 화면과 같은 글이다', () => {
     const r = rules();
-    expect(r).toMatch(/#screen-menu \.site-footer \.usage-long \{\s*display:\s*none/);
-    expect(r).toMatch(/#screen-menu \.site-footer \.usage-short \{\s*display:\s*inline/);
     expect(r).toMatch(/#screen-menu \.site-footer \.mail-host \{\s*display:\s*none/);
+    expect(r).not.toContain('usage-long');
   });
 
   /*

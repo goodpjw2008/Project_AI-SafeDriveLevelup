@@ -11,8 +11,6 @@ import {
   APP_NAME_PARTS,
   APP_TAGLINE,
   APP_TAGLINE_PARTS,
-  APP_USAGE,
-  APP_USAGE_SHORT,
 } from '../brand';
 import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
@@ -311,27 +309,20 @@ const OSS_LIBRARIES: Array<{ name: string; role: string; license: string; url: s
 /**
  * **첫 화면 맨 아래의 저작권 줄** — 사이트에서 흔한 꼴: `Copyright © 해 만든 이 · 연락처 · 이용 조건`.
  *
- * 사용자가 "카피라이트를 첫 페이지 가장 하단에 일반적인 형태로" 적어 달라고 했다 — 만든 사람, 이메일, 비영리.
+ * 사용자가 "카피라이트를 첫 페이지 가장 하단에 일반적인 형태로" 적어 달라고 했다 — 만든 사람과 이메일. 이용 조건은 적지 않는다.
  * 이메일은 누르면 바로 메일을 쓰게 `mailto:` 로 둔다. 값은 brand.ts 한 곳에서 온다 (About 창과 같이 쓴다).
  */
 function siteFooter(): string {
   /*
-    **세로 휴대폰에서는 짧은 꼴로 두 줄** (사용자가 정했다) — `Copyright © 2026 goodpjw2008` / `비영리 목적 사용`.
-    손안 화면에서는 이 줄이 셋으로 갈라져 저작권만 세 줄을 썼다.
-
-    글은 CSS 로 바꿀 수 없으니 **두 벌을 두고 화면이 고르게 한다.** 메일 주소는 통째로 두 벌 두지 않고
-    뒷부분(`@gmail.com`)만 감싼다 — 링크(`mailto:`)는 그대로라 눌러서 메일을 쓸 수 있다.
+    **세로 휴대폰에서는 메일의 뒷부분(`@gmail.com`)을 감춘다** — 손안 화면에서 줄이 갈라지지 않게. 링크(`mailto:`)는
+    그대로라 눌러서 메일을 쓸 수 있다.
   */
   const [mailName, mailHost] = APP_CONTACT.split('@');
   return `
     <footer class="site-footer">
       <span>Copyright © ${APP_COPYRIGHT_YEAR}</span>
-      <span class="dot" aria-hidden="true">·</span>
+      <!-- 이용 조건 줄은 없다 (사용자가 정했다, 2026-09-27: "Copyright © 2026 goodpjw2008@gmail.com" 만) -->
       <a href="mailto:${esc(APP_CONTACT)}">${esc(mailName)}<span class="mail-host">@${esc(mailHost)}</span></a>
-      <span class="dot" aria-hidden="true">·</span>
-      <!-- PC 도 짧은 꼴이다 (사용자가 정했다: "Copyright © 2026 · goodpjw2008@gmail.com · 비영리 목적 사용"). 긴 꼴은 About 창에 남는다 -->
-      <span class="usage-long">${esc(APP_USAGE_SHORT)}</span>
-      <span class="usage-short">${esc(APP_USAGE_SHORT)}</span>
     </footer>`;
 }
 
@@ -2405,7 +2396,7 @@ export class Screens {
    * ## 계급 머리가 사라졌다
    *
    * 계급이 넷일 때는 계급마다 머리를 두고 그 아래 차 두세 대를 묶었다. 레벨이 열이
-   * 되면서 **한 레벨에 한 대**가 되어, 머리를 두면 차 아홉 대에 머리 아홉 개가 붙는다.
+   * 되면서 **레벨마다 한 대**가 되어, 머리를 두면 차마다 머리가 하나씩 붙는다.
    * 지금은 카드 자체에 레벨 뱃지를 얹고 한 줄로 늘어놓는다 — 목록이 곧 레벨 순서다.
    */
   renderShop(
@@ -2468,7 +2459,7 @@ export class Screens {
 
       예전에는 사진을 등록하기 전까지 아홉 칸이 모두 "사진 없음" 이라는 회색 글자였다.
       지금은 카탈로그의 치수·색으로 빚은 차체를 그 자리에서 구워 넣는다(carThumb.ts) —
-      받아 오는 것이 없으므로 목록을 여는 값이 늘지 않고, 아홉 대가 서로 다르게 보인다.
+      받아 오는 것이 없으므로 목록을 여는 값이 늘지 않고, 차들이 서로 다르게 보인다.
 
       그림 자체는 **누르는 곳이 아니다.** 카드에 누를 것이 이미 여럿이라, 그림까지
       눌리면 무엇이 일어날지 예측할 수 없다.
@@ -2754,8 +2745,6 @@ export class Screens {
       <div class="about-maker">
         <span>만든 사람 :</span>
         <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a>
-        <span class="dot" aria-hidden="true">·</span>
-        <span>${esc(APP_USAGE)}</span>
       </div>
     `;
     this.bindBack('about', onBack);
@@ -2769,8 +2758,6 @@ export class Screens {
       설명문과 목록이 어긋나는데, 라이선스 표기가 어긋나는 것은 오탈자와 급이 다르다.
       (`assets/cars/<id>/license.txt` — Sketchfab 이 모델과 함께 주는 원본 표기가 근거다)
     */
-    const nonCommercialCount = CAR_MODEL_CREDITS.filter((c) => c.license.includes('NC')).length;
-    const freeCount = CAR_MODEL_CREDITS.length - nonCommercialCount;
 
     // 라이선스 이름도 목록에서 뽑는다 — 라이브러리를 갈아 끼우면 설명문이 따라와야 한다
     const ossLicenses = [...new Set(OSS_LIBRARIES.map((l) => l.license))].join(' 와 ');
@@ -2797,9 +2784,8 @@ export class Screens {
         표기하는 내용(이름 · 라이선스 · 출처 · 제작자)은 하나도 빼지 않았다 — 줄만 합쳤다.
       -->
       <p class="credit-lede">
-        이 홈페이지는 <b>비상업적으로만 사용됩니다.</b> 오픈소스를 사용하여 저작권과 라이선스를
-        지키며 만들었습니다. 실제로 사용된 각각의 라이선스를 아래에 모두 표기 합니다.
-        문제가 되는 사항이 있을 경우 연락을 주시면 즉시 조치 하도록 하겠습니다.
+        이 홈페이지에서 사용한 오픈소스와 저작권에 대해서 설명합니다. 실제로 사용된 각각의 라이선스를
+        아래에 모두 표기 합니다. 문제가 되는 사항이 있을 경우 연락을 주시면 즉시 조치 하도록 하겠습니다.
       </p>
 
       <!--
@@ -2835,15 +2821,13 @@ export class Screens {
           ? `<section class="credit-sec">
                <div class="credit-h">
                  <h2>차량 3D 모델</h2>
-                 <p>Sketchfab 에 <b>크리에이티브 커먼즈(CC)</b>로 공개된 모델 — ${freeCount}대는 상업적 이용까지
-                   허용되는 CC BY, ${nonCommercialCount}대는 비상업(NC) 조건입니다.</p>
+                 <p>Sketchfab 에 <b>크리에이티브 커먼즈 CC BY 4.0</b> 으로 공개된 모델 — 만든 사람을 밝히는 조건입니다.</p>
                </div>
                <div class="credit-grid">
                  ${CAR_MODEL_CREDITS.map(
                    (c) => `
                  <div class="credit-card">
-                   <div class="credit-name">${esc(getCar(c.carId).name)}
-                     ${c.license.includes('NC') ? '<span class="badge nc">비상업</span>' : ''}</div>
+                   <div class="credit-name">${esc(getCar(c.carId).name)}</div>
                    <a class="credit-link" href="${esc(c.sourceUrl)}" target="_blank" rel="noopener">${esc(c.title)}</a>
                    <div>제작 ${esc(c.author)} · <a class="credit-lic" href="${esc(c.licenseUrl)}" target="_blank" rel="noopener">${esc(
                      c.license,

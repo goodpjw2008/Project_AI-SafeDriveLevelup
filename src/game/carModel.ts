@@ -42,7 +42,8 @@ export interface CarModelCredit {
  * **모델마다 한 줄이다.** CC-BY 는 저작물마다 제작자 표기가 의무이고, 이 프로젝트는
  * glb 를 저장소와 단일 파일 빌드에 함께 실어 재배포하기 때문이다. 예전에는 한 대만 적을 수
  * 있는 단일 객체였고, 그래서 두 번째 차부터는 표기가 빠졌다 — 라이선스 위반이다.
- * `public/models/` 에 파일을 넣으면 여기에도 한 줄 넣는다.
+ * `public/models/` 에 파일을 넣으면 여기에도 한 줄 넣는다. **비상업(NC) 조건의 모델은 싣지 않는다** — 2026-09-27 에 네 대를
+ * 뺐다 (사용자: "영리 목적으로 사용하면 안 되는 부분을 모두 빼줘"). 남은 것은 모두 CC BY 4.0 이다.
  */
 export const CAR_MODEL_CREDITS: CarModelCredit[] = [
   {
@@ -73,54 +74,12 @@ export const CAR_MODEL_CREDITS: CarModelCredit[] = [
       'https://sketchfab.com/3d-models/kia-k5-mx-hq-interior-2016-6b745e6c63924c82b92d680cbc5fee6a',
   },
   {
-    carId: 'avante',
-    title: '2024 Hyundai Elantra N',
-    author: 'Ddiaz Design',
-    // 이 모델만 비상업(NC) 조건이다. 상업적으로 쓰려면 이 차를 카탈로그에서 빼야 한다.
-    license: 'CC BY-NC 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-nc/4.0/',
-    sourceUrl:
-      'https://sketchfab.com/3d-models/2024-hyundai-elantra-n-4ba1b1b0eb844e318cc708ada1f2f51f',
-  },
-  {
-    carId: 'm8',
-    title: '2020 BMW M8 Competition Convertible',
-    author: 'Ddiaz Design',
-    license: 'CC BY-NC-SA 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
-    sourceUrl:
-      'https://sketchfab.com/3d-models/2020-bmw-m8-competition-convertible-f7c1401ee5724e969db890c207fb099f',
-  },
-  {
     carId: 'sf90',
     title: '2021 Ferrari SF90 Spider',
     author: 'Ddiaz Design',
     license: 'CC BY 4.0',
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
     sourceUrl: 'https://sketchfab.com/3d-models/2021-ferrari-sf90-spider-8f8ef613e39746668b4f0268a3176dde',
-  },
-  {
-    carId: 'm5',
-    title: '2022 BMW M5 CS',
-    author: 'Ddiaz Design',
-    // 아반떼 N 과 같은 제작자지만 이쪽은 SA 까지 붙는다 (아래 SL63 주석 참조)
-    license: 'CC BY-NC-SA 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
-    sourceUrl: 'https://sketchfab.com/3d-models/2022-bmw-m5-cs-dc34c3fd9056460da48317ce0ff6b998',
-  },
-  {
-    carId: 'sl63',
-    title: 'Mercedes-Benz SL63 Mansory',
-    author: 'VTX',
-    /*
-      NC(비상업)에 더해 **SA(동일조건변경허락)** 다. 이 모델을 손본 결과물(우리가 굽는
-      public/models/sl63.glb 가 그렇다)은 같은 조건으로만 배포할 수 있다.
-      상업적으로 쓰거나 라이선스를 단순하게 유지해야 하면 이 차부터 뺀다.
-    */
-    license: 'CC BY-NC-SA 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
-    sourceUrl:
-      'https://sketchfab.com/3d-models/mercedes-benz-sl63-mansory-669099d7d4374d3bbbd86c62f5d66507',
   },
   {
     carId: 'sorento',
@@ -333,7 +292,7 @@ const cache = new Map<string, THREE.Group | null>();
  * **받는 중인 모델.**
  *
  * 캐시는 다 받은 뒤에야 채워지므로, 같은 차를 여러 대(무작위 시나리오는 NPC 가 최대
- * 아홉 대다) 동시에 만들면 **같은 파일을 그 수만큼 따로 받아 따로 푼다.** SL63(7.6MB)
+ * 다섯 대다) 동시에 만들면 **같은 파일을 그 수만큼 따로 받아 따로 푼다.** 콜벳(4.4MB)
  * 처럼 큰 모델에서는 그것만으로 몇 초가 날아간다. 받는 중인 약속을 나눠 쓰면 한 번만 푼다.
  */
 /**

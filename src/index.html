@@ -517,10 +517,6 @@
         그으면 선이 두 겹으로 보였고, 선과 그 위아래 여백(28 · 14px)이 이 줄을 화면 밖으로 밀어내고
         있었다. 카드가 끝나는 자리가 이미 경계라, 저작권 줄을 가르는 일은 여백만으로 넉넉하다.
       */
-      /* 저작권 줄의 짧은 꼴 — 세로 휴대폰에서만 쓴다 (ui/Screens.ts 의 siteFooter) */
-      .site-footer .usage-short {
-        display: none;
-      }
       /*
         같은 규칙의 다른 두 곳 — 누가 골랐는지/조언했는지의 짧은 꼴(ui/pickedBy.ts)과
         뒤로 버튼의 짧은 글(ui/Screens.ts 의 head). 기본은 긴 꼴만 보인다.
@@ -1745,14 +1741,6 @@
       .badge.new {
         background: rgba(255, 176, 32, 0.18);
         color: var(--amber);
-      }
-      /*
-        저작권 화면의 '비상업' — 한때 `badge violation` 을 썼는데, 결과 화면의 위반 카드(.violation)와 이름이 같아
-        카드 여백과 왼쪽 굵은 선까지 따라와 딱지가 큰 상자가 됐다. 이름을 따로 둔다.
-      */
-      .badge.nc {
-        background: rgba(255, 69, 58, 0.16);
-        color: #ff8a80;
       }
 
 
@@ -6042,12 +6030,6 @@
           margin: 0;
           font-size: 11.5px;
         }
-        #screen-menu .site-footer .usage-long {
-          display: none;
-        }
-        #screen-menu .site-footer .usage-short {
-          display: inline;
-        }
         /* 메일은 앞부분만 — 세로 화면과 같다. 링크는 그대로라 눌러서 메일을 쓸 수 있다 */
         #screen-menu .site-footer .mail-host {
           display: none;
@@ -6710,15 +6692,6 @@
         /* 메일은 앞부분만 — 링크는 그대로라 눌러서 메일을 쓸 수 있다 */
         #screen-menu .site-footer .mail-host {
           display: none;
-        }
-        /* 긴 꼴 대신 짧은 꼴. `flex-basis: 100%` 로 **늘 둘째 줄**에 선다 (사용자가 두 줄로 정했다) */
-        #screen-menu .site-footer .usage-long {
-          display: none;
-        }
-        #screen-menu .site-footer .usage-short {
-          display: block;
-          flex-basis: 100%;
-          text-align: center;
         }
 
         /*

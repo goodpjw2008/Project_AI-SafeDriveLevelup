@@ -37,7 +37,7 @@ describe('public/car-photos — 목록과 파일', () => {
 
 describe('parseManifest — 손으로 고친 목록을 거른다', () => {
   it('숫자 버전과 안전한 id 만 남긴다', () => {
-    expect(parseManifest({ avante: 1, '../x': 2, k5: 'a', m5: Number.NaN })).toEqual({ avante: 1 });
+    expect(parseManifest({ corolla: 1, '../x': 2, k5: 'a', sorento: Number.NaN })).toEqual({ corolla: 1 });
   });
 
   it('객체가 아니면 빈 목록이다', () => {
@@ -46,7 +46,7 @@ describe('parseManifest — 손으로 고친 목록을 거른다', () => {
   });
 
   it('목록을 받기 전에는 어느 차에도 사진 주소가 없다', () => {
-    expect(carPhotoUrl('avante')).toBeNull();
+    expect(carPhotoUrl('corolla')).toBeNull();
   });
 });
 
@@ -60,11 +60,11 @@ describe('handleCarPhoto — 서버에 쓰기', () => {
   });
 
   it('사진 파일을 쓰고 목록에 버전을 남긴다', async () => {
-    const out = await handleCarPhoto({ id: 'avante', dataUrl: JPEG }, { dir, ids: IDS });
+    const out = await handleCarPhoto({ id: 'corolla', dataUrl: JPEG }, { dir, ids: IDS });
     expect(out.status).toBe(200);
-    expect((await readFile(join(dir, 'avante.jpg')))[0]).toBe(0xff);
+    expect((await readFile(join(dir, 'corolla.jpg')))[0]).toBe(0xff);
     const manifest = await readManifest(dir);
-    expect(manifest.avante).toBe((out.body as { version: number }).version);
+    expect(manifest.corolla).toBe((out.body as { version: number }).version);
   });
 
   it('덮어쓰면 버전이 바뀐다 — 브라우저가 옛 사진을 캐시에서 꺼내면 안 된다', async () => {
@@ -81,9 +81,9 @@ describe('handleCarPhoto — 서버에 쓰기', () => {
   });
 
   it('다른 차의 목록 항목을 지우지 않는다', async () => {
-    await handleCarPhoto({ id: 'avante', dataUrl: JPEG }, { dir, ids: IDS });
-    await handleCarPhoto({ id: 'm5', dataUrl: JPEG }, { dir, ids: IDS });
-    expect(Object.keys(await readManifest(dir)).sort()).toEqual(['avante', 'm5']);
+    await handleCarPhoto({ id: 'corolla', dataUrl: JPEG }, { dir, ids: IDS });
+    await handleCarPhoto({ id: 'k5', dataUrl: JPEG }, { dir, ids: IDS });
+    expect(Object.keys(await readManifest(dir)).sort()).toEqual(['corolla', 'k5']);
   });
 
   it('카탈로그에 없는 id 는 받지 않는다 — 파일 이름이 되는 값이다', async () => {
@@ -98,7 +98,7 @@ describe('handleCarPhoto — 서버에 쓰기', () => {
     const png = `data:image/png;base64,${Buffer.from([0x89, 0x50]).toString('base64')}`;
     const fake = `data:image/jpeg;base64,${Buffer.from('hello').toString('base64')}`;
     for (const dataUrl of [png, fake, '', undefined]) {
-      const out = await handleCarPhoto({ id: 'avante', dataUrl }, { dir, ids: IDS });
+      const out = await handleCarPhoto({ id: 'corolla', dataUrl }, { dir, ids: IDS });
       expect(out.status).toBe(400);
     }
   });
@@ -113,7 +113,7 @@ describe('예전 저장본의 사진', () => {
     const stored = JSON.stringify({
       version: 10,
       money: 77,
-      carPhotos: { avante: 'data:image/jpeg;base64,AAAA' },
+      carPhotos: { corolla: 'data:image/jpeg;base64,AAAA' },
     });
     vi.stubGlobal('localStorage', { getItem: () => stored, setItem: () => undefined });
     const out = load();
@@ -137,17 +137,17 @@ describe('사진 목록 다시 받기', () => {
     vi.stubGlobal('fetch', () => {
       calls += 1;
       if (calls === 1) return Promise.reject(new Error('서버 재시작 중'));
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ avante: 7 }) } as Response);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ corolla: 7 }) } as Response);
     });
     expect(await loadCarPhotos()).toBe(false);
-    expect(carPhotoUrl('avante')).toBeNull();
+    expect(carPhotoUrl('corolla')).toBeNull();
 
     const redrawn = await new Promise<boolean>((resolve) => {
       ensureCarPhotos(() => resolve(true));
       setTimeout(() => resolve(false), 1000);
     });
     expect(redrawn, '받아 오면 화면을 다시 그리게 한다').toBe(true);
-    expect(carPhotoUrl('avante')).toBe('car-photos/avante.jpg?v=7');
+    expect(carPhotoUrl('corolla')).toBe('car-photos/corolla.jpg?v=7');
   });
 
   it('이미 받았으면 다시 받지 않는다', async () => {

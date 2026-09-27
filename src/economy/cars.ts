@@ -44,7 +44,7 @@ export interface CarSpec {
    * 오른 그 판에서 차가 바뀐다. 이 게임이 보상하려는 것과 화면이 보여 주는 것이
    * 그제야 같은 박자로 움직인다.
    *
-   * 값은 **1~9** 다. 차가 아홉 대인데 레벨은 열이라 마지막 레벨에는 새 차가 없다 —
+   * 값은 **1~9** 다. 차가 다섯 대라(홀수 레벨마다 한 대) 마지막 레벨에는 새 차가 없다 —
    * L9 의 차가 L10 까지 간다 (`carForLevel`). 마지막 레벨은 새 차를 받는 자리가 아니라
    * 경험치를 끝까지 채우고 나쁜 습관을 모두 고쳐 이 과정을 마치는 자리다.
    */
@@ -125,32 +125,12 @@ export interface CarAnchors {
  * 고성능을 지나 슈퍼카로 간다. 한 판 올라갈 때마다 차가 눈에 띄게 달라져야 오른 것이
  * 보인다.
  *
- *   L1 아반떼 N · L2 코롤라 · L3 K5 · L4 쏘렌토 · L5 M5 CS
- *   L6 콜벳 C8 · L7 M8 컨버터블 · L8 SL63 · L9 SF90 (L10 까지 이 차)
+ *   L1 코롤라 · L3 K5 · L5 쏘렌토 · L7 콜벳 C8 · L9 SF90 (L10 까지 이 차)
+ *
+ * **홀수 레벨마다 한 대다.** 한때 아홉 대가 레벨마다 한 대였는데, 비상업(CC BY-NC) 조건이던 네 대(아반떼 N · M5 ·
+ * M8 · SL63)를 뺐다 (2026-09-27, 사용자: "영리 목적으로 사용하면 안 되는 부분을 모두 빼줘"). 짝수 레벨은 타던 차로 오른다.
  */
 export const CARS: CarSpec[] = [
-  /*
-    기본 차량 (STARTER_CAR_ID). 실내 텍스처가 있으면서 **가장 가벼운** 국산 모델이다(20만 면).
-
-    치수는 2024년형 아반떼 N(CN7) 제원 4,710×1,825×1,415 에서 왔다(전폭만 0.82배).
-    cabinFront 0.264 는 모델 실측과 맞는다 — 중앙선 단면에서 앞유리가 카울 z −1.11(y 1.02)
-    에서 헤더 z −0.50(y 1.35) 까지 올라가는데, 절차적 공식이 잡는 카울(−1.111)·헤더(−0.5)가
-    그대로 겹친다. 눈높이는 자동 측정이 1.234 로 나온다(수동 보정이 필요 없다).
-
-    **이 모델만 CC BY-NC 다** — 비상업적 사용만 허용된다. carModel.ts 의 크레딧 참조.
-  */
-  {
-    id: 'avante',
-    name: '현대 아반떼 N',
-    nameEn: 'Hyundai Elantra N',
-    maker: '현대',
-    level: 1,
-    tagline: '국산 준중형 세단. 차가 짧아 우회전 궤적을 가장 작게 돌 수 있다.',
-    spec: '준중형 세단 · 2,000cc 터보',
-    engineNote: 120,
-    dims: { length: 4.71, width: 1.5, height: 1.415, roofRatio: 0.45, cabinFront: 0.264, cabinRear: 0.8 },
-    color: 0x0e3b8c,
-  },
   /*
     국산 세단.
 
@@ -199,7 +179,7 @@ export const CARS: CarSpec[] = [
     name: '기아 쏘렌토',
     nameEn: 'Kia Sorento PHEV',
     maker: '기아',
-    level: 4,
+    level: 5,
     tagline: '국산 SUV. 눈높이가 높아 앞차 너머가 보이지만, 우측 사각지대는 그만큼 넓다.',
     spec: '중형 SUV · 1,598cc 하이브리드',
     engineNote: 98,
@@ -221,76 +201,12 @@ export const CARS: CarSpec[] = [
     name: '토요타 코롤라',
     nameEn: 'Toyota Corolla',
     maker: '토요타',
-    level: 2,
+    level: 1,
     tagline: '첫 차. 세계에서 가장 많이 팔린 준중형 세단으로 우회전 습관을 만든다.',
     spec: '준중형 세단 · 1,798cc',
     engineNote: 106,
     dims: { length: 4.62, width: 1.46, height: 1.46, roofRatio: 0.47, cabinFront: 0.3, cabinRear: 0.82 },
     color: 0x1e2430,
-  },
-  /*
-    수입 고성능 세단. **카탈로그에서 가장 길다**(4.975m) — 우회전 궤적이 그만큼 커진다.
-
-    아반떼 N 과 같은 제작자(Ddiaz Design) 모델이라 손댈 것이 없었다. 부품·재질 이름이
-    살아 있어(`...Window_Material`·`...InteriorA_Material`) 눈높이가 자동으로 잡히고
-    (카울 1.049 · 헤더 1.386 → 1.268), 유리도 alphaMode BLEND 라 투명 처리가 필요 없다.
-    앉힌 뒤 폭이 1.903 으로 실차 제원과 정확히 같게 나온다.
-
-    치수는 2022년형 M5 CS(F90) 제원 4,975×1,903×1,463 에서 왔다(전폭만 0.82배).
-    cabinFront 0.319 는 모델 실측 카울(z −0.90)과 맞는 값이다.
-  */
-  {
-    id: 'm5',
-    name: 'BMW M5 CS',
-    nameEn: 'BMW M5 CS',
-    maker: 'BMW',
-    level: 5,
-    tagline: '수입 고성능 세단. 카탈로그에서 가장 길어 우회전 궤적이 가장 크게 그려진다.',
-    spec: '대형 세단 · 4,395cc V8 트윈터보',
-    engineNote: 126,
-    dims: { length: 4.975, width: 1.56, height: 1.463, roofRatio: 0.42, cabinFront: 0.319, cabinRear: 0.8 },
-    color: 0x27302c,
-  },
-  /*
-    오픈 그란투리스모. **카탈로그에서 가장 가볍다** — 7만 9천 면·1.1MB 로 코롤라보다도 가볍다.
-
-    같은 Ddiaz Design 모델이지만 재질 이름 규칙이 다르다(`bMAT_Glass_025`·`bMAT_Details_INT1`).
-    그래도 유리·실내·바퀴가 이름으로 다 걸린다.
-
-    이 모델이 **차체 기준 박스 규칙**을 하나 만들게 했다. `MAT_Details_Chassis` 라는 재질이
-    있는데 실제로는 두께 없는 밑판(0.018×0.001×0.047)이라, 그것에 맞춰 스케일하면 차가
-    4% 길어진다(4.87m → 5.07m). carModel.ts 가 "길이의 15% 보다 낮은 박스는 차체가 아니다"
-    로 걸러 낸다.
-
-    치수는 2020년형 M8 컴페티션 컨버터블(F91) 제원 4,867×1,907×1,346 에서 왔다(전폭만 0.82배).
-    cabinFront 0.305 로 계산한 헤더(z −0.317)가 모델 실측 헤더(z −0.30)와 거의 겹친다.
-    **소프트톱이 닫힌 상태**로 만들어져 있어 지붕이 있다 (아래 tagline 참조).
-  */
-  {
-    id: 'm8',
-    name: 'BMW M8 컴페티션 컨버터블',
-    nameEn: 'BMW M8 Competition Convertible',
-    maker: 'BMW',
-    level: 7,
-    tagline: '오픈 그란투리스모. 슈퍼카보다 눈높이가 높아 시야는 세단에 가깝다.',
-    spec: '대형 컨버터블 · 4,395cc V8 트윈터보',
-    engineNote: 130,
-    dims: { length: 4.867, width: 1.56, height: 1.346, roofRatio: 0.34, cabinFront: 0.305, cabinRear: 0.8 },
-    color: 0x14335c,
-    /*
-      **눈높이를 자동값(앞유리에서 잰 1.11m)보다 조금 올린다.**
-
-      이 차는 대시보드가 높아 노면이 그만큼 가려진다. 눈을 올리면 대시보드 너머로 앞 노면이
-      더 들어온다 — 우회전 궤적과 정지선을 눈으로 맞춰야 하는 게임이라 그쪽이 중요하다.
-
-      한때 반대로 1.05m 까지 내려 봤는데(천장이 화면을 덮어서), 그러면 노면이 더 가려졌다.
-      천장 쪽은 모델에서 그 부분만 잘라내(remove-view-blockers.mjs 의 sphereCut) 해결했으므로
-      눈은 노면이 잘 보이는 쪽으로 올린다.
-
-      1.11 → 1.16 → **1.20m** 으로 두 번 올렸다. 앞유리 헤더가 1.26m 라 여기가 사실상
-      상한이다 — 더 올리면 눈이 헤더에 붙어 위쪽이 다시 막힌다.
-    */
-    anchors: { eye: { y: 1.2 } },
   },
   /*
     슈퍼카. **눈높이가 가장 낮다**(1.01m) — 앞차 뒤에 서면 신호등도 안 보인다.
@@ -316,35 +232,6 @@ export const CARS: CarSpec[] = [
     color: 0xc8102e,
   },
   /*
-    수입 로드스터. 카탈로그에서 **실내가 가장 촘촘한** 모델이다.
-
-    재질만 89종이고 계기 눈금(script_rt_dials_race)·바느질선(stitchesopc)·카펫·스피커가
-    따로 있다. 그만큼 무겁다 — 66만 면·7.5MB 로 카탈로그 최대다.
-
-    **부품 하나하나가 본에 물린 스킨 모델이다**(178개 중 173개). 정점의 실제 자리를
-    본 변환이 정하므로 carModel.ts 의 vertexWorld 를 거쳐야 제대로 잰다.
-
-    modelYaw 0 — 기본값(180°)으로 두면 핸들이 오른쪽에 온다(우핸들 차가 된다).
-    본 변환을 넣고 재면 핸들 x −0.46~−0.29(좌측 ✓), 계기판이 핸들 앞, 미등이 뒤에 온다.
-
-    치수는 SL63(R232) 제원 4,705×1,915×1,359 에서 왔다(전폭만 0.82배). 이 모델은
-    맨소리 킷을 씌워 낮춘 차라 실제 모델 높이는 1.274 로 나온다.
-    cabinFront 0.351 은 모델 실측 카울(z −0.70)과 맞는 값이다.
-  */
-  {
-    id: 'sl63',
-    name: '메르세데스-벤츠 SL63 맨소리',
-    nameEn: 'Mercedes-Benz SL63 Mansory',
-    maker: '메르세데스-벤츠',
-    level: 8,
-    tagline: '오픈 로드스터. 눈높이가 1.0m 로 가장 낮아 앞차 너머가 전혀 안 보인다.',
-    spec: '로드스터 · 4,000cc V8 트윈터보',
-    engineNote: 138,
-    dims: { length: 4.705, width: 1.57, height: 1.359, roofRatio: 0.38, cabinFront: 0.351, cabinRear: 0.62 },
-    color: 0x1b1b1f,
-    modelYaw: 0,
-  },
-  /*
     오픈카.
 
     이 모델은 부품이 재질별로 통합돼 있고 이름이 `Mesh6` 처럼 무의미해서, 핸들을 찾아
@@ -358,7 +245,7 @@ export const CARS: CarSpec[] = [
     name: '쉐보레 콜벳 C8 컨버터블',
     nameEn: 'Chevrolet Corvette C8 Stingray Convertible',
     maker: '쉐보레',
-    level: 6,
+    level: 7,
     tagline: '오픈카. 지붕이 없어 시야는 트이지만, 눈높이가 낮아 앞차 너머가 안 보인다.',
     spec: '미드십 컨버터블 · 6,162cc',
     engineNote: 132,
@@ -375,11 +262,11 @@ export const CARS: CarSpec[] = [
  * 예전에는 `CARS[0].id` 였는데, 목록을 보기 좋은 순서로 바꾸면 기본 차량이 조용히 따라
  * 바뀐다. 어느 차로 시작할지는 순서와 별개로 정하는 편이 맞다.
  *
- * 국산 준중형 세단이라 처음 배우는 사람에게 가장 익숙하고, 카탈로그에서 가장 짧아
- * 우회전 궤적을 잡기도 쉽다. 다만 **이 모델은 CC BY-NC** 라 비상업적 사용만 허용된다 —
- * 상업 배포로 방향이 바뀌면 여기부터 코롤라로 되돌려야 한다.
+ * 준중형 세단이라 처음 배우는 사람에게 익숙하고, 짧아서 우회전 궤적을 잡기도 쉽다. 한때 아반떼 N 이었는데 그 모델은
+ * CC BY-NC(비상업) 조건이라 2026-09-27 에 카탈로그에서 뺐다 (사용자: "영리 목적으로 사용하면 안 되는 부분을 모두 빼줘") —
+ * 남은 차는 모두 CC BY 4.0 이다.
  */
-export const STARTER_CAR_ID = 'avante';
+export const STARTER_CAR_ID = 'corolla';
 
 export function getCar(id: string): CarSpec {
   return CARS.find((c) => c.id === id) ?? CARS.find((c) => c.id === STARTER_CAR_ID) ?? CARS[0];
@@ -417,11 +304,11 @@ export const isCarUnlocked = (car: CarSpec, bestLevel: Difficulty): boolean =>
 const TOP_CAR_LEVEL = Math.max(...CARS.map((c) => c.level));
 
 /**
- * 그 레벨에서 **내주는 차** — 레벨이 오르면 이 차로 갈아탄다.
+ * 그 레벨에서 **타는 차** — 그 레벨까지 열린 차 가운데 가장 높은 것. 새 차가 열리는 레벨이면 그 차, 아니면 타던 차다.
  *
- * **마지막 레벨에는 새 차가 없다.** 차가 아홉 대인데 레벨은 열이라, L10 은 L9 의 차를
- * 그대로 탄다. 그 자리는 새 차를 받는 곳이 아니라 이 과정을 마치는 곳이다.
+ * 차가 홀수 레벨에만 있으므로(위 CARS 주석) 짝수 레벨과 마지막 레벨(L10)에는 새 차가 없다 — main.ts 는 이 값이
+ * 직전 레벨과 다를 때만 "새 차가 열렸다" 고 알린다. 한때는 레벨과 같은 번호의 차를 찾았다(레벨마다 한 대이던 때).
  */
 export const carForLevel = (level: Difficulty): CarSpec | undefined =>
-  CARS.find((c) => c.level === Math.min(level, TOP_CAR_LEVEL));
+  CARS.filter((c) => c.level <= Math.min(level, TOP_CAR_LEVEL)).sort((x, y) => y.level - x.level)[0];
 

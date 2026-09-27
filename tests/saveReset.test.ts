@@ -37,7 +37,7 @@ function playedSave(): SaveData {
   // 진행이 아닌 것들 — 초기화 뒤에도 남아야 한다
   s.settings.startView = 'driver';
   s.settings.autoNextStage = false;
-  s.seatOffsets = { sf90: 0.12, avante: -0.05 };
+  s.seatOffsets = { sf90: 0.12, corolla: -0.05 };
   return s;
 }
 
@@ -90,8 +90,8 @@ describe('진행 초기화 — 남기는 것', () => {
   });
 
   it('넘겨받은 저장본을 건드리지 않는다 (복사해서 담는다)', () => {
-    out.seatOffsets['avante'] = 9;
-    expect(before.seatOffsets['avante']).toBe(-0.05);
+    out.seatOffsets['corolla'] = 9;
+    expect(before.seatOffsets['corolla']).toBe(-0.05);
   });
 });
 
