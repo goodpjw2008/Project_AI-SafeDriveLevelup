@@ -56,6 +56,8 @@
  * 색을 여기서 정하지 않고 이름만 주는 이유는, 값은 화면의 것이고 **여기서 정하는 것은
  * "이 글자가 신호등의 어느 등인가"** 이기 때문이다.
  */
+import { version as pkgVersion } from '../package.json';
+
 export interface NamePart {
   text: string;
   /**
@@ -161,6 +163,12 @@ export const APP_TAGLINE = APP_TAGLINE_PARTS.map((p) => p.text).join('');
  * 이름과 메일 앞부분이 같은 글자라 두 번 읽히던 것을 한 번으로 줄였다.
  */
 export const APP_CONTACT = 'goodpjw2008@gmail.com';
+
+/**
+ * 앱 버전 — package.json 의 것 하나만 쓴다 (CHANGELOG 의 버전과 같다). 설정 창 맨 아래에 보인다 (사용자 요청 2026-09-27:
+ * "버전을 1.0.0 로 해줘. 설정을 누르면 가장 하단에 나오게 해줘"). 빌드 도구가 JSON 에서 이 값만 골라 싣는다.
+ */
+export const APP_VERSION: string = pkgVersion;
 /** 저작권 표기의 해 — 처음 만든 해다 (해마다 올리는 값이 아니다) */
 export const APP_COPYRIGHT_YEAR = 2026;
 

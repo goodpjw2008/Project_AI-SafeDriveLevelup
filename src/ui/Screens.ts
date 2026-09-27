@@ -11,6 +11,7 @@ import {
   APP_NAME_PARTS,
   APP_TAGLINE,
   APP_TAGLINE_PARTS,
+  APP_VERSION,
 } from '../brand';
 import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
@@ -1564,6 +1565,8 @@ export class Screens {
             </div>
           </div>
         </section>
+        <!-- 버전 — 설정 창 맨 아래 (사용자가 정했다). 값은 brand.ts 의 APP_VERSION 하나 -->
+        <p class="settings-version">버전 ${esc(APP_VERSION)}</p>
       </div>
     `;
 
