@@ -1069,7 +1069,7 @@ export class Screens {
         -->
         <div class="ai-split">
           ${this.activeCarStrip(save)}
-          ${this.habitList(c.badHabits, c.level, c.mastered, c.skills ?? {})}
+          ${this.habitList(c.badHabits, c.level, c.mastered)}
         </div>
 
         <!--
@@ -1123,6 +1123,12 @@ export class Screens {
             </div>
           </div>
         </div>
+        <!--
+          **AI 학습자 모델(개념별 숙달 · 베이즈 지식 추적)은 두 시작 버튼 아래에** — 한때 '나쁜 운전 습관' 칸 안에 있었는데
+          사용자가 정했다 (2026-09-27): "초기화면의 AI 학습자 모델 개념별 숙달 부분은 안전연습운전 · 안전운전 자율주행 하단에
+          배치하게 해줘". 습관 칸은 고칠 것에 집중하고, 숙달 레이더는 출발 버튼을 지나 마지막에 읽는 참고 자료다.
+        -->
+        ${this.skillCard(c.skills ?? {})}
         ${ai.error ? `<p class="ai-note" style="color:var(--amber)">${esc(ai.error)}</p>` : ''}
 
       </div>
@@ -1324,12 +1330,12 @@ export class Screens {
       </div>`;
   }
 
-  private habitList(habits: BadHabit[], level: Difficulty, mastered = false, skills: Knowledge = {}): string {
+  private habitList(habits: BadHabit[], level: Difficulty, mastered = false): string {
+    // 학습자 모델(개념별 숙달) 카드는 여기 아래가 아니라 두 시작 버튼 아래에 선다 (renderMenu 의 skillCard — 사용자가 정했다)
     const wrap = (body: string): string => `
       <div class="ai-habits">
         <div class="ai-habits-title">${icon('clipboard')}AI 가 기록한 나쁜 운전 습관</div>
         ${body}
-        ${this.skillCard(skills)}
       </div>`;
 
     // 마스터 — 오를 레벨은 없고, L10 코스가 무작위로 이어진다 (마스터 운행). 새로 생긴 습관은 아래처럼 그대로 보인다
