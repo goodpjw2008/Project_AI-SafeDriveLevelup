@@ -1006,6 +1006,32 @@
         opacity: 1;
         transform: none;
       }
+      /* 단계 묶음의 제목 — 장표의 ① 예측 모델 · ② LLM 구분 (ui/AiPick.ts 의 AnalyzeStep.heading). 표시가 없고 바로 보인다 */
+      .ai-pick-steps li.group {
+        margin-top: 10px;
+        padding-bottom: 2px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.14);
+        font-weight: 800;
+        color: #b9a7ff;
+      }
+      .ai-pick-steps li.group:first-child {
+        margin-top: 0;
+      }
+      /* 제목 앞의 1차 · 2차 알약 — 장표 7장의 것과 같은 보라 알약 */
+      .ai-pick-steps li.group .stage {
+        display: inline-grid;
+        place-items: center;
+        padding: 1px 9px;
+        border-radius: 999px;
+        background: #5d47ce;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+      .ai-pick-steps li:not(.group) {
+        padding-left: 6px;
+      }
       .ai-pick-steps li.on {
         color: var(--text);
       }

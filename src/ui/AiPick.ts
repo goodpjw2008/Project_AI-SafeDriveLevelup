@@ -34,6 +34,9 @@ const ANALYST_MIN_MS = 700;
 /** 결과 카드를 적어도 이만큼은 보여 준다 — 추천 사유 두 줄을 읽는 시간 */
 export const RESULT_MIN_MS = 4500;
 
+/** 분석 단계 — 글(또는 단계가 시작될 때 만드는 글)이거나 단계 묶음의 제목. `tag` 는 제목 앞의 알약 ("1차" · "2차", 장표와 같은 것) */
+export type AnalyzeStep = string | (() => string) | { heading: string; tag?: string };
+
 export interface PickResult {
   title: string;
   /** 시나리오 번호 — 갈래 한 글자 + 다섯 자리 (scenarios/scenarioCode.ts). 없으면 번호 없이 적는다 */
@@ -112,7 +115,12 @@ export class AiPickOverlay {
    * @param steps 네 단계의 글 — 함수면 그 단계가 켜지는 순간에 부른다(그때 알게 된 실제 숫자를 쓰려고)
    * @param picked AI 의 답 — 이것이 풀리고 최소 시간이 지나야 연출이 끝난다
    */
-  async analyze(steps: (string | (() => string))[], picked: Promise<unknown>): Promise<void> {
+  /**
+   * 분석 연출 — 단계 글을 차례로 켠다. `{ heading }` 항목은 단계 **묶음의 제목**이라 바로 보이고 진행률에는 들지 않는다.
+   * 사용자가 정했다 (2026-09-27): 장표의 두 단계와 같은 구분 — "① 전통 기계학습(지도학습) 기반 예측 모델 맵 추천" 아래에
+   * 브라우저의 단계들, "② 최신 AI LLM 으로 최종 맵 선택 중" 아래에 LLM 단계.
+   */
+  async analyze(steps: AnalyzeStep[], picked: Promise<unknown>): Promise<void> {
     const run = ++this.run;
     this.analystAt = 0;
     this.img.src = robotNormal;
@@ -126,20 +134,29 @@ export class AiPickOverlay {
     const title = $('ai-pick-title');
     title.innerHTML = this.titleDefault;
     title.classList.remove('named');
-    this.stepsEl.innerHTML = steps.map(() => '<li></li>').join('');
+    this.stepsEl.innerHTML = steps
+      .map((s) =>
+        typeof s === 'object'
+          ? `<li class="group on">${s.tag ? `<span class="stage">${esc(s.tag)}</span>` : ''}${withAiBadge(esc(s.heading))}</li>`
+          : '<li></li>',
+      )
+      .join('');
     const items = [...this.stepsEl.querySelectorAll('li')];
+    // 제목 줄을 뺀 실제 단계의 자리
+    const work = steps.map((s, i) => (typeof s === 'object' ? -1 : i)).filter((i) => i >= 0);
     this.bar.style.width = '0%';
 
-    for (let i = 0; i < items.length; i++) {
+    for (let k = 0; k < work.length; k++) {
       if (run !== this.run) return;
-      const text = steps[i];
+      const i = work[k];
+      const text = steps[i] as string | (() => string);
       // 'AI 가 …' 의 AI 는 배지로 — 제목 · 말풍선과 같은 모양 (brandName.ts)
       items[i].innerHTML = `<span class="mark"></span><span>${withAiBadge(
         esc(typeof text === 'function' ? text() : text),
       )}</span>`;
       items[i].className = 'on';
-      this.bar.style.width = `${((i + 0.5) / items.length) * 100}%`;
-      if (i < items.length - 1) {
+      this.bar.style.width = `${((k + 0.5) / work.length) * 100}%`;
+      if (k < work.length - 1) {
         await sleep(STEP_MS);
       } else {
         // 마지막 — AI 가 답할 때까지 (그리고 적어도 PICK_MIN_MS)

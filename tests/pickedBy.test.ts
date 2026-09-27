@@ -9,11 +9,15 @@ import { describe, expect, it } from 'vitest';
 import { advisedBy, analyzingBy, pickedByCard, pickedByHud } from '../src/ui/pickedBy';
 
 describe('추천 카드의 한 줄', () => {
-  it('AI 가 골랐으면 회사와 모델 이름을 적는다', () => {
+  // 사용자가 정했다 (2026-09-27): "세부 모델명은 적지 말아줘 — Gemini 분석, Groq 분석 정도로"
+  it('AI 가 골랐으면 회사 이름만 적는다 — 세부 모델명은 적지 않는다', () => {
     const line = pickedByCard('gemini', 'gemini-3.1-flash-lite');
     expect(line).toContain('Gemini');
-    expect(line).toContain('gemini-3.1-flash-lite');
+    expect(line).toContain('분석');
+    expect(line).not.toContain('gemini-3.1-flash-lite');
     expect(line).toContain('골라 줬어요');
+    expect(pickedByHud('groq', 'llama-3.3-70b')).not.toContain('llama');
+    expect(advisedBy('groq', 'llama-3.3-70b')).not.toContain('llama');
   });
 
   it('최종 후보 수를 주면 "최종 후보 10개 중" 이라고 말한다 — 규칙 N개 → 최종 10개 → 하나 (사용자가 헷갈렸다)', () => {
@@ -40,8 +44,8 @@ describe('주행 화면 첫 줄', () => {
   it('무엇이 분석해서 추천했는지 짧게 적는다', () => {
     const line = pickedByHud('groq', 'qwen/qwen3.8-27b');
     expect(line).toContain('Groq');
-    expect(line).toContain('qwen/qwen3.8-27b');
-    expect(line).toContain('분석해서 추천해준 맵');
+    expect(line).not.toContain('qwen/qwen3.8-27b');
+    expect(line).toContain('분석 · 추천해준 맵');
     // 달리면서 읽는 줄이라 문장이 아니라 한 토막이다
     expect(line).not.toContain('이에요');
   });
@@ -59,8 +63,8 @@ describe('주행 화면 첫 줄', () => {
     expect(pickedByHud('gemini', 'm')).toContain('picker-chip picker-gemini');
   });
 
-  it('모델 이름은 그대로 싣되 HTML 은 이스케이프한다', () => {
-    expect(pickedByHud('gemini', '<script>')).toContain('&lt;script&gt;');
+  it('모델 이름은 화면에 싣지 않는다 — 넘어와도 그대로 버린다', () => {
+    expect(pickedByHud('gemini', '<script>')).not.toContain('script');
   });
 });
 
@@ -69,10 +73,10 @@ describe('주행 화면 첫 줄', () => {
   (ui/AiPick.ts 의 setAnalyst). 시작할 때는 어느 자리가 받을지 알 수 없어서 뒤늦게 갈아 끼운다.
 */
 describe('분석 화면 제목', () => {
-  it('AI 가 답했으면 그 이름과 모델로 바꾼다', () => {
+  it('AI 가 답했으면 그 회사 이름으로 바꾼다 — 세부 모델명은 없다', () => {
     const line = analyzingBy('gemini', 'gemini-3.1-flash-lite');
     expect(line).toContain('Gemini');
-    expect(line).toContain('gemini-3.1-flash-lite');
+    expect(line).not.toContain('gemini-3.1-flash-lite'); // 세부 모델명은 적지 않는다 (사용자 결정 2026-09-27)
     expect(line).toContain('운전 습관을 분석하고 있습니다');
   });
 
@@ -91,7 +95,7 @@ describe('조언한 AI', () => {
   it('회사와 모델 이름을 적는다', () => {
     const line = advisedBy('gemini', 'gemini-3.1-flash-lite');
     expect(line).toContain('Gemini');
-    expect(line).toContain('gemini-3.1-flash-lite');
+    expect(line).not.toContain('gemini-3.1-flash-lite'); // 세부 모델명은 적지 않는다 (사용자 결정 2026-09-27)
     expect(line).toContain('조언해 준');
   });
 

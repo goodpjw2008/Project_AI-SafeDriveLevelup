@@ -318,6 +318,8 @@ async function makeAiScenario(): Promise<void> {
       : '기록된 나쁜 습관 없음 — 다음 레벨 준비';
     await aiPick.analyze(
       [
+        // 장표의 두 단계와 같은 구분 (사용자가 정했다, 2026-09-27) — ① 브라우저의 예측 모델, ② 외부 LLM
+        { tag: '1차', heading: '전통 기계학습(지도학습) 기반 예측 모델 맵 추천' },
         history.length ? `주행 기록 ${history.length}판을 읽는 중` : '첫 주행입니다 — 기본 판단부터 확인하는 중',
         `나쁜 운전 습관 분석 — ${habitsText}`,
         /*
@@ -334,6 +336,7 @@ async function makeAiScenario(): Promise<void> {
           OUTCOME_MODEL
             ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
             : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
+        { tag: '2차', heading: '최신 AI LLM 으로 최종 맵 선택 중' },
         () =>
           many
             ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`

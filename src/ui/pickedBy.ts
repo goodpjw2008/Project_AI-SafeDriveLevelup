@@ -28,8 +28,11 @@ const esc = (s: string): string =>
 const chip = (picker: Picker): string =>
   `<span class="picker-chip picker-${picker}">${esc(PICKER_LABEL[picker])}</span>`;
 
-/** 모델 이름 — AI 가 고른 판에만 있다 */
-const modelName = (model: string): string => `<span class="picker-model">${esc(model)}</span>`;
+/*
+  **세부 모델명은 적지 않는다.** 한때 "Gemini gemini-3.1-flash-lite 모델이 …" 처럼 모델 이름까지 적었는데, 사용자가 정했다
+  (2026-09-27): "세부 모델명은 적지 말아줘. 그냥 Gemini 분석, Groq 분석 정도로." 제공자(회사) 이름표만 남긴다. 함수의
+  `model` 인자는 부르는 쪽(main.ts · Screens.ts)을 바꾸지 않으려고 받기만 하고 쓰지 않는다.
+*/
 
 /**
  * 추천 카드의 한 줄 — 고르는 순간.
@@ -39,13 +42,13 @@ const modelName = (model: string): string => `<span class="picker-model">${esc(m
  * Gemini 나 Groq 가 이것을 골랐다는 것을 알 수 있게 해 줘." 분석 화면의 단계 글이 "규칙 N개 → 최종 10개" 를 말하고,
  * 이 줄이 "그 10개 중 누가 골랐나" 를 말한다. 무작위 마스터 운행처럼 후보가 없으면 예전 문장 그대로다.
  */
-export function pickedByCard(picker?: Picker, model?: string, courses?: number): string {
+export function pickedByCard(picker?: Picker, _model?: string, courses?: number): string {
   if (!picker) return '';
   const among = courses && courses > 0 ? `최종 후보 ${courses}개 중 ` : '';
   if (picker === 'quota') return `${chip(picker)} 일일 사용량이 초과됐어요. 아쉽지만 프로그램으로 추천했어요${among ? ` (${among.trim()})` : ''}.`;
   if (picker === 'rule') return `${chip(picker)}이 ${among}운전자에 맞는 맵을 골라 줬어요!`;
   if (picker === 'random') return `${chip(picker)}가 운전자에 맞는 맵을 골라 줬어요!`;
-  return `${chip(picker)}${model ? ` ${modelName(model)} 모델이` : '이'} ${among}운전자에 맞는 맵을 골라 줬어요!`;
+  return `${chip(picker)} 분석 — ${among}운전자에 맞는 맵을 골라 줬어요!`;
 }
 
 /**
@@ -57,11 +60,9 @@ export function pickedByCard(picker?: Picker, model?: string, courses?: number):
  *
  * 코드가 고른 판(한도 초과 · AI 없음 · 무작위)에는 빈 문자열을 준다 — 부르는 쪽이 제목을 그대로 둔다.
  */
-export function analyzingBy(picker?: Picker, model?: string): string {
+export function analyzingBy(picker?: Picker, _model?: string): string {
   if (!picker || picker === 'quota' || picker === 'rule' || picker === 'random') return '';
-  return `${chip(picker)}${
-    model ? ` ${modelName(model)} 모델이` : '이'
-  } 운전 습관을 분석하고 있습니다`;
+  return `${chip(picker)} 분석 — 운전 습관을 분석하고 있습니다`;
 }
 
 /**
@@ -73,14 +74,10 @@ export function analyzingBy(picker?: Picker, model?: string): string {
  *
  * 서버가 이름을 주지 않으면(예전 배포 · 정적 빌드) 빈 문자열이라 줄이 아예 뜨지 않는다.
  */
-export function advisedBy(picker?: Picker, model?: string): string {
+export function advisedBy(picker?: Picker, _model?: string): string {
   if (!picker || picker === 'quota' || picker === 'rule' || picker === 'random') return '';
-  // 세로 휴대폰은 짧은 꼴 — `Groq 모델의 AI 코칭` (index.html 의 .pick-short)
-  return (
-    `${chip(picker)}<span class="pick-long">${
-      model ? ` ${modelName(model)} 모델이` : '이'
-    } 조언해 준 AI 의 코칭이에요</span>` + `<span class="pick-short"> 모델의 AI 코칭</span>`
-  );
+  // 세로 휴대폰은 짧은 꼴 — `Groq AI 코칭` (index.html 의 .pick-short)
+  return `${chip(picker)}<span class="pick-long"> 분석 — 조언해 준 AI 의 코칭이에요</span>` + `<span class="pick-short"> AI 코칭</span>`;
 }
 
 /**
@@ -89,7 +86,7 @@ export function advisedBy(picker?: Picker, model?: string): string {
  * **짧게 적는다** (사용자가 두 번 줄였다): `Gemini : <모델> 모델이 분석해서 추천해준 맵`.
  * 달리면서 읽는 줄이라 한 번에 눈에 들어와야 하고, 판 이름이 바로 아래 줄에 또 있다.
  */
-export function pickedByHud(picker?: Picker, model?: string): string {
+export function pickedByHud(picker?: Picker, _model?: string): string {
   if (!picker) return '';
   const head = chip(picker);
   /*
@@ -102,5 +99,5 @@ export function pickedByHud(picker?: Picker, model?: string): string {
   if (picker === 'quota') return pair(' : 일일 사용량 초과로 프로그램이 고른 맵', ' 한도 초과 · 프로그램 맵');
   if (picker === 'rule') return pair(' : 프로그램이 고른 맵', ' 프로그램 맵');
   if (picker === 'random') return pair(' : 무작위로 고른 마스터 운행 맵', ' 무작위 마스터 맵');
-  return pair(` : ${model ? `${modelName(model)} 모델이 ` : ''}분석해서 추천해준 맵`, ' 추천 맵');
+  return pair(' 분석 · 추천해준 맵', ' 추천 맵');
 }
