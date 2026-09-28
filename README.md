@@ -11,8 +11,19 @@
 
 AI를 통해서 안전한 도로가 되었으면 좋겠습니다. 아래 주소로 접속해서 안전운전을 연습해봐요.
 
-* 서비스 주소 : https://safedrive.ai.kr
-* 포트폴리오 : https://safedrive.ai.kr/AI_safelevelup_portfolio.html
+<table>
+  <tr>
+    <td valign="middle">
+      <p><b>서비스 주소</b> : <a href="https://safedrive.ai.kr">https://safedrive.ai.kr</a></p>
+      <p><b>포트폴리오</b> : <a href="https://safedrive.ai.kr/AI_safelevelup_portfolio.html">https://safedrive.ai.kr/AI_safelevelup_portfolio.html</a></p>
+      <p>휴대폰 카메라로 오른쪽 QR코드를 찍으면 설치 없이 바로 연습할 수 있습니다.</p>
+    </td>
+    <td width="180" align="center" valign="middle">
+      <a href="https://safedrive.ai.kr"><img src="docs/qr-safedrive.png" width="160" alt="safedrive.ai.kr 로 바로 가는 QR코드"></a><br>
+      <sub>QR코드로 바로 접속</sub>
+    </td>
+  </tr>
+</table>
 
 <a href="https://safedrive.ai.kr/AI_safelevelup_portfolio.html"><img src="docs/portfolio-slideshow.webp" alt="AI 안전운전 레벨업 포트폴리오 — 장표 10장이 저절로 넘어갑니다" width="880"></a>
 
