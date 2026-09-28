@@ -49,7 +49,9 @@ import {
 import {
   habitsTestedBy,
   libraryEntry,
+  libraryReady,
   scenarioLibrary,
+  warmLibrary,
 } from './scenarios/library';
 import { zoneCourse } from './scenarios/zoneCourse';
 import { offlineCourses } from './scenarios/offlineCourse';
@@ -125,6 +127,28 @@ let paused = false;
  * 보여 주는 것이 이 기능이다. 첫 화면으로 나가면 꺼진다.
  */
 let aiDriving = false;
+
+/**
+ * **브라우저가 한 번 그릴 때까지 기다린다.** 버튼을 '만드는 중' 으로 바꾼 뒤 곧바로 무거운 일을 하면 그 바뀐 모습이
+ * 그려지지 않는다 — 한 프레임을 넘기고 다시 한 번 차례를 넘겨야 화면에 실린다.
+ */
+const nextPaint = (): Promise<void> =>
+  new Promise((r) => requestAnimationFrame(() => window.setTimeout(r, 0)));
+
+/**
+ * **시나리오 라이브러리를 첫 화면이 뜬 뒤 한가할 때 미리 만든다** (scenarios/library.ts 의 warmLibrary — 12ms 씩 나눠
+ * 화면을 멈추지 않는다). 예전에는 '연습' 을 처음 누를 때 6~8초를 한꺼번에 만들어 그동안 아무 반응이 없었다
+ * (사용자가 짚었다, 2026-09-28). 한 번만 건다.
+ */
+let libraryWarmupScheduled = false;
+function scheduleLibraryWarmup(): void {
+  if (libraryWarmupScheduled || libraryReady()) return;
+  libraryWarmupScheduled = true;
+  const idle = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number })
+    .requestIdleCallback;
+  if (idle) idle(() => void warmLibrary(), { timeout: 1500 });
+  else window.setTimeout(() => void warmLibrary(), 600);
+}
 
 /**
  * AI 맞춤 훈련 — 만들어 둔 판과 그 상태.
@@ -207,6 +231,20 @@ async function makeAiScenario(): Promise<void> {
     순으로 불려서, 순서를 바꾸면 방금 씌운 덮개가 그 자리에서 걷힌다.
   */
   renderMenu();
+  /*
+    **눌린 것이 먼저 보인다.** 버튼이 '다음 판을 만드는 중…' 으로 바뀐 것을 브라우저가 그리게 한 프레임 넘기고,
+    곧바로 분석 덮개를 씌운다 — 후보를 추리는 일(모델 채점)은 덮개가 뜬 **뒤에** 한다. 라이브러리가 아직 없으면
+    (첫 화면이 뜨자마자 눌렀을 때) 덮개에 그 사실을 적고 나눠 만드는 것을 기다린다 (library.ts 의 warmLibrary).
+    사용자가 짚었다 (2026-09-28): "버튼을 누르면 바로 반응을 하지 않고 … 사용자는 내가 버튼을 눌렀는지 알 수가 없어."
+  */
+  await nextPaint();
+  if (!libraryReady()) {
+    aiPick.prepare([
+      { tag: '준비', heading: '시나리오 라이브러리 준비' },
+      '시나리오 22,818판을 처음 한 번 만드는 중 — 다음부터는 바로 시작합니다',
+    ]);
+    await warmLibrary();
+  }
   const zoneTurn = rollSchoolZoneTurn();
   /*
     **신호기 없는 보호구역이 몇 판째 없었으면 이번 판은 반드시 그 판이다** (recommend.ts 의 `noSignalZoneDue`).
@@ -275,6 +313,7 @@ async function makeAiScenario(): Promise<void> {
     const recentIds = [...saveData.history.map((r) => r.st), ...aiTraining.made.map((s) => s.id)];
     // 마스터 운행 — 학습자 모델이 가장 옅어진 개념을 시험하는 코스에서 고른다 (recommend.ts)
     const pick = masterPick(recentIds, Math.random, c.skills);
+    aiPick.hide(); // 라이브러리 준비 덮개가 떠 있었을 수 있다 — 마스터 운행은 분석 연출 없이 바로 달린다
     aiTraining.busy = false;
     aiTraining.made.push(pick.scenario);
     aiCourse = true;
@@ -294,6 +333,12 @@ async function makeAiScenario(): Promise<void> {
       마지막 단계는 AI 의 답이 올 때까지 돈다.
     */
     let counts = { candidates: 0, courses: 0 };
+    // 후보 채점(recommendScenario 의 동기 앞부분)이 도는 동안에도 덮개가 보이게 — 먼저 띄우고 한 프레임 넘긴다
+    aiPick.prepare([
+      { tag: '1차', heading: '전통 기계학습(지도학습) 기반 예측 모델 맵 추천' },
+      history.length ? `주행 기록 ${history.length}판을 읽는 중` : '첫 주행입니다 — 기본 판단부터 확인하는 중',
+    ]);
+    await nextPaint();
     /*
       마지막 인자는 **실제로 탄 판**이다 — `recentIds` 에는 추천만 되고 아직 안 탄 판이 섞여 있어
       (aiTraining.made), 경험 커버리지가 그것을 "겪었다" 로 세면 거짓이 된다 (recommend.ts 의 coverageOf).
@@ -750,13 +795,29 @@ function renderMenu(): void {
       "규정대로 하면 이렇게 된다" 를 보여 주는 기능이라 레벨 · 잠금과 무관하게 돈다.
       적색 · 보행자 · 우회전 신호등 · 보호구역 · 앞차 · 꼬리물기를 한 바퀴에 모두 보여 준다.
     */
-    onAiDrive: () => {
-      aiDriving = true;
-      aiCourse = false;
-      // **열 판, 사용자가 정한 차례 그대로** (scenarios/offlineCourse.ts) — 교차로 여덟 + 보호구역 전용 도로 둘
-      demoQueue = offlineCourses().map((e) => e.spec.id);
-      goRun(demoQueue[0]);
-    },
+    onAiDrive: () =>
+      void (async () => {
+        /*
+          **누른 즉시 반응한다** — 버튼을 잠그고 '준비 중…' 으로 바꾼 뒤 덮개를 씌우고 한 프레임 넘긴다. 열 판을 고르는
+          일(offlineCourses)은 라이브러리가 있어야 하는데, 첫 화면이 뜨자마자 누르면 아직 만드는 중일 수 있다 —
+          그때는 나눠 만드는 것을 기다린다 (library.ts 의 warmLibrary). 사용자가 짚었다 (2026-09-28).
+        */
+        if (aiDriving) return;
+        aiDriving = true;
+        for (const id of ['btn-ai-drive', 'btn-generate']) {
+          const b = document.getElementById(id) as HTMLButtonElement | null;
+          if (b) b.disabled = true;
+        }
+        const btn = document.getElementById('btn-ai-drive');
+        if (btn) btn.textContent = '준비 중…';
+        showLoading('안전운전 자율주행을 준비하는 중', { immediate: true });
+        await nextPaint();
+        await warmLibrary();
+        aiCourse = false;
+        // **열 판, 사용자가 정한 차례 그대로** (scenarios/offlineCourse.ts) — 교차로 여덟 + 보호구역 전용 도로 둘
+        demoQueue = offlineCourses().map((e) => e.spec.id);
+        goRun(demoQueue[0]);
+      })(),
     onShop: () => nav.go({ name: 'shop', enter: renderShop }),
     onHelp: () => nav.go({ name: 'help', enter: renderHelp }),
     onZoneHelp: () => nav.go({ name: 'zone-help', enter: renderZoneHelp }),
@@ -777,6 +838,7 @@ function renderMenu(): void {
     onBadges: () => nav.go({ name: 'badges', enter: renderBadges }),
   }, aiTraining);
   showSiteStatsOnMenu();
+  scheduleLibraryWarmup();
 }
 
 /**

@@ -120,6 +120,30 @@ export class AiPickOverlay {
    * 사용자가 정했다 (2026-09-27): 장표의 두 단계와 같은 구분 — "① 전통 기계학습(지도학습) 기반 예측 모델 맵 추천" 아래에
    * 브라우저의 단계들, "② 최신 AI LLM 으로 최종 맵 선택 중" 아래에 LLM 단계.
    */
+  /**
+   * **누른 즉시 덮개를 띄운다** — 연출(analyze)은 후보를 추린 뒤에야 시작되는데, 그 앞의 준비(라이브러리 만들기 ·
+   * 후보 채점)가 몇 초 걸리면 그동안 메뉴가 그대로라 눌렀는지 알 수 없었다 (사용자가 짚었다, 2026-09-28). 여기서는
+   * 시계 없이 제목과 첫 단계만 바로 그리고, 준비가 끝나면 analyze 가 같은 자리를 이어받아 단계를 차례로 켠다.
+   */
+  prepare(steps: AnalyzeStep[]): void {
+    this.run++;
+    this.analystAt = 0;
+    this.img.src = robotNormal;
+    this.root.classList.remove('result');
+    this.root.hidden = false;
+    const title = $('ai-pick-title');
+    title.innerHTML = this.titleDefault;
+    title.classList.remove('named');
+    this.stepsEl.innerHTML = steps
+      .map((s) =>
+        typeof s === 'object'
+          ? `<li class="group on">${s.tag ? `<span class="stage">${esc(s.tag)}</span>` : ''}${withAiBadge(esc(s.heading))}</li>`
+          : `<li class="on"><span class="mark"></span><span>${withAiBadge(esc(typeof s === 'function' ? s() : s))}</span></li>`,
+      )
+      .join('');
+    this.bar.style.width = '4%';
+  }
+
   async analyze(steps: AnalyzeStep[], picked: Promise<unknown>): Promise<void> {
     const run = ++this.run;
     this.analystAt = 0;

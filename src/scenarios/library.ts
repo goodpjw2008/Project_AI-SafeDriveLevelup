@@ -1699,27 +1699,87 @@ export function isCombinedLevel(level: number): boolean {
   return level > last;
 }
 
-/** 조합 규칙을 통과하는 **모든** 태그 — 검증 전 후보다 */
-export function allCombinations(): LibraryTags[] {
-  const out: LibraryTags[] = [];
-  /*
-    **방향(side)은 곱하지 않고 뒤에 붙인다.** 열세 축을 곱한 조합마다 성립하면 `auto` 를 넣고, 거울로 뒤집어 다른 장면이
-    되면 `flip` 을 바로 뒤에 넣는다 — 축을 곱하면 성립 검사가 두 배가 되고, 뒤집어도 같은 판(사람 없음 · 양쪽 대칭)까지 생긴다.
-  */
-  const keys = AXIS_KEYS.filter((k) => k !== 'side');
-  const walk = (i: number, acc: Partial<LibraryTags>): void => {
-    if (i === keys.length) {
-      const t = { ...acc, side: 'auto' } as LibraryTags;
-      if (!combinationAllowed(t)) return;
-      out.push(t);
-      if (flipMatters(t)) out.push({ ...t, side: 'flip' });
+/**
+ * **조합 걷기 — 이어서 할 수 있는 상태.**
+ *
+ * 열세 축의 원시 조합은 1,382만 개이고 그중 1만 5천 개만 성립한다. 예전에는 재귀로 걸으며 단계마다 객체를 복사해
+ * (`{ ...acc, [k]: v }`) 첫 호출에 6~7초가 걸렸고, 그 시간에 화면이 멈춰 '연습' 버튼을 눌러도 아무 반응이 없었다
+ * (사용자가 짚었다, 2026-09-28: "버튼을 누르면 바로 반응을 하지 않고 시간이 지나면 분석화면이 나와").
+ *
+ * 지금은 **주행 거리계(odometer)처럼** 축마다 자리 하나씩 올리며 한 객체를 고쳐 쓰고, 성립하는 조합만 복사한다.
+ * 그리고 시간을 정해 두고 걷다가 멈출 수 있어(`stepWalk`) 브라우저가 그 사이에 화면을 그린다 (`warmLibrary`).
+ * 나오는 순서는 예전 재귀와 같다 — 첫 축이 가장 느리게, 마지막 축이 가장 빠르게 돈다 (번호가 이 순서에 걸려 있다).
+ */
+interface ComboWalk {
+  /** 축마다 지금 가리키는 값의 자리 */
+  idx: number[];
+  done: boolean;
+  out: LibraryTags[];
+}
+/** side 를 뺀 열세 축 — side 는 곱하지 않고 뒤에 붙인다 (아래 stepWalk) */
+const COMBO_KEYS = AXIS_KEYS.filter((k) => k !== 'side');
+
+function newWalk(): ComboWalk {
+  return { idx: COMBO_KEYS.map(() => 0), done: false, out: [] };
+}
+
+/**
+ * 조합 걷기를 `budgetMs` 만큼 진행한다 (Infinity 면 끝까지).
+ *
+ * **방향(side)은 곱하지 않고 뒤에 붙인다.** 열세 축을 곱한 조합마다 성립하면 `auto` 를 넣고, 거울로 뒤집어 다른 장면이
+ * 되면 `flip` 을 바로 뒤에 넣는다 — 축을 곱하면 성립 검사가 두 배가 되고, 뒤집어도 같은 판(사람 없음 · 양쪽 대칭)까지 생긴다.
+ */
+function stepWalk(w: ComboWalk, budgetMs: number): void {
+  if (w.done) return;
+  const keys = COMBO_KEYS;
+  const last = keys.length - 1;
+  const deadline = budgetMs === Infinity ? Infinity : performance.now() + budgetMs;
+  // 고쳐 쓰는 한 객체 — 성립하는 조합만 복사해 내보낸다. 키 차례는 예전 재귀와 같게 열세 축 뒤에 side (JSON 이 같게)
+  const accAny: Record<string, unknown> = {};
+  for (let i = 0; i <= last; i++) accAny[keys[i]] = AXES[keys[i]][w.idx[i]];
+  accAny.side = 'auto';
+  const acc = accAny as unknown as LibraryTags;
+  let n = 0;
+  for (;;) {
+    if (combinationAllowed(acc)) {
+      const t = { ...acc };
+      w.out.push(t);
+      if (flipMatters(t)) w.out.push({ ...t, side: 'flip' });
+    }
+    // 거리계 한 칸 — 마지막 축부터 올리고, 끝에 닿으면 0 으로 돌리며 앞 축을 올린다
+    let i = last;
+    while (i >= 0) {
+      const values = AXES[keys[i]];
+      if (++w.idx[i] < values.length) {
+        accAny[keys[i]] = values[w.idx[i]];
+        break;
+      }
+      w.idx[i] = 0;
+      accAny[keys[i]] = values[0];
+      i--;
+    }
+    if (i < 0) {
+      w.done = true;
       return;
     }
-    const k = keys[i];
-    for (const v of AXES[k]) walk(i + 1, { ...acc, [k]: v });
-  };
-  walk(0, {});
-  return out;
+    // 1024 칸마다 시계를 본다 — 매 칸 보면 시계 읽는 값이 걷는 값보다 커진다
+    if ((++n & 1023) === 0 && performance.now() > deadline) return;
+  }
+}
+
+/** 처음 부를 때 한 번 걷는다 — warmLibrary 가 나눠 걷던 중이면 남은 만큼만 이어서 걷는다 */
+let combosWalk: ComboWalk | null = null;
+let combosCache: LibraryTags[] | null = null;
+
+/** 조합 규칙을 통과하는 **모든** 태그 — 검증 전 후보다 */
+export function allCombinations(): LibraryTags[] {
+  if (!combosCache) {
+    const w = (combosWalk ??= newWalk());
+    stepWalk(w, Infinity);
+    combosCache = w.out;
+    combosWalk = null;
+  }
+  return combosCache;
 }
 
 /** 거울로 뒤집으면 **다른 장면**이 되는가 — 한쪽에서만 오는 횡단보도가 하나라도 있을 때 (mirrorableCrosswalks) */
@@ -1747,13 +1807,81 @@ let byId: Map<number, LibraryEntry> | null = null;
  */
 export function scenarioLibrary(): readonly LibraryEntry[] {
   if (!cache) {
-    cache = numberedTags()
-      .filter((t) => !playtestExcluded(t))
-      .map(entryFor);
-    assignLevels(cache);
+    const b = startBuild();
+    buildSome(b, Infinity);
+    finishBuild(b);
   }
-  return cache;
+  return cache!;
 }
+
+/**
+ * **나눠 만들기** — 판 만들기(entryFor)를 이어서 할 수 있는 상태. 조합 걷기(combosWalk)와 함께 warmLibrary 가 쓰고,
+ * 도중에 scenarioLibrary() 가 불리면 남은 만큼만 동기로 이어서 끝낸다 — 두 번 만들지 않는다.
+ */
+interface EntryBuild {
+  tags: LibraryTags[];
+  out: LibraryEntry[];
+  i: number;
+}
+let building: EntryBuild | null = null;
+let warming: Promise<readonly LibraryEntry[]> | null = null;
+
+function startBuild(): EntryBuild {
+  return (building ??= { tags: numberedTags().filter((t) => !playtestExcluded(t)), out: [], i: 0 });
+}
+function buildSome(b: EntryBuild, budgetMs: number): void {
+  const deadline = budgetMs === Infinity ? Infinity : performance.now() + budgetMs;
+  while (b.i < b.tags.length) {
+    b.out.push(entryFor(b.tags[b.i++]));
+    if ((b.i & 255) === 0 && performance.now() > deadline) return;
+  }
+}
+function finishBuild(b: EntryBuild): void {
+  assignLevels(b.out);
+  cache = b.out;
+  building = null;
+}
+/** 브라우저에 한 번 차례를 넘긴다 — 그 사이에 화면을 그리고 누른 것을 받는다 */
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+/**
+ * **라이브러리를 화면을 멈추지 않고 미리 만든다.** 첫 화면이 뜬 뒤 한가할 때 main.ts 가 부르고, '연습' · '자율주행'
+ * 버튼도 이것을 기다린다 — 그래서 누른 순간 눌림 표시와 분석 화면이 바로 그려지고, 만드는 일은 뒤에서 이어진다.
+ *
+ * 한 번에 12ms 씩 걷고 브라우저에 차례를 넘긴다. 이미 다 만들었으면 바로 그것을 준다. 도중에 누가 scenarioLibrary()
+ * 를 동기로 불렀으면(맵 체험 등) 그쪽이 남은 것을 이어서 끝내므로 여기서는 그 결과를 돌려준다.
+ */
+export function warmLibrary(): Promise<readonly LibraryEntry[]> {
+  if (cache) return Promise.resolve(cache);
+  return (warming ??= (async () => {
+    const SLICE_MS = 12; // 조각 하나가 한 프레임(16ms) 안에 끝나게 — 그 사이 화면이 60fps 로 움직인다
+    if (!combosCache) {
+      const w = (combosWalk ??= newWalk());
+      while (!w.done && !combosCache) {
+        stepWalk(w, SLICE_MS);
+        await tick();
+      }
+      if (!combosCache && w.done) {
+        combosCache = w.out;
+        combosWalk = null;
+      }
+      await tick();
+    }
+    if (!cache) {
+      const b = startBuild(); // 번호 매기기(정렬)는 여기서 한 번에 — 수십 ms
+      await tick();
+      while (b.i < b.tags.length && !cache) {
+        buildSome(b, SLICE_MS);
+        await tick();
+      }
+      if (!cache) finishBuild(b);
+    }
+    return cache!;
+  })());
+}
+
+/** 라이브러리가 이미 만들어져 있는가 — 버튼이 기다릴지 말지 고를 때 */
+export const libraryReady = (): boolean => cache !== null;
 
 let numbered: LibraryTags[] | null = null;
 
