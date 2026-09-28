@@ -465,6 +465,54 @@
         font-weight: 800;
         color: var(--green);
       }
+      /* About 의 주소 · QR코드 줄 — 휴대폰으로 찍어 이어서 연습하게 (사용자 요청) */
+      .about-site {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-top: 14px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+      .about-qr {
+        flex: none;
+        padding: 4px;
+        border-radius: 10px;
+        background: #fff;
+        line-height: 0;
+      }
+      .about-qr img {
+        display: block;
+        width: 112px;
+        height: 112px;
+      }
+      .about-site-text {
+        min-width: 0;
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--text);
+        word-break: keep-all;
+      }
+      .about-site-text b {
+        margin-right: 8px;
+      }
+      .about-site-text > a {
+        color: var(--green);
+        font-weight: 800;
+        text-decoration: none;
+      }
+      .about-site-text p {
+        margin: 4px 0 0;
+        color: var(--muted);
+      }
+      @media (max-width: 620px) {
+        .about-site {
+          flex-direction: column;
+          text-align: center;
+        }
+      }
       .about-maker {
         display: flex;
         flex-wrap: wrap;
@@ -1885,6 +1933,50 @@
         line-height: 1.5;
         color: var(--text);
         word-break: keep-all;
+      }
+      /*
+        **제목 끝의 QR코드 — PC 에서만.** (사용자 요청) 휴대폰으로 찍어 이어서 연습하라는 문이라,
+        손가락 화면(이미 휴대폰)에서는 뜻이 없고 제목 줄만 밀어 감춘다.
+        80px 이면 제목 줄(글자 54px + 안쪽 여백)과 높이가 같아 히어로가 커지지 않고, 1배 화면에서도 한 칸이 2.4px 이라
+        휴대폰을 가까이 대면 읽힌다. 마우스를 올리면 2.5배로 커져 더 쉽게 읽힌다.
+        흰 바탕을 깐 까닭: QR 은 어두운 바탕 위에 바로 놓으면 카메라가 여백을 못 찾는다.
+      */
+      .brand-qr {
+        display: block;
+        align-self: center;
+        flex: none;
+        /*
+          위아래 마이너스 여백 — QR(86px)이 제목 줄(54px)보다 커서 그냥 두면 히어로가 그만큼 자란다.
+          히어로의 안쪽 여백(16px)을 QR 이 쓰게 해 상자는 8px 만 자란다 (사용자가 이 상자의 높이를 아꼈다).
+        */
+        margin: -12px 0;
+        padding: 3px;
+        border-radius: 8px;
+        background: #fff;
+        line-height: 0;
+        transition: transform 0.18s ease;
+        transform-origin: right center;
+      }
+      .brand-qr img {
+        display: block;
+        width: 80px;
+        height: 80px;
+      }
+      /*
+        손가락 화면(휴대폰 · 태블릿)에서는 뺀다 — main.ts 가 마우스 없는 기기에 붙이는 body.touch 로 가른다.
+        (@media (pointer: coarse) 블록을 새로 만들지 않는 까닭: tests/mobileHome 이 첫 coarse 블록을 주행 HUD 의 것으로 읽는다)
+      */
+      body.touch .brand-qr {
+        display: none;
+      }
+      @media (hover: hover) {
+        .brand-qr:hover,
+        .brand-qr:focus-visible {
+          position: relative;
+          z-index: 3;
+          transform: scale(2.5);
+          box-shadow: var(--shadow-1);
+        }
       }
       .brand-red,
       .brand-yellow,

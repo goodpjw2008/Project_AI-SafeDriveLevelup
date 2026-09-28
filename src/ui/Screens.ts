@@ -11,11 +11,13 @@ import {
   APP_NAME_PARTS,
   APP_TAGLINE,
   APP_TAGLINE_PARTS,
+  APP_SITE,
   APP_VERSION,
 } from '../brand';
 import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
 import robotTurn from '../assets/airobot/turnlight.webp';
+import qrSite from '../assets/qr-site.png';
 import { fetchCoaching, fetchHabitReport, toCoachRequest } from '../coach/client';
 import { MIN_RUNS, summarize, weakestPoint, type HabitSummary } from '../coach/habits';
 import { CARS_BY_LEVEL, getCar, isCarUnlocked, type CarSpec } from '../economy/cars';
@@ -781,6 +783,13 @@ export class Screens {
                 ? `<span class="brand-keep">${esc(p.text)}</span>`
                 : esc(p.text),
           ).join('')}</p>
+          <!--
+            **PC 에서만 제목 끝에 QR코드** (사용자 요청: "pc버전에만 제목 옆에 마지막에 qr코드를 노출시켜줘").
+            휴대폰으로 찍어 그 자리에서 이어서 연습하라는 문이다 — 손가락 화면은 이미 그 휴대폰 안이라 뜻이 없고
+            제목 줄만 밀어, CSS(.brand-qr)가 손가락 화면(pointer: coarse)에서는 감춘다. 작아서 마우스를 올리면 커진다.
+          -->
+          <a class="brand-qr" href="${esc(APP_SITE)}" title="휴대폰 카메라로 찍으면 ${esc(APP_SITE)} 로 바로 갑니다"
+            aria-label="사이트 QR코드"><img src="${qrSite}" alt="${esc(APP_SITE)} QR코드" width="80" height="80" /></a>
         </div>
         <!--
           **연습은 하나다 — AI 연습.**
@@ -2749,6 +2758,14 @@ export class Screens {
           <p>아빠 차를 타며 헷갈리는 상황들을 많이 봤었습니다. 그리고 AI를 활용해서 훈련하는 곳을 만들면 많은 사람들이
             교통법규도 잘 지키고 안전하게 운전을 할 수 있을 것 같아서 만들게 되었습니다.</p>
           <p class="about-wish">AI를 통해서 안전한 도로가 되었으면 좋겠습니다.</p>
+        </div>
+      </div>
+      <!-- 사이트 주소와 QR코드 — 휴대폰으로 찍어 이어서 연습하게 (사용자 요청: "about에도 qr코드를 넣어줘") -->
+      <div class="about-site">
+        <a class="about-qr" href="${esc(APP_SITE)}" aria-label="사이트 QR코드"><img src="${qrSite}" alt="${esc(APP_SITE)} QR코드" width="112" height="112" /></a>
+        <div class="about-site-text">
+          <b>서비스 주소</b><a href="${esc(APP_SITE)}">${esc(APP_SITE)}</a>
+          <p>휴대폰 카메라로 QR코드를 찍으면 설치 없이 바로 연습할 수 있습니다. PC 와 휴대폰 어디서나 됩니다.</p>
         </div>
       </div>
       <div class="about-maker">
