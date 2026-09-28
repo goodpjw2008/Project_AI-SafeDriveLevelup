@@ -176,6 +176,16 @@ export const APP_COPYRIGHT_YEAR = 2026;
 export const APP_SITE = 'https://safedrive.ai.kr';
 
 /**
+ * **주의사항** — 프로토타입이고 교육용 도구라는 것 (사용자가 문구를 정했다, 2026-09-28). README 의 소개 글 아래,
+ * About 창, 설정 창 맨 아래(PC · 휴대폰)에 같은 말이 선다 — 한 곳에서 온다.
+ */
+export const APP_NOTICE_TITLE = '주의사항';
+export const APP_NOTICE_LINES: readonly string[] = [
+  '현재 프로토타입 버전으로 교통법규에 대한 정확한 테스트 및 추가 기능 개발 예정입니다.',
+  '이 프로그램은 안전운전 습관을 연습하는 교육용 도구이지, 실제 도로 상황이나 현행 법령의 해석을 보장하지 않습니다.',
+];
+
+/**
  * **검색 결과와 공유 카드에 붙는 설명** (`<meta name="description">` · `og:description`).
  *
  * 사용자가 직접 적었다. 한때는 무엇을 다루는 물건인지만 적었는데(`2023년 개정 도로교통법의

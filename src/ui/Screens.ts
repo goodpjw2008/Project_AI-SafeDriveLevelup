@@ -11,6 +11,8 @@ import {
   APP_NAME_PARTS,
   APP_TAGLINE,
   APP_TAGLINE_PARTS,
+  APP_NOTICE_LINES,
+  APP_NOTICE_TITLE,
   APP_SITE,
   APP_VERSION,
 } from '../brand';
@@ -225,6 +227,13 @@ const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'sett
 
 /** 뒤에 있던 화면 위에 뜨는 화면 — 바깥을 누르면 닫힌다 (index.html 의 `.sheet`) */
 const SHEET_IDS: ReadonlySet<ScreenId> = new Set<ScreenId>(['settings', 'credits', 'about']);
+
+/**
+ * **주의사항 상자** — 프로토타입이고 교육용 도구라는 것. About 창과 설정 창 맨 아래(PC · 휴대폰)에 같은 말이 선다
+ * (사용자 요청 2026-09-28). 문구는 brand.ts 의 APP_NOTICE_* 한 곳에서 온다 — README 의 소개 글 아래에도 같은 말이 있다.
+ */
+const noticeHtml = (): string =>
+  `<div class="app-notice"><b>※ ${esc(APP_NOTICE_TITLE)}</b> : ${APP_NOTICE_LINES.map(esc).join('<br>')}</div>`;
 
 /**
  * 시작 시점 선택지.
@@ -1580,6 +1589,8 @@ export class Screens {
             </div>
           </div>
         </section>
+        <!-- 주의사항 — 설정 창 맨 아래, PC · 휴대폰 모두 (사용자 요청). 문구는 brand.ts 의 APP_NOTICE_* -->
+        ${noticeHtml()}
         <!-- 버전 — 설정 창 맨 아래 (사용자가 정했다). 값은 brand.ts 의 APP_VERSION 하나 -->
         <p class="settings-version">버전 ${esc(APP_VERSION)}</p>
       </div>
@@ -2768,6 +2779,7 @@ export class Screens {
           <p>휴대폰 카메라로 QR코드를 찍으면 설치 없이 바로 연습할 수 있습니다. PC 와 휴대폰 어디서나 됩니다.</p>
         </div>
       </div>
+      ${noticeHtml()}
       <div class="about-maker">
         <span>만든 사람 :</span>
         <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a>
