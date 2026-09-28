@@ -583,6 +583,19 @@
         color: var(--muted);
         text-shadow: 0 1px 3px rgba(4, 6, 10, 0.85);
       }
+      /* 저작권 아래 주의사항 한 줄 — 제 줄을 차지하고(flex-basis 100%), 손가락 화면(body.touch)에서는 뺀다 */
+      .site-footer .site-notice {
+        flex-basis: 100%;
+        text-align: center;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted);
+        opacity: 0.9;
+        word-break: keep-all;
+      }
+      body.touch .site-footer .site-notice {
+        display: none;
+      }
       #screen-settings .screen-inner {
         max-width: 1180px;
         max-height: 94vh;

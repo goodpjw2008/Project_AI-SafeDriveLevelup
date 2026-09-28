@@ -335,6 +335,12 @@ function siteFooter(): string {
       <span>Copyright © ${APP_COPYRIGHT_YEAR}</span>
       <!-- 이용 조건 줄은 없다 (사용자가 정했다, 2026-09-27: "Copyright © 2026 goodpjw2008@gmail.com" 만) -->
       <a href="mailto:${esc(APP_CONTACT)}">${esc(mailName)}<span class="mail-host">@${esc(mailHost)}</span></a>
+      <!--
+        **주의사항 한 줄 — PC 에서만** (사용자 요청 2026-09-28: "pc 버전에서만 카피라이트 아래에도 한줄로").
+        휴대폰은 설정 창 맨 아래에 같은 말이 있고 첫 화면이 길어 여기서는 뺀다 (body.touch · .site-notice).
+        문구는 brand.ts 의 APP_NOTICE_* — About · 설정과 같은 말이다.
+      -->
+      <span class="site-notice">※ ${esc(APP_NOTICE_TITLE)} : ${APP_NOTICE_LINES.map(esc).join(' ')}</span>
     </footer>`;
 }
 
