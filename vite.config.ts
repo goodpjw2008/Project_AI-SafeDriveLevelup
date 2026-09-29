@@ -9,7 +9,7 @@ import { handleRecommend } from './server/recommendHandler.mjs';
 import { handleReport } from './server/reportHandler.mjs';
 import { handleScenario } from './server/scenarioHandler.mjs';
 import { handleStatsRead, handleStatsWrite } from './server/statsHandler.mjs';
-import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_SITE, APP_TAGLINE } from './src/brand';
+import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_SITE, APP_TAGLINE, NAVER_SITE_VERIFICATION } from './src/brand';
 import { CARS } from './src/economy/cars';
 
 /** 전시관 대표 사진을 저장하는 폴더 (server/carPhotoHandler.mjs) */
@@ -55,11 +55,18 @@ function brandHtml(): Plugin {
           그대로 살아남는다 — 500바이트 남짓이라 길이도 문제가 아니다.
         */
         APP_ICON: `data:image/svg+xml;base64,${Buffer.from(APP_ICON_SVG, 'utf8').toString('base64')}`,
+        // 링크 미리보기 · 검색 결과의 대표 그림 (public/og-image.png, 1200×630) — 절대 주소여야 카카오톡 · 네이버가 읽는다
+        OG_IMAGE: `${APP_SITE}/og-image.png`,
+        NAVER_VERIFICATION: NAVER_SITE_VERIFICATION,
       };
-      return html.replace(
-        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_SITE|APP_ICON)\}\}/g,
+      const filled = html.replace(
+        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_SITE|APP_ICON|OG_IMAGE|NAVER_VERIFICATION)\}\}/g,
         (_, key: string) => escapeHtml(values[key]),
       );
+      // 네이버 소유 확인 코드가 비어 있으면 그 줄을 통째로 뺀다 — 빈 content 의 태그는 없느니만 못하다 (brand.ts)
+      return NAVER_SITE_VERIFICATION
+        ? filled
+        : filled.replace(/^[ \t]*<meta name="naver-site-verification"[^>]*>[ \t]*\n/m, '');
     },
   };
 }

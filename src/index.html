@@ -25,11 +25,43 @@
     <meta property="og:url" content="{{APP_SITE}}" />
     <meta property="og:title" content="{{APP_NAME}} — {{APP_TAGLINE}}" />
     <meta property="og:description" content="{{APP_DESCRIPTION}}" />
-    <meta name="twitter:card" content="summary" />
+    <!-- 대표 그림 (public/og-image.png · 1200×630) — 링크를 붙였을 때와 네이버 · 구글 검색 결과에 뜬다 -->
+    <meta property="og:image" content="{{OG_IMAGE}}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{{APP_NAME}} — {{APP_TAGLINE}}" />
     <meta name="twitter:description" content="{{APP_DESCRIPTION}}" />
+    <meta name="twitter:image" content="{{OG_IMAGE}}" />
+    <!-- 검색 로봇 — 모두 읽어 가도 된다 (robots.txt 와 같은 말). 네이버 서치어드바이저의 점검 항목이라 적어 둔다 -->
+    <meta name="robots" content="index, follow" />
+    <!-- 네이버 서치어드바이저 소유 확인 — brand.ts 의 NAVER_SITE_VERIFICATION 이 비어 있으면 빌드가 이 줄을 뺀다 -->
+    <meta name="naver-site-verification" content="{{NAVER_VERIFICATION}}" />
     <!-- 대표 주소 — 같은 내용이 여러 주소로 잡히지 않게 한 곳을 가리킨다 -->
     <link rel="canonical" href="{{APP_SITE}}" />
+    <!--
+      **검색 엔진이 읽는 구조화 데이터** (schema.org) — 이 주소가 무엇인지(교육용 웹 앱 · 한국어 · 무료) 글로 풀지 않아도
+      알게 한다. 네이버 · 구글 모두 읽는다. 값은 위 태그들과 같은 곳(brand.ts)에서 온다.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "{{APP_NAME}}",
+        "alternateName": "{{APP_NAME}} — {{APP_TAGLINE}}",
+        "url": "{{APP_SITE}}",
+        "description": "{{APP_DESCRIPTION}}",
+        "image": "{{OG_IMAGE}}",
+        "inLanguage": "ko",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "WebGL",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" },
+        "author": { "@type": "Person", "name": "박진우" }
+      }
+    </script>
 
     <!--
       본문 글꼴 (Pretendard, SIL OFL 1.1).

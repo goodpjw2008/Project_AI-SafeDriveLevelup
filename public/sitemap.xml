@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 검색 엔진에 알리는 주소 목록 — 첫 화면과 포트폴리오 두 쪽. 네이버 서치어드바이저 · 구글 서치 콘솔에 이 파일 주소를 낸다. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://safedrive.ai.kr/</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://safedrive.ai.kr/AI_safelevelup_portfolio.html</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

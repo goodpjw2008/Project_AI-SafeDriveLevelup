@@ -176,6 +176,15 @@ export const APP_COPYRIGHT_YEAR = 2026;
 export const APP_SITE = 'https://safedrive.ai.kr';
 
 /**
+ * **네이버 서치어드바이저 소유 확인 코드** — 비어 있으면 태그를 넣지 않는다 (vite.config.ts).
+ *
+ * 구글은 DNS TXT 로 확인했지만 네이버는 HTML 태그(또는 HTML 파일)로만 확인한다. searchadvisor.naver.com → 웹마스터 도구 →
+ * 사이트 등록(https://safedrive.ai.kr) → 'HTML 태그' 를 고르면 `<meta name="naver-site-verification" content="…">` 를 주는데,
+ * 그 content 값을 여기 적고 배포한 뒤 '소유확인' 을 누른다. 사용자가 받아 와야 하는 값이라 코드에는 미리 적을 수 없다.
+ */
+export const NAVER_SITE_VERIFICATION = '';
+
+/**
  * **주의사항** — 프로토타입이고 교육용 도구라는 것 (사용자가 문구를 정했다, 2026-09-28). README 의 소개 글 아래,
  * About 창, 설정 창 맨 아래(PC · 휴대폰)에 같은 말이 선다 — 한 곳에서 온다.
  */

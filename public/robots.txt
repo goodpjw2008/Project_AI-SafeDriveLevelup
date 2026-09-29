@@ -1,0 +1,7 @@
+# 검색 로봇 안내 — 구글(Googlebot) · 네이버(Yeti) · 다음(Daum) 모두 첫 화면과 포트폴리오를 읽어 가도 된다.
+# AI 함수(/api/)는 검색할 글이 없는 호출 창구라 뺀다.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://safedrive.ai.kr/sitemap.xml
