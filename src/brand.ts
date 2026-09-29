@@ -182,7 +182,7 @@ export const APP_SITE = 'https://safedrive.ai.kr';
  * 사이트 등록(https://safedrive.ai.kr) → 'HTML 태그' 를 고르면 `<meta name="naver-site-verification" content="…">` 를 주는데,
  * 그 content 값을 여기 적고 배포한 뒤 '소유확인' 을 누른다. 사용자가 받아 와야 하는 값이라 코드에는 미리 적을 수 없다.
  */
-export const NAVER_SITE_VERIFICATION = '';
+export const NAVER_SITE_VERIFICATION = 'a9c534ca1d515d84007c44c27855473a6b9d95fd';
 
 /**
  * **주의사항** — 프로토타입이고 교육용 도구라는 것 (사용자가 문구를 정했다, 2026-09-28). README 의 소개 글 아래,
