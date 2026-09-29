@@ -22,8 +22,12 @@
  *     한 제공자에 **키를 여러 개** 넣을 수 있다 — `GEMINI_API_KEY` · `GEMINI_API_KEY1` · `GEMINI_API_KEY2` …
  *     무료 한도는 **키마다** 세므로, 키 둘이면 그 제공자의 하루치가 두 배다 (사용자가 그렇게 넣어 두었다).
  *     키 하나가 한 자리이고, 아래 차례에도 각각 들어간다.
+ *     자리는 **제공자를 번갈아** 선다 — Gemini 1번 · Groq 1번 · Gemini 2번 · Groq 2번 … (유료는 맨 뒤). 그래서 이어지는
+ *     요청이 다른 모델을 만나고, 한 제공자의 키 여덟 개를 연달아 태우지 않는다 (사용자가 정했다, 2026-09-29).
  *  2. 요청마다 **시작점을 한 칸씩 민다**(`turn`) — 고르게 돌아간다.
  *  3. 그 자리에서 실패하면 **다음 곳으로 넘어간다.** 한도를 다 쓴 날(429)에도, 잠깐 죽은 날(5xx)에도 판은 돈다.
+ *     **한도(429)를 맞은 자리는 잠시 쉰다** (`COOLDOWN_MS`) — 다음 요청들이 그 키를 헛되이 두드리지 않는다. 쉬는 자리뿐이면
+ *     그래도 한 바퀴 돌아본다: 분 단위 한도는 그새 풀렸을 수 있다.
  *  4. 전부 실패하면 마지막 이유를 그대로 돌려준다 — 부르는 쪽은 그때 **코드로 고른다**
  *     (src/scenarios/recommend.ts 의 rulePick). 한도 초과는 **품질 저하이지 중단이 아니다.**
  *
@@ -156,6 +160,8 @@ const PROVIDERS = [
     env: 'OPENAI',
     url: (env) => env.OPENAI_BASE_URL || 'https://api.openai.com/v1/chat/completions',
     models: ['gpt-4o-mini'],
+    // 유료 — 무료 자리를 번갈아 다 돈 뒤에야 차례가 온다 (providersFor)
+    paid: true,
   },
 ];
 
@@ -217,22 +223,55 @@ function modelOf(provider, env, slot, n) {
  */
 export function providersFor(env) {
   const only = (env.LLM_PROVIDER || '').trim();
-  const slots = [];
+  // 제공자마다 자리 목록을 먼저 만들고 …
+  const perProvider = [];
   for (const p of PROVIDERS) {
     if (only && p.id !== only) continue;
     const keys = keysOf(p, env);
-    keys.forEach(({ key, n }, i) =>
-      slots.push({
+    if (keys.length === 0) continue;
+    perProvider.push(
+      keys.map(({ key, n }, i) => ({
         ...p,
         keyVar: `${p.env}_API_KEY`,
         key,
+        keyNo: n,
         slot: i + 1,
         keyCount: keys.length,
         model: modelOf(p, env, i + 1, n),
-      }),
+      })),
     );
   }
-  return slots;
+  /*
+    … **번갈아 끼운다** — 1번 자리들을 제공자 차례로, 그다음 2번 자리들을, … (무료끼리 먼저, 유료는 그 뒤에 같은 식으로).
+    예전에는 Gemini 1~8 다음 Groq 1~8 이라 이어지는 요청 여덟 개가 같은 모델을 만났다.
+  */
+  const weave = (lists) => {
+    const out = [];
+    const longest = Math.max(0, ...lists.map((l) => l.length));
+    for (let i = 0; i < longest; i++) for (const l of lists) if (i < l.length) out.push(l[i]);
+    return out;
+  };
+  return [...weave(perProvider.filter((l) => !l[0].paid)), ...weave(perProvider.filter((l) => l[0].paid))];
+}
+
+/**
+ * **한도를 맞은 자리는 잠시 쉰다.** 키마다 `제공자:번호` 로 적어 두고, 그 시각까지는 차례에서 뺀다.
+ *
+ * 무료 한도는 분 단위(RPM)와 하루 단위(RPD)가 있다. 분 단위는 1분이면 풀리므로 그만큼 쉬고, 하루 단위는 1분마다 한 번씩
+ * 가볍게 다시 두드려 본다(429 는 바로 돌아오므로 비용이 거의 없다). 제공자가 `retry-after` 를 알려 주면 그 값을 따른다
+ * (10초 ~ 10분 사이로 자른다). 서버 인스턴스마다 따로 세는 값이라 완벽하지는 않지만, 같은 인스턴스가 이어서 받는 요청에서는 헛걸음이 없다.
+ */
+export const COOLDOWN_MS = 60_000;
+const resting = new Map();
+const restKey = (provider) => `${provider.id}:${provider.keyNo}`;
+const isResting = (provider, now) => (resting.get(restKey(provider)) ?? 0) > now;
+function rest(provider, retryAfterSec) {
+  const ms = retryAfterSec ? Math.min(600_000, Math.max(10_000, retryAfterSec * 1000)) : COOLDOWN_MS;
+  resting.set(restKey(provider), Date.now() + ms);
+}
+/** 시험용 — 쉬는 자리 기록을 비운다 (tests/llm.test.ts) */
+export function resetRotation() {
+  resting.clear();
 }
 
 /**
@@ -278,7 +317,13 @@ export async function callModel({ system, user, maxTokens, json = false }, env) 
   */
   if (available.length === 0) return { status: 503, body: { error: 'NO_KEY' } };
 
-  const queue = order(available, turn++);
+  /*
+    쉬는 자리는 뺀다 — 다만 **모두 쉬는 중이면 그래도 한 바퀴** 돈다 (분 단위 한도는 그새 풀렸을 수 있고, 안 물어보면
+    답이 없다). 시작점은 전체 자리 기준으로 민다 — 쉬는 자리가 빠졌다고 차례가 앞으로 쏠리지 않게.
+  */
+  const now = Date.now();
+  const awake = available.filter((p) => !isResting(p, now));
+  const queue = order(awake.length ? awake : available, turn++);
   let last = { status: 502, body: { error: 'UPSTREAM_UNREACHABLE' } };
 
   /*
@@ -294,6 +339,8 @@ export async function callModel({ system, user, maxTokens, json = false }, env) 
     if (left < 1_000) break;
     const res = await once(provider, { system, user, maxTokens, json }, env, Math.min(ATTEMPT_TIMEOUT_MS, left));
     if (res.status === 200) return res;
+    // 한도(429)만 쉬게 한다 — 400 · 404 · 5xx · 끊김은 그 요청의 사정이지 키의 사정이 아니다
+    if (res.body.status === 429) rest(provider, res.body.retryAfter);
     last = res;
   }
   return last;
@@ -355,9 +402,18 @@ async function request(provider, { system, user, maxTokens, json }, env, signal)
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
+    // 한도(429)면 언제 다시 와도 되는지 — 제공자가 초 단위로 알려 줄 때만 (없으면 undefined, 위 rest 가 기본값을 쓴다)
+    const retryAfter = res.status === 429 ? Number(res.headers?.get?.('retry-after')) || undefined : undefined;
     return {
       status: 502,
-      body: { error: 'UPSTREAM_ERROR', provider: provider.id, model, status: res.status, detail: detail.slice(0, 400) },
+      body: {
+        error: 'UPSTREAM_ERROR',
+        provider: provider.id,
+        model,
+        status: res.status,
+        detail: detail.slice(0, 400),
+        ...(retryAfter ? { retryAfter } : {}),
+      },
     };
   }
 

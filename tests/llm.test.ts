@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ATTEMPT_TIMEOUT_MS,
   BadInput,
+  COOLDOWN_MS,
   TOTAL_BUDGET_MS,
   callModel,
   num,
@@ -23,6 +24,7 @@ import {
   order,
   providersFor,
   ratio,
+  resetRotation,
   str,
 } from '../server/llm.mjs';
 import { TIMEOUT_MS as COACH_TIMEOUT_MS } from '../src/coach/client';
@@ -54,7 +56,12 @@ function stub(reply: (url: string) => { status: number; body?: unknown }): { url
 const ask = (env: Env) => callModel({ system: '시스템', user: '사용자', maxTokens: 300, json: true }, env);
 const host = (url: string): string => new URL(url).host.split('.').slice(-2)[0];
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  // 한도를 맞아 쉬는 자리 기록은 모듈에 남는다 — 시험마다 비운다
+  resetRotation();
+});
 
 describe('제공자 고르기', () => {
   it('키가 있는 곳만 후보다', () => {
@@ -67,10 +74,27 @@ describe('제공자 고르기', () => {
     **키 하나가 한 자리다.** 무료 한도는 키마다 세므로 키를 늘리면 그 제공자의 하루치가 그만큼 늘어난다 —
     사용자가 Gemini 키를 둘 넣어 두었다 (`GEMINI_API_KEY1` · `GEMINI_API_KEY2`).
   */
-  it('한 제공자에 키를 여러 개 넣으면 그만큼 자리가 는다', () => {
+  it('한 제공자에 키를 여러 개 넣으면 그만큼 자리가 는다 — 제공자를 번갈아 선다', () => {
     const slots = providersFor({ GEMINI_API_KEY1: 'a', GEMINI_API_KEY2: 'b', GROQ_API_KEY: 'q' });
-    expect(slots.map((p) => `${p.id}#${p.slot}`)).toEqual(['gemini#1', 'gemini#2', 'groq#1']);
-    expect(slots.map((p) => p.key)).toEqual(['a', 'b', 'q']);
+    expect(slots.map((p) => `${p.id}#${p.slot}`)).toEqual(['gemini#1', 'groq#1', 'gemini#2']);
+    expect(slots.map((p) => p.key)).toEqual(['a', 'q', 'b']);
+  });
+
+  it('키 여덟 개씩이면 Gemini 1 · Groq 1 · Gemini 2 · Groq 2 … — 이어지는 요청이 다른 모델을 만난다', () => {
+    const env: Env = {};
+    for (let i = 1; i <= 8; i++) {
+      env[`GEMINI_API_KEY${i}`] = `g${i}`;
+      env[`GROQ_API_KEY${i}`] = `q${i}`;
+    }
+    const slots = providersFor(env);
+    expect(slots.length).toBe(16);
+    expect(slots.slice(0, 4).map((p) => `${p.id}#${p.slot}`)).toEqual(['gemini#1', 'groq#1', 'gemini#2', 'groq#2']);
+    expect(slots[15].key).toBe('q8');
+  });
+
+  it('유료는 번갈아 끼우지 않고 맨 뒤다', () => {
+    const slots = providersFor({ GEMINI_API_KEY1: 'a', GEMINI_API_KEY2: 'b', GROQ_API_KEY1: 'q', OPENAI_API_KEY: 'o' });
+    expect(slots.map((p) => p.id)).toEqual(['gemini', 'groq', 'gemini', 'openai']);
   });
 
   it('번호 없는 키와 번호 키를 함께 쓴다 — 번호가 비어도 뒤엣것을 찾는다', () => {
@@ -174,6 +198,62 @@ describe('돌아가며 부르기', () => {
     const res = await ask({ ...ALL, GEMINI_BASE_URL: 'https://x.gemini.test/v1/chat/completions' });
     expect(res.status).toBe(200);
     expect(seen.urls.length).toBeLessThanOrEqual(3);
+  });
+
+  it('한도(429)를 맞은 키는 잠시 쉰다 — 다음 요청들이 헛되이 두드리지 않는다', async () => {
+    const seen = stub((url) => ({ status: host(url) === 'gemini' ? 429 : 200 }));
+    // 기본 Gemini 주소는 host() 가 'googleapis' 로 읽는다 — 위 400 · 404 시험처럼 시험용 주소를 준다
+    const env: Env = { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q', GEMINI_BASE_URL: 'https://x.gemini.test/v1/chat/completions' };
+    for (let i = 0; i < 4; i++) expect((await ask(env)).status).toBe(200);
+    // 시작점이 어디든 Gemini 는 딱 한 번만 맞는다 — 그 뒤로는 쉬는 자리라 차례에서 빠진다
+    expect(seen.urls.filter((u) => host(u) === 'gemini').length).toBe(1);
+  });
+
+  it('쉬는 시간이 지나면 다시 두드려 본다 — 분 단위 한도는 풀린다', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const seen = stub((url) => ({ status: host(url) === 'gemini' ? 429 : 200 }));
+    // 기본 Gemini 주소는 host() 가 'googleapis' 로 읽는다 — 위 400 · 404 시험처럼 시험용 주소를 준다
+    const env: Env = { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q', GEMINI_BASE_URL: 'https://x.gemini.test/v1/chat/completions' };
+    for (let i = 0; i < 2; i++) await ask(env);
+    expect(seen.urls.filter((u) => host(u) === 'gemini').length).toBe(1);
+    vi.setSystemTime(Date.now() + COOLDOWN_MS + 1);
+    for (let i = 0; i < 2; i++) await ask(env);
+    expect(seen.urls.filter((u) => host(u) === 'gemini').length).toBe(2);
+  });
+
+  it('모두 쉬는 중이면 그래도 한 바퀴 돈다 — 안 물어보면 답이 없다', async () => {
+    const seen = stub(() => ({ status: 429 }));
+    // 기본 Gemini 주소는 host() 가 'googleapis' 로 읽는다 — 위 400 · 404 시험처럼 시험용 주소를 준다
+    const env: Env = { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q', GEMINI_BASE_URL: 'https://x.gemini.test/v1/chat/completions' };
+    await ask(env);
+    await ask(env);
+    expect(seen.urls.length).toBe(4);
+  });
+
+  it('제공자가 retry-after 를 주면 그만큼 쉰다 (10초 ~ 10분)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const gemini: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      const g = host(url) === 'gemini';
+      if (g) gemini.push(url);
+      return Promise.resolve({
+        ok: !g,
+        status: g ? 429 : 200,
+        headers: { get: (h: string) => (h === 'retry-after' ? '180' : null) },
+        json: () => Promise.resolve({ choices: [{ message: { content: '답' } }] }),
+        text: () => Promise.resolve(''),
+      });
+    });
+    // 기본 Gemini 주소는 host() 가 'googleapis' 로 읽는다 — 위 400 · 404 시험처럼 시험용 주소를 준다
+    const env: Env = { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q', GEMINI_BASE_URL: 'https://x.gemini.test/v1/chat/completions' };
+    for (let i = 0; i < 2; i++) await ask(env);
+    expect(gemini.length).toBe(1);
+    vi.setSystemTime(Date.now() + COOLDOWN_MS + 1); // 기본 1분은 지났지만 180초는 아직
+    for (let i = 0; i < 2; i++) await ask(env);
+    expect(gemini.length).toBe(1);
+    vi.setSystemTime(Date.now() + 120_001);
+    for (let i = 0; i < 2; i++) await ask(env);
+    expect(gemini.length).toBe(2);
   });
 
   it('모두 실패하면 마지막 이유를 그대로 — 부르는 쪽이 코드로 고른다', async () => {
