@@ -21,8 +21,12 @@ export interface ProviderSlot {
   key: string;
   /** 같은 제공자 안에서 몇 번째 키인가 (1부터) */
   slot: number;
+  /** 환경변수의 번호 (`GEMINI_API_KEY3` 이면 3, 번호 없는 키는 0) — 쉬는 자리를 적을 때 쓴다 */
+  keyNo: number;
   /** 그 제공자에 넣어 둔 키 수 */
   keyCount: number;
+  /** 유료 제공자 — 번갈아 끼우지 않고 맨 뒤에 선다 */
+  paid?: boolean;
 }
 
 /** 쓸 수 있는 자리들 — **키 하나가 한 자리**다. `LLM_PROVIDER` 로 한 제공자만 못박을 수 있다 */
@@ -33,6 +37,10 @@ export declare function order<T>(available: T[], start: number): T[];
 /** 한 곳을 기다리는 시간 · 한 요청 전체의 예산 (ms) */
 export declare const ATTEMPT_TIMEOUT_MS: number;
 export declare const TOTAL_BUDGET_MS: number;
+/** 한도(429)를 맞은 키가 쉬는 시간 (ms) — 제공자가 retry-after 를 주면 그 값(10초~10분) */
+export declare const COOLDOWN_MS: number;
+/** 시험용 — 쉬는 자리 기록을 비운다 */
+export declare function resetRotation(): void;
 
 export declare function callModel(
   prompt: { system: string; user: string; maxTokens: number; json?: boolean },
