@@ -22,6 +22,8 @@ import {
   levelLabel,
   unlockedLevel,
   advance,
+  observe,
+  XP_OBSERVE_RATIO,
   checkDifficulty,
   clampToLevel,
   describesRemoved,
@@ -60,16 +62,14 @@ describe('진급', () => {
   });
 
   /*
-    **어느 레벨도 한 판으로는 오르지 않는다** — 사용자가 "1판만 했는데 레벨 2로 올라갔어 … 저랩에서 너무 쉽게" 라고 했다.
-    한 판은 운일 수 있다. 그 뒤 "레벨이 너무 늦게 오른다" 는 말에 가장 낮은 레벨을 세 판에서 **두 판**으로 줄였다 — 한 판은 아니다.
+    **직접 운전 무위반 한 판이면 오른다** — 사용자가 정했다 (2026-10-18): *"수동일때는 200xp, 자동일때는 100xp"*, 막대는 200
+    그대로. 한때 "1판만 했는데 레벨 2로 올라갔어 … 너무 쉽게" 라는 말에 두 판으로 늘렸었다 — 그 결정을 사용자가 다시 바꿨다.
   */
-  it('무위반 한 판으로는 오르지 않는다 — 가장 낮은 레벨도 두 판이다', () => {
-    let s = step(freshCurriculum(), clean());
-    expect(s.level).toBe(START_LEVEL);
-    expect(s.runs).toBe(1);
-    expect(s.xp).toBe(XP_PER_CLEAN_RUN);
-    s = step(s, clean());
+  it('직접 운전 무위반 한 판이면 오른다 — 한 판이 막대 하나(200)다', () => {
+    expect(XP_PER_CLEAN_RUN).toBe(XP_MAX);
+    const s = step(freshCurriculum(), clean());
     expect(s.level).toBe(START_LEVEL + 1);
+    expect(s.runs).toBe(1);
     expect(s.xp, '새 레벨은 빈 막대에서').toBe(0);
   });
 
@@ -108,16 +108,12 @@ describe('진급', () => {
   });
 
   /*
-    **경험치 곡선은 평평하다** — 모든 레벨이 200, 새 맵 무위반 **두 판**이면 오른다.
+    **경험치 곡선은 평평하다** — 모든 레벨이 200, 직접 운전 새 맵 무위반 **한 판**이면 오른다 (2026-10-18 — 그 전에는 두 판).
 
-    사용자가 정한 값이다: "각 단계의 레벨을 200점을 맥스로 해 줘. 2게임만 성공하면 바로 레벨업이
-    되는 거지. 레벨이 쉽게 올라야 사용자들이 체감하기 좋을 것 같아." 그 전에는 2 · 2 · 3 · 3 ·
-    3 · 3 · 4 · 4 · 4 · 4판(모두 32판)이었고, 그보다 앞서는 55판이었다.
-
-    **두 판이 바닥이다.** 한때 L1~L3 이 한 판이면 올랐는데 사용자가 짚었다 — "1판만 했는데 레벨 2로
-    올라갔어." 한 판은 운일 수 있다(보행자가 마침 안 나왔거나 신호가 마침 맞았다).
+    사용자가 정한 값이다: "각 단계의 레벨을 200점을 맥스로 해 줘." 그 전에는 2 · 2 · 3 · 3 · 3 · 3 · 4 · 4 · 4 · 4판(모두
+    32판)이었고, 그보다 앞서는 55판이었다.
   */
-  it('어느 레벨이든 새 맵 무위반 두 판이면 오른다', () => {
+  it('어느 레벨이든 직접 운전 새 맵 무위반 한 판이면 오른다', () => {
     const runsToLevelUp = (level: CurriculumState['level']): number => {
       let s = at(level);
       let n = 0;
@@ -128,16 +124,16 @@ describe('진급', () => {
       return n;
     };
     expect(([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((l) => runsToLevelUp(l))).toEqual([
-      2, 2, 2, 2, 2, 2, 2, 2, 2,
+      1, 1, 1, 1, 1, 1, 1, 1, 1,
     ]);
-    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 안전운전 마스터').toBe(2);
+    expect(XP_TO_NEXT[MAX_LEVEL] / XP_PER_CLEAN_RUN, 'L10 → 안전운전 마스터').toBe(1);
     for (let l = 1; l <= MAX_LEVEL; l++) {
       expect(XP_TO_NEXT[l as 1], `L${l}`).toBe(XP_MAX);
     }
     expect(
       Object.values(XP_TO_NEXT).reduce((n, x) => n + x, 0) / XP_PER_CLEAN_RUN,
-      '마스터까지 새 맵 무위반 20판',
-    ).toBe(20);
+      '마스터까지 새 맵 무위반 10판',
+    ).toBe(10);
   });
 
   /*
@@ -145,15 +141,15 @@ describe('진급', () => {
     어려움이 어려운 자리는 **감점**과 코스 · 주행 · 도움이다 (challenge.ts). 판을 더 많이
     달리게 하는 것은 어려움이 아니라 시간이 더 드는 것뿐이다.
   */
-  it('난이도를 바꿔도 두 판이다 — 200 이 막대의 최대치다', () => {
+  it('난이도를 바꿔도 직접 한 판 · AI 시범 두 판이다 — 200 이 막대의 최대치다', () => {
     for (const xpScale of [0.5, 0.75, 1, 1.25, 1.5]) {
       for (let l = 1; l <= MAX_LEVEL; l++) {
         const need = xpToNext(l as 1, { xpScale, missPenalty: 0 });
-        // 위로는 200 을 넘지 않고(XP_MAX), 아래로는 한 판으로 오르지 않는다(XP_FLOOR)
+        // 위로는 200 을 넘지 않고(XP_MAX), 아래로는 AI 시범 한 판으로 오르지 않는다(XP_FLOOR)
         expect(need, `×${xpScale} L${l}`).toBeLessThanOrEqual(XP_MAX);
-        expect(need, `×${xpScale} L${l}`).toBeGreaterThan(XP_PER_CLEAN_RUN);
-        // 어느 쪽이든 **무위반 두 판**이다 — 경험치는 한 판에 100 씩 들어온다
-        expect(Math.ceil(need / XP_PER_CLEAN_RUN), `×${xpScale} L${l}`).toBe(2);
+        expect(need, `×${xpScale} L${l}`).toBeGreaterThan(XP_PER_CLEAN_RUN * XP_OBSERVE_RATIO);
+        expect(Math.ceil(need / XP_PER_CLEAN_RUN), `직접 ×${xpScale} L${l}`).toBe(1);
+        expect(Math.ceil(need / (XP_PER_CLEAN_RUN * XP_OBSERVE_RATIO)), `AI ×${xpScale} L${l}`).toBe(2);
       }
     }
   });
@@ -236,8 +232,8 @@ describe('차가 열리는 자리 — bestLevel', () => {
     expect(s.bestLevel, '열리는 것은 방금 통과한 1까지다').toBe(START_LEVEL);
   });
 
-  it('무위반이어도 막대가 차기 전에는 통과가 아니다', () => {
-    const s = step(freshCurriculum(), clean());
+  it('무위반이어도 막대가 차기 전에는 통과가 아니다 — 다시 달린 맵(절반)', () => {
+    const s = advance(freshCurriculum(), clean(), undefined, undefined, { replay: true }).next;
     expect(s.level).toBe(START_LEVEL);
     expect(s.bestLevel).toBe(1);
   });
@@ -315,14 +311,14 @@ describe('마스터', () => {
 
   it('중간에 틀리면 연속은 끊기지만 모은 경험치는 남는다 (감점 없는 난이도)', () => {
     /*
-      **두 판이면 마스터다** (XP_MAX = 200). 그래서 '아직 마스터가 아닌' 자리를 보려면
-      한 판만 통과한 뒤 틀려야 한다 — 막대가 평평해지며 달라진 것은 판 수뿐이다.
+      **새 맵 무위반 한 판이면 마스터다** (XP_MAX = 200 · 한 판 200). 그래서 '아직 마스터가 아닌' 자리를 보려면
+      다시 달린 맵(절반)을 통과한 뒤 틀려야 한다.
     */
     let s = toTop();
-    s = step(s, clean());
+    s = advance(s, clean(), undefined, undefined, { replay: true }).next;
     s = step(s, run(['PEDESTRIAN_BLOCKED']));
     expect(s.cleanStreak).toBe(0);
-    expect(s.xp).toBe(XP_PER_CLEAN_RUN);
+    expect(s.xp).toBe(XP_REPLAY);
     expect(s.mastered).toBe(false);
   });
 });
@@ -744,5 +740,69 @@ describe('학습 루프 — 습관을 고쳐야 올라간다', () => {
     for (let i = 0; i < HABIT_CLEARED_AFTER; i++) s = step(s, clean(), RED);
     expect(s.badHabits).toEqual([]);
     expect(s.mastered).toBe(true);
+  });
+});
+
+/*
+  **AI 자율주행이 몬 판 — 시범 관찰 경험치** (observe). 사용자가 정했다: *"ai안전운전으로 했다고 해도 간접적으로 학습이 된다고
+  생각해 … 보상을 주는게 맞다"*, *"1/2정도가 적당 … 기록에도 포함시키지 말고"*. 레벨은 직접 운전으로만 오른다.
+*/
+describe('AI 자율주행 시범 관찰 경험치', () => {
+  it('직접 운전의 절반이다 — 새 맵 100, 이미 통과한 맵 50', () => {
+    expect(XP_OBSERVE_RATIO).toBe(0.5);
+    expect(observe(freshCurriculum(), clean()).xp.gained).toBe(XP_PER_CLEAN_RUN / 2);
+    expect(observe(freshCurriculum(), clean(), undefined, { replay: true }).xp.gained).toBe(XP_REPLAY / 2);
+  });
+
+  /* 사용자가 정했다 (2026-10-18): "AI만으로도 레벨업" — AI 시범 두 판이면 한 레벨 */
+  it('AI 시범 두 판이면 오른다 — 통과한 레벨만큼 차도 열린다', () => {
+    const first = observe(freshCurriculum(), clean());
+    expect(first.xp.leveledUp).toBe(false);
+    expect(first.next.xp).toBe(XP_TO_NEXT[START_LEVEL] / 2);
+    const second = observe(first.next, clean());
+    expect(second.xp.leveledUp).toBe(true);
+    expect(second.next.level).toBe(START_LEVEL + 1);
+    expect(second.next.xp, '새 레벨은 빈 막대에서').toBe(0);
+    expect(second.next.bestLevel).toBe(START_LEVEL);
+  });
+
+  it('L10 에서 막대를 채우면 AI 시범으로도 마스터다', () => {
+    let s: CurriculumState = { ...freshCurriculum(), level: MAX_LEVEL };
+    s = observe(s, clean()).next;
+    s = observe(s, clean()).next;
+    expect(s.mastered).toBe(true);
+  });
+
+  it('여는 문은 직접 운전과 같다 — 나쁜 습관이 남았으면 막대가 찬 채로 기다린다', () => {
+    let s = advance(freshCurriculum(), run(['PEDESTRIAN_BLOCKED'])).next;
+    for (let i = 0; i < 4; i += 1) s = observe(s, clean()).next;
+    expect(s.level).toBe(START_LEVEL);
+    expect(s.xp).toBe(XP_TO_NEXT[START_LEVEL]);
+    expect(observe(s, clean()).xp.heldByHabits).toBe(true);
+  });
+
+  it('경험치 말고는 아무것도 바꾸지 않는다 — 습관 · 학습자 모델 · 판 수 · 연속 기록', () => {
+    const habitual = advance(freshCurriculum(), run(['PEDESTRIAN_BLOCKED'])).next;
+    expect(habitual.badHabits.length, '습관이 하나 있는 학습자').toBe(1);
+    const step = observe(habitual, clean());
+    const { xp: _a, ...rest } = step.next;
+    const { xp: _b, ...was } = habitual;
+    expect(rest).toEqual(was);
+  });
+
+  it('직접 몰다 어긴 판은 0 — 잃지도 않는다 (기록이 아니다)', () => {
+    const s = { ...freshCurriculum(), xp: 80 };
+    for (const r of [run(['PEDESTRIAN_BLOCKED']), run([], 'collision')]) {
+      const step = observe(s, r);
+      expect(step.xp.gained).toBe(0);
+      expect(step.next.xp).toBe(80);
+    }
+  });
+
+  it('마스터는 막대가 움직이지 않는다', () => {
+    const master = { ...freshCurriculum(), level: MAX_LEVEL, mastered: true, xp: XP_TO_NEXT[MAX_LEVEL] };
+    const step = observe(master, clean());
+    expect(step.next).toEqual(master);
+    expect(step.xp.gained).toBe(0);
   });
 });

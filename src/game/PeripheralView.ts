@@ -413,6 +413,12 @@ export class PeripheralView {
     this.enabled = on;
     if (!on) this.strength = this.targetStrength = 0;
     this.applyOpacity();
+    /*
+      **이 시점에서 창을 쓰는가를 문서에 적는다** (body.side-views) — 왼쪽 위의 레벨 칸이 이것을 보고 창 아래로 비켜선다
+      (index.html 의 .hud-player). 창이 떠오르는 세기(교차로에 가까울 때만)가 아니라 켜짐을 본다 — 세기를 따르면 레벨
+      칸이 달리는 내내 오르내린다.
+    */
+    if (typeof document !== 'undefined') document.body?.classList?.toggle('side-views', on && this.units.length > 0);
   }
 
   /**
@@ -452,7 +458,7 @@ export class PeripheralView {
       **계기판 옆 자리가 방향키와 겹치면 방향키 바로 위**에 선다. 휴대폰 세로에서는 계기판이 왼쪽 아래로 가고 그
       오른쪽이 방향키 십자 자리라, 계기판 옆에 붙이면 창이 ◀ · ▼ 밑에 깔렸다. 휴대폰 가로에서는 계기판 옆이
       비어 있는데, 거기서도 방향키 위로 올리면 오른쪽 위의 우측 시야 창과 겹쳤다 — 그래서 **겹칠 때만** 옮긴다.
-      방향키가 떠 있지 않으면(PC · 자율 주행 중) 늘 계기판 옆이다.
+      방향키가 떠 있지 않으면(PC · AI 자율 주행 중) 늘 계기판 옆이다.
     */
     const padRect = document.querySelector('#touch .dpad')?.getBoundingClientRect();
     const rowGap = margin * 0.6;
@@ -736,6 +742,7 @@ export class PeripheralView {
     this.disposables = [];
     this.overlayScene.clear();
     this.units = [];
+    if (typeof document !== 'undefined') document.body?.classList?.remove('side-views');
   }
 }
 

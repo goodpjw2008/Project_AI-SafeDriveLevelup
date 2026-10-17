@@ -644,6 +644,18 @@
       .settings-cols > .settings-version {
         grid-column: 1 / -1;
       }
+      /* 설정 전체 초기화 — 두 칸 아래 한 줄 (Screens 의 renderSettings) */
+      .settings-cols > .settings-reset {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-top: 10px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+      }
       .settings-cols > .app-notice {
         margin-top: 6px;
       }
@@ -817,7 +829,7 @@
       */
       /*
         ── AI 학습자 모델 (ui/skillRadar.ts · Screens.skillCard · Screens.modelCard) ──
-        첫 화면의 두 시작 버튼(AI 안전운전 연습 · 안전운전 자율주행) 아래 레이더, 결과 화면의 AI 평가 아래 '이 판으로 움직인 것'. 약한 개념(70% 미만)은 붉게.
+        첫 화면의 두 시작 버튼(AI 안전운전 연습 · 안전운전 AI 자율주행) 아래 레이더, 결과 화면의 AI 평가 아래 '이 판으로 움직인 것'. 약한 개념(70% 미만)은 붉게.
       */
       .skill-card,
       .model-card {
@@ -2179,7 +2191,7 @@
       }
       /*
         AI 자율 주행 — 출발보다 **한 단계 낮게.** 이 게임에서 배우는 방법은 직접 모는
-        것이고, 자율 주행은 "어떻게 하는 건지 먼저 보고 싶다" 는 사람을 위한 곁길이다.
+        것이고, AI 자율 주행은 "어떻게 하는 건지 먼저 보고 싶다" 는 사람을 위한 곁길이다.
         같은 크기·같은 파랑으로 두면 무엇부터 눌러야 할지가 다시 흐려진다.
       */
       button.ghost-cta {
@@ -3075,6 +3087,10 @@
         grid-template-columns: 1fr 1fr;
         gap: 14px;
       }
+      /* 시작 길이 하나뿐이면 칸을 나누지 않는다 — 'AI 안전운전 연습' 하나 (사용자가 정했다) */
+      .mode-split.single {
+        grid-template-columns: minmax(0, 1fr);
+      }
       .mode-split > .mode-group {
         min-width: 0;
         padding: 15px 16px 16px;
@@ -3138,7 +3154,7 @@
       /*
         **상자 안의 버튼은 칸 폭을 꽉 채운다.**
 
-        글자 길이대로 두었더니 'AI 안전운전 연습' 과 '안전운전 자율주행' 이
+        글자 길이대로 두었더니 'AI 안전운전 연습' 과 '안전운전 AI 자율주행' 이
         서로 어긋난 폭으로 서서, 두 길이 대등하다는 것이 생김새에서 무너졌다. 폭을 칸에 맞추면
         **두 버튼이 같은 크기**가 되고 그 자체가 "둘 중 하나를 고른다" 는 말이 된다.
 
@@ -3929,6 +3945,67 @@
       }
 
       /*
+        LiDAR(가상) 화면 — AI 자율 주행 · 직접 운전 모두 **늘 뜬다** — 끄는 버튼은 뺐다 (사용자가 정했다: "lidar 끄는 버튼은
+        제거해주고, 항상 디폴트로"). 내 차를 가운데 두고 앞길과 뒤차(뒤로 9.5m)를 함께 담는다 (LidarPanel.ts 의 CAM).
+
+        **PC 는 화면 오른쪽 위, 과제 상자 오른편에 세로로 긴 3:4** 로 선다 (사용자가 정했다: *"라이다 대시보드가 오른쪽 시야를
+        가려. 우측 상단으로 올리고 크기에 맞게 대시보드의 사이드를 줄여서 배치해줘"*). 한때 계기판 바로 위에 정사각형(폭
+        min(30vw, 380px))으로 있었는데(사용자가 처음 정한 "속도기 위 여백"), 화면 오른쪽의 도로 · 보도 — 우회전할 때 봐야 하는
+        자리 — 를 덮었다. 왼쪽 위의 레벨 칸과 짝이다.
+
+         - 폭: 과제 상자(가운데, 최대 min(58vw, 1000px))의 오른쪽 남은 자리 − 28px, 많아야 320px. 그림은 높이에 맞춰 그려
+           폭이 좁은 만큼 **양옆이 잘린다** (LidarPanel.ts 의 CAM 주석)
+         - 높이: 폭의 4/3. 창이 낮으면 계기판(아래 16px, 높이 폭의 0.332배)에 닿지 않게 폭을 줄인다 (--lidar-room)
+         - 운전석 시점처럼 **오른쪽 위에 우측 시야 창이 뜨면 그 아래로** 내려선다(body.side-views — 레벨 칸과 같은 셈) —
+           시야 창은 보행자를 보는 창이라 덮으면 안 된다(아래 .hud-home 주석)
+
+        휴대폰 · 좁은 화면(760px 이하)은 예전처럼 아래쪽 정사각형이다 (아래 body.touch · 760px 규칙).
+      */
+      #lidar-box {
+        --lidar-top: 14px;
+        --lidar-room: calc(100vh - var(--lidar-top) - 16px - min(30vw, 380px) * 0.332 - 24px);
+        position: absolute;
+        right: 16px;
+        top: var(--lidar-top);
+        width: min(calc((100vw - min(58vw, 1000px)) / 2 - 28px), 320px, calc(var(--lidar-room) * 0.75));
+        opacity: 0;
+        transition: opacity 0.18s ease;
+        pointer-events: none;
+      }
+      /* 넓은 화면만 — 좁은 화면 · 휴대폰은 아래쪽에 있어 시야 창과 상관없다 (그쪽 규칙보다 앞서지 않게 범위를 묶는다) */
+      @media (min-width: 761px) {
+        body.side-views #lidar-box {
+          --lidar-top: calc(30px + max(132px, 17vw) * 0.761 + 8px);
+        }
+      }
+      #lidar-box.on {
+        opacity: 1;
+      }
+      #lidar {
+        display: block;
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        border-radius: 12px;
+        box-shadow: 0 6px 26px rgba(0, 0, 0, 0.42);
+      }
+      /* AI 가 모는 동안 LiDAR 화면 둘레가 파랗게 숨 쉰다 (아래 'AI 자율주행 중 — 움직이는 표시') */
+      #lidar-box::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        pointer-events: none;
+        box-shadow:
+          0 0 0 2px rgba(76, 141, 255, 0.9),
+          0 0 24px 2px rgba(76, 141, 255, 0.55);
+        opacity: 0;
+      }
+      body.ai-drive #lidar-box::after {
+        opacity: 1;
+        animation: ai-breathe 2.4s ease-in-out infinite;
+      }
+
+      /*
         주행 중 나가는 길.
 
         **좌하단 맨 아래**에 둔다. 위쪽 좌·우 끝은 운전자 시점의 시야 창이 쓰고(보행자를
@@ -3962,12 +4039,258 @@
         border-color: rgba(255, 255, 255, 0.24);
       }
 
+      /*
+        **운전 모드 카드 — 홈으로 바로 위, 크게** (index.html 의 #drive-mode · main.ts 의 showAutoDriveButton).
+        사용자가 정했다 (2026-10-17):
+
+            일반주행 모드일경우 :  현재상태 아이콘 + 일반모드 | AI 자율주행 [토글]
+            AI 자율주행 모드일경우 :  현재상태 아이콘 + AI 자율주행 | 일반모드 [토글]
+
+        **왼쪽은 지금의 모드**(아이콘 · 이름 — 일반모드는 운전대, AI 자율주행은 로봇), **오른쪽은 바꿀 모드와 꺼진
+        스위치**다. 오른쪽(.mode-toggle)을 누르면 그 모드로 바뀐다 — PC 는 P 키도. #drive-mode 의 data-mode 가 지금의
+        모드이고, .in-manual · .in-ai 는 그 모드에서만 보이는 글 · 그림이다.
+
+        **색으로 모드를 가른다** (사용자가 정했다: *"일반주행 모드 : 현재색 유지 / AI 자율 주행 모드 : 더 짙은 파란색
+        계열"*) — 일반모드는 파란 기가 도는 남색에 숨 쉬는 파란 테두리, AI 자율주행은 짙고 선명한 파랑에 파란 빛이 번진다.
+        AI 자율주행 중에는 로봇이 둥실 떠서 눈을 깜빡이고 발밑에 물결이 퍼진다(사용자가 원한 "역동적" 인 움직임).
+
+        지나온 모양: '● AI 자율주행 켜기 / 끄기' 버튼 → 지금 모드 카드 하나(✓ · ○) — AI 를 어디서 켜는지 안 보였다 →
+        두 카드를 늘 함께(지금 모드에 ✓) — 지금 모드가 헷갈렸다 → 바꿀 모드 카드 하나 — 지금 모드가 카드에 없었다 → 이것.
+
+        크기는 변수(--card-*)로 둔다. 손가락 화면은 **두 줄**이다(아래 body.touch 규칙) — 위에 지금 모드, 아래에 바꿀
+        모드와 스위치. 한 줄로 펴면 세로 휴대폰에서 오른쪽 아래 방향키(↑)에 닿는다.
+      */
+      .hud-ai {
+        --card-h: 64px;
+        --card-w: 344px;
+        --card-icon: 44px;
+        --card-title: 22px;
+        --card-sub: 15px;
+        --card-switch: 28px;
+        --card-gap: 12px;
+        --card-radius: 17px;
+        position: absolute;
+        left: 18px;
+        bottom: 94px;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: var(--card-gap);
+        box-sizing: border-box;
+        width: var(--card-w);
+        height: var(--card-h);
+        padding: 0 calc(var(--card-gap) - 4px) 0 calc(var(--card-gap) - 2px);
+        color: #ffffff;
+        white-space: nowrap;
+        border-radius: var(--card-radius);
+        /* 일반모드 — 지금까지의 남색 (사용자가 정했다: "현재색 유지") */
+        background: linear-gradient(180deg, #24345a, #1a2440);
+        border: 1.5px solid rgba(96, 165, 250, 0.7);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          0 8px 26px rgba(0, 0, 0, 0.42);
+        animation: ai-invite 2.4s ease-in-out infinite;
+      }
+      /* AI 자율주행 — 더 짙고 선명한 파랑, 둘레에 파란 빛 */
+      .hud-ai[data-mode='ai'] {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+        border-color: #60a5fa;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.2),
+          0 0 22px rgba(37, 99, 235, 0.7),
+          0 8px 26px rgba(0, 0, 0, 0.42);
+        animation: none;
+      }
+      /* 그 모드에서만 보이는 글 · 그림 — 바뀌는 순간 살짝 떠오른다 */
+      .hud-ai[data-mode='manual'] .in-ai,
+      .hud-ai[data-mode='ai'] .in-manual {
+        display: none;
+      }
+      .hud-ai .in-manual,
+      .hud-ai .in-ai {
+        animation: mode-in 0.35s ease-out;
+      }
+      .mode-icon {
+        flex: none;
+        display: block;
+        width: var(--card-icon);
+        height: var(--card-icon);
+        overflow: visible;
+      }
+      /* 왼쪽 — 지금의 모드 이름 */
+      .mode-name {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--card-title);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+      }
+      .mode-divider {
+        flex: none;
+        width: 1.5px;
+        height: calc(var(--card-h) * 0.56);
+        background: rgba(255, 255, 255, 0.32);
+      }
+      /* 오른쪽 — 바꿀 모드와 꺼진 스위치. 누르는 곳은 여기다 */
+      .mode-toggle {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: calc(var(--card-gap) * 0.75);
+        padding: 6px 6px 6px 8px;
+        margin: 0;
+        font-family: inherit;
+        font-size: var(--card-sub);
+        font-weight: 700;
+        color: #bfdbfe;
+        background: transparent;
+        border: 0;
+        border-radius: calc(var(--card-radius) - 5px);
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .hud-ai[data-mode='ai'] .mode-toggle {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .mode-toggle:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      body.touch .key-hint {
+        display: none;
+      }
+      /* 꺼진 스위치 — 손잡이가 왼쪽. 마우스를 올리면 조금, 누르면 끝까지 밀린다 */
+      .mode-switch {
+        flex: none;
+        position: relative;
+        box-sizing: border-box;
+        width: calc(var(--card-switch) * 1.75);
+        height: var(--card-switch);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+        border: 1.5px solid rgba(147, 197, 253, 0.9);
+        transition: background 0.15s ease;
+      }
+      .hud-ai[data-mode='ai'] .mode-switch {
+        background: rgba(15, 23, 42, 0.35);
+        border-color: rgba(255, 255, 255, 0.7);
+      }
+      .mode-switch i {
+        position: absolute;
+        top: 50%;
+        left: 3px;
+        width: calc(var(--card-switch) - 9px);
+        height: calc(var(--card-switch) - 9px);
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        transform: translateY(-50%);
+        transition: left 0.18s ease;
+      }
+      .mode-toggle:hover .mode-switch i {
+        left: 8px;
+      }
+      .mode-toggle:active .mode-switch i {
+        left: calc(100% - var(--card-switch) + 6px);
+      }
+      .mode-toggle:active .mode-switch {
+        background: #3b82f6;
+      }
+      .hud-ai[data-mode='ai'] .mode-toggle:active .mode-switch {
+        background: rgba(255, 255, 255, 0.55);
+      }
+      /* 로봇 — AI 자율주행 중에 둥실 뜨고, 안테나가 반짝이고, 눈을 깜빡이고, 발밑에 물결이 퍼진다 */
+      .mode-robot .bot {
+        animation: ai-bob 1.5s ease-in-out infinite alternate;
+      }
+      .mode-robot .antenna {
+        animation: ai-antenna 0.8s ease-in-out infinite alternate;
+      }
+      .mode-robot .eyes {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: ai-blink 3.4s ease-in-out infinite;
+      }
+      .mode-robot .rp {
+        fill: none;
+        stroke: #9fdcff;
+        stroke-width: 1.8;
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: ai-wave 1.8s ease-out infinite;
+      }
+      .mode-robot .rp2 {
+        animation-delay: -0.9s;
+      }
+      @keyframes ai-invite {
+        0%,
+        100% {
+          border-color: rgba(96, 165, 250, 0.55);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            0 0 0 rgba(59, 130, 246, 0),
+            0 8px 26px rgba(0, 0, 0, 0.42);
+        }
+        50% {
+          border-color: rgba(147, 197, 253, 1);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            0 0 16px rgba(59, 130, 246, 0.55),
+            0 8px 26px rgba(0, 0, 0, 0.42);
+        }
+      }
+      @keyframes mode-in {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes ai-bob {
+        from {
+          transform: translateY(-2.5px);
+        }
+        to {
+          transform: translateY(2px);
+        }
+      }
+      @keyframes ai-antenna {
+        from {
+          fill: #ffffff;
+        }
+        to {
+          fill: #7dd3fc;
+        }
+      }
+      @keyframes ai-blink {
+        0%,
+        90%,
+        100% {
+          transform: scaleY(1);
+        }
+        94% {
+          transform: scaleY(0.15);
+        }
+      }
+      @keyframes ai-wave {
+        0% {
+          transform: scale(0.45);
+          opacity: 0.95;
+        }
+        100% {
+          transform: scale(1.25);
+          opacity: 0;
+        }
+      }
       /* 좌하단 키 안내 — 실제로 자주 쓰는 키만 */
       .keyhints {
         position: absolute;
         left: 18px;
-        /* 아래 '홈으로' 버튼(약 60px)을 피해 띄운다 */
-        bottom: 112px;
+        /* 아래 '홈으로' 버튼(약 60px)과 그 위 운전 모드 카드(64px)를 피해 띄운다 */
+        bottom: 170px;
         font-size: 22px;
         color: var(--muted);
         line-height: 1.85;
@@ -3978,15 +4301,33 @@
         backdrop-filter: blur(8px);
       }
       /*
+        **일반모드에서만 띄운다** (사용자가 정했다: *"좌우, 출발, 정지, 시점변환 부분은 일반주행일 경우에만 표시, P AI자율주행은
+        토글이 있으니 단축키에서 제외"*) — AI 가 모는 동안은 방향키가 듣지 않는다. 자리는 그대로라, 일반모드로 돌아오면 같은
+        곳에 다시 뜬다. (한때 두 모드 모두 띄웠다.)
+      */
+      body.ai-drive .keyhints {
+        display: none;
+      }
+      /*
         ── 내 레벨과 경험치 ──────────────────────────────────────
-        게임에서 흔한 플레이어 칸 — 레벨 배지 · 이름 · 경험치 바. 조작 안내(.keyhints) 바로 위, 같은 폭 · 같은 바탕이라
-        왼쪽 아래가 한 묶음으로 읽힌다. 운전 중에 읽는 것이라 글자를 키 안내와 비슷하게 크게 둔다.
+        게임에서 흔한 플레이어 칸 — 레벨 배지 · 이름 · 경험치 바.
+
+        **화면 왼쪽 위, 과제 상자 왼편에 둔다 — AI 자율주행이든 일반 운전이든 같은 자리** (사용자가 정했다: *"인게임 레벨
+        배너를 자율모드든 운전모드든 모두 표시되게, 그리고 위치가 모드마다 변하지 않도록 위쪽에 배치하는게 좋을것같아"*).
+        한때 왼쪽 아래 묶음(홈으로 → 모드 카드 → 키 안내) 맨 위에 얹었는데, AI 가 모는 동안에는 숨고 그 자리에 'AI 자율 주행
+        중' 표가 섰다.
+
+        폭은 과제 상자(가운데, 최대 58vw — 왼쪽 끝이 21vw)에 닿지 않게 `21vw - 30px` 를 넘지 않고, 글자 · 배지도 폭을 따라
+        줄어든다(아래 .player.hud). 운전석 시점처럼 **왼쪽 위에 시야 창이 뜨면 그 아래로** 내려선다(body.side-views —
+        Game.ts 의 setOverlaysVisible). 창의 아랫변은 PeripheralView.ts 의 자리 셈과 같다: 위 14px + 창 높이(폭 × 0.625)
+        + 이름표(폭 × 0.136) + 6px, 창 폭은 max(132px, 17vw). 좁은 화면(1200px 이하)은 자리가 모자라 왼쪽 아래 묶음 맨 위다.
       */
       .hud-player {
         position: absolute;
         left: 18px;
-        bottom: 236px;
-        width: 340px;
+        top: 14px;
+        width: min(340px, calc(21vw - 30px));
+        box-sizing: border-box;
         padding: 10px 16px 12px 10px;
         background: rgba(12, 16, 24, 0.72);
         border: 1px solid rgba(255, 255, 255, 0.07);
@@ -3997,12 +4338,26 @@
         display: none;
       }
       /* 안의 칸은 첫 화면 · 결과 화면과 같은 .player 다 — 여기서는 운전 중에 맞는 크기만 정한다 */
+      body.side-views .hud-player {
+        top: calc(30px + max(132px, 17vw) * 0.761 + 8px);
+      }
+      @media (max-width: 1200px) {
+        .hud-player,
+        body.side-views .hud-player {
+          top: auto;
+        }
+        /* 홈으로 → 모드 카드 → 키 안내(높이 112px 남짓) 위 — 키 안내가 숨는 AI 자율주행 중에도 같은 자리. 더 좁은 화면(760px)은 아래 규칙이 다시 정한다 */
+        .hud-player {
+          bottom: 296px;
+          width: 340px;
+        }
+      }
       .player.hud {
         gap: 12px;
       }
       .player.hud .level-badge-wrap {
-        width: 50px;
-        height: 50px;
+        width: clamp(36px, 3.2vw, 50px);
+        height: clamp(36px, 3.2vw, 50px);
       }
       .player.hud .level-badge-wrap::before {
         display: none;
@@ -4011,96 +4366,195 @@
         gap: 7px;
       }
       .player.hud .player-name {
-        font-size: 21px;
+        font-size: clamp(14px, 1.2vw, 21px);
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .player.hud .player-xp b {
-        font-size: 17px;
+        font-size: clamp(13px, 1.05vw, 17px);
       }
       .player.hud .player-track {
         height: 10px;
       }
-      /* 시범 주행에서는 내 기록이 아니므로 감춘다 (main.ts 가 null 을 넘기지만, 자율 주행 표시와 겹치지 않게 한 번 더) */
-      body.ai-drive .hud-player {
-        display: none;
-      }
 
       /*
-        ── AI 자율 주행 표시 ────────────────────────────────────
-        조작 안내와 **같은 자리**를 쓴다. 그 안내는 자율 주행 중에 거짓말이 되므로
-        같이 띄우지 않고 바꿔 단다 (body.ai-drive 가 둘을 맞바꾼다).
+        ── AI 자율주행 중 — 움직이는 표시 ──────────────────────
+        사용자가 짚었다: *"자율주행 중인것을 시각적으로 더 구분이 되게 움직이게 해줘"* — 'AI 자율 주행 중' 표와 파란
+        버튼만으로는 직접 운전과 한눈에 갈리지 않았다(그 표는 뒤에 뺐다 — 모드 카드와 같은 말을 두 번 했다). 그래서 AI 가
+        모는 동안(body.ai-drive)만:
 
-        깜빡이는 점을 붙이는 이유: 정지 신호 앞에서 차가 서 있으면 화면이 완전히
-        멎어서 **멈춘 것인지 게임이 죽은 것인지** 알 수 없다. 점이 뛰고 있으면 안다.
+         - **화면 테두리** — 가장자리가 파랗게 숨 쉬고(.ai-frame::before), 밝은 빛 두 줄기가 테두리를 따라 시계 방향으로
+           서로 쫓으며 돈다(.ai-frame i 넷이 위 → 오른쪽 → 아래 → 왼쪽 차례로 이어 달리고, .k2 넷이 반 바퀴 뒤에서 따라온다)
+         - 테두리 빛이 늘 돌아, 신호 앞에 서서 화면이 멎어 보여도 AI 가 살아 있다(게임이 멈춘 것이 아니다)는 것이 보인다
+         - **LiDAR 화면** — 둘레가 숨 쉬고, 갈 길 위로 갈매기표가 흐른다 (LidarPanel.ts 의 FLOW)
+
+        움직임은 transform · opacity 로만 한다 — 화면 전체를 매 프레임 다시 칠하지 않게 (휴대폰). 움직임을 줄이라는
+        설정(prefers-reduced-motion)이면 빛은 그대로 두고 움직임만 뺀다.
       */
-      .hud-auto {
+      .ai-frame {
         position: absolute;
-        left: 18px;
-        bottom: 112px;
-        display: none;
-        align-items: center;
-        gap: 10px;
-        font-size: 22px;
-        font-weight: 800;
-        letter-spacing: -0.01em;
-        color: var(--text);
-        background: rgba(12, 16, 24, 0.72);
-        border: 1px solid rgba(76, 141, 255, 0.45);
-        border-radius: 10px;
-        padding: 13px 20px;
-        backdrop-filter: blur(8px);
-        box-shadow: 0 6px 26px rgba(0, 0, 0, 0.42);
-      }
-      body.ai-drive .hud-auto {
-        display: flex;
-      }
-      body.ai-drive .keyhints {
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
         display: none;
       }
-      /* 터치 컨트롤을 감추는 규칙은 `body.touch #touch` 뒤에 있다 (아래 '모바일 터치 컨트롤') */
-      .hud-auto .dot {
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-        background: var(--blue);
-        box-shadow: 0 0 12px var(--blue);
-        animation: ai-pulse 1.4s ease-in-out infinite;
+      body.ai-drive .ai-frame {
+        display: block;
       }
-      @keyframes ai-pulse {
+      .ai-frame::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        box-shadow:
+          inset 0 0 0 4px rgba(76, 141, 255, 0.85),
+          inset 0 0 70px 12px rgba(76, 141, 255, 0.5);
+        animation: ai-breathe 1.8s ease-in-out infinite;
+      }
+      /* 빛 줄기 — 끝(머리)만 밝고 꼬리는 옅어진다. 한 바퀴 3.6초, 한 변에 0.9초 */
+      .ai-frame i {
+        position: absolute;
+        display: block;
+      }
+      .ai-frame .t,
+      .ai-frame .b {
+        left: 0;
+        width: 100%;
+        height: 5px;
+      }
+      .ai-frame .r,
+      .ai-frame .l {
+        top: 0;
+        width: 5px;
+        height: 100%;
+      }
+      .ai-frame .t {
+        top: 0;
+        background: linear-gradient(90deg, transparent 55%, rgba(147, 197, 253, 0.9) 90%, #ffffff);
+        animation: ai-run-right 3.6s linear infinite;
+      }
+      .ai-frame .r {
+        right: 0;
+        background: linear-gradient(180deg, transparent 55%, rgba(147, 197, 253, 0.9) 90%, #ffffff);
+        animation: ai-run-down 3.6s linear -2.7s infinite;
+      }
+      .ai-frame .b {
+        bottom: 0;
+        background: linear-gradient(270deg, transparent 55%, rgba(147, 197, 253, 0.9) 90%, #ffffff);
+        animation: ai-run-left 3.6s linear -1.8s infinite;
+      }
+      .ai-frame .l {
+        left: 0;
+        background: linear-gradient(0deg, transparent 55%, rgba(147, 197, 253, 0.9) 90%, #ffffff);
+        animation: ai-run-up 3.6s linear -0.9s infinite;
+      }
+      /* 둘째 줄기 — 반 바퀴(1.8초) 뒤 */
+      .ai-frame .t.k2 {
+        animation-delay: -1.8s;
+      }
+      .ai-frame .r.k2 {
+        animation-delay: -0.9s;
+      }
+      .ai-frame .b.k2 {
+        animation-delay: 0s;
+      }
+      .ai-frame .l.k2 {
+        animation-delay: -2.7s;
+      }
+      /* 한 변을 25% 동안 달려 머리가 모서리에 닿고, 꼬리(빛 띠의 45%)가 빠져나가면 다음 바퀴까지 숨는다 */
+      @keyframes ai-run-right {
+        0% {
+          transform: translateX(-100%);
+        }
+        25% {
+          transform: translateX(0);
+        }
+        36.25%,
+        100% {
+          transform: translateX(45%);
+        }
+      }
+      @keyframes ai-run-down {
+        0% {
+          transform: translateY(-100%);
+        }
+        25% {
+          transform: translateY(0);
+        }
+        36.25%,
+        100% {
+          transform: translateY(45%);
+        }
+      }
+      @keyframes ai-run-left {
+        0% {
+          transform: translateX(100%);
+        }
+        25% {
+          transform: translateX(0);
+        }
+        36.25%,
+        100% {
+          transform: translateX(-45%);
+        }
+      }
+      @keyframes ai-run-up {
+        0% {
+          transform: translateY(100%);
+        }
+        25% {
+          transform: translateY(0);
+        }
+        36.25%,
+        100% {
+          transform: translateY(-45%);
+        }
+      }
+      @keyframes ai-breathe {
+        0%,
+        100% {
+          opacity: 0.5;
+        }
         50% {
-          opacity: 0.25;
+          opacity: 1;
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        .hud-auto .dot {
+        .ai-frame::before,
+        .hud-ai,
+        .hud-ai .in-manual,
+        .hud-ai .in-ai,
+        .mode-robot .bot,
+        .mode-robot .antenna,
+        .mode-robot .eyes,
+        body.ai-drive #lidar-box::after {
           animation: none;
         }
-      }
-      /* 두 줄로 세운다 — 굵은 첫 줄과 흐린 둘째 줄 (마크업 주석). 점(.dot)은 두 줄의 가운데에 선다 */
-      .hud-auto .hud-auto-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        line-height: 1.2;
-      }
-      .hud-auto .sub {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--muted);
-        letter-spacing: 0;
-      }
-      @media (max-width: 760px) {
-        /* 왼쪽 아래는 계기판 · 홈으로 자리라 플레이어 칸 자리로 올린다 (자율 주행 중에는 플레이어 칸이 숨는다) */
-        .hud-auto {
-          font-size: 16px;
-          padding: 10px 14px;
-          bottom: 196px;
+        .mode-switch i {
+          transition: none;
         }
-        /* 둘째 줄도 남긴다 — 세로 휴대폰에서 첫 줄만 뜨던 것을 사용자가 짚었다. 글자만 한 단계 작게 */
-        .hud-auto .sub {
-          font-size: 12px;
+        .ai-frame i,
+        .mode-robot .ripples {
+          display: none;
         }
       }
-
+      /*
+        **가벼운 화면 (body.lite-fx)** — 느린 기기에서 fps 가 떨어지면 Game.ts 의 setLite 가 켠다 (quality.ts 의 LoadWatch).
+        사용자가 정했다 (2026-10-18): "자율주행이 들어오면서 느린 컴퓨터에서 화면이 끊어질수가 있는데 … 저사양에서도 동작하도록
+        약간 조정". **매 프레임 다시 칠하게 하는 움직임**을 멈춘다 — 그림자(box-shadow) · 바탕 위치를 움직이는 것(모드 카드의
+        숨 쉬는 테두리)과 화면 전체를 덮는 흐린 테두리의 숨쉬기. 색과 모양은 그대로라 모드는 똑같이 갈린다: 테두리는 옅은 파란
+        선으로 서 있고, 그 위를 도는 빛 두 줄기(transform 만 움직여 가볍다)와 로봇의 움직임은 남긴다.
+      */
+      body.lite-fx .hud-ai,
+      body.lite-fx .ai-frame::before,
+      body.lite-fx #lidar-box::after {
+        animation: none;
+      }
+      body.lite-fx .ai-frame::before {
+        box-shadow: inset 0 0 0 3px rgba(76, 141, 255, 0.75);
+      }
+      body.lite-fx .mode-robot .ripples {
+        display: none;
+      }
       /*
         fps. **화면 오른쪽 위 구석**에 둔다 — 이 게임에서 유일하게 비어 있는 자리이고,
         판단에 쓰는 표시(신호·판단·정지 거리)와 겹치지 않는다.
@@ -4401,7 +4855,7 @@
         display: block;
       }
       /*
-        자율 주행 중에는 터치 조작을 감춘다 — 눌러도 아무 일이 없는 버튼을 띄워 두면
+        AI 자율 주행 중에는 터치 조작을 감춘다 — 눌러도 아무 일이 없는 버튼을 띄워 두면
         AI 가 도는 것을 사람이 방해할 수 있다고 오해한다.
 
         **`body.touch` 규칙보다 뒤에 둔다.** 둘의 우선순위가 같아서(0,2,1) 순서로 갈리는데,
@@ -4499,11 +4953,81 @@
         bottom: max(12px, env(safe-area-inset-bottom));
         width: min(46vw, 240px);
       }
+      /*
+        **LiDAR 화면은 오른쪽 아래** — 손가락 화면에서 계기판 위는 홈으로 · AI 자율 주행 표시 자리다. AI 자율 주행 중에는
+        방향키가 숨으므로(body.ai-drive #touch) 오른쪽 아래가 빈다. 직접 운전할 때는 아래 규칙이 방향키 위로 올린다.
+      */
+      body.touch #lidar-box {
+        top: auto;
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        width: min(36vw, 240px);
+      }
+      /* 휴대폰은 정사각형 그대로 (PC 만 세로로 긴 3:4) */
+      body.touch #lidar {
+        aspect-ratio: 1 / 1;
+      }
+      /*
+        **직접 운전할 때는 방향키 바로 위** — 오른쪽 아래가 방향키 자리다(태블릿은 세 줄 190px). 위쪽 AI 말풍선에 닿지 않게
+        남은 높이로 크기를 묶는다. 손에 든 화면(방향키 두 줄 125px)은 아래 규칙이 다시 정한다.
+      */
+      body.touch:not(.ai-drive) #lidar-box {
+        bottom: calc(max(12px, env(safe-area-inset-bottom)) + 200px);
+        width: min(36vw, 240px, 100vh - 330px);
+      }
+      /* 조건을 pointer 부터 적는다 — 세로 · 가로 덩어리를 찾는 검사(tests/mobileHome 등)가 이 줄을 그 덩어리로 오인하지 않게 */
+      @media (pointer: coarse) and (orientation: portrait) and (max-width: 720px),
+        (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+        body.touch:not(.ai-drive) #lidar-box {
+          bottom: calc(max(16px, env(safe-area-inset-bottom)) + 135px);
+          width: min(36vw, 200px, 100vh - 250px);
+        }
+      }
       body.touch .hud-home {
         left: max(12px, env(safe-area-inset-left));
         bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(46vw, 240px) * 0.332 + 10px);
         font-size: 14px;
         padding: 8px 16px;
+      }
+      /*
+        운전 모드 카드 — 손가락 화면에서도 홈으로(높이 35px 남짓) 바로 위. **두 줄로 접는다** — 위 줄은 지금 모드, 아래 줄은
+        바꿀 모드와 스위치, 아이콘은 두 줄에 걸친다(폭 156px 남짓, 높이 58px 남짓). 한 줄로 펴면 260px 이 넘어 세로
+        휴대폰(360px)의 오른쪽 아래 방향키 ↑ 에 닿는다.
+      */
+      body.touch .hud-ai {
+        left: max(12px, env(safe-area-inset-left));
+        bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(46vw, 240px) * 0.332 + 10px + 44px);
+        --card-icon: 30px;
+        --card-title: 16px;
+        --card-sub: 11.5px;
+        --card-switch: 18px;
+        --card-gap: 8px;
+        --card-radius: 13px;
+        display: grid;
+        grid-template-columns: auto auto;
+        align-items: center;
+        column-gap: 9px;
+        row-gap: 2px;
+        width: auto;
+        height: auto;
+        padding: 7px 8px 6px 9px;
+      }
+      body.touch .hud-ai .mode-icon {
+        grid-row: 1 / 3;
+      }
+      body.touch .hud-ai .mode-name {
+        grid-column: 2;
+        grid-row: 1;
+        padding-left: 4px;
+      }
+      body.touch .hud-ai .mode-divider {
+        display: none;
+      }
+      body.touch .hud-ai .mode-toggle {
+        grid-column: 2;
+        grid-row: 2;
+        justify-content: space-between;
+        padding: 3px 2px 3px 4px;
       }
       body.touch .keyhints {
         display: none;
@@ -4677,12 +5201,6 @@
           font-size: 18px;
         }
       }
-      /* 자율 주행 표시 — 출발(↑) 버튼과 같은 줄 */
-      body.touch .hud-auto {
-        left: max(12px, env(safe-area-inset-left));
-        bottom: calc(max(12px, env(safe-area-inset-bottom)) + 130px);
-      }
-
       /* 주행 지도 — 어디서 걸렸는지 */
       .runmap-card {
         margin-top: 16px;
@@ -5693,6 +6211,16 @@
           bottom: 12px;
           width: min(52vw, 260px);
         }
+        /* LiDAR 화면은 계기판이 비운 오른쪽 아래로, 정사각형 — 위쪽은 과제 상자가 화면 폭을 거의 다 쓴다 */
+        #lidar-box {
+          top: auto;
+          right: 12px;
+          bottom: 12px;
+          width: min(40vw, 240px);
+        }
+        #lidar {
+          aspect-ratio: 1 / 1;
+        }
         /*
           **홈으로는 계기판 바로 위**로 올리고 작게 줄인다. 계기판이 왼쪽 아래로 오면서 원래 자리(왼쪽 아래 18px)의
           홈으로가 계기판을 덮었다 (사용자가 짚었다).
@@ -5702,10 +6230,23 @@
           font-size: 14px;
           padding: 8px 16px;
         }
-        /* 플레이어 칸은 작게 줄여 홈으로 위에 둔다 */
+        /* 운전 모드 카드는 홈으로(높이 35px 남짓) 바로 위 — 크기 변수만 줄인다 (높이 46px, 손가락 화면은 위 두 줄 규칙) */
+        .hud-ai {
+          left: 12px;
+          bottom: calc(12px + min(52vw, 260px) * 0.332 + 10px + 44px);
+          --card-h: 46px;
+          --card-w: 262px;
+          --card-icon: 30px;
+          --card-title: 16px;
+          --card-sub: 12px;
+          --card-switch: 20px;
+          --card-gap: 8px;
+          --card-radius: 13px;
+        }
+        /* 플레이어 칸은 작게 줄여 운전 모드 카드 위에 둔다 (키 안내는 이 폭에서 숨는다) — 모드가 바뀌어도 그 자리다 */
         .hud-player {
           left: 12px;
-          bottom: 196px;
+          bottom: calc(12px + min(52vw, 260px) * 0.332 + 10px + 100px);
           width: min(64vw, 250px);
           padding: 7px 12px 9px 7px;
         }
@@ -5757,7 +6298,6 @@
         .hud-home,
         .keyhints,
         .hud-player,
-        .hud-auto,
         .fps,
         .signal-chip,
         .drive-coach-bubble,
@@ -5767,8 +6307,7 @@
         }
         .hud-home,
         .keyhints,
-        .hud-player,
-        .hud-auto {
+        .hud-player {
           background: rgba(12, 16, 24, 0.9);
         }
         .fps {
@@ -6073,6 +6612,10 @@
           grid-column: 3;
           grid-row: 1;
         }
+        /* 칸이 하나뿐이면 오른쪽 두 칸을 다 쓴다 */
+        #screen-menu .mode-split.single > .mode-group:first-child {
+          grid-column: 3 / 5;
+        }
         #screen-menu .mode-split > .mode-group + .mode-group {
           grid-column: 4;
           grid-row: 1;
@@ -6091,7 +6634,7 @@
           max-width: none;
           height: 96px;
         }
-        /* 두 버튼이 저마다 칸을 끝까지 채운다 — 온라인 연습 · 안전운전 자율주행 */
+        /* 두 버튼이 저마다 칸을 끝까지 채운다 — 온라인 연습 · 안전운전 AI 자율주행 */
         #screen-menu .mode-split > .mode-group {
           display: flex;
           flex-direction: column;
@@ -6642,6 +7185,10 @@
         body.touch .hud-home {
           bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(30.7vw, 160px) * 0.332 + 10px);
         }
+        /* 계기판이 작아진 만큼 그 위의 운전 모드 카드도 함께 내려앉는다 */
+        body.touch .hud-ai {
+          bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(30.7vw, 160px) * 0.332 + 10px + 44px);
+        }
         /* 뱃지 요약 — 모아 보는 재미는 큰 화면의 몫이다 */
         .badge-summary {
           display: none;
@@ -7072,6 +7619,11 @@
 
       <!-- ── 주행 HUD ─────────────────────────────────────────── -->
       <div id="hud">
+        <!-- AI 자율주행 중 화면 테두리 — 숨 쉬는 파란 빛과 테두리를 도는 빛 네 줄기 (CSS 의 .ai-frame) -->
+        <div class="ai-frame" aria-hidden="true">
+          <i class="t"></i><i class="r"></i><i class="b"></i><i class="l"></i>
+          <i class="t k2"></i><i class="r k2"></i><i class="b k2"></i><i class="l k2"></i>
+        </div>
         <!--
           목표 상자 · 진행 판단 · 정지 거리는 **한 묶음으로 위에서부터 쌓는다.**
           예전에는 판단 표시가 화면 위에서 232px 로 못 박혀 있었는데, 시나리오 설명이
@@ -7113,26 +7665,22 @@
         <!-- 아직 사지 않은 차로 달리는 중이라는 표시. 산 차에서는 감춘다 -->
 
         <!--
-          AI 자율 주행 중이라는 표시.
-
-          **조작 안내(keyhints)가 있던 자리에 대신 뜬다.** 그 안내는 "←→ 좌우 ↑출발" 인데
-          자율 주행 중에는 눌러도 아무 일이 없다 — 거짓말이 되는 안내를 띄워 둘 수는 없다.
+          'AI 자율 주행 중 / 안전규정 준수 주행 중' 표가 여기 있었다 — AI 가 모는 동안 키 안내 자리에 대신 떴다. 아래
+          운전 모드 카드('AI 자율주행 · Autonomous mode active ✓')와 같은 말을 두 번 해 뺐다 (사용자가 정했다: "자율주행
+          모드일때 자율 주행 중으로 표시되는 또 하나의 중복으로 표시되는 창이 있는데 그거는 제거해줘").
         -->
-        <!--
-          **두 줄** — '자율 주행 중' / '안전규정 준수 주행 중' (사용자가 정했다: 한 줄로 길게 두면 차를 가린다,
-          AI 가 아니라 규정 주행이므로 'AI' 는 뺀다). PC · 세로 · 가로 모두 같다.
-        -->
-        <div class="hud-auto" id="hud-auto">
-          <i class="dot"></i>
-          <span class="hud-auto-text">
-            <b>자율 주행 중</b>
-            <span class="sub">안전규정 준수 주행 중</span>
-          </span>
-        </div>
 
         <!-- 계기판 — 3D 대시보드가 아니라 화면 우측 하단에 둔다.
              모델마다 계기판 자리가 달라 자동으로 찾을 수 없기 때문이다. -->
         <canvas id="cluster"></canvas>
+
+        <!--
+          LiDAR 화면 — 센서가 찾은 물체를 테슬라 계기판처럼 보여 준다 (game/LidarPanel.ts). AI 자율 주행 · 직접 운전 모두.
+          자리는 계기판 바로 위다 (사용자가 정했다: "속도기 위 여백부분").
+        -->
+        <div class="lidar-box" id="lidar-box">
+          <canvas id="lidar" aria-label="LiDAR(가상)로 찾은 주변 물체"></canvas>
+        </div>
 
         <!--
           안내는 실제로 자주 쓰는 키만 적는다. Z/X(좌우 확인)·E(정면 복귀)·R(재시작)·
@@ -7149,6 +7697,47 @@
 
         <!-- 주행을 그만두고 첫 화면으로. HUD 는 pointer-events:none 이라 버튼만 auto 로 켠다 -->
         <button class="hud-home" id="btn-hud-home">홈으로</button>
+        <!--
+          **운전 모드 카드 — 홈으로 바로 위에 크게** (사용자가 정했다: "일반주행 모드일경우 : 현재상태 아이콘 + 일반모드 |
+          AI 자율주행 [토글] / AI 자율주행 모드일경우 : 현재상태 아이콘 + AI 자율주행 | 일반모드 [토글]"). data-mode 가 지금의
+          모드다 — 왼쪽은 그 모드의 아이콘과 이름, 오른쪽 버튼(#mode-toggle)은 바꿀 모드와 꺼진 스위치이고 누르면 그 모드로
+          바뀐다 (main.ts 의 toggleAutoDrive). PC 는 P 키도. 그림 · 글은 .in-manual · .in-ai 로 모드마다 하나씩 보인다.
+        -->
+        <div class="hud-ai" id="drive-mode" data-mode="manual">
+          <svg class="mode-icon mode-wheel in-manual" viewBox="0 0 64 64" aria-hidden="true">
+            <g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round">
+              <circle cx="32" cy="32" r="24" />
+              <path d="M10 29.5 Q21 27 26.5 33" />
+              <path d="M54 29.5 Q43 27 37.5 33" />
+              <path d="M32 40 L32 55" />
+            </g>
+            <circle cx="32" cy="34" r="7" fill="#ffffff" />
+          </svg>
+          <svg class="mode-icon mode-robot in-ai" viewBox="5 4 54 54" aria-hidden="true">
+            <g class="ripples">
+              <ellipse class="rp rp1" cx="32" cy="57" rx="24" ry="5" />
+              <ellipse class="rp rp2" cx="32" cy="57" rx="24" ry="5" />
+            </g>
+            <g class="bot">
+              <line x1="32" y1="8" x2="32" y2="15" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" />
+              <circle class="antenna" cx="32" cy="6.5" r="3.4" fill="#ffffff" />
+              <rect x="6.5" y="25" width="7" height="13" rx="3.5" fill="#ffffff" />
+              <rect x="50.5" y="25" width="7" height="13" rx="3.5" fill="#ffffff" />
+              <rect x="11" y="14.5" width="42" height="33" rx="13" fill="#ffffff" />
+              <rect x="16.5" y="20.5" width="31" height="21" rx="9" fill="#13204a" />
+              <g class="eyes" fill="none" stroke="#5fd4ff" stroke-width="2.8" stroke-linecap="round">
+                <path d="M22.5 33 q3.6 -4.6 7.2 0" />
+                <path d="M34.3 33 q3.6 -4.6 7.2 0" />
+              </g>
+            </g>
+          </svg>
+          <b class="mode-name" role="status"><span class="in-manual">일반모드</span><span class="in-ai">AI 자율주행</span></b>
+          <i class="mode-divider" aria-hidden="true"></i>
+          <button class="mode-toggle" id="mode-toggle" type="button" title="AI 자율주행으로 바꾸기 (P)" aria-label="AI 자율주행으로 바꾸기">
+            <span class="mode-dest"><span class="in-manual">AI 자율주행</span><span class="in-ai">일반모드</span></span>
+            <span class="mode-switch" aria-hidden="true"><i></i></span>
+          </button>
+        </div>
         <!-- 전체 화면 ↔ 주소창 (휴대폰만 — .fs-toggle). 첫 화면의 토글과 같은 일을 한다 (main.ts 의 toggleFullscreen) -->
         <button class="hud-home hud-fullscreen fs-toggle" id="btn-hud-fullscreen">전체 화면</button>
 

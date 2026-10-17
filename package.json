@@ -3,7 +3,7 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "goodpjw2008",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "type": "module",
   "description": "개정 도로교통법 우회전 규정 학습용 3D 운전 시뮬레이터",
   "scripts": {
@@ -20,7 +20,8 @@
     "fix:windshield": "node scripts/clear-windshield.mjs",
     "sounds": "node scripts/build-sounds.mjs",
     "airobot": "node scripts/build-airobot.mjs",
-    "train:ai": "vite-node scripts/train-ai.ts"
+    "train:ai": "vite-node scripts/train-ai.ts",
+    "train:lidar": "vite-node scripts/train-lidar.ts"
   },
   "dependencies": {
     "three": "^0.169.0"

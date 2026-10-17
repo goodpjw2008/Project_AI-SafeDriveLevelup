@@ -39,6 +39,8 @@ export interface PlayerInfo {
   habitsLeft?: number;
   /** 이번 판에 얻은 양 — 막대 끝의 그만큼을 밝게 칠한다 (결과 화면) */
   gained?: number;
+  /** AI 자율주행이 몬 판의 결과 화면인가 — 아랫줄이 시범 관찰 경험치(직접 운전의 절반)와, 레벨업은 직접 운전이라는 것을 말한다 */
+  observed?: boolean;
 }
 
 export type PlayerSize = 'lg' | 'md' | 'hud';
@@ -89,6 +91,7 @@ export function playerFoot(given: PlayerInfo): string {
       ? `경험치가 가득 찼습니다 — 나쁜 습관 ${p.habitsLeft}개를 고치면 ${target}`
       : `${target} 준비 완료`;
   }
+  if (p.observed) return `AI 시범 관찰은 직접 운전의 절반 · ${target}까지 ${p.need - p.xp} XP`;
   return `${target}까지 ${p.need - p.xp} XP · 새 맵 무위반 +${XP_PER_CLEAN_RUN}`;
 }
 

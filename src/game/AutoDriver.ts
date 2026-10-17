@@ -25,6 +25,7 @@ import {
   PLAYER_APPROACH_X,
   PLAYER_EXIT_Z,
   SPAWN_Z,
+  SPAWN_Z_SCHOOL_ZONE,
   SPAWN_Z_STRAIGHT,
   STOP_LINE,
   CROSSWALK_S_OUTER,
@@ -38,7 +39,7 @@ import type {
   PedestrianSample,
   RightArrowColor,
 } from '../rules/lawRules';
-import { STOP_HOLD_SECONDS } from '../rules/lawRules';
+import { STOP_HOLD_SECONDS, ZONE_ROAD_EDGES } from '../rules/lawRules';
 import type { VehicleInput } from './Vehicle';
 
 /** 이번 프레임의 세계 — Game 이 채워 준다 (판정에 쓰는 값과 같은 출처다) */
@@ -137,8 +138,13 @@ function buildPath(): Array<{ x: number; z: number }> {
   const pts: Array<{ x: number; z: number }> = [];
   const lane = PLAYER_APPROACH_X;
 
-  // 진입 직선 — 스폰보다 뒤에서 시작해 첫 프레임부터 따라갈 점이 있게 한다
-  for (let z = SPAWN_Z + 20; z > TURN_START_Z; z -= 1) pts.push({ x: lane, z });
+  /*
+    진입 직선 — **가장 먼 스폰**(보호구역을 지나오는 판, z = 174)보다 뒤에서 시작해 첫 프레임부터 따라갈 점이 있게 한다.
+    한때 평소 스폰(68) 뒤에서만 시작해, 긴 진입로 판에서는 길이 차 앞 86m 에서야 시작했다 — 조향은 같은 차로의 먼 점을
+    보고 곧게 갔지만, LiDAR 화면의 파란 길은 차를 따라오지 않고 멀리 박혀 있다가 차가 거기 닿아서야 이어졌다
+    (사용자가 짚었다: "경로 추적이 차를 따라가지 않고, 긴 도로에서 처음부터 나타나지 않음").
+  */
+  for (let z = Math.max(SPAWN_Z, SPAWN_Z_SCHOOL_ZONE) + 20; z > TURN_START_Z; z -= 1) pts.push({ x: lane, z });
 
   // 코너 — 제어점을 (차로, 진출차로)에 두는 2차 베지어
   for (let i = 0; i <= 50; i += 1) {
@@ -174,15 +180,47 @@ export class AutoDriver {
     진입 · 우회전 관문이 없다. 자리는 교차로 맵과 같은 좌표를 쓴다 (rules/lawRules.ts 의 ZONE_ROAD_EDGES).
   */
   private zoneGate = 0;
-  private static readonly ZONE_GATES: ReadonlyArray<{ id: CrosswalkId; near: number }> = [
-    { id: 'S', near: CROSSWALK_S_OUTER },
-    { id: 'A', near: CROSSWALK_OUTER },
-    { id: 'B', near: CROSSWALK_B_INNER },
-  ];
+  /*
+    `near` 는 횡단보도에서 내가 먼저 닿는 끝(관문을 넘기는 자리), `stopLine` 은 **서는 자리**다 — 횡단보도 2m 앞에
+    정지선이 그어져 있고, 그 사이에 자전거횡단도 띠가 놓이기도 한다(layout.ts 의 bikeLaneCenter).
+
+    한때 `near` 까지의 거리로 제동했다. 그러면 횡단보도 1.8m 앞, 곧 **정지선을 0.2m 넘은 자리**에 섰다 — 판정은
+    횡단보도 앞이면 정지로 쳐 주므로 검증에 걸리지 않았지만, 정지선 직전에 서는 것이 규정이고 띠가 있으면 범퍼가 띠 위에
+    걸린다. 사용자가 LiDAR 화면에서 짚었다: "어린이보호구역에서 정지선을 횡단보도로 잡는".
+  */
+  private static readonly ZONE_GATES: ReadonlyArray<{ id: CrosswalkId; near: number; stopLine: number }> = (
+    ['S', 'A', 'B'] as const
+  ).map((id) => ({ id, near: ZONE_ROAD_EDGES[id].near, stopLine: ZONE_ROAD_EDGES[id].stopLine }));
   /** 그 관문에서 요구되는 일시정지를 이미 마쳤는가 */
   private heldAtGate = false;
   /** 길 위에서 지금 어디쯤인지 (뒤로 되돌아가지 않게 앞으로만 움직인다) */
   private pathIndex = 0;
+  /** 첫 프레임에 길 전체에서 내 자리를 찾았는가 — 그 뒤로는 앞쪽 60점만 본다 (steer) */
+  private located = false;
+  /**
+   * **이번 프레임에 서기로 했다면 그 자리** — 앞범퍼에서 몇 m 앞인가. 가기로 했으면 `null`.
+   * 판단에는 쓰지 않는다 — LiDAR 화면(LidarPanel.ts)이 경로 띠를 거기서 끊고 정지선을 긋는다.
+   */
+  private holdDistance: number | null = null;
+
+  /** 서기로 한 자리 (앞범퍼에서 m) — 가기로 했으면 `null` */
+  get stopAhead(): number | null {
+    return this.holdDistance;
+  }
+
+  /**
+   * **앞으로 달릴 길** — 지금 자리부터 `maxLength` m 까지의 점들.
+   * LiDAR 화면이 파란 경로 띠로 그리고, 인지(ai/perception.ts)가 그 길 위에 사람이 있는지 본다.
+   */
+  routeAhead(maxLength: number): Array<{ x: number; z: number }> {
+    const out = [this.path[this.pathIndex]];
+    let walked = 0;
+    for (let i = this.pathIndex; i + 1 < this.path.length && walked < maxLength; i += 1) {
+      walked += Math.hypot(this.path[i + 1].x - this.path[i].x, this.path[i + 1].z - this.path[i].z);
+      out.push(this.path[i + 1]);
+    }
+    return out;
+  }
 
   /**
    * @param brakeDecel 이 차의 제동 감속도 (m/s²). 난이도가 오르면 브레이크가 무르고 더 빨리 다가가므로
@@ -210,6 +248,7 @@ export class AutoDriver {
   }
 
   decide(s: AutoDriveState): VehicleInput {
+    this.holdDistance = null;
     if (this.drive === 'zoneOnly') {
       return { stop: this.zoneShouldStop(s), steer: this.steer(s), rightSignal: false };
     }
@@ -229,16 +268,20 @@ export class AutoDriver {
    * ② 신호기가 있으면 녹색이 아닌 동안 갈 수 없다. 사람이 건너고 있으면 어느 쪽이든 선다(제27조 제1항).
    */
   private zoneShouldStop(s: AutoDriveState): boolean {
-    if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) return true;
+    if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) {
+      this.holdDistance = Math.max(0, s.lead.gap - 2.5);
+      return true;
+    }
     while (this.zoneGate < AutoDriver.ZONE_GATES.length && s.frontZ <= AutoDriver.ZONE_GATES[this.zoneGate].near) {
       this.zoneGate += 1;
       this.heldAtGate = false;
     }
     if (this.zoneGate >= AutoDriver.ZONE_GATES.length) return false;
 
-    const { id, near } = AutoDriver.ZONE_GATES[this.zoneGate];
+    const { id, stopLine } = AutoDriver.ZONE_GATES[this.zoneGate];
     const light = s.zoneLights?.[id] ?? null;
-    const distance = s.frontZ - near;
+    // 정지선까지 — 정지선을 넘어 횡단보도 앞에 있으면 음수다(그래도 사람이 나서면 그 자리에서 선다)
+    const distance = s.frontZ - stopLine;
     const blocked = (light !== null && light !== 'green') || pedConflict(s, id);
     const needHold = light === null;
 
@@ -247,7 +290,7 @@ export class AutoDriver {
       this.heldAtGate = true;
     }
     if (!blocked && (!needHold || this.heldAtGate)) return false;
-    return distance <= this.brakeDistance(s.speedKmh);
+    return this.holdAt(distance, s.speedKmh);
   }
 
   // ── 정지 판단 ────────────────────────────────────────────────────────────
@@ -280,6 +323,7 @@ export class AutoDriver {
       지난 뒤든 같다. 앞차가 속도를 줄이는 중이면 그 차의 속도만큼만 여유를 덜어 준다.
     */
     if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) {
+      this.holdDistance = Math.max(0, s.lead.gap - 2.5);
       return true;
     }
     if (this.gate === 'clear') return false;
@@ -308,7 +352,14 @@ export class AutoDriver {
     }
 
     if (!blocked && (!needHold || this.heldAtGate)) return false;
-    return distance <= this.brakeDistance(s.speedKmh);
+    return this.holdAt(distance, s.speedKmh);
+  }
+
+  /** 관문 앞에서 서는가 — 선다면 그 자리를 적어 둔다 (판단은 예전과 같은 한 줄이다) */
+  private holdAt(distance: number, speedKmh: number): boolean {
+    const stop = distance <= this.brakeDistance(speedKmh);
+    if (stop) this.holdDistance = Math.max(0, distance);
+    return stop;
   }
 
   /** 지금은 어떤 경우에도 갈 수 없다 (사라질 때까지 기다린다) */
@@ -399,10 +450,15 @@ export class AutoDriver {
     const speed = s.speedKmh / 3.6;
     const lookahead = Math.max(3, Math.min(8, 2.5 + speed * 0.6));
 
-    // 길 위에서 지금 가장 가까운 점 — 앞으로만 찾는다 (되돌아가면 코너에서 갇힌다)
+    /*
+      길 위에서 지금 가장 가까운 점 — 앞으로만 찾는다 (되돌아가면 코너에서 갇힌다). 첫 프레임만은 길 전체를 본다:
+      길은 가장 먼 스폰 뒤에서 시작하므로, 가까운 스폰(68)에서 출발하면 내 자리가 길 앞쪽 60점 너머에 있다.
+    */
+    const reach = this.located ? 60 : this.path.length;
+    this.located = true;
     let best = this.pathIndex;
     let bestDist = Infinity;
-    for (let i = this.pathIndex; i < Math.min(this.path.length, this.pathIndex + 60); i += 1) {
+    for (let i = this.pathIndex; i < Math.min(this.path.length, this.pathIndex + reach); i += 1) {
       const d = Math.hypot(this.path[i].x - s.x, this.path[i].z - s.z);
       if (d < bestDist) {
         bestDist = d;
@@ -453,7 +509,7 @@ function pedConflict(s: AutoDriveState, id: CrosswalkId): boolean {
   );
 }
 
-/** 완주선을 넘었는가 — 자율 주행이 끝났는지 판단하는 데 쓴다. 코스마다 완주선이 다르다 */
+/** 완주선을 넘었는가 — AI 자율 주행이 끝났는지 판단하는 데 쓴다. 코스마다 완주선이 다르다 */
 export const isFinished = (s: AutoDriveState, drive: DriveMode = 'rightTurn'): boolean =>
   drive === 'rightTurn' ? s.frontX > FINISH_X : s.frontZ < FINISH_Z;
 

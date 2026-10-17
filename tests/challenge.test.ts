@@ -62,7 +62,7 @@ describe('다섯 단계가 모든 축에서 한 방향으로 어려워진다', (
     expect(easy.missPenalty).toBe(20);
   });
 
-  it('자율 주행은 예전 쉬움 그대로다 — 도움 전부 · 가장 느린 차 · 정지 구역 12m', () => {
+  it('AI 자율 주행은 예전 쉬움 그대로다 — 도움 전부 · 가장 느린 차 · 정지 구역 12m', () => {
     expect(AUTO_DRIVE_RULE.pace).toEqual(DEFAULT_PACE);
     expect(AUTO_DRIVE_RULE.stopZone).toBe(STOP_ZONE_DEPTH);
     expect(AUTO_DRIVE_RULE.hints).toBe('full');
@@ -150,14 +150,15 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
   };
 
   /*
-    **레벨업은 어느 난이도에서도 무위반 두 판이다** (curriculum.ts 의 XP_MAX). 사용자가 정했다:
-    "각 단계의 레벨을 200점을 맥스로 해 줘 … 레벨이 쉽게 올라야 사용자들이 체감하기 좋을 것 같아."
+    **레벨업은 어느 난이도에서도 직접 운전 무위반 한 판이다** (curriculum.ts 의 XP_MAX · XP_PER_CLEAN_RUN). 사용자가 정했다:
+    "각 단계의 레벨을 200점을 맥스로 해 줘 … 레벨이 쉽게 올라야 사용자들이 체감하기 좋을 것 같아.", 그리고 2026-10-18
+    "수동일때는 200xp, 자동일때는 100xp" (그 전에는 한 판 100 · 두 판).
 
     그래서 난이도가 **판 수**로 어려워지지 않는다 — 판을 더 많이 달리게 하는 것은 어려움이 아니라
     시간이 더 드는 것뿐이다. 어려움이 갈리는 자리는 **감점**(아래)과 코스 · 주행 · 도움이다.
   */
-  it('레벨업은 어느 난이도에서도 무위반 두 판이다', () => {
-    for (const c of [1, 3, 5] as const) expect(runsToLevelUp(6, c), `난이도 ${c}`).toBe(2);
+  it('레벨업은 어느 난이도에서도 직접 운전 무위반 한 판이다', () => {
+    for (const c of [1, 3, 5] as const) expect(runsToLevelUp(6, c), `난이도 ${c}`).toBe(1);
   });
 
   it('어려움(5)은 위반한 판에서 80 을, 쉬움(1)은 20 을 잃는다', () => {
@@ -166,13 +167,13 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
     expect(advance(s, miss, undefined, challengeRule(1)).next.xp).toBe(80);
   });
 
-  it('경험치가 차도 레벨을 올리기 전에는 그 레벨의 차가 열리지 않는다', () => {
-    const s = advance({ ...at(6), bestLevel: 5 }, clean, undefined, challengeRule(5)).next;
+  it('경험치가 차도 레벨을 올리기 전에는 그 레벨의 차가 열리지 않는다 — 다시 달린 맵(절반)', () => {
+    const s = advance({ ...at(6), bestLevel: 5 }, clean, undefined, challengeRule(5), { replay: true }).next;
     expect(s.level).toBe(6);
     expect(s.bestLevel).toBe(5);
   });
 
-  it('L10 에서 마스터도 무위반 두 판이다', () => {
+  it('L10 에서 마스터도 직접 운전 무위반 한 판이다', () => {
     const until = (c: 1 | 5): number => {
       let s = at(MAX_LEVEL);
       let n = 0;
@@ -182,8 +183,8 @@ describe('경험치 — 난이도에 따라 오르는 속도가 다르다', () =
       }
       return n;
     };
-    // 막대의 최대치가 200 이라 어느 난이도든 두 판이다 (curriculum.ts 의 XP_MAX)
-    expect(until(1)).toBe(2);
-    expect(until(5)).toBe(2);
+    // 막대의 최대치가 200 이고 한 판이 200 이라 어느 난이도든 한 판이다 (curriculum.ts 의 XP_MAX)
+    expect(until(1)).toBe(1);
+    expect(until(5)).toBe(1);
   });
 });

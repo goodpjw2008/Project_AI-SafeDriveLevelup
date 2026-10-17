@@ -255,6 +255,11 @@ const START_VIEWS: Array<{ id: ViewMode; name: string; isDefault?: boolean }> = 
  * 사이트에서 아무나 대표 사진을 바꾸는 것은 기능이 아니라 구멍이다. 사진은 개발 서버에서 등록해 커밋한다.
  */
 const CAN_UPLOAD_PHOTO = import.meta.env.DEV;
+/**
+ * **맵 체험하기는 개발 서버에서만** (사용자가 정했다, 2026-10-18: "배포시에 맵체험 기능 제거"). 고친 판을 번호로 골라 보는
+ * 시험용 문이라 배포본(npm run build)에는 첫 화면의 버튼이 없다 — main.ts 의 renderTrial 도 같은 값으로 막는다.
+ */
+export const CAN_TRY_MAP = import.meta.env.DEV;
 
 /**
  * 이 프로젝트가 쓰는 오픈소스 — package.json 의 dependencies·devDependencies 와 짝을 이룬다.
@@ -412,11 +417,11 @@ function debriefTitle(sc: ScenarioSpec): { stage: string; title: string } {
   const trial = document.body.classList.contains('map-trial');
   // 번호는 갈래 한 글자 + 다섯 자리다 — `M08400` (scenarios/scenarioCode.ts)
   const n = scenarioCode(sc.id);
-  // 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 M01363` (main.ts 의 hud.show)
+  // AI 자율 주행도 주행 화면과 같은 이름 — `오프라인 교육 - 시나리오 M01363` (main.ts 의 hud.show)
   const stage = demo
     ? n !== undefined
-      ? `오프라인 교육 - 시나리오 ${n}`
-      : '오프라인 교육'
+      ? `AI 자율주행 - 시나리오 ${n}`
+      : 'AI 자율주행'
     : n !== undefined
       ? trial
         ? `맵 체험 ${n}`
@@ -725,8 +730,6 @@ export class Screens {
   renderMenu(
     save: SaveData,
     handlers: {
-      /** AI 자율 주행 시범 — 라이브러리의 대표 코스를 AI 가 차례로 규정대로 몬다 */
-      onAiDrive(): void;
       onShop(): void;
       onHelp(): void;
       /** 어린이보호구역 운전 방법 — 우회전 하는 방법과 같은 꼴의 규정 요약 */
@@ -840,9 +843,9 @@ export class Screens {
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
-          (AI 안전운전 연습 · 안전운전 자율주행 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
+          (AI 안전운전 연습 · 안전운전 AI 자율주행 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
         -->
-        <button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>
+        ${CAN_TRY_MAP ? `<button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>` : ''}
         <button class="icon ghost" id="btn-settings" title="설정" aria-label="설정">${icon(
           'gear',
         )}</button>
@@ -874,7 +877,6 @@ export class Screens {
     const on = (id: string, fn: () => void): void =>
       void document.getElementById(id)?.addEventListener('click', fn);
 
-    on('btn-ai-drive', handlers.onAiDrive);
     $('btn-shop').addEventListener('click', handlers.onShop);
     $('btn-help').addEventListener('click', handlers.onHelp);
     $('btn-zone-help').addEventListener('click', handlers.onZoneHelp);
@@ -1097,6 +1099,10 @@ export class Screens {
         </div>
 
         <!--
+          **지금은 시작하는 길이 하나다 — 'AI 안전운전 연습'** (사용자가 정했다: "메뉴의 플레이 옵션을 ai 안전운전 연습 하나로
+          줄이고 대신 운전 인게임에서 자율주행 온오프 옵션 버튼을 넣자"). AI 가 모는 것은 주행 중 'AI 자율주행' 버튼 · P 키로
+          그 자리에서 넘긴다 (main.ts 의 toggleAutoDrive). 아래는 두 길(온라인 연습 · 오프라인 교육)을 나란히 두던 때의 기록이다.
+
           **이 교실에는 배우는 길이 둘이다** (사용자가 정한 개념).
 
            - **온라인 연습** — 내가 직접 몬다. 혼자서, 아무 때나. 이 교실의 본래 자리다.
@@ -1125,7 +1131,7 @@ export class Screens {
           출발만큼 커 보여 실수로 누르는 쪽이 무서워지고, 아래 한 줄로 두면 두 상자 밑에 꼬리가 하나
           더 붙는다. 이름 줄은 **양쪽 상자가 같은 키**여야 큰 버튼 둘이 나란히 서므로 min-height 로 묶는다.
         -->
-        <div class="mode-split">
+        <div class="mode-split single">
           <div class="mode-group">
             <!-- 손에 든 화면(세로 · 가로)에서는 '온라인' 만 (index.html 의 .lbl-tail) — 갤럭시 S21 폭에서 줄이 밀렸다 -->
             <p class="mode-label">${icon('monitor')}<b>온라인<span class="lbl-tail"> 연습</span></b>${resetButton}</p>
@@ -1136,15 +1142,6 @@ export class Screens {
               한 갈래만 붙잡고 파고 싶은 사람을 위한 자리는 **설정**으로 옮겼다 (renderSettings).
             -->
             <div class="ai-course-actions">${button}</div>
-          </div>
-          <div class="mode-group">
-            <!-- 손에 든 가로 화면에서는 짧은 꼴 '오프라인 교육' (index.html 의 .lbl-short) — 칸이 좁아 폭을 온라인 연습에 내준다 -->
-            <p class="mode-label">${icon('users')}<b><span class="lbl-long">오프라인 교육 활용</span><span class="lbl-short">오프라인 교육</span></b></p>
-            <div class="ai-course-actions">
-              <button class="btn" id="btn-ai-drive" title="AI 가 규정대로 모는 것을 함께 봅니다">${icon(
-                'auto',
-              )}안전운전 자율주행</button>
-            </div>
           </div>
         </div>
         <!--
@@ -1251,6 +1248,7 @@ export class Screens {
           mastered: course.mastered,
           habitsLeft: course.habits.length,
           gained: x.leveledUp ? 0 : Math.max(0, x.gained),
+          observed: x.observed,
         },
         'md',
         /*
@@ -1261,7 +1259,11 @@ export class Screens {
           **딱 한 경우만 남긴다:** 막대가 가득 찼는데 나쁜 습관이 남아 못 오른 판. 그때는 가득 찬 막대만 보이고
           레벨은 그대로여서, 이유를 적지 않으면 "왜 안 오르지?" 로 남는다 (ui/playerCard.ts 의 playerFoot).
         */
-        { foot: course.habits.length > 0 && x.after >= x.need },
+        /*
+          **AI 자율주행이 몬 판도 남긴다** (curriculum.ts 의 observe) — 받은 경험치가 직접 운전의 절반이라는 것, 막대가 차도
+          직접 운전으로 통과해야 오른다는 것을 적지 않으면 "왜 반만 차지 · 왜 안 오르지?" 로 남는다.
+        */
+        { foot: (course.habits.length > 0 && x.after >= x.need) || !!x.observed },
       )}
       </div>`;
   }
@@ -1431,6 +1433,8 @@ export class Screens {
       onGraphicsPreset(tier: QualityTier): void;
       /** 소리 — 누른 즉시 저장하고 미리 들려준다 */
       onSound(kind: 'engine' | 'horn' | 'blinker', id: string): void;
+      /** 설정 전체 초기화 — 이 창의 값만 처음 값으로 (레벨 · 기록은 그대로) */
+      onResetSettings(): void;
       onBack(): void;
     },
   ): void {
@@ -1595,6 +1599,15 @@ export class Screens {
             </div>
           </div>
         </section>
+        <!--
+          **설정 전체 초기화** (사용자가 정했다, 2026-10-18: "설정 전체 초기화버튼 추가"). 이 창의 값 — 난이도 · 연습 갈래 · 시점 ·
+          화질 · 소리 · 다음 판 자동 넘김 — 만 처음 값으로 돌린다. 레벨 · 경험치 · 습관 · 기록은 첫 화면의 '처음부터' 가 맡는다.
+          두 칸 아래, 주의사항 위에 한 줄로 선다.
+        -->
+        <div class="settings-reset">
+          <button class="ghost" id="btn-reset-settings">${icon('retry')}설정 전체 초기화</button>
+          <span class="opt-hint">이 창의 값을 처음 값으로 되돌립니다 · 레벨과 기록은 그대로입니다</span>
+        </div>
         <!-- 주의사항 — 설정 창 맨 아래, PC · 휴대폰 모두 (사용자 요청). 문구는 brand.ts 의 APP_NOTICE_* -->
         ${noticeHtml()}
         <!-- 버전 — 설정 창 맨 아래 (사용자가 정했다). 값은 brand.ts 의 APP_VERSION 하나 -->
@@ -1603,6 +1616,7 @@ export class Screens {
     `;
 
     this.bindBack('settings', handlers.onBack);
+    $('btn-reset-settings').addEventListener('click', () => handlers.onResetSettings());
     for (const [kind, prefix, list] of [
       ['engine', 'eng', ENGINE_SOUNDS],
       ['blinker', 'blk', BLINKER_SOUNDS],
@@ -1719,15 +1733,15 @@ export class Screens {
     /** 이번 판에 얻거나 잃은 뱃지 (economy/badges.ts) — 없으면 뱃지 줄을 그리지 않는다 */
     badgeEvents: readonly BadgeEvent[] = [],
     /**
-     * **자율 주행의 결과 화면** (main.ts 의 finishDemoRun). AI 주행결과 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적고,
+     * **AI 자율 주행의 결과 화면** (main.ts 의 finishDemoRun). AI 주행결과 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적고,
      * 다음 시범 코스(마지막이면 첫 화면)로 가는 버튼과 카운트다운을 일반 판과 같은 자리에 둔다.
      */
-    options: { demo?: { nextLabel: string } } = {},
+    options: { demo?: { nextLabel: string; note?: string } } = {},
   ): void {
     // 등급 이름은 판정 엔진이 정한다 — 주행 기록도 같은 표를 쓴다 (lawRules.ts 의 GRADE_TEXT)
     const gradeLabel = GRADE_TEXT[result.grade] ?? result.grade;
     // AI 과정은 늘 다음 판이 있다 — 마스터가 된 뒤에도 마스터 운행(L10 무작위)이 이어진다
-    // 자율 주행은 다음 시범 코스(마지막이면 첫 화면)로 늘 넘어간다 — 번호가 라이브러리 번호라 스테이지 수와 견줄 수 없다
+    // AI 자율 주행은 다음 시범 코스(마지막이면 첫 화면)로 늘 넘어간다 — 번호가 라이브러리 번호라 스테이지 수와 견줄 수 없다
     const hasNext = options.demo ? true : course ? true : sc.id < SCENARIOS.length;
     /*
       자동 넘김은 **이어 달릴 수 있을 때만** 뜬다 — 다음 판이 있고, 실패하지 않았을 때.
@@ -1796,7 +1810,7 @@ export class Screens {
       이었다. AI 활용 공모전 작품에서 잘 달린 판일수록 AI 가 사라지는 셈이라, 무위반 판에도 부른다 —
       프롬프트에 '위반이 없는 경우' 절이 이미 있어 잘한 판단을 짚어 준다 (server/coachPrompt.mjs).
 
-      **자율 주행만은 AI 에게 묻지 않는다** (options.demo). AI 가 규정대로 몬 판이라 짚을 것이 없고, 부르면 무료 AI
+      **AI 자율 주행만은 AI 에게 묻지 않는다** (options.demo). AI 가 규정대로 몬 판이라 짚을 것이 없고, 부르면 무료 AI
       한도만 쓴다. 다만 **칸은 둔다** — 사용자가 정했다: "AI 분석결과 화면은 나오고 … 자율주행은 교통법규를 준수하는
       주행으로 AI가 분석을 하지 않습니다 라고 적어 줘." 늘 있던 자리가 비면 고장처럼 보인다.
     */
@@ -1950,7 +1964,9 @@ export class Screens {
               <div class="verdict-head">${icon('guide')}<span id="coach-head">AI 주행결과 분석</span></div>
               <div class="verdict-row">
                 <img class="verdict-robot" src="${robotTurn}" alt="" aria-hidden="true" />
-                <div class="coach-body" id="coach-body">오프라인 교육(자율 주행)은 교통법규를 준수하는 주행으로 AI가 분석을 하지 않습니다.</div>
+                <div class="coach-body" id="coach-body">${esc(
+                  options.demo.note ?? 'AI 자율주행은 교통법규를 준수하는 주행으로 AI가 분석을 하지 않습니다.',
+                )}</div>
               </div>
             </div>`
             : ''
@@ -2035,7 +2051,7 @@ export class Screens {
             있어야 남은 초가 왜 세어지는지 알 수 있다. 한때 버튼 아래 줄에 따로 있었는데, 결과 화면
             윗부분이 두 줄을 차지해 정산 · 지도가 그만큼 밀려 내려갔다.
           */
-          // 자율 주행은 늘 다음 시범 코스로 넘어간다 — 끄고 켤 것이 없다 (멈춤 버튼은 그대로 둔다)
+          // AI 자율 주행은 늘 다음 시범 코스로 넘어간다 — 끄고 켤 것이 없다 (멈춤 버튼은 그대로 둔다)
           canAdvance && !options.demo
             ? `<label class="auto-next">
                  <input type="checkbox" id="chk-auto-next" ${
@@ -2136,7 +2152,7 @@ export class Screens {
 
     if (canAdvance) {
       $('btn-next').addEventListener('click', handlers.onNext);
-      // 자율 주행에는 체크가 없다 (위) — 있을 때만 묶는다
+      // AI 자율 주행에는 체크가 없다 (위) — 있을 때만 묶는다
       const chk = document.getElementById('chk-auto-next') as HTMLInputElement | null;
       chk?.addEventListener('change', () => handlers.onToggleAutoNext(chk.checked));
       $('btn-auto-pause').addEventListener('click', handlers.onToggleAutoNextPause);

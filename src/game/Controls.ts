@@ -12,6 +12,8 @@ export interface ControlCallbacks {
   onPause(): void;
   onLook(dx: number, dy: number): void;
   onRecenter(): void;
+  /** P — AI 자율주행 켜기/끄기 (main.ts) */
+  onToggleAutoDrive?(): void;
   /** 정지 · 출발 상태가 바뀌었다 — 터치 방향키의 ↑ · ↓ 불을 맞춘다 (키보드로 바꿔도 알린다) */
   onStopChange?(stopped: boolean): void;
 }
@@ -212,6 +214,11 @@ export class Controls {
       if (e.code === 'KeyE') {
         e.preventDefault();
         this.cb.onRecenter();
+        return;
+      }
+      if (e.code === 'KeyP') {
+        e.preventDefault();
+        this.cb.onToggleAutoDrive?.();
         return;
       }
       const k = KEYMAP[e.code];

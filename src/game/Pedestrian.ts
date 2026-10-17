@@ -20,6 +20,7 @@ import { CROSSWALK_INNER, CROSSWALK_OUTER,
   BIKE_SLOT_SHRINK,
 } from '../layout';
 import { PedWalk, type CarFront, type PedWalkContext } from './pedWalk';
+import { personShapes, type LidarShape } from './lidarSensor';
 import type { CrosswalkId, PedSignal, PedestrianSample } from '../rules/lawRules';
 import type { PedSpawn } from '../scenarios/scenarios';
 
@@ -785,6 +786,18 @@ export class Pedestrian {
       x: this.group.position.x,
       z: this.group.position.z,
     };
+  }
+
+  /**
+   * **LiDAR 가 맞힐 몸** (game/lidarSensor.ts 의 personShapes — 분류기 학습 데이터와 같은 몸이다).
+   *
+   * 손에 든 화면에서만 키우는 `visualScale` 은 따르지 않는다 — 충돌 판정(hits)과 같은 몸이다.
+   * 보이지 않거나 다 건너 사라진 사람은 없다.
+   */
+  lidarShapes(): LidarShape[] {
+    if (!this.group.visible || this.walk.done) return [];
+    const p = this.group.position;
+    return personShapes({ x: p.x, z: p.z, facing: this.group.rotation.y, scale: this.scale, bike: this.bike });
   }
 
   /** 차량과의 충돌 판정 (원-원 근사) */

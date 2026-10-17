@@ -1845,7 +1845,7 @@ function finishBuild(b: EntryBuild): void {
 const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 /**
- * **라이브러리를 화면을 멈추지 않고 미리 만든다.** 첫 화면이 뜬 뒤 한가할 때 main.ts 가 부르고, '연습' · '자율주행'
+ * **라이브러리를 화면을 멈추지 않고 미리 만든다.** 첫 화면이 뜬 뒤 한가할 때 main.ts 가 부르고, '연습' · 'AI 자율주행'
  * 버튼도 이것을 기다린다 — 그래서 누른 순간 눌림 표시와 분석 화면이 바로 그려지고, 만드는 일은 뒤에서 이어진다.
  *
  * 한 번에 12ms 씩 걷고 브라우저에 차례를 넘긴다. 이미 다 만들었으면 바로 그것을 준다. 도중에 누가 scenarioLibrary()

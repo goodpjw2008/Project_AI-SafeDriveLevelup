@@ -32,7 +32,7 @@ import { bakeEnvironment } from './game/environment';
 import { carForLevel, getCar } from './economy/cars';
 import { ensureCarPhotos, hasCarPhoto, loadCarPhotos, uploadCarPhoto } from './economy/carPhotos';
 import { settle } from './economy/reward';
-import { load, save as persist, pushHistory, reset as resetSave, type SaveData } from './economy/save';
+import { defaultSave, load, save as persist, pushHistory, reset as resetSave, type SaveData } from './economy/save';
 import { updateBadges } from './economy/badges';
 import type { JudgeResult } from './rules/lawRules';
 import {
@@ -54,7 +54,6 @@ import {
   warmLibrary,
 } from './scenarios/library';
 import { zoneCourse } from './scenarios/zoneCourse';
-import { offlineCourses } from './scenarios/offlineCourse';
 import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
 import { masterBadge } from './ui/badges';
 import { practiceTrack } from './scenarios/trackPick';
@@ -67,7 +66,15 @@ import {
   type Picker,
   type RecentRun,
 } from './scenarios/recommend';
-import { advance, currentTarget, levelLabel, recordHabits, xpToNext } from './scenarios/curriculum';
+import {
+  advance,
+  currentTarget,
+  levelLabel,
+  observe,
+  recordHabits,
+  xpToNext,
+  type CurriculumState,
+} from './scenarios/curriculum';
 import { abilityPriorFor, difficultyOf } from './ai/difficulty';
 import { riskOf } from './ai/risk';
 import { modelStep } from './ai/report';
@@ -75,9 +82,9 @@ import { OUTCOME_MODEL, learnerVector, predictOutcome } from './ai/outcome';
 import { costOf } from './scenarios/difficulty';
 import { summarize } from './coach/habits';
 import { Hud } from './ui/Hud';
-import { Screens, type AiTrainingState, type CourseStep } from './ui/Screens';
+import { CAN_TRY_MAP, Screens, type AiTrainingState, type CourseStep } from './ui/Screens';
 import { AiPickOverlay } from './ui/AiPick';
-import { habitTitle } from './coach/badHabits';
+import { emptyChange, habitTitle } from './coach/badHabits';
 import { nav } from './ui/nav';
 import { beginRun, cachedSiteStats, endRun, loadSiteStats, outcomeOf } from './siteStats';
 
@@ -127,6 +134,14 @@ let paused = false;
  * 보여 주는 것이 이 기능이다. 첫 화면으로 나가면 꺼진다.
  */
 let aiDriving = false;
+
+/**
+ * **이번 판에 AI 자율주행이 한 번이라도 차를 몰았는가** — 주행 중 버튼 · P 키로 AI 에게 넘긴 판 (toggleAutoDrive).
+ *
+ * AI 가 몬 구간이 있는 판은 **학습자의 기록이 아니다** — 레벨 · 경험치 · 습관 · 뱃지 · 통계에 남기지 않는다(시범 주행 · 맵 체험과
+ * 같은 선). 남기면 AI 가 대신 서 준 정지가 학습자가 익힌 것으로 세어진다. 결과 화면은 보여 주고 '다음' 은 평소처럼 다음 판이다.
+ */
+let aiAssisted = false;
 
 /**
  * **브라우저가 한 번 그릴 때까지 기다린다.** 버튼을 '만드는 중' 으로 바꾼 뒤 곧바로 무거운 일을 하면 그 바뀐 모습이
@@ -193,8 +208,9 @@ let mapTrial = false;
 let justMastered = false;
 
 /**
- * **AI 자율 주행 시범**에서 돌 코스 (scenarios/offlineCourse.ts 의 `offlineCourses`) — 앞에서부터 하나씩 꺼낸다.
- * 비어 있으면 시범이 아니다.
+ * **AI 자율 주행으로 처음부터 끝까지 달리는 판** — 주소의 `?ai=번호` (검증용, 아래 boot). 첫 화면의 'AI 자율주행' 시작
+ * 버튼(오프라인 교육 열 판, scenarios/offlineCourse.ts)은 빠졌다 — 사용자가 정했다: "메뉴의 플레이 옵션을 ai 안전운전 연습
+ * 하나로 줄이고 대신 운전 인게임에서 자율주행 온오프 옵션 버튼을 넣자". 주행 중 켜기/끄기는 아래 toggleAutoDrive 다.
  */
 let demoQueue: number[] = [];
 
@@ -459,6 +475,7 @@ async function makeAiScenario(): Promise<void> {
 /** AI 자율 주행을 끈다. 화면을 떠날 때마다 부른다. */
 function stopAiDriving(): void {
   aiDriving = false;
+  aiAssisted = false;
   demoQueue = [];
   document.body.classList.remove('ai-drive');
 }
@@ -693,6 +710,53 @@ const controls = new Controls(canvas, {
   onGlance: (dir) => game?.setGlance(dir),
   onRecenter: () => game?.recenterLook(),
   onStopChange: () => syncGoStop(),
+  onToggleAutoDrive: () => toggleAutoDrive(),
+});
+
+/** 주행 중 운전 모드 카드 — 왼쪽은 지금의 모드, 오른쪽 스위치는 바꿀 모드 (index.html 의 #drive-mode) */
+function showAutoDriveButton(on: boolean): void {
+  const box = document.getElementById('drive-mode');
+  if (box) box.dataset.mode = on ? 'ai' : 'manual';
+  const toggle = document.getElementById('mode-toggle');
+  if (toggle) {
+    const label = on ? '일반모드로 바꾸기' : 'AI 자율주행으로 바꾸기';
+    toggle.setAttribute('aria-label', label);
+    toggle.title = `${label} (P)`;
+  }
+}
+
+/*
+  **AI 자율주행 켜기/끄기 — 주행 중 버튼 · P 키** (사용자가 정했다: "운전 인게임에서 자율주행 온오프 옵션 버튼을 넣자").
+
+  켜면 그 자리에서 AI 가 이어 몬다 — AI 운전자는 사람이 모는 동안에도 그림자로 판단해 왔으므로 지나온 관문을 안다
+  (Game 의 driver). 사람 입력은 막고, 방향키 · 키 안내를 숨기고, 운전 모드 카드를 파랗게 바꾼다(body.ai-drive ·
+  #drive-mode 의 data-mode). 끄면 AI 가 서 있던 상태(정지 · 출발)를 그대로 넘겨받아 사람이 이어 몬다 — 정지선에 서 있던
+  차가 넘기는 순간 튀어 나가지 않게. AI 가 한 번이라도 몬 판은 기록에 남기지 않는다 (위 aiAssisted).
+*/
+function toggleAutoDrive(): void {
+  if (!game || screens.active !== 'none') return;
+  const on = !game.autoDriving;
+  game.setAutoDrive(on);
+  if (on) aiAssisted = true;
+  controls.setEnabled(!on);
+  if (!on) {
+    controls.setStopped(game.aiWantsStop);
+    syncGoStop();
+  }
+  document.body.classList.toggle('ai-drive', on);
+  showAutoDriveButton(on);
+}
+/*
+  **운전 모드 카드의 스위치** — 오른쪽에 적힌 모드로 바꾼다: 일반모드에서는 'AI 자율주행', AI 자율주행에서는 '일반모드'
+  (사용자가 정했다: *"일반주행 모드일경우 : 현재상태 아이콘 + 일반모드 | AI 자율주행 [토글]"*). P 키와 같은 일이다.
+
+  누른 뒤 포커스를 뗀다 — 남아 있으면 AI 가 모는 동안(키 입력을 막지 않는 동안) Space(정지 별칭)가 이 버튼을 눌러 모드가
+  바뀐다.
+*/
+document.getElementById('mode-toggle')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).blur();
+  toggleAutoDrive();
 });
 
 for (const [id, action] of [
@@ -789,35 +853,6 @@ function renderMenu(): void {
     if (nav.current === 'menu') renderMenu();
   });
   screens.renderMenu(saveData, {
-    /*
-      AI 자율 주행 시범 — 라이브러리의 **대표 코스**를 AI 가 차례로 규정대로 몬다.
-
-      "규정대로 하면 이렇게 된다" 를 보여 주는 기능이라 레벨 · 잠금과 무관하게 돈다.
-      적색 · 보행자 · 우회전 신호등 · 보호구역 · 앞차 · 꼬리물기를 한 바퀴에 모두 보여 준다.
-    */
-    onAiDrive: () =>
-      void (async () => {
-        /*
-          **누른 즉시 반응한다** — 버튼을 잠그고 '준비 중…' 으로 바꾼 뒤 덮개를 씌우고 한 프레임 넘긴다. 열 판을 고르는
-          일(offlineCourses)은 라이브러리가 있어야 하는데, 첫 화면이 뜨자마자 누르면 아직 만드는 중일 수 있다 —
-          그때는 나눠 만드는 것을 기다린다 (library.ts 의 warmLibrary). 사용자가 짚었다 (2026-09-28).
-        */
-        if (aiDriving) return;
-        aiDriving = true;
-        for (const id of ['btn-ai-drive', 'btn-generate']) {
-          const b = document.getElementById(id) as HTMLButtonElement | null;
-          if (b) b.disabled = true;
-        }
-        const btn = document.getElementById('btn-ai-drive');
-        if (btn) btn.textContent = '준비 중…';
-        showLoading('안전운전 자율주행을 준비하는 중', { immediate: true });
-        await nextPaint();
-        await warmLibrary();
-        aiCourse = false;
-        // **열 판, 사용자가 정한 차례 그대로** (scenarios/offlineCourse.ts) — 교차로 여덟 + 보호구역 전용 도로 둘
-        demoQueue = offlineCourses().map((e) => e.spec.id);
-        goRun(demoQueue[0]);
-      })(),
     onShop: () => nav.go({ name: 'shop', enter: renderShop }),
     onHelp: () => nav.go({ name: 'help', enter: renderHelp }),
     onZoneHelp: () => nav.go({ name: 'zone-help', enter: renderZoneHelp }),
@@ -969,6 +1004,8 @@ function renderZoneHelp(): void {
  * 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘" 라고 했다.
  */
 function renderTrial(): void {
+  // 배포본에는 문이 없다 (Screens 의 CAN_TRY_MAP) — 혹시 불려도 아무 일 없이 첫 화면에 머문다
+  if (!CAN_TRY_MAP) return;
   stopAutoNext();
   disposeSeatPreview();
   ensureMenuScene();
@@ -1067,6 +1104,25 @@ function renderSettings(): void {
       `resume()` 을 먼저 부르는 이유: 설정 화면까지 한 번도 소리를 낸 적이 없으면
       오디오가 아직 안 켜져 있다. 이 클릭이 그 사용자 제스처가 된다.
     */
+    /*
+      **설정 전체 초기화** (사용자가 정했다, 2026-10-18). 이 창의 값만 처음 값(save.ts 의 defaultSave)으로 — 레벨 · 경험치 ·
+      습관 · 기록 · 좌석 자리는 그대로다. 되돌릴 수 없으니 한 번 묻는다.
+    */
+    onResetSettings: async () => {
+      const ok = await screens.confirm({
+        title: '설정을 처음 값으로 되돌립니다.',
+        lines: [
+          [{ em: '난이도 · 연습 · 시점 · 화질 · 소리' }, '가 모두 처음 값이 됩니다.'],
+          '레벨 · 경험치 · 운전 습관 · 기록은 그대로입니다.',
+        ],
+        ok: '초기화',
+      });
+      if (!ok) return;
+      saveData.settings = defaultSave().settings;
+      commit();
+      hud.setShowFps(saveData.settings.graphics.showFps);
+      renderSettings();
+    },
     onSound: (kind, id) => {
       saveData.settings.sounds = { ...saveData.settings.sounds, [kind]: id };
       commit();
@@ -1352,12 +1408,15 @@ async function startRun(id: number): Promise<void> {
   controls.setNoTurn(currentScenario.drive !== undefined && currentScenario.drive !== 'rightTurn');
   controls.reset();
   /*
-    자율 주행 중에는 **사람 입력을 받지 않는다.** 핸들이 두 곳에서 들어오면 AI 가
+    AI 자율 주행 중에는 **사람 입력을 받지 않는다.** 핸들이 두 곳에서 들어오면 AI 가
     그리는 선이 흔들려, 정답을 보여 준다는 이 기능의 뜻이 무너진다.
     (시점 전환 C·재시작 R·나가기 Esc 는 enabled 와 무관하게 그대로 동작한다)
   */
   controls.setEnabled(!aiDriving);
   document.body.classList.toggle('ai-drive', aiDriving);
+  // 새 판은 사람이 몰며 시작한다 (주소의 ?ai= 로 연 판만 AI 가 처음부터) — 주행 중 버튼으로 바꾼다
+  aiAssisted = false;
+  showAutoDriveButton(aiDriving);
   // 결과 화면의 제목이 이것을 본다 — 체험한 판을 'AI 추천' 이라 부르지 않게 (Screens 의 debriefTitle)
   document.body.classList.toggle('map-trial', mapTrial);
   /*
@@ -1381,12 +1440,12 @@ async function startRun(id: number): Promise<void> {
   const libNo = scenarioCode(currentScenario.id);
   hud.show(
     /*
-      **자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 M01363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
+      **AI 자율 주행도 번호를 적는다** — `오프라인 교육 - 시나리오 M01363 - 제목`. 사용자가 "AI 가 추천하는 결과는 시나리오 ??
       시나리오 내용 이렇게 나왔잖아. 자율주행도 자율주행 - 시나리오 ??? 시나리오 상황 이렇게 나오게 해 줘" 라고 했다.
       번호가 있으면 맵 체험으로 같은 판을 직접 달려 볼 수 있다.
     */
     aiDriving
-      ? `오프라인 교육 - 시나리오 ${libNo ?? ''}`.trim()
+      ? `AI 자율주행 - 시나리오 ${libNo ?? ''}`.trim()
       : mapTrial && libNo !== undefined
       ? `맵 체험 ${libNo}`
       : libNo !== undefined
@@ -1450,7 +1509,7 @@ async function startRun(id: number): Promise<void> {
     **난이도가 주행을 바꾼다** (challenge.ts) — 도움의 양(hints), 다가가는 속도와 제동(pace), 정지 구역(stopZone).
     시범 주행은 보여 주는 판이라 쉬움으로 달린다 — 도움이 다 켜져 있고, AI 운전이 맞춰 둔 속도와 제동이다.
   */
-  // 자율 주행은 난이도 설정과 상관없이 가장 친절한 시범 값으로 몬다 (challenge.ts 의 AUTO_DRIVE_RULE)
+  // AI 자율 주행은 난이도 설정과 상관없이 가장 친절한 시범 값으로 몬다 (challenge.ts 의 AUTO_DRIVE_RULE)
   const challenge = aiDriving ? AUTO_DRIVE_RULE : challengeRule(saveData.settings.difficulty);
   const hints = challenge.hints;
   hud.setHints(hints);
@@ -1461,7 +1520,7 @@ async function startRun(id: number): Promise<void> {
   setClusterStopCue(hints !== 'none');
 
   /*
-    시작 시점 — 자율 주행 중에는 후방 시점으로 고정한다 (아래 startView 주석).
+    시작 시점 — AI 자율 주행 중에는 후방 시점으로 고정한다 (아래 startView 주석).
 
     **손에 든 화면도 후방 시점으로 고정한다** (사용자가 정했다: *"모바일에서는 C 시점 전환을 쓰지 않는다.
     세로는 횡단보도 앞에서 카메라가 올라갔다 내려오는 후방 시점, 가로는 후방 시점 하나."*). 운전석 시점이
@@ -1492,7 +1551,7 @@ async function startRun(id: number): Promise<void> {
     // 차고에서 맞춰 둔 좌석 자리를 그대로 들고 들어간다
     seatOffset: saveData.seatOffsets[carSpec.id] ?? 0,
     /*
-      시작 시점 — 자율 주행 중에는 **후방 시점**으로 고정한다.
+      시작 시점 — AI 자율 주행 중에는 **후방 시점**으로 고정한다.
 
       설정이 운전자 시점이면 자기 차 안에서 보게 되는데, 이 기능은 "어떻게 도는지"를
       보여 주는 것이라 차와 차로가 함께 보이는 화면이라야 한다. 주행 중 C 로 바꾸는
@@ -1502,6 +1561,11 @@ async function startRun(id: number): Promise<void> {
     // 운전자 시점 미사용(기본)이면 시야 창을 만들지 않고 C 로 돌 때 운전석을 건너뛴다 (save.ts 의 driverView)
     driverView: saveData.settings.driverView,
     autoDrive: aiDriving,
+    /*
+      **LiDAR 화면은 늘 뜬다.** 직접 운전에서 AI 가 설 자리 · 위험 색은 정답을 짚어 주는 도움이라, 도움 없는
+      난이도(hints 'none')에서는 빼고 물체만 보인다. AI 가 모는 동안에는 늘 보인다 (Game 의 coachManual).
+    */
+    lidarCoach: hints !== 'none',
     graphics: saveData.settings.graphics,
     // 난이도가 오르면 더 빨리 다가가고 브레이크가 무르며, 정지선에 더 붙여 서야 한다 (challenge.ts)
     pace: challenge.pace,
@@ -1613,6 +1677,11 @@ function finishRun(result: JudgeResult): void {
     finishDemoRun(sc, result);
     return;
   }
+  // 주행 중 AI 에게 넘긴 판 — 기록하지 않는다 (위 aiAssisted)
+  if (aiAssisted) {
+    finishAssistedRun(sc, result);
+    return;
+  }
   // 맵 체험도 기록하지 않는다 — 고친 판을 시험해 보는 자리다 (위 mapTrial)
   if (mapTrial) {
     finishTrialRun(sc, result);
@@ -1632,16 +1701,8 @@ function finishRun(result: JudgeResult): void {
   if (result.grade === 'FAIL') saveData.stats.fails += 1;
 
   const key = String(sc.id);
-  /*
-    **이 맵을 이미 무위반으로 통과했는가** — 그러면 이번 무위반은 경험치가 절반이다 (curriculum.ts 의 XP_REPLAY).
-    최고 등급을 고치기 **전에** 읽는다. 라이브러리 맵은 번호가 고정이라 저장된 최고 등급으로 알 수 있지만, AI 가 새로
-    만든 판은 접속할 때마다 번호를 다시 매겨(generate.ts 의 nextId) 지난 접속의 다른 판과 번호가 겹친다 — 그 판은
-    이번 접속에서 통과한 것만 센다.
-  */
-  const clearedBefore =
-    scenarioCode(sc.id) !== undefined
-      ? saveData.bestGrades[key] === 'PERFECT' || saveData.bestGrades[key] === 'PASS'
-      : clearedThisSession.has(sc.id);
+  // 최고 등급을 고치기 **전에** 읽는다 (아래 clearedBefore)
+  const clearedBefore = clearedBeforeOf(sc);
   if (result.violations.length === 0 && !result.failReason) clearedThisSession.add(sc.id);
   if (isBetter(result.grade, saveData.bestGrades[key])) saveData.bestGrades[key] = result.grade;
 
@@ -1741,12 +1802,7 @@ function finishRun(result: JudgeResult): void {
       직전 레벨의 차와 같으면 아무 일도 하지 않는다 — 타던 차를 "새로 열렸다" 고 알리면
       그 알림이 한 번에 값어치를 잃는다.
     */
-    const car = next.bestLevel > before.bestLevel ? carForLevel(next.bestLevel) : undefined;
-    if (car && car.id !== carForLevel(before.bestLevel)?.id) {
-      saveData.activeCarId = car.id;
-      void loadCarModel(car, { lod: playerLod() }).catch(() => undefined);
-      courseStep.unlockedCar = { id: car.id, name: car.name, level: car.level };
-    }
+    courseStep.unlockedCar = unlockCarFor(before, next);
   } else {
     // 수동 주행 — 레벨·판 수는 그대로 두고 습관 기록만 갱신한다
     saveData.curriculum = recordHabits(saveData.curriculum, result, tested, { risk, now, predicted });
@@ -1754,7 +1810,7 @@ function finishRun(result: JudgeResult): void {
   }
 
   /*
-    **뱃지** (economy/badges.ts) — 이 판에서 지킨 법규는 오르고, 어긴 법규는 한 단계 내려간다. 자율 주행 · 맵 체험은 위에서
+    **뱃지** (economy/badges.ts) — 이 판에서 지킨 법규는 오르고, 어긴 법규는 한 단계 내려간다. AI 자율 주행 · 맵 체험은 위에서
     이미 걸러 냈다 — 직접 운전한 판만 센다. 얻고 잃은 것은 결과 화면이 곧바로 보여 준다 (renderDebrief).
   */
   const habitsAfter = new Set(saveData.curriculum.badHabits.map((h) => h.code));
@@ -1920,7 +1976,7 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
         null,
         [],
         /*
-          **자율 주행(오프라인 교육)** — AI 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적는다, 다음 교육 코스(마지막이면 첫 화면)로 가는
+          **AI 자율 주행(오프라인 교육)** — AI 분석 칸은 두되 AI 에게 묻지 않고 까닭을 적는다, 다음 교육 코스(마지막이면 첫 화면)로 가는
           버튼과 카운트다운은 일반 판과 같은 자리에 둔다 (사용자 요청 — Screens.renderDebrief 의 options.demo).
         */
         { demo: { nextLabel: last ? '첫 화면으로' : '다음 교육 코스' } },
@@ -1931,11 +1987,123 @@ function finishDemoRun(sc: ScenarioSpec, result: JudgeResult): void {
       }
       // 마지막 교육 코스 — 카운트다운 없이 끝났다는 창. 어느 길로 닫든 확인이라(Screens.confirm 의 single) 첫 화면으로 간다
       void screens
-        .confirm({ title: '안전운행 자율주행이 끝났습니다.', lines: ['감사합니다.'], ok: '확인', single: true })
+        .confirm({ title: '안전운행 AI 자율주행이 끝났습니다.', lines: ['감사합니다.'], ok: '확인', single: true })
         .then(() => {
           // 창이 떠 있는 사이 다른 길로 결과 화면을 떠났으면(첫 화면 등) 그대로 둔다
           if (nav.current === 'debrief') goHome();
         });
+    },
+  });
+}
+
+/** 레벨이 올라 새 차가 열렸으면 그 차로 갈아태운다 — 열린 차 (위 finishRun 의 주석). AI 자율주행 판도 같다 */
+function unlockCarFor(before: CurriculumState, next: CurriculumState): CourseStep['unlockedCar'] {
+  const car = next.bestLevel > before.bestLevel ? carForLevel(next.bestLevel) : undefined;
+  if (!car || car.id === carForLevel(before.bestLevel)?.id) return null;
+  saveData.activeCarId = car.id;
+  void loadCarModel(car, { lod: playerLod() }).catch(() => undefined);
+  return { id: car.id, name: car.name, level: car.level };
+}
+
+/**
+ * **이 맵을 이미 (직접 운전으로) 무위반으로 통과했는가** — 그러면 이번 무위반은 경험치가 절반이다 (curriculum.ts 의
+ * XP_REPLAY). 라이브러리 맵은 번호가 고정이라 저장된 최고 등급으로 알 수 있지만, AI 가 새로 만든 판은 접속할 때마다 번호를
+ * 다시 매겨(generate.ts 의 nextId) 지난 접속의 다른 판과 번호가 겹친다 — 그 판은 이번 접속에서 통과한 것만 센다.
+ */
+function clearedBeforeOf(sc: ScenarioSpec): boolean {
+  const key = String(sc.id);
+  return scenarioCode(sc.id) !== undefined
+    ? saveData.bestGrades[key] === 'PERFECT' || saveData.bestGrades[key] === 'PASS'
+    : clearedThisSession.has(sc.id);
+}
+
+/**
+ * **주행 중 AI 자율주행에게 넘긴 판을 마쳤다** — 시범 관찰 경험치만 주고 다른 기록은 남기지 않는다 (위 aiAssisted).
+ *
+ * 사용자가 정했다 (2026-10-17 · 18): *"ai안전운전으로 했다고 해도 간접적으로 학습이 된다고 생각해. 그리고 사용자들의 운전인식
+ * 강화를 위해서 보상을 주는게 맞다"*, *"1/2정도가 적당 … 기록에도 포함시키지 말고"*, *"수동일때는 200xp, 자동일때는 100xp"*
+ * (AI 만으로도 레벨업). 그래서 AI 과정의 판이면 직접 운전의 절반(100)을 주고, 막대가 차면 이 판에서도 오른다 — 새 차가 열리고
+ * 마스터면 엔딩도 뜬다(curriculum.ts 의 observe). 습관 · 학습자 모델 · 뱃지 · 통계 · 최고
+ * 등급 · 사이트 전체 횟수에는 남기지 않는다 — 최고 등급을 고치지 않으므로, AI 시범을 본 맵을 곧바로 직접 달려 통과해도
+ * '다시 달린 맵'(절반)이 아니라 새 맵 경험치를 다 받는다. 라이브러리 판(직접 몰아도 경험치가 없는 판)은 예전처럼 결과만 보인다.
+ *
+ * '다음' 은 평소처럼 다음 판이다 — AI 과정이면 새로 고른 판, 아니면 다음 Stage. AI 분석 칸은 두되 묻지 않고 까닭을 적는다
+ * (AI 가 대신 몬 구간을 학습자의 운전으로 평가할 수 없다). 자동 넘김은 하지 않는다 — 기록이 없는 판이라 넘어가면 방금 무엇을
+ * 맡겼는지 돌아볼 틈이 없다.
+ */
+function finishAssistedRun(sc: ScenarioSpec, result: JudgeResult): void {
+  controls.setEnabled(false);
+  game?.showTopView();
+  hud.hide();
+  // 결과 화면의 제목은 평소의 판 이름이다 — 'AI 자율주행' 판으로 부르는 것은 처음부터 AI 가 몬 판(?ai=)뿐이다
+  document.body.classList.remove('ai-drive');
+  const nextId = sc.id + 1;
+
+  // AI 과정의 판이면 시범 관찰 경험치 — 막대가 차면 이 판에서도 오른다
+  let courseStep: CourseStep | null = null;
+  if (aiCourse) {
+    const before = saveData.curriculum;
+    const { next, xp } = observe(before, result, challengeRule(saveData.settings.difficulty), {
+      replay: clearedBeforeOf(sc),
+      tested: habitsTestedBy(sc),
+    });
+    // 이 판으로 마스터가 됐다 — 결과 화면 위에 엔딩을 띄운다 (finishRun 과 같은 justMastered)
+    justMastered = !before.mastered && next.mastered;
+    saveData.curriculum = next;
+    aiTraining.curriculum = next;
+    courseStep = {
+      prevLevel: before.level,
+      level: next.level,
+      mastered: next.mastered,
+      xp,
+      clean: result.violations.length === 0 && !result.failReason,
+      habits: next.badHabits,
+      change: emptyChange(),
+      unlockedCar: unlockCarFor(before, next),
+    };
+    commit();
+  }
+  const note = !courseStep
+    ? 'AI 자율주행이 운전한 판은 기록(습관 · 뱃지 · 통계)에 남기지 않고, AI가 분석하지 않습니다.'
+    : courseStep.mastered
+      ? 'AI 자율주행이 운전한 판입니다. 습관 · 뱃지 · 통계에 남기지 않고, AI가 분석하지 않습니다.'
+      : !courseStep.clean
+        ? '직접 운전하는 동안 어긴 것이 있어 이 판은 경험치를 받지 못했습니다. AI 자율주행이 운전한 판은 습관 · 뱃지 · 통계에 남기지 않고, AI가 분석하지 않습니다.'
+        : `AI 자율주행 시범을 지켜본 판 — 직접 운전의 절반(+${courseStep.xp.gained} XP)을 받았습니다. 습관 · 뱃지 · 통계에는 남기지 않고, AI가 분석하지 않습니다.`;
+  nav.replace({
+    name: 'debrief',
+    enter: () => {
+      screens.show('debrief');
+      screens.renderDebrief(
+        sc,
+        result,
+        false,
+        saveData,
+        {
+          onRetry: () => goRun(sc.id, true),
+          onNext: () => (aiCourse ? void makeAiScenario() : goRun(nextId, true)),
+          onMenu: goHome,
+          onToggleAutoNext: () => undefined,
+          onToggleAutoNextPause: () => toggleAutoNextHold(),
+        },
+        courseStep,
+        [],
+        {
+          demo: {
+            nextLabel: !aiCourse
+              ? '다음 Stage'
+              : courseStep && courseStep.level > courseStep.prevLevel
+                ? `${levelLabel(courseStep.level)} 도전`
+                : '다음 판',
+            note,
+          },
+        },
+      );
+      // 마스터를 해낸 그 판이면 엔딩으로 — 한 번만 (finishRun 과 같다)
+      if (justMastered) {
+        justMastered = false;
+        showEnding();
+      }
     },
   });
 }
@@ -2014,10 +2182,10 @@ function boot(): void {
   nav.reset({ name: 'menu', enter: renderMenu });
 
   /*
-    **검증용 — 주소의 `?ai=번호` 로 그 판을 자율 주행으로 바로 달린다** (예 `?ai=M02601` · `?ai=110005203020`).
+    **검증용 — 주소의 `?ai=번호` 로 그 판을 AI 자율 주행으로 바로 달린다** (예 `?ai=M02601` · `?ai=110005203020`).
     판의 사람 · 앞차 움직임을 고친 뒤 브라우저에서도 시뮬레이터와 같은지 볼 때 쓴다 — 오프라인 교육은 정해진 열 판만 돌아
-    다른 판을 자율 주행으로 볼 길이 없었다 (2026-09-27, 빗길 앞차 뒤 뛰어드는 사람의 방아쇠를 고치며). 오프라인 교육과 같은
-    길을 타되 한 판만 달리고, 끝나면 그 안내창으로 첫 화면에 돌아온다. 저장본에는 여느 자율 주행처럼 남는다.
+    다른 판을 AI 자율 주행으로 볼 길이 없었다 (2026-09-27, 빗길 앞차 뒤 뛰어드는 사람의 방아쇠를 고치며). 오프라인 교육과 같은
+    길을 타되 한 판만 달리고, 끝나면 그 안내창으로 첫 화면에 돌아온다. 저장본에는 여느 AI 자율 주행처럼 남는다.
   */
   const aiParam = new URLSearchParams(location.search).get('ai');
   if (aiParam) {

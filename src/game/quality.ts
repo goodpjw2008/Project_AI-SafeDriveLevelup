@@ -391,6 +391,60 @@ export class AutoResolution {
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/**
+ * **가벼운 화면으로 바꿀 때인가** — AI 자율주행 · LiDAR(가상)가 들어온 뒤의 저사양 대책 (사용자가 정했다, 2026-10-18: "자율주행이
+ * 들어오면서 느린 컴퓨터에서 화면이 끊어질수가 있는데 이걸 고려해서 저사양에서도 동작하도록 약간 조정").
+ *
+ * LiDAR(가상) 화면은 1초에 서른 번 남짓 2D 캔버스에 3천 번 넘게 그리고(차 · 사람 · 노면 · 점), 지붕 센서 · 화면 테두리의 빛이
+ * 늘 움직인다. 빠른 PC 에서는 1ms 안팎이지만 느린 PC 에서는 프레임을 깎는다. 그래서 그린 프레임마다 `frame(now)` 를 부르면
+ * 1초마다 fps 를 재고, **목표(60 · 프레임 상한)의 80% 밑이 2초 이어지면 한 번 true** 를 돌려준다 — 그때부터 가벼운 화면이다
+ * (Game.ts 의 setLite: LiDAR 화면 15fps · 화소 배율 1 · 빛 번짐 · 점 생략, 움직이는 테두리 빛을 멈춤).
+ *
+ * **인지는 그대로다** — 센서는 1초에 열 바퀴, 분류기 · 추적도 같다. 판단의 질은 떨어뜨리지 않고 보여 주는 쪽만 가볍게 한다.
+ * 판을 막 시작한 3초는 재지 않고(셰이더 컴파일), 탭을 떠나 창이 비면 버린다(AutoResolution 과 같다). 한 번 켜면 그 판 내내
+ * 켜 두고, **다음 판도 가볍게 시작한다**(`learnedLite` — 새로고침하면 풀린다). 오르내리며 번갈아 바뀌면 그것이 더 거슬린다.
+ */
+export class LoadWatch {
+  private windowStart = -1;
+  private frames = 0;
+  private slow = 0;
+  private done = false;
+  private readonly quietUntil: number;
+
+  constructor(
+    private readonly targetFps: number,
+    now: number,
+  ) {
+    this.quietUntil = now + 3000;
+  }
+
+  /** 그린 프레임마다 부른다 — 가벼운 화면으로 바꿀 때 한 번만 true */
+  frame(now: number): boolean {
+    if (this.done) return false;
+    if (this.windowStart < 0 || now - this.windowStart > 3000) {
+      this.windowStart = now;
+      this.frames = 0;
+      return false;
+    }
+    this.frames++;
+    const span = now - this.windowStart;
+    if (span < 1000) return false;
+    const fps = (this.frames * 1000) / span;
+    this.windowStart = now;
+    this.frames = 0;
+    if (now < this.quietUntil) return false;
+    this.slow = fps < this.targetFps * 0.8 ? this.slow + 1 : 0;
+    if (this.slow < 2) return false;
+    this.done = true;
+    liteLearned = true;
+    return true;
+  }
+}
+let liteLearned = false;
+
+/** 지난 판에서 가벼운 화면으로 바꿨는가 — 다음 판은 처음부터 가볍게 (새로고침하면 풀린다) */
+export const learnedLite = (): boolean => liteLearned;
+
 /** 지난 판에서 찾은 배율 — 다음 판의 시작값 (새로고침하면 1 로 돌아간다) */
 export const learnedScale = (): number => learned;
 

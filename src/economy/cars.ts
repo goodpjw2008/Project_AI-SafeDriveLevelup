@@ -74,6 +74,12 @@ export interface CarSpec {
   color: number;
   /** 지붕 표시등 (택시) */
   roofSign?: boolean;
+  /**
+   * **지붕 LiDAR 센서의 자리** (game/LidarRig.ts — AI 자율주행 중에만 뜬다). 적지 않으면 모델의 지붕을 재서 지붕 앞쪽에
+   * 둔다. **지붕이 없는 오픈카**만 적는다 — 재면 앞유리 윗변을 지붕으로 잡아 센서가 빈 운전석 위에 뜬다. 그래서 운전석
+   * 뒤 덮개 위, 차 한가운데에서 `z` m 뒤(차 기준 앞이 −)에 작은 받침으로 둔다. 높이는 그 자리에서 잰다.
+   */
+  lidarMount?: { z: number };
 
 
 
@@ -234,6 +240,8 @@ export const CARS: CarSpec[] = [
     engineNote: 140,
     dims: { length: 4.704, width: 1.62, height: 1.236, roofRatio: 0.32, cabinFront: 0.296, cabinRear: 0.62 },
     color: 0xc8102e,
+    // 스파이더(오픈카)라 지붕이 없다 — LiDAR 센서는 운전석 뒤 엔진 덮개 위 (실측: 가운데 덮개가 z 0.6~1.0 에서 1.02~1.04m 로 평평)
+    lidarMount: { z: 0.8 },
   },
   /*
     오픈카.
@@ -257,6 +265,8 @@ export const CARS: CarSpec[] = [
     color: 0x8d1b1b,
     // 유리 재질이 통합돼 눈높이를 자동으로 못 재므로 손으로 적는다 (캐빈 실측 y 0.15~1.19)
     anchors: { eye: { y: 0.95 } },
+    // 오픈카라 지붕이 없다 — LiDAR 센서는 운전석 뒤 덮개 위 (실측: z 0.65 에 1.10m 가로대, 그 뒤 z 0.7~1.0 덮개가 1.01~1.03m)
+    lidarMount: { z: 0.9 },
   },
 ];
 

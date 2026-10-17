@@ -260,6 +260,20 @@ describe('어린이보호구역 전용 도로 전수 검증', () => {
   }, 180_000);
 
   /*
+    **AI 는 정지선 앞에 선다** — 횡단보도 2m 앞에 정지선이 있다(lawRules.ts 의 ZONE_ROAD_EDGES). 한때 AI 가 횡단보도
+    끝을 기준으로 제동해 정지선을 0.2m 넘은 자리에 섰다 — 판정은 횡단보도 앞이면 정지로 쳐 주므로 위 검사로는 드러나지
+    않았고, 사용자가 LiDAR 화면의 붉은 정지 막대가 정지선 너머에 그어진 것을 보고 짚었다.
+  */
+  it('AI 자율 주행은 정지선을 넘어 서지 않는다', () => {
+    const bad: string[] = [];
+    for (const spec of courses) {
+      const over = playScenario(spec, { persona: 'careful' }).events.filter((e) => e.kind === 'car' && /넘음/.test(e.text));
+      if (over.length) bad.push(`${spec.title} — ${over[0].text}`);
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  }, 180_000);
+
+  /*
     **보행자는 역할이 있다** — 보행자를 보지 않는 운전자가 걸려야 한다. 걸리지 않으면 그 사람은
     서 있는 그림이고, 학습자는 "보행자는 신경 안 써도 된다" 를 배운다.
 

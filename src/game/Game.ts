@@ -52,11 +52,23 @@ import { GameAudio } from './Audio';
 import { buildCar, type CarModel } from './CarMesh';
 import { AutoDriver, type AutoDriveState } from './AutoDriver';
 import { FpsMeter } from './FpsMeter';
-import { AutoResolution, defaultGraphics, startScale, type GraphicsSettings } from './quality';
+import {
+  AutoResolution,
+  LoadWatch,
+  defaultGraphics,
+  learnedLite,
+  matchedPreset,
+  startScale,
+  type GraphicsSettings,
+} from './quality';
 import { CameraRig, type ViewMode } from './CameraRig';
 import { Controls } from './Controls';
 import { Intersection } from './Intersection';
 import { ClusterPanel } from './ClusterPanel';
+import { LidarPanel, type PanelSignal } from './LidarPanel';
+import { LidarRig } from './LidarRig';
+import { LIDAR, scanLidar, type LidarScan, type LidarShape } from './lidarSensor';
+import { Tracker, assessHazard, detect } from '../ai/perception';
 import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, type CarModelAnchors, playerLod } from './carModel';
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer, contextLossCount, gpuName } from './renderer';
@@ -280,6 +292,8 @@ export class Game {
   private stopMarkers = new StopMarkers();
   private vehicle: Vehicle;
   private carModel: CarModel;
+  /** 지붕 위 LiDAR 센서 — AI 자율주행 중에만 솟아 돈다 (LidarRig.ts) */
+  private readonly lidarRig: LidarRig;
   private judge: RightTurnJudge;
   /** 주행 결과 데이터 — 판정과 같은 표본을 보고 요약 한 줄을 쌓는다 (ai/telemetry.ts) */
   private telemetry: RunTelemetry;
@@ -306,8 +320,33 @@ export class Game {
   private signalGantryZ: Partial<Record<CrosswalkId, number>> = {};
   /** 우회전신호등 — 설치된 시나리오에서만 만든다 */
   private rightSignal: RightTurnSignal | null = null;
-  /** AI 자율 주행 중이면 값이 있다 — 사람 입력 대신 이쪽이 운전한다 */
-  private auto: AutoDriver | null = null;
+  /**
+   * **AI 운전자** — 늘 있다. AI 자율주행이 켜져 있으면(`aiOn`) 이쪽의 판단으로 차를 몰고, 꺼져 있으면 사람이 모는 동안 옆에서
+   * 판단만 해 본다(그림자). LiDAR 화면의 갈 길 · 'AI 라면 설 자리' 가 이것이고, 관문 · 일시정지 기억이 사람이 모는 차에 늘
+   * 맞춰져 있어 **주행 중 언제 넘겨도 그 자리에서 이어 몬다** (setAutoDrive — 사용자가 정했다: "운전 인게임에서 자율주행
+   * 온오프 옵션 버튼을 넣자").
+   */
+  private readonly driver: AutoDriver;
+  /** 지금 AI 가 모는가 */
+  private aiOn = false;
+  /** AI 운전자가 이번 프레임에 서기로 했는가 — 사람에게 넘길 때 정지 · 출발 상태를 이어받게 한다 */
+  private aiStop = false;
+  /**
+   * **LiDAR** — 센서(lidarSensor.ts) · 인지(ai/perception.ts) · 계기판 위 화면(LidarPanel.ts). **늘 켜져 있다** — 끄는 버튼은
+   * 뺐다 (사용자가 정했다: "lidar 끄는 버튼은 제거해주고, 항상 디폴트로").
+   * 사람이 몰 때 `coachManual` 이 꺼져 있으면(도움 없는 난이도) AI 가 설 자리와 위험 색을 빼고 물체만 그린다.
+   */
+  private lidar: {
+    /** 사람이 몰 때도 AI 의 판단(설 자리 · 위험 색)을 보여 주는가 — AI 가 몰 때는 늘 보여 준다 */
+    coachManual: boolean;
+    panel: LidarPanel;
+    tracker: Tracker;
+    scan: LidarScan | null;
+    /** 센서의 시계 (초) · 마지막 바퀴를 돈 때 · 바퀴 번호 */
+    clock: number;
+    lastScan: number;
+    frame: number;
+  } | null = null;
   /** 화질 설정 — 그림자·반사·시야 창·프레임 상한이 여기서 갈린다 */
   private graphics: GraphicsSettings;
   /** 프레임 상한을 지키려고 마지막으로 그린 시각 (0 = 제한 없음) */
@@ -320,6 +359,12 @@ export class Game {
    */
   private renderScale = 1;
   private autoRes: AutoResolution | null = null;
+  /**
+   * **느린 기기에서 가벼운 화면으로** (quality.ts 의 LoadWatch) — fps 가 2초 이어 목표의 80% 밑이면 한 번 켠다. 화질 프리셋이
+   * '낮음' 이거나 지난 판에서 이미 켰으면 처음부터 켠다 (setLite).
+   */
+  private loadWatch: LoadWatch | null = null;
+  private lite = false;
   /** 캔버스 크기를 다음 그리기 직전에 바꾼다 — 그린 뒤에 바꾸면 빈 버퍼가 화면에 올라간다 (loop 의 주석) */
   private pendingResize = false;
   /*
@@ -416,6 +461,12 @@ export class Game {
        * 통과하므로, 끝나고 뜨는 등급이 곧 "규정대로 하면 이렇게 된다" 는 증거다.
        */
       autoDrive?: boolean;
+      /**
+       * LiDAR 화면이 **AI 의 판단까지** 보여 주는가 — AI 가 설 자리(붉은 정지 막대)와 사람의 위험 색(주황 · 빨강).
+       * 직접 운전에서는 정답을 짚어 주는 도움이라 난이도의 도움 단계를 따른다 (main.ts — 'none' 이면 끈다).
+       * 끄면 센서가 찾은 물체만 회색으로 보인다.
+       */
+      lidarCoach?: boolean;
       /** 화질 설정 (game/quality.ts). 없으면 기본값(높음). */
       graphics?: GraphicsSettings;
       /** 교차로에 다가가는 속도와 브레이크 — 난이도가 정한다 (scenarios/challenge.ts). 없으면 쉬움(예전 값) */
@@ -434,18 +485,34 @@ export class Game {
     this.telemetry = new RunTelemetry(scenario.drive ?? 'rightTurn', Boolean(scenario.approachSchoolZone));
     if (opts.stopZone !== undefined) this.stopAdviceLead = Math.min(STOP_ADVICE_LEAD, opts.stopZone);
     this.graphics = opts.graphics ?? defaultGraphics();
-    // 자율 주행도 코스에 맞는 길을 따라간다 — 직진 코스면 돌지 않고 곧장 통과한다 (game/AutoDriver.ts)
+    // AI 자율 주행도 코스에 맞는 길을 따라간다 — 직진 코스면 돌지 않고 곧장 통과한다 (game/AutoDriver.ts)
     /*
       **브레이크는 차와 같은 값을 준다** (opts.pace.brakeDecel). 운전자가 서는 거리를 계산하는 감속도와 차가 실제로 서는 감속도가
       다르면 서는 자리가 어긋난다 — 기본값 4.8 을 둔 채 난이도 5 의 차(3.4)를 몰면 정지선 앞 1.8m 에 서야 할 차가 0.97m 에 선다
-      (시뮬레이션). 지금 자율 주행은 AUTO_DRIVE_RULE(4.8)로만 달려 값이 같지만, 시뮬레이터(playSim.ts)처럼 늘 차의 값을 넘겨
+      (시뮬레이션). 지금 AI 자율 주행은 AUTO_DRIVE_RULE(4.8)로만 달려 값이 같지만, 시뮬레이터(playSim.ts)처럼 늘 차의 값을 넘겨
       둔다. 사용자가 "후방에서 볼 때 정지선을 조금 넘는 느낌" 이라 짚어 확인한 자리다 — 실제 정지 자리는 정지선 앞 1.8m 이고,
       느낌은 높고 뒤에 있는 후방 카메라의 시차(범퍼가 노면 2m 쯤 앞을 덮어 보인다)에서 온다 (CameraRig.ts).
     */
     // 환경이 물리를 바꾼다 — 빗길은 브레이크가 무르다 (scenarios/conditions.ts). 차와 운전자가 같은 값을 본다
     const pace = paceFor(opts.pace ?? DEFAULT_PACE, scenario.weather);
-    if (opts.autoDrive) {
-      this.auto = new AutoDriver(carSpec.dims.length * 0.58, pace.brakeDecel, scenario.drive ?? 'rightTurn');
+    this.driver = new AutoDriver(carSpec.dims.length * 0.58, pace.brakeDecel, scenario.drive ?? 'rightTurn');
+    this.aiOn = opts.autoDrive === true;
+    {
+      this.lidar = {
+        coachManual: opts.lidarCoach === true,
+        // 도로 모양은 Intersection 을 지을 때와 같은 값이다 (아래)
+        panel: new LidarPanel({
+          zoneOnly: scenario.drive === 'zoneOnly',
+          approachZone: this.straight || Boolean(scenario.approachSchoolZone),
+          schoolZone: scenario.isSchoolZone,
+          bikeLane: scenario.bikeLane,
+        }),
+        tracker: new Tracker(),
+        scan: null,
+        clock: 0,
+        lastScan: -Infinity,
+        frame: 0,
+      };
     }
     // 판마다 새로 만들지 않는다 — 모델의 텍스처·셰이더가 그대로 남는다 (renderer.ts)
     this.renderer = sharedRenderer(canvas);
@@ -494,6 +561,9 @@ export class Game {
     this.world.scene.add(this.myCarMarker.mesh);
     this.cluster = new ClusterPanel();
     this.world.scene.add(this.carModel.group);
+    this.lidarRig = new LidarRig(carSpec);
+    this.carModel.group.add(this.lidarRig.group);
+    this.lidarRig.setActive(this.aiOn, true);
 
     this.rig = new CameraRig(canvas.clientWidth / canvas.clientHeight, carSpec);
     this.rig.setDriverView(driverView);
@@ -555,6 +625,8 @@ export class Game {
     if (this.disposed) return;
     if (model) {
       this.carModel.useModel(model);
+      // 지붕 센서는 모델의 지붕을 재서 그 위에 앉힌다 — 모델마다 지붕 높이가 다르다
+      this.lidarRig.fitRoof(model, this.carModel.group, carSpec.dims.width, carSpec.lidarMount);
       // 눈높이만 모델에서 받는다 — 계기판·거울은 화면 HUD 로 옮겨 모델과 무관해졌다
       const anchors = model.userData.anchors as CarModelAnchors | null;
       if (anchors?.eye) {
@@ -1358,6 +1430,7 @@ export class Game {
   start(): void {
     if (this.disposed) return;
     this.cluster.setVisible(true);
+    this.lidar?.panel.setVisible(true);
     // 계기판이 화면에 자리를 잡은 뒤라야 후방 창을 그 옆에 붙일 수 있다
     this.resize();
     /*
@@ -1372,6 +1445,9 @@ export class Game {
       const target = this.graphics.frameCap > 0 ? this.graphics.frameCap : 60;
       this.autoRes = new AutoResolution(target, this.renderScale, performance.now());
     }
+    // 가벼운 화면 — 이미 켤 까닭이 있으면 처음부터, 아니면 느려지는지 지켜본다
+    if (learnedLite() || matchedPreset(this.graphics) === 'low') this.setLite(true);
+    else this.loadWatch = new LoadWatch(this.graphics.frameCap > 0 ? this.graphics.frameCap : 60, performance.now());
     this.lastFrame = performance.now();
     this.looping = true;
     this.loop();
@@ -1534,6 +1610,12 @@ export class Game {
     // 진단 읽기는 GPU 를 기다리게 하므로 두 프레임에 한 번만 — 자동 해상도 조절이 진단 때문에 움직이는 것을 줄인다
     if (this.graphics.showFps && (this.diagFrame++ & 1) === 0) this.sampleDiag(now);
 
+    // 느린 것이 이어지면 가벼운 화면으로 (위 loadWatch) — 한 번만
+    if (this.loadWatch?.frame(now)) {
+      this.loadWatch = null;
+      this.setLite(true);
+    }
+
     // 해상도 '자동' — 느린 것이 이어지면 한 단계 낮춘다 (그린 프레임으로 잰다)
     const next = this.autoRes?.frame(now);
     if (next != null && next !== this.renderScale) {
@@ -1630,6 +1712,129 @@ export class Game {
     return out;
   }
 
+  /**
+   * **AI 자율주행 켜기/끄기** — 주행 중 버튼 · P 키 (main.ts). 켜면 다음 프레임부터 AI 운전자의 판단이 입력이 되고, 끄면 사람의
+   * 조작으로 돌아간다. 사람 입력을 막고 푸는 것 · 정지 상태를 이어받는 것은 main.ts 가 한다 (aiWantsStop).
+   */
+  /**
+   * **가벼운 화면** — 느린 기기를 위해 AI 자율주행 · LiDAR 의 보여 주는 쪽만 덜어 낸다 (사용자가 정했다, 2026-10-18: "저사양에서도
+   * 동작하도록 약간 조정"). LiDAR(가상) 화면은 15fps · 화소 배율 1 · 번짐 · 점 생략(LidarPanel.setLite), 지붕 센서는 그림자를
+   * 드리우지 않고(LidarRig.setLite), 화면 테두리 · 모드 카드의 늘 움직이는 빛은 멈춘다(index.html 의 body.lite-fx).
+   * 센서 · 인지 · AI 의 판단은 그대로다.
+   */
+  private setLite(on: boolean): void {
+    this.lite = on;
+    this.lidar?.panel.setLite(on);
+    this.lidarRig.setLite(on);
+    document.body.classList.toggle('lite-fx', on);
+  }
+
+  setAutoDrive(on: boolean): void {
+    this.aiOn = on;
+    // AI 가 모는 동안 지붕에 LiDAR 센서가 솟는다 (사용자가 정했다: "AI 자율주행 모드일 경우에는 … 차량 위에 라이더 센서가 보이게")
+    this.lidarRig.setActive(on);
+  }
+
+  /** 지금 AI 가 모는가 */
+  get autoDriving(): boolean {
+    return this.aiOn;
+  }
+
+  /** AI 운전자가 지금 서려 하는가 — 사람에게 넘길 때 정지 · 출발 상태를 이렇게 맞춘다 */
+  get aiWantsStop(): boolean {
+    return this.aiStop;
+  }
+
+  /**
+   * **LiDAR 한 프레임** — 센서는 1초에 열 바퀴(LIDAR.hz)만 돌고, 화면은 그 사이를 물체의 속도로 이어 그린다.
+   *
+   * 센서가 맞히는 것은 보행자(자전거 포함)와 NPC 차의 몸뿐이다 — 내 차는 센서가 달린 자리라 빼고, 건물 · 신호기 같은
+   * 고정물은 아직 넣지 않았다. 빗길에서는 열 줄에 한 줄 남짓이 돌아오지 않는다.
+   */
+  private updateLidar(dt: number, phase: SignalPhase, auto: AutoDriver): void {
+    const L = this.lidar!;
+    // AI 가 모는 동안은 그 판단을 늘 보여 준다 — 사람이 몰 때는 난이도의 도움 단계를 따른다
+    const coach = this.aiOn || L.coachManual;
+    L.clock += dt;
+    if (L.clock - L.lastScan >= 1 / LIDAR.hz) {
+      L.lastScan = L.clock;
+      const shapes: LidarShape[] = [];
+      for (const p of this.pedestrians) shapes.push(...p.lidarShapes());
+      for (const n of this.npcs) {
+        const s = n.lidarShape;
+        if (s) shapes.push(s);
+      }
+      L.scan = scanLidar({ x: this.vehicle.x, z: this.vehicle.z }, this.vehicle.yaw, shapes, {
+        dropout: this.scenario.weather === 'rain' ? 0.12 : 0,
+        frame: L.frame++,
+      });
+      L.tracker.update(detect(L.scan), L.clock);
+      // 가벼운 화면에서는 바퀴를 돈 프레임에 화면까지 그리지 않는다 — 인지와 그리기가 한 프레임에 겹치면 그 프레임이 튄다
+      if (this.lite) return;
+    }
+
+    const route = auto.routeAhead(45);
+    L.panel.draw({
+      ego: {
+        x: this.vehicle.x,
+        z: this.vehicle.z,
+        yaw: this.vehicle.yaw,
+        length: this.carSpec.dims.length,
+        width: this.carSpec.dims.width,
+        height: this.carSpec.dims.height,
+      },
+      tracks: L.tracker.confirmed.map((track) => {
+        const hazard = assessHazard(track, route);
+        // 도움이 꺼져 있으면 사람의 위험 색은 빼고, 앞차 표시(파란 판)만 남긴다
+        return { track, hazard: coach || hazard === 'lead' ? hazard : 'none' };
+      }),
+      scan: L.scan,
+      scanAge: L.clock - L.lastScan,
+      route,
+      stopAhead: coach ? auto.stopAhead : null,
+      signals: this.panelSignals(phase),
+      autopilot: this.aiOn,
+    });
+  }
+
+  /**
+   * LiDAR 화면에 세울 신호등 — **장면에 세운 신호기의 자리**를 그대로 읽고, 등화는 운전자(AI)가 보는 값과 같다.
+   * 가로 팔에 매단 것은 지주 자리를 함께 넘긴다 (buildSignals · buildZoneRoadSignals 의 지주와 같은 자리).
+   */
+  private panelSignals(phase: SignalPhase): PanelSignal[] {
+    const color = (c: LightColor): PanelSignal['color'] =>
+      c === 'green' ? 'green' : c === 'yellow' ? 'yellow' : 'red';
+    const out: PanelSignal[] = [];
+    if (this.scenario.drive === 'zoneOnly') {
+      const phases = this.zoneRoadPhases();
+      for (const [id, signal] of Object.entries(this.zoneRoadSignals)) {
+        const ph = phases[id as CrosswalkId];
+        if (!signal || !ph) continue;
+        const p = signal.group.position;
+        out.push({ x: p.x, z: p.z, poleX: ROAD_HALF_WIDTH + 1.5, color: color(ph.vehicle), kind: 'vehicle3' });
+      }
+      return out;
+    }
+    const main = this.vehicleSignal.group.position;
+    out.push({ x: main.x, z: main.z, poleX: -(ROAD_HALF_WIDTH + 1.5), color: color(phase.vehicle), kind: 'vehicle4' });
+    if (this.rightSignal && this.scenario.rightArrowInstalled) {
+      const p = this.rightSignal.group.position;
+      const arrow = phase.rightArrow;
+      out.push({
+        x: p.x,
+        z: p.z,
+        kind: 'rightArrow',
+        color: arrow === 'greenArrow' ? 'green' : arrow === 'yellowArrow' ? 'yellow' : 'red',
+      });
+    }
+    const zone = this.schoolZonePhase();
+    if (this.zoneSignal && zone) {
+      const p = this.zoneSignal.group.position;
+      out.push({ x: p.x, z: p.z, poleX: ROAD_HALF_WIDTH + 1.5, color: color(zone.vehicle), kind: 'vehicle3' });
+    }
+    return out;
+  }
+
   private currentPhase(): SignalPhase {
     return phaseAt(
       STANDARD_PROGRAM,
@@ -1647,7 +1852,13 @@ export class Game {
       정지선에 닿기 전에 막혀 있는지를 봐야 하기 때문이다. (아래 NPC 갱신도 같은 값을 쓴다)
     */
     const exitBlocked = this.scenario.exitBlocked && this.elapsed < JAM_CLEAR_SECONDS;
-    const input = this.auto ? this.auto.decide(this.autoState(phase, exitBlocked)) : this.controls.read();
+    /*
+      AI 운전자는 **늘 판단한다** — AI 가 모는 동안에는 그 판단이 입력이고, 사람이 모는 동안에는 그림자로 돌며 출력을 버린다
+      (위 driver). 그래서 주행 중에 AI 에게 넘겨도 지나온 관문 · 마친 일시정지를 이미 알고 있다.
+    */
+    const aiInput = this.driver.decide(this.autoState(phase, exitBlocked));
+    this.aiStop = aiInput.stop;
+    const input = this.aiOn ? aiInput : this.controls.read();
 
     // ── 차량 ──
     // 앞차 간격은 **지난 프레임** 앞차 자리로 잰다 — 앞차는 아래에서 보행자를 본 뒤에 움직인다
@@ -1663,6 +1874,7 @@ export class Game {
     this.carModel.group.rotation.y = this.vehicle.yaw;
     this.carModel.spinWheels(this.vehicle.travel(dt));
     this.carModel.setSteer(-this.vehicle.steerAngle);
+    this.lidarRig.update(dt);
 
     // ── 등화 ──
     this.blinkPhase = (this.blinkPhase + dt) % BLINK_PERIOD;
@@ -1909,7 +2121,7 @@ export class Game {
       queuedBehind: this.lead?.queuesAhead(front.x, front.z) ?? false,
     };
     this.judge.update(sample, dt);
-    // 같은 표본으로 요약을 쌓는다 — 브레이크는 조작 입력(자율 주행이면 운전자의 정지 결정)이다
+    // 같은 표본으로 요약을 쌓는다 — 브레이크는 조작 입력(AI 자율 주행이면 운전자의 정지 결정)이다
     this.telemetry.update(sample, dt, input.stop);
 
     this.checkCollisions();
@@ -1933,6 +2145,8 @@ export class Game {
     this.periph.update(this.vehicle, dt, this.rig.camera);
     // 벡터를 재사용한다 — 매 프레임 새로 만들면 그 쓰레기를 치우느라 언젠가 한 번 멈칫한다
     this.world.update(dt, this.scratch.set(this.vehicle.x, 0, this.vehicle.z));
+
+    if (this.lidar) this.updateLidar(dt, phase, this.driver);
 
     const snapshot = this.buildSnapshot(phase, input.rightSignal, blinkOn, sample);
     // 계기판은 HUD 와 같은 값을 쓴다 — 화면 표시와 계기가 어긋나면 안 된다
@@ -2377,6 +2591,7 @@ export class Game {
       (this.handheld?.matches === true && mode !== 'top');
     this.periph.setEnabled(want);
     this.cluster.setVisible(true);
+    this.lidar?.panel.setVisible(true);
   }
 
   look(dx: number, dy: number): void {
@@ -2544,6 +2759,7 @@ export class Game {
   /** 결과 화면에서 교차로 전체를 보여주기 위해 */
   showTopView(): void {
     this.cluster.setVisible(false);
+    this.lidar?.panel.setVisible(false);
     this.rig.setMode('top');
     this.periph.setEnabled(false);
   }
@@ -2596,6 +2812,9 @@ export class Game {
     this.myCarMarker.dispose();
     this.periph.dispose();
     this.cluster.dispose();
+    this.lidar?.panel.dispose();
+    this.lidarRig.dispose();
+    document.body.classList.remove('lite-fx');
     this.carModel.dispose();
     this.intersection.dispose();
     this.world.dispose();

@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { buildCar, type CarModel } from './CarMesh';
 import type { CarSpec } from '../economy/cars';
 import { loadCarModel } from './carModel';
+import type { LidarShape } from './lidarSensor';
 import {
   CROSSWALK_INNER,
   CROSSWALK_OUTER,
@@ -325,6 +326,12 @@ export class TrafficCar {
   private pedHold = 0;
   /** 보행자에게 양보를 걸어 둔 상태인가 — 정지선을 스쳐도 풀리지 않는다 */
   private yieldingToPed = false;
+
+  /** **LiDAR 가 맞힐 차체** (game/lidarSensor.ts) — 충돌 판정의 사각형에 전고를 더한 상자. 숨은 차(빠져나간 앞차)는 없다 */
+  get lidarShape(): LidarShape | null {
+    if (!this.group.visible) return null;
+    return { kind: 'box', ...this.obb, height: this.dims.height };
+  }
 
   /** 충돌 판정용 차체 사각형 */
   get obb(): { x: number; z: number; yaw: number; halfL: number; halfW: number } {

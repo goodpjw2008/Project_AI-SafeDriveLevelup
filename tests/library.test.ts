@@ -174,7 +174,7 @@ describe('이 판이 무엇을 시험했는가 — habitsTestedBy', () => {
 });
 
 /*
-  **자율 주행 시범은 열 판 — 사용자가 하나하나 정한 차례** (2026-09-26): 교차로 여덟(library.ts 의 DEMO) + 보호구역 전용 도로
+  **AI 자율 주행 시범은 열 판 — 사용자가 하나하나 정한 차례** (2026-09-26): 교차로 여덟(library.ts 의 DEMO) + 보호구역 전용 도로
   둘(zoneCourse.ts 의 zoneDemoCourses), 엮는 차례는 scenarios/offlineCourse.ts. 판 번호는 밀리지 않으므로 번호로 못 박는다.
 */
 describe('AI 자율 주행 시범 코스', () => {

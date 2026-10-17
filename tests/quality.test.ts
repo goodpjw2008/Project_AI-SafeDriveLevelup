@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTO_RES_MIN,
   AutoResolution,
+  LoadWatch,
+  learnedLite,
   defaultGraphics,
   graphicsFromSaved,
   learnedScale,
@@ -210,5 +212,36 @@ describe('저장본의 화질 읽기', () => {
     expect(matchedPreset(graphicsFromSaved(undefined))).toBe('medium');
     // 고른 것 하나 없는 빈 저장본도 기본값 그대로다 (해상도를 넘겨짚지 않는다)
     expect(graphicsFromSaved({}).resolution).toBe('auto');
+  });
+});
+
+/*
+  **가벼운 화면으로 바꿀 때** (LoadWatch) — AI 자율주행 · LiDAR(가상)가 들어온 뒤의 저사양 대책 (사용자가 정했다, 2026-10-18).
+  목표 fps 의 80% 밑이 2초 이어지면 한 번만 켠다. 판을 막 시작한 3초는 재지 않는다.
+*/
+describe('가벼운 화면으로 바꿀 때', () => {
+  /** 일정한 fps 로 `seconds` 초 동안 그리고, true 가 나온 시각(초)들을 돌려준다 */
+  const watch = (w: LoadWatch, fps: number, seconds: number, start = 0): number[] => {
+    const hits: number[] = [];
+    for (let t = start; t < start + seconds * 1000; t += 1000 / fps) if (w.frame(t)) hits.push(t / 1000);
+    return hits;
+  };
+
+  it('60fps 를 지키면 켜지 않는다 — 목표의 80%(48fps) 언저리도', () => {
+    expect(watch(new LoadWatch(60, 0), 60, 30)).toEqual([]);
+    expect(watch(new LoadWatch(60, 0), 50, 30)).toEqual([]);
+  });
+
+  it('느린 것이 2초 이어지면 한 번만 켠다 — 시작 3초는 재지 않는다', () => {
+    const hits = watch(new LoadWatch(60, 0), 35, 30);
+    expect(hits.length).toBe(1);
+    expect(hits[0]).toBeGreaterThan(3);
+    expect(hits[0]).toBeLessThan(7);
+    expect(learnedLite(), '다음 판은 처음부터 가볍게').toBe(true);
+  });
+
+  it('프레임 상한 30 이면 30 이 목표다 — 30fps 로는 켜지 않는다', () => {
+    expect(watch(new LoadWatch(30, 0), 30, 30)).toEqual([]);
+    expect(watch(new LoadWatch(30, 0), 20, 30).length).toBe(1);
   });
 });

@@ -8,7 +8,7 @@
  * 뒤에 브레이크를 밟고, 차는 난이도에 따라 더 빨리 다가가고 더 무르게 선다(challenge.ts). 그래서 "공정한가"
  * (사람이 보고 설 수 있는가)는 검증기로는 알 수 없었다.
  *
- * 여기서는 게임의 차(Vehicle) · 자율 주행(AutoDriver) · 보행자 상태기계(PedWalk) · 앞차(LeadDrive) · 판정
+ * 여기서는 게임의 차(Vehicle) · AI 자율 주행(AutoDriver) · 보행자 상태기계(PedWalk) · 앞차(LeadDrive) · 판정
  * (RightTurnJudge)를 **게임 루프(Game.step)와 같은 순서로** 돌린다. 운전자는 AutoDriver 에 성격을 입혀 만든다 —
  * 늦게 알아차리는 사람, 보행자를 보지 않는 사람, 막 모는 사람.
  *
@@ -49,6 +49,7 @@ import {
 import {
   RightTurnJudge,
   STOP_ZONE_DEPTH,
+  ZONE_ROAD_EDGES,
   type CrosswalkId,
   type JudgeResult,
   type LightColor,
@@ -174,10 +175,13 @@ const PED_KIND_WORD = { adult: '어른', child: '어린이', elder: '노인' } a
 
 function pedLabel(p: PedSpawn, i: number, spec: ScenarioSpec): string {
   const who = PED_KIND_WORD[p.kind ?? 'adult'];
+  // 사거리 없는 보호구역 도로는 횡단보도마다 자기 신호기가 있다(zoneSignals) — 교차로의 설치 여부를 보면 늘 '없음' 이 된다
   const hasSignal =
-    p.crosswalk === 'S'
-      ? spec.approachSchoolZone?.signal === true
-      : spec.pedSignalInstalled[p.crosswalk === 'B' ? 'A' : p.crosswalk];
+    spec.drive === 'zoneOnly'
+      ? p.crosswalk !== 'C' && spec.zoneSignals?.[p.crosswalk] !== undefined
+      : p.crosswalk === 'S'
+        ? spec.approachSchoolZone?.signal === true
+        : spec.pedSignalInstalled[p.crosswalk === 'B' ? 'A' : p.crosswalk];
   // 신호기가 없는 횡단보도의 사람은 지킬 신호가 없다 — '신호무시' 라고 적으면 무단횡단자로 읽힌다
   const how = !hasSignal ? '신호없음' : p.obeysSignal === false ? '신호무시' : '신호준수';
   const tags = [how, p.afterLead ? '앞차뒤' : '', p.letsCarPass ? '내차보냄' : '', p.chance !== undefined ? `확률${p.chance}` : '']
@@ -218,12 +222,18 @@ function whereStopped(front: { x: number; z: number }, hasS: boolean, straight =
     읽는 사람이 있지도 않은 자리를 찾는다 (rules/lawRules.ts 의 ZONE_ROAD_NAME 과 같은 이름).
   */
   if (zoneOnly) {
-    for (const [name, near] of [
-      ['첫 번째', CROSSWALK_S_OUTER],
-      ['두 번째', CROSSWALK_OUTER],
-      ['세 번째', CROSSWALK_B_INNER],
+    /*
+      **정지선 기준으로 적는다** — 횡단보도 2m 앞에 정지선이 있다(rules/lawRules.ts 의 ZONE_ROAD_EDGES). 횡단보도까지의
+      거리로만 적었을 때는 AI 가 정지선을 넘어 서도("횡단보도 1.8m 앞") 기록에서 드러나지 않았다.
+    */
+    for (const [name, id] of [
+      ['첫 번째', 'S'],
+      ['두 번째', 'A'],
+      ['세 번째', 'B'],
     ] as const) {
-      if (front.z > near) return `${name} 횡단보도 ${(front.z - near).toFixed(1)}m 앞`;
+      const { near, stopLine } = ZONE_ROAD_EDGES[id];
+      if (front.z > stopLine - 0.05) return `${name} 횡단보도 정지선 ${(front.z - stopLine).toFixed(1)}m 앞`;
+      if (front.z > near) return `${name} 횡단보도 ${(front.z - near).toFixed(1)}m 앞 (정지선 ${(stopLine - front.z).toFixed(1)}m 넘음)`;
     }
     return '세 번째 횡단보도를 지난 뒤';
   }

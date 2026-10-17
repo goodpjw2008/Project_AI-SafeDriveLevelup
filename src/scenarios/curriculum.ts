@@ -55,8 +55,12 @@ export const MAX_LEVEL: Difficulty = 10;
  * 오르고, 높은 레벨일수록 오래 머물며 여러 상황을 겪은 뒤에 오른다. 라이브러리의 레벨별 판 수도 이 곡선을 따른다
  * (library.ts 의 LEVEL_SHARE — 오래 머무는 레벨일수록 판이 많아야 같은 판을 되풀이하지 않는다).
  */
-/** 무위반으로 통과한 판 하나의 경험치 — **처음 통과하는 맵**이다 */
-export const XP_PER_CLEAN_RUN = 100;
+/**
+ * 무위반으로 통과한 판 하나의 경험치 — **처음 통과하는 맵**이다. **200 — 막대 하나(XP_MAX)라 직접 운전 무위반 한 판이면 오른다**
+ * (사용자가 정했다, 2026-10-18: *"수동일때는 200xp, 자동일때는 100xp주는거로 변경을 하자. 4판동안 비슷한 판 자율주행 하는걸
+ * 보는것도 약간 지겨울것같다"* — 막대는 200 그대로, AI 자율주행만으로도 오르게). 그 전에는 100(두 판)이었다 — 아래 XP_TO_NEXT.
+ */
+export const XP_PER_CLEAN_RUN = 200;
 /**
  * **이미 무위반으로 통과한 맵을 다시 통과했을 때** — 절반이다.
  *
@@ -64,11 +68,18 @@ export const XP_PER_CLEAN_RUN = 100;
  * 그 맵을 되풀이해 경험치를 채우면 레벨이 오르는 동안 새 상황을 하나도 만나지 않는다. 그렇다고 0 으로 두면 틀린 판을
  * 다시 달려 고치는 것(이건 권할 일이다)과 구분이 안 된다 — 틀린 맵을 처음 통과하면 100 을 다 받는다.
  */
-export const XP_REPLAY = 50;
+export const XP_REPLAY = 100;
 /** 나쁜 운전 습관 하나를 고친 판에 더 얹는 경험치 — 고친 것이 곧 보상이다 */
 export const XP_HABIT_FIXED = 50;
 /**
- * **다음 레벨까지 필요한 경험치.** 모든 레벨이 **200** — 새 맵 무위반 **두 판**이면 오른다.
+ * **AI 자율주행이 몬 판(시범 관찰)의 경험치 — 직접 운전의 절반** (사용자가 정했다: *"ai안전운전으로 했다고 해도 간접적으로
+ * 학습이 된다고 생각해. 그리고 사용자들의 운전인식 강화를 위해서 보상을 주는게 맞다"*, 이어서 *"1/2정도가 적당"*). 새 맵이면
+ * 100, 이미 통과한 맵이면 50 — AI 시범 두 판이면 막대가 찬다 (아래 `observe`).
+ */
+export const XP_OBSERVE_RATIO = 0.5;
+/**
+ * **다음 레벨까지 필요한 경험치.** 모든 레벨이 **200** — 직접 운전 새 맵 무위반 **한 판**, 또는 AI 자율주행 시범 **두 판**이면
+ * 오른다 (XP_PER_CLEAN_RUN · XP_OBSERVE_RATIO).
  *
  * ## 사용자가 정한 값이다
  *
@@ -80,18 +91,19 @@ export const XP_HABIT_FIXED = 50;
  * 이 작품에서 배우는 것은 레벨이 아니라 **판마다 만나는 상황**이고, 상황은 레벨이 올라야 새로 열린다
  * (library.ts 의 levelGuide). 레벨이 빨리 오르면 새 상황을 더 빨리 만난다.
  *
- * ## 어느 레벨도 한 판으로는 오르지 않는다
+ * ## 직접 운전은 다시 한 판이다 (2026-10-18)
  *
- * 한때 L1~L3 이 무위반 한 판이면 올랐다. 사용자가 짚었다 — "1판만 했는데 레벨 2로 올라갔어 …
- * 저랩에서 너무 쉽게 레벨이 올라가는 것 같아." 한 판은 운일 수 있다(보행자가 마침 안 나왔거나
- * 신호가 마침 맞았다). 두 판이 가장 낮은 값이고, 난이도로도 그 아래로는 내려가지 않는다.
+ * 한때 L1~L3 이 무위반 한 판이면 올랐는데, 사용자가 짚었다 — "1판만 했는데 레벨 2로 올라갔어 … 저랩에서 너무 쉽게 레벨이
+ * 올라가는 것 같아." 그래서 한동안 모든 레벨이 두 판이었다. AI 자율주행 시범에 경험치를 주기로 하면서 사용자가 다시 정했다:
+ * 직접 운전 200 · AI 100 · 막대 200 그대로 — 직접 운전 무위반 한 판이면 오른다. 그 대신 습관 · 학습자 모델의 문(아래
+ * advance)은 그대로라, 나쁜 습관이 남았거나 모델이 아직 확신하지 못하는 개념이 있으면 막대가 찬 채로 기다린다.
  *
  * ## 난이도는 감점으로 갈린다
  *
  * **감점은 그대로다** — 위반하면 난이도가 정한 만큼 잃고(보통 −40, 어려움 −80, 사고 · 이탈 ·
  * 위반 3개 이상은 두 배), 나쁜 습관이 남아 있으면 막대가 차도 오르지 않는다 (아래 advance).
- * 막대가 200 으로 짧아진 만큼 **한 번의 위반이 차지하는 몫은 커졌다** — 어려움에서 한 번 크게
- * 틀리면 두 판을 더 달려야 한다.
+ * 다만 직접 운전 무위반 한 판이 막대 하나라, 감점이 레벨업을 늦추는 것은 AI 시범(100)으로 채울 때뿐이다 — 직접 운전에서는
+ * 위반이 남기는 나쁜 습관이 레벨업을 붙잡는다.
  */
 export const XP_TO_NEXT: Readonly<Record<Difficulty, number>> = {
   1: 200,
@@ -129,10 +141,10 @@ export interface ProgressRule {
 export const DEFAULT_PROGRESS: ProgressRule = { xpScale: 1, missPenalty: 0 };
 
 /**
- * **가장 적게 드는 경험치** — 새 맵 무위반 두 판(한 판 100 으로는 모자라는 150).
- * 쉬움(×0.5)이면 L1 이 100 이 되어 한 판에 올랐다 — 위 "어느 레벨도 한 판으로는 오르지 않는다" 를 난이도가 깨지 않게 한다.
+ * **가장 적게 드는 경험치** — 150. 쉬움(×0.5)이면 L1 이 100 이 되어 AI 시범 한 판(100)에 올랐다 — 난이도 배율이 막대를
+ * 그 아래로 줄이지 않게 한다. (지금은 배율과 상관없이 모든 레벨이 XP_MAX 200 이다)
  */
-const XP_FLOOR = XP_PER_CLEAN_RUN + 50;
+const XP_FLOOR = 150;
 
 /** 이 레벨에서 다음 레벨(L10 은 마스터)까지 필요한 경험치 — 50 단위로 맞추고 `XP_MAX` 를 넘지 않는다 */
 export const xpToNext = (level: Difficulty, rule: ProgressRule = DEFAULT_PROGRESS): number =>
@@ -156,6 +168,8 @@ export interface XpStep {
   heldByModel: ViolationCode[];
   /** 이미 통과한 맵을 다시 통과해 절반(XP_REPLAY)만 받았는가 */
   replay: boolean;
+  /** AI 자율주행이 몬 판이라 시범 관찰 경험치(XP_OBSERVE_RATIO)만 받았는가 — 레벨은 오르지 않는다 (observe) */
+  observed?: boolean;
 }
 
 /**
@@ -385,7 +399,7 @@ export const freshCurriculum = (): CurriculumState => ({
  *
  * ## 경험치
  *
- * - 무위반 통과: +100 (XP_PER_CLEAN_RUN), 이 판으로 나쁜 습관을 고쳤으면 하나에 +50 (XP_HABIT_FIXED)
+ * - 무위반 통과: +200 (XP_PER_CLEAN_RUN — 막대 하나), 이 판으로 나쁜 습관을 고쳤으면 하나에 +50 (XP_HABIT_FIXED)
  * - 위반: 난이도가 정한 만큼 잃는다 (보통 −20, 어려움 −60 · 사고 · 이탈 · 위반 3개 이상은 두 배). 0 아래로는 안 내려간다
  * - 막대가 차고 **나쁜 습관이 하나도 없으면** 오른다. 습관이 남아 있으면 막대는 찬 채로 기다린다 — 학습 루프의
  *   "습관을 다 고쳐야 다음 레벨" 은 그대로다.
@@ -502,6 +516,78 @@ export function advance(
     replay,
   };
   return { next, change, xp };
+}
+
+/**
+ * **AI 자율주행이 몬 판을 마쳤다 — 시범 관찰 경험치를 준다.** 주행 중 AI 자율주행을 한 번이라도 켠 판이다 (main.ts 의
+ * aiAssisted).
+ *
+ *  - 무위반이면 직접 운전의 **절반**(XP_OBSERVE_RATIO — 새 맵 100 · 이미 통과한 맵 50). 습관을 고친 몫은 없다 — 습관은 직접
+ *    운전으로만 고친다. 직접 몰다 어긴 것이 있으면 0 이고, **잃지도 않는다** (기록이 아니므로)
+ *  - **막대가 차면 AI 판에서도 오른다** (사용자가 정했다, 2026-10-18: "AI만으로도 레벨업" — AI 시범 두 판이면 한 레벨). 한때는
+ *    막대가 찬 채로 기다렸다가 직접 운전으로 통과해야 올랐다. 다만 오르는 문은 직접 운전(advance)과 같다 — 나쁜 습관이
+ *    남았거나, 이 판이 시험한 개념을 학습자 모델이 아직 확신하지 못하면 막대가 찬 채로 기다린다. 그 둘은 직접 운전으로만
+ *    풀린다
+ *  - **그 밖에는 아무것도 바꾸지 않는다** (사용자가 정했다: *"기록에도 포함시키지 말고"*) — 습관 · 학습자 모델(BKT ·
+ *    능력 θ · 결과 예측) · 판 수 · 연속 기록은 직접 운전한 판만의 것이다. AI 의 완벽한 주행이 섞이면 못하는 개념도 익혔다고
+ *    보고, 정작 연습이 필요한 판을 추천하지 않게 된다
+ *  - 마스터가 된 뒤에는 막대가 움직이지 않는다 (advance 와 같다)
+ */
+export function observe(
+  state: CurriculumState,
+  result: JudgeResult,
+  rule: ProgressRule = DEFAULT_PROGRESS,
+  opts: {
+    replay?: boolean;
+    /** 이 판이 시험한 개념 (library.ts 의 `habitsTestedBy`) — 학습자 모델의 문이 본다. 생략하면 전부 */
+    tested?: ReadonlySet<ViolationCode>;
+  } = {},
+): { next: CurriculumState; xp: XpStep } {
+  const clean = result.violations.length === 0 && !result.failReason;
+  const needBefore = xpToNext(state.level, rule);
+  const before = Math.min(state.xp ?? 0, needBefore);
+  const replay = clean && !!opts.replay;
+  if (state.mastered) {
+    return {
+      next: state,
+      xp: { gained: 0, before, needBefore, after: before, need: needBefore, leveledUp: false, heldByHabits: false, heldByModel: [], replay, observed: true },
+    };
+  }
+  const gain = clean ? Math.round((replay ? XP_REPLAY : XP_PER_CLEAN_RUN) * XP_OBSERVE_RATIO) : 0;
+  const filled = Math.min(needBefore, before + gain);
+  const next: CurriculumState = { ...state, xp: filled };
+
+  // 오르는 문은 advance 와 같다 — 습관 · 학습자 모델 (둘 다 이 판으로 바뀌지 않는다)
+  const full = filled >= needBefore;
+  const habitsLeft = state.badHabits.length > 0;
+  const held = heldBy(state.skills ?? {}, opts.tested ? [...opts.tested] : SKILL_ORDER);
+  let leveledUp = false;
+  if (full && !habitsLeft && !held.length) {
+    leveledUp = true;
+    if (state.level < MAX_LEVEL) {
+      next.level = (state.level + 1) as Difficulty;
+      next.xp = 0;
+    } else {
+      next.mastered = true;
+    }
+    // 통과한 레벨만큼 차가 열린다 (advance 의 bestLevel 주석) — 레벨을 올린 판이 그 레벨을 통과한 판이다
+    next.bestLevel = Math.max(next.bestLevel, state.level) as Difficulty;
+  }
+  return {
+    next,
+    xp: {
+      gained: filled - before,
+      before,
+      needBefore,
+      after: next.xp,
+      need: xpToNext(next.level, rule),
+      leveledUp,
+      heldByHabits: full && habitsLeft,
+      heldByModel: full && !habitsLeft ? held : [],
+      replay,
+      observed: true,
+    },
+  };
 }
 
 /** `advance` 의 선택 인자 */

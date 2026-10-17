@@ -392,7 +392,6 @@ describe('손에 든 화면의 주행 HUD', () => {
       '.hud-home',
       '.keyhints',
       '.hud-player',
-      '.hud-auto',
       '.fps',
       '.signal-chip',
       '.drive-coach-bubble',
