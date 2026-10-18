@@ -142,6 +142,12 @@ let aiDriving = false;
  * 같은 선). 남기면 AI 가 대신 서 준 정지가 학습자가 익힌 것으로 세어진다. 결과 화면은 보여 주고 '다음' 은 평소처럼 다음 판이다.
  */
 let aiAssisted = false;
+/**
+ * **판을 AI 자율주행으로 시작하는가** — 기본은 켜짐 (사용자가 정했다, 2026-10-18: *"디폴트를 AI 자율주행 모드로 해줘"*).
+ * 주행 중 모드 카드 · P 키로 바꾸면 그 모드가 다음 판에도 이어진다 — 직접 연습하려고 직접주행으로 바꾼 사람이 판마다 다시
+ * 바꾸지 않게. 저장하지 않으므로 사이트를 새로 열면 다시 AI 자율주행으로 시작한다.
+ */
+let autoDrivePreferred = true;
 
 /**
  * **브라우저가 한 번 그릴 때까지 기다린다.** 버튼을 '만드는 중' 으로 바꾼 뒤 곧바로 무거운 일을 하면 그 바뀐 모습이
@@ -719,7 +725,8 @@ function showAutoDriveButton(on: boolean): void {
   if (box) box.dataset.mode = on ? 'ai' : 'manual';
   const toggle = document.getElementById('mode-toggle');
   if (toggle) {
-    const label = on ? '일반모드로 바꾸기' : 'AI 자율주행으로 바꾸기';
+    // 이름 — 직접주행 · AI 자율주행 (사용자가 정했다, 2026-10-18 — 예전 이름 일반모드)
+    const label = on ? '직접주행으로 바꾸기' : 'AI 자율주행으로 바꾸기';
     toggle.setAttribute('aria-label', label);
     toggle.title = `${label} (P)`;
   }
@@ -738,6 +745,8 @@ function toggleAutoDrive(): void {
   const on = !game.autoDriving;
   game.setAutoDrive(on);
   if (on) aiAssisted = true;
+  // 바꾼 모드가 다음 판에도 이어진다 (위 autoDrivePreferred) — 맵 체험에서 바꾼 것은 체험 안의 일이라 남기지 않는다
+  if (!mapTrial) autoDrivePreferred = on;
   controls.setEnabled(!on);
   if (!on) {
     controls.setStopped(game.aiWantsStop);
@@ -756,6 +765,17 @@ function toggleAutoDrive(): void {
 document.getElementById('mode-toggle')?.addEventListener('click', (e) => {
   e.preventDefault();
   (e.currentTarget as HTMLElement).blur();
+  toggleAutoDrive();
+});
+/*
+  **손가락 화면에서는 카드 전체가 스위치다** (사용자가 짚었다, 2026-10-18: *"토글이 너무 작아. 모바일에서는 손으로 눌러야 하니
+  더 크게"*). 카드도 키웠지만(index.html 의 body.touch .hud-ai), 작은 스위치를 겨누지 않고 카드 어디를 눌러도 바뀌게 한다.
+  스위치 단추를 누른 것은 위 처리기가 맡는다 — 여기서 또 바꾸면 두 번 바뀌어 제자리다.
+*/
+document.getElementById('drive-mode')?.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('touch')) return;
+  if ((e.target as Element | null)?.closest('#mode-toggle')) return;
+  e.preventDefault();
   toggleAutoDrive();
 });
 
@@ -1412,18 +1432,25 @@ async function startRun(id: number): Promise<void> {
     그리는 선이 흔들려, 정답을 보여 준다는 이 기능의 뜻이 무너진다.
     (시점 전환 C·재시작 R·나가기 Esc 는 enabled 와 무관하게 그대로 동작한다)
   */
-  controls.setEnabled(!aiDriving);
-  document.body.classList.toggle('ai-drive', aiDriving);
-  // 새 판은 사람이 몰며 시작한다 (주소의 ?ai= 로 연 판만 AI 가 처음부터) — 주행 중 버튼으로 바꾼다
-  aiAssisted = false;
-  showAutoDriveButton(aiDriving);
+  /*
+    **새 판은 AI 자율주행으로 시작한다** (위 autoDrivePreferred — 사용자가 정한 기본값, 바꾼 모드는 다음 판에도 이어진다).
+    주소의 ?ai= 로 연 판(aiDriving)은 처음부터 끝까지 AI 가 모는 시범이고, 이쪽은 주행 중 카드로 언제든 넘겨받을 수 있는
+    판이다 — 그래서 AI 가 몬 판의 길(aiAssisted → finishAssistedRun)로 끝난다.
+  */
+  // 맵 체험은 번호로 고른 판을 직접 달려 보는 시험 자리라 직접주행으로 시작한다 (결과도 체험의 길 finishTrialRun 으로)
+  const startAi = aiDriving || (autoDrivePreferred && !mapTrial);
+  controls.setEnabled(!startAi);
+  document.body.classList.toggle('ai-drive', startAi);
+  aiAssisted = !aiDriving && startAi;
+  showAutoDriveButton(startAi);
   // 결과 화면의 제목이 이것을 본다 — 체험한 판을 'AI 추천' 이라 부르지 않게 (Screens 의 debriefTitle)
   document.body.classList.toggle('map-trial', mapTrial);
   /*
     **사이트 전체 안전운전 횟수의 판 표** (siteStats.ts) — 사람이 모는 판만 받는다. AI 자율 주행 시범은 AI 가 몬
     판이고, 맵 체험은 시험용이라 세지 않는다 (둘 다 finishRun 에서 기록을 남기지 않는 것과 같은 선).
   */
-  if (!aiDriving && !mapTrial) beginRun();
+  // AI 자율주행으로 시작한 판도 세지 않는다 — 중간에 넘겨받아도 AI 가 몬 판의 길로 끝난다 (aiAssisted)
+  if (!startAi && !mapTrial) beginRun();
   // 판은 가는 상태로 시작한다 (controls.reset) — ↑ 에 불을 켠다
   syncGoStop();
 
@@ -1560,7 +1587,7 @@ async function startRun(id: number): Promise<void> {
     startView: startViewOfRun,
     // 운전자 시점 미사용(기본)이면 시야 창을 만들지 않고 C 로 돌 때 운전석을 건너뛴다 (save.ts 의 driverView)
     driverView: saveData.settings.driverView,
-    autoDrive: aiDriving,
+    autoDrive: startAi,
     /*
       **LiDAR 화면은 늘 뜬다.** 직접 운전에서 AI 가 설 자리 · 위험 색은 정답을 짚어 주는 도움이라, 도움 없는
       난이도(hints 'none')에서는 빼고 물체만 보인다. AI 가 모는 동안에는 늘 보인다 (Game 의 coachManual).
@@ -2032,6 +2059,13 @@ function clearedBeforeOf(sc: ScenarioSpec): boolean {
  * 맡겼는지 돌아볼 틈이 없다.
  */
 function finishAssistedRun(sc: ScenarioSpec, result: JudgeResult): void {
+  /*
+    **AI 자율주행으로 끝난 판은 저절로 다음 판으로 넘어간다** (사용자가 짚었다, 2026-10-18: *"AI 자율주행 모드일 때는 다음 판으로
+    자동으로 넘어가지 않아"*). 결과 화면의 설정 체크(자동으로 다음 판)와 상관없이 센다 — 지켜보는 모드라 사람이 누를 일이 없다.
+    세는 동안 멈춤 단추로 붙잡을 수 있다. 끝날 때 사람이 몰고 있었으면(중간에 넘겨받은 판) 예전처럼 기다린다.
+    다음 판이 없는 곳(맵 체험 · 마지막 Stage)과 마스터가 된 판(엔딩이 뜨는 자리)은 넘기지 않는다.
+  */
+  const endedInAi = game?.autoDriving === true;
   controls.setEnabled(false);
   game?.showTopView();
   hud.hide();
@@ -2103,7 +2137,10 @@ function finishAssistedRun(sc: ScenarioSpec, result: JudgeResult): void {
       if (justMastered) {
         justMastered = false;
         showEnding();
+        return;
       }
+      const hasNext = aiCourse || (!mapTrial && nextId <= SCENARIOS.length);
+      if (endedInAi && hasNext) startAutoNext(nextId);
     },
   });
 }
