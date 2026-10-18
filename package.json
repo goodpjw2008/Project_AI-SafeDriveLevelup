@@ -21,7 +21,8 @@
     "sounds": "node scripts/build-sounds.mjs",
     "airobot": "node scripts/build-airobot.mjs",
     "train:ai": "vite-node scripts/train-ai.ts",
-    "train:lidar": "vite-node scripts/train-lidar.ts"
+    "train:lidar": "vite-node scripts/train-lidar.ts",
+    "train:intent": "vite-node scripts/train-intent.ts"
   },
   "dependencies": {
     "three": "^0.169.0"

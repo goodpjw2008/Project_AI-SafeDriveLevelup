@@ -76,6 +76,17 @@ export interface AutoDriveState {
    * `gap` 은 내 앞범퍼에서 앞차 뒷범퍼까지 **경로를 따라 잰** 간격이다 (leadDrive.ts).
    */
   lead: { gap: number; speedKmh: number } | null;
+  /**
+   * **AI 가 짐작한 보행자의 뜻** — 사람 번호(`PedestrianSample.id`) → 양보하는가 (ai/intent.ts 의 IntentEstimator).
+   *
+   * 있으면 AI 는 보행자의 속(`intendsToCross`)을 읽지 않고 이것으로 양보한다 — 선 자리 · 움직임 · 보행신호를 보고
+   * 신경망이 짐작한 것과, 이미 차도 위에 있는 사람이면 무조건 서는 규칙 안전장치다. 짐작이 없는 사람(LiDAR 거리 밖)은
+   * 아직 모르는 사람이다.
+   *
+   * 없으면 판정과 같은 값을 본다 — 사람 운전자를 흉내 내는 시뮬레이터의 운전자들(scenarios/playSim.ts)은 화면의
+   * 느낌표로 그 뜻을 보므로 그쪽이 맞다.
+   */
+  pedYield?: ReadonlyMap<number, boolean>;
 }
 
 /**
@@ -499,10 +510,15 @@ export class AutoDriver {
 /**
  * 그 횡단보도에 **통행 중이거나 통행하려는** 보행자가 있는가 (제27조 제1항).
  *
- * 판정 엔진이 위반을 잡는 조건과 같은 값을 본다 — 보행신호 색은 보지 않는다.
+ * 판정 엔진이 위반을 잡는 조건과 같은 것을 묻는다 — 보행신호 색으로 정하지 않는다.
  * 이것이 이 게임이 가르치려는 한 가지다.
+ *
+ * AI 의 짐작(`pedYield`)이 있으면 그것으로 답한다 — 게임의 AI 자율주행은 사람의 속을 읽지 않는다 (ai/intent.ts).
+ * 짐작하는 신경망은 보행신호도 단서로 보지만(녹색이 막 켜지면 건너려는 사람이 많다), 답은 사람마다의 뜻이다.
  */
 function pedConflict(s: AutoDriveState, id: CrosswalkId): boolean {
+  const guess = s.pedYield;
+  if (guess) return s.pedestrians.some((p) => p.crosswalk === id && p.id !== undefined && guess.get(p.id) === true);
   return s.pedestrians.some(
     // `active`(결과 지도용, 등장 시각 뒤에야 켜짐)는 보지 않는다 — 판정과 같은 기준이다
     (p) => p.crosswalk === id && p.intendsToCross && p.onConflictPath,

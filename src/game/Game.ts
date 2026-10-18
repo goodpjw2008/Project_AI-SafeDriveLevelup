@@ -69,6 +69,7 @@ import { LidarPanel, type PanelSignal } from './LidarPanel';
 import { LidarRig } from './LidarRig';
 import { LIDAR, scanLidar, type LidarScan, type LidarShape } from './lidarSensor';
 import { Tracker, assessHazard, detect } from '../ai/perception';
+import { IntentEstimator, intentModelReady, routeCrosses, type IntentEstimate, type PedObservation } from '../ai/intent';
 import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, type CarModelAnchors, playerLod } from './carModel';
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer, contextLossCount, gpuName } from './renderer';
@@ -331,6 +332,12 @@ export class Game {
   private aiOn = false;
   /** AI 운전자가 이번 프레임에 서기로 했는가 — 사람에게 넘길 때 정지 · 출발 상태를 이어받게 한다 */
   private aiStop = false;
+  /**
+   * **보행자 횡단 의도 예측** (ai/intent.ts) — AI 운전자는 보행자의 속(`intendsToCross`)을 읽지 않고, 사람마다 몸이 선 자리 ·
+   * 움직임 · 보행신호를 보고 신경망이 짐작한 것으로 양보한다. LiDAR 화면의 위협 예측(2초 안에 차도에 들어서는가)도 이것이다.
+   * 학습한 모델이 없으면(처음 학습하기 전) 없다 — 그때 AI 는 예전처럼 판정과 같은 값을 본다.
+   */
+  private readonly intent = intentModelReady() ? new IntentEstimator() : null;
   /**
    * **LiDAR** — 센서(lidarSensor.ts) · 인지(ai/perception.ts) · 계기판 위 화면(LidarPanel.ts). **늘 켜져 있다** — 끄는 버튼은
    * 뺐다 (사용자가 정했다: "lidar 끄는 버튼은 제거해주고, 항상 디폴트로").
@@ -1640,9 +1647,29 @@ export class Game {
    *
    * 보행자 표본은 이 프레임의 갱신(아래 `p.update`) 전 값이라 한 프레임 뒤처지는데,
    * 16ms 라 판단이 달라지지 않는다.
+   *
+   * **보행자의 속(건너려는 뜻)은 넘기지 않는다** — 판정은 그 값으로 재지만, AI 는 사람의 몸이 선 자리 · 움직임과 보행신호를
+   * 보고 신경망이 짐작한 것으로 양보한다 (`pedYield`, ai/intent.ts). 시뮬레이터의 AI(scenarios/playSim.ts 의 careful)도 같은
+   * 짐작으로 22,818판을 달려 검증한다.
    */
   private autoState(phase: SignalPhase, exitBlocked: boolean): AutoDriveState {
     const front = this.vehicle.front;
+    const pedSignal = {
+      A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+      // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
+      B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+      C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
+      S: this.schoolZonePhase()?.ped ?? null,
+    };
+    const samples = this.pedestrians.map((p, i) => ({ ...p.sample(), id: i }));
+    if (this.intent) {
+      const obs: PedObservation[] = [];
+      for (const p of samples) {
+        if (p.state === 'done' || p.x === undefined || p.z === undefined) continue;
+        obs.push({ id: p.id, crosswalk: p.crosswalk, x: p.x, z: p.z, bike: p.bike });
+      }
+      this.intent.update(this.elapsed, obs, { pedSignal, front, speedKmh: this.vehicle.speedKmh });
+    }
     return {
       x: this.vehicle.x,
       z: this.vehicle.z,
@@ -1653,13 +1680,7 @@ export class Game {
       stopHold: this.stopHold,
       vehicleLight: phase.vehicle,
       rightArrow: this.scenario.rightArrowInstalled ? phase.rightArrow : null,
-      pedSignal: {
-        A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
-        // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
-        B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
-        C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
-        S: this.schoolZonePhase()?.ped ?? null,
-      },
+      pedSignal,
       approachZone: this.scenario.approachSchoolZone
         ? { light: this.schoolZonePhase()?.vehicle ?? null }
         : null,
@@ -1675,13 +1696,14 @@ export class Game {
           }
         : {}),
       // 밤에는 전조등 범위 안의 사람만 알아본다 (scenarios/conditions.ts) — 시뮬레이터의 운전자와 같은 눈
-      pedestrians: seenPedestrians(this.pedestrians.map((p) => p.sample()), front, this.scenario.timeOfDay),
+      pedestrians: seenPedestrians(samples, front, this.scenario.timeOfDay),
       exitBlocked,
       isSchoolZone: this.scenario.isSchoolZone,
       lead:
         this.lead && !this.lead.gone
           ? { gap: this.lead.gapFrom(front.x, front.z), speedKmh: this.lead.speedKmh }
           : null,
+      ...(this.intent ? { pedYield: this.intent.yieldMap() } : {}),
     };
   }
 
@@ -1774,6 +1796,7 @@ export class Game {
     }
 
     const route = auto.routeAhead(45);
+    const guesses = this.intent ? [...this.intent.all().values()] : [];
     L.panel.draw({
       ego: {
         x: this.vehicle.x,
@@ -1784,9 +1807,31 @@ export class Game {
         height: this.carSpec.dims.height,
       },
       tracks: L.tracker.confirmed.map((track) => {
-        const hazard = assessHazard(track, route);
-        // 도움이 꺼져 있으면 사람의 위험 색은 빼고, 앞차 표시(파란 판)만 남긴다
-        return { track, hazard: coach || hazard === 'lead' ? hazard : 'none' };
+        // LiDAR 가 잡은 사람에게 의도 예측의 짐작을 붙인다 — 가장 가까운 몸(2m 안)의 것
+        const g = track.cls === 'car' || track.cls === 'unknown' ? undefined : nearestGuess(track, guesses);
+        const hazard = assessHazard(
+          track,
+          route,
+          g && { yields: g.yields, enter: g.enter, onRoute: routeCrosses(g.crosswalk, route) },
+        );
+        // 도움이 꺼져 있으면 사람의 위험 색 · 짐작은 빼고, 앞차 표시(파란 판)만 남긴다
+        if (!coach) return { track, hazard: hazard === 'lead' ? hazard : 'none' };
+        return {
+          track,
+          hazard,
+          ...(g
+            ? {
+                intent: {
+                  yield: g.yield,
+                  enter: g.enter,
+                  onRoadway: g.onRoadway,
+                  axis: g.axis,
+                  dirX: g.crosswalk === 'C' ? 0 : g.inward,
+                  dirZ: g.crosswalk === 'C' ? g.inward : 0,
+                },
+              }
+            : {}),
+        };
       }),
       scan: L.scan,
       scanAge: L.clock - L.lastScan,
@@ -2822,4 +2867,18 @@ export class Game {
     this.props.length = 0;
     // 렌더러는 버리지 않는다 — 다음 판이 그대로 이어 쓴다 (renderer.ts)
   }
+}
+
+/** LiDAR 가 잡은 물체에 가장 가까운 사람의 짐작 — 2m 안에 없으면 없다 (자전거는 몸과 자전거 가운데가 조금 어긋난다) */
+function nearestGuess(track: { x: number; z: number }, guesses: readonly IntentEstimate[]): IntentEstimate | undefined {
+  let best: IntentEstimate | undefined;
+  let bestD = 2;
+  for (const g of guesses) {
+    const d = Math.hypot(g.x - track.x, g.z - track.z);
+    if (d < bestD) {
+      bestD = d;
+      best = g;
+    }
+  }
+  return best;
 }

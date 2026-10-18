@@ -11,23 +11,11 @@
  */
 
 import * as THREE from 'three';
-import { CROSSWALK_INNER, CROSSWALK_OUTER,
-  CROSSWALK_S_INNER,
-  CROSSWALK_B_INNER,
-  CROSSWALK_B_OUTER,
-  CROSSWALK_S_OUTER,
-  bikeLaneCenter,
-  BIKE_SLOT_SHRINK,
-} from '../layout';
 import { PedWalk, type CarFront, type PedWalkContext } from './pedWalk';
+import { WAIT_SETBACK, WAIT_SLOTS, bodyPosition, pedAcross, stepSetback, wantsCurb } from './pedBody';
 import { personShapes, type LidarShape } from './lidarSensor';
 import type { CrosswalkId, PedSignal, PedestrianSample } from '../rules/lawRules';
 import type { PedSpawn } from '../scenarios/scenarios';
-
-const CROSSWALK_CENTER = (CROSSWALK_INNER + CROSSWALK_OUTER) / 2;
-/** 진입부 보호구역 횡단보도의 한가운데 (z) */
-const CROSSWALK_S_CENTER = (CROSSWALK_S_INNER + CROSSWALK_S_OUTER) / 2;
-const CROSSWALK_B_CENTER = (CROSSWALK_B_INNER + CROSSWALK_B_OUTER) / 2;
 
 /**
  * 같은 보도에 선 사람들이 서로 겹치지 않도록 **횡단보도 폭 안에서** 자리를 어긋나게 둔다.
@@ -39,7 +27,7 @@ const CROSSWALK_B_CENTER = (CROSSWALK_B_INNER + CROSSWALK_B_OUTER) / 2;
  * 보행자를 2.0배로 키우면서(SIZE_SCALE) 간격도 넓혔다 — 어깨너비가 0.8m 가까이 되어 예전
  * 간격(0.95m)으로는 옆 사람과 팔이 겹쳤다.
  */
-const WAIT_SLOTS = [0, -1.15, 1.15, -1.8, 1.8];
+// 자리 표(WAIT_SLOTS)는 pedBody.ts 에 있다 — 시뮬레이터(playSim.ts)도 같은 표로 사람을 세운다
 
 /**
  * 보행자 크기 배율.
@@ -91,10 +79,9 @@ const LEG_RADIUS = 0.095;
  *
  * 0.8m 는 사람 어깨너비보다 넓어 나란히 선 둘 사이에서도 앞뒤가 갈린다.
  */
-export const WAIT_SETBACK = 0.8;
-
-/** 연석까지 한 걸음 나서는 데 걸리는 시간 (초) */
-const STEP_UP_TIME = 0.55;
+// 이 거리(WAIT_SETBACK)와 한 걸음의 시간(STEP_UP_TIME)은 pedBody.ts 에 있다 — AI 자율주행의 보행자 의도 예측(ai/intent.ts)이
+// 바로 이 선 자리를 보므로, 시뮬레이터에서 학습 · 검증한 몸과 게임의 몸이 한 벌이어야 한다.
+export { WAIT_SETBACK };
 
 /*
   ── 머리 위 느낌표 ─────────────────────────────────────────────────────────
@@ -485,25 +472,18 @@ export class Pedestrian {
   /** 상태기계의 축 좌표를 실제 3D 위치로 반영 */
   private syncTransform(): void {
     /*
-      **물러선 만큼 진행 방향의 반대로 민다.** 상태기계의 축 좌표는 손대지 않는다 —
-      판정(통행 의사·차도 위인가)은 그쪽이 만들고, 여기서 좌표를 바꾸면 검증기와 갈라진다.
-      나와 선 자리(setback = 0)가 곧 상태기계의 출발 자리라, 걷기 시작하는 순간
-      이어 붙는 곳이 없다.
-    */
-    const axis = this.walk.axis - this.walk.dir * WAIT_SETBACK * this.setback;
-    const dir = this.walk.dir;
-    /*
+      **물러선 만큼 진행 방향의 반대로 민다** (pedBody.ts 의 bodyPosition — 시뮬레이터도 같은 셈으로 몸을 세운다).
       **S · B 는 A 와 같은 방향으로 걷는다** — 셋 다 남북 도로를 가로지르므로 x 축으로 간다.
       다른 것은 자리 하나뿐이다 (layout.ts 의 CROSSWALK_* — S 68 · A 16.8 · B -38).
     */
-    const across = this.across();
+    const dir = this.walk.dir;
+    const p = bodyPosition(this.crosswalk, this.walk.axis, dir, this.setback, this.across());
+    this.group.position.set(p.x, 0, p.z);
     if (this.crosswalk === 'S' || this.crosswalk === 'A' || this.crosswalk === 'B') {
       // 남북 도로를 가로지름 — x축으로 이동
-      this.group.position.set(axis, 0, across);
       this.group.rotation.y = dir === 1 ? -Math.PI / 2 : Math.PI / 2;
     } else {
       // 동서 도로를 가로지름 — z축으로 이동
-      this.group.position.set(across, 0, axis);
       this.group.rotation.y = dir === 1 ? Math.PI : 0;
     }
   }
@@ -515,20 +495,11 @@ export class Pedestrian {
    * 보행자이므로(제2조 제17호) 줄무늬 위로 건넌다 — 두 사람이 **다른 자리로 건너는 것**이 곧
    * 이 판이 가르치는 규칙이라, 그림에서 갈라져야 말이 된다.
    *
-   * 자리를 여기 한 곳에서 내는 까닭은 **부딪힘 검사도 같은 값을 봐야** 하기 때문이다
-   * (scenarios/playSim.ts 에 같은 셈이 있다 — 한쪽만 옮기면 보이는 자리와 부딪히는 자리가 갈린다).
+   * 자리는 pedBody.ts 의 pedAcross 한 곳에서 낸다 — **부딪힘 검사(scenarios/playSim.ts)도 같은 값을 봐야** 하기
+   * 때문이다. 한쪽만 옮기면 보이는 자리와 부딪히는 자리가 갈린다.
    */
   private across(): number {
-    if (this.bike === 'ride') {
-      return bikeLaneCenter(this.crosswalk) + this.offset * BIKE_SLOT_SHRINK;
-    }
-    const center =
-      this.crosswalk === 'S'
-        ? CROSSWALK_S_CENTER
-        : this.crosswalk === 'B'
-          ? CROSSWALK_B_CENTER
-          : CROSSWALK_CENTER;
-    return center + this.offset;
+    return pedAcross(this.crosswalk, this.bike, this.offset);
   }
 
   /**
@@ -554,12 +525,8 @@ export class Pedestrian {
       **건널 뜻이 있으면 연석까지 나선다.** 되돌아가기도 한다 — 보행신호가 녹색점멸로
       바뀌면 새로 건너지 않는 사람이 되므로(pedWalk 의 isVisiblyWaiting) 한 걸음 물러선다.
     */
-    const wantsCurb = s.state !== 'waiting' || s.intendsToCross;
     const before = this.setback;
-    const step = dt / STEP_UP_TIME;
-    this.setback = wantsCurb
-      ? Math.max(0, this.setback - step)
-      : Math.min(1, this.setback + step);
+    this.setback = stepSetback(this.setback, wantsCurb(s), dt);
 
     if (s.state === 'crossing') {
       // 걷는 동작 — 상태기계가 실제로 나아간 뒤에만 팔다리를 흔든다

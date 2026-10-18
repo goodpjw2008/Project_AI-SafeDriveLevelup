@@ -68,12 +68,28 @@ export interface PanelSignal {
   kind: 'vehicle4' | 'vehicle3' | 'rightArrow';
 }
 
+/** 사람 하나에 대한 의도 예측의 짐작 — 그리는 데 필요한 것만 */
+export interface PanelIntent {
+  /** 지금 건너려 할(양보할) 확률 · 2초 안에 차도에 들어설 확률 */
+  yield: number;
+  enter: number;
+  /** 이미 차도 위에 있는가 */
+  onRoadway: boolean;
+  /** 건너는 축 위의 자리 · 차도 한가운데 쪽 방향(월드, 단위 벡터) */
+  axis: number;
+  dirX: number;
+  dirZ: number;
+}
+
 /** 한 프레임에 그릴 것 */
 export interface LidarFrame {
   /** 내 차 — 중심 · 방향 · 크기 */
   ego: { x: number; z: number; yaw: number; length: number; width: number; height: number };
-  /** 확정된 물체와 그 위험도 */
-  tracks: ReadonlyArray<{ track: Track; hazard: Hazard }>;
+  /**
+   * 확정된 물체와 그 위험도 — 사람 · 자전거에는 **보행자 횡단 의도 예측**(ai/intent.ts)의 짐작이 붙는다(도움이 켜져 있을 때).
+   * 화면은 그 짐작으로 2초 뒤를 점으로 깔고(PC 는 머리 위에 확률도), 위험 색은 assessHazard 가 그 짐작으로 정한 것이다.
+   */
+  tracks: ReadonlyArray<{ track: Track; hazard: Hazard; intent?: PanelIntent }>;
   /** 마지막 바퀴 — 점을 옅게 깐다 */
   scan: LidarScan | null;
   /** 마지막 바퀴 뒤로 흐른 시간 (초) — 움직이는 물체를 그만큼 앞으로 그린다 */
@@ -281,6 +297,9 @@ export class LidarPanel {
   /** 화면을 담은 상자 (index.html 의 #lidar-box) */
   private readonly box: HTMLElement | null;
 
+  /** 이번 프레임에 단 확률 딱지의 자리 — 붙어 선 사람끼리 딱지가 겹치지 않게 (drawIntentLabel) */
+  private labels: Array<[number, number, number, number]> = [];
+
   constructor(private readonly road: LidarRoad) {
     this.canvas = document.getElementById('lidar') as HTMLCanvasElement | null;
     this.ctx = this.canvas?.getContext('2d') ?? null;
@@ -316,6 +335,7 @@ export class LidarPanel {
     if (!this.fit(canvas)) return;
     this.lastDraw = now;
     this.now = now;
+    this.labels = [];
 
     this.aim(frame.ego);
     this.drawBackground(ctx);
@@ -325,13 +345,23 @@ export class LidarPanel {
     // 땅에 깔리는 것 — LiDAR 가 맞힌 점(바닥에 눌러 찍는다) · 위험 고리 · 앞차 표시
     if (frame.scan && !this.lite) this.drawPoints(ctx, frame.scan);
     for (const { track, hazard } of frame.tracks) this.drawGroundMark(ctx, track, hazard, frame.scanAge);
+    // AI 가 짐작한 2초 뒤 — 땅에 깐 점 (보행자 횡단 의도 예측)
+    for (const { track, hazard, intent } of frame.tracks) {
+      if (intent) this.drawForecast(ctx, track, hazard, intent, frame.scanAge);
+    }
 
     // 서 있는 것 — 먼 것부터
     const items: Array<{ depth: number; paint: () => void }> = [];
-    for (const { track, hazard } of frame.tracks) {
+    for (const { track, hazard, intent } of frame.tracks) {
       const x = track.x + track.vx * frame.scanAge;
       const z = track.z + track.vz * frame.scanAge;
-      items.push({ depth: this.cam({ x, y: 0, z }).z, paint: () => this.drawObject(ctx, track, hazard, x, z) });
+      items.push({
+        depth: this.cam({ x, y: 0, z }).z,
+        paint: () => {
+          this.drawObject(ctx, track, hazard, x, z);
+          if (intent) this.drawIntentLabel(ctx, track, hazard, intent, x, z);
+        },
+      });
     }
     for (const sig of frame.signals) {
       items.push({ depth: this.cam({ x: sig.x, y: 0, z: sig.z }).z, paint: () => this.drawSignal(ctx, sig) });
@@ -692,6 +722,80 @@ export class LidarPanel {
       pts.push({ x: x + Math.cos(a) * radius, y: 0.03, z: z + Math.sin(a) * radius });
     }
     this.poly(ctx, pts, hazard === 'danger' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.26)');
+  }
+
+  /**
+   * **AI 가 짐작한 2초 뒤** — 의도 예측이 "곧 차도에 들어선다" 고 본 사람 앞에, 건너는 쪽으로 0.4초 간격의 점 다섯을 깐다.
+   * 점의 짙기가 그 확률이다(25% 밑이면 그리지 않는다). 이미 건너는 사람은 지금 걸음 그대로 앞으로 — 반대편 연석까지만.
+   * 예전의 위협 예측(2초 등속)은 서 있는 사람을 늘 '안 움직인다' 로 봤다 — 발을 떼기 전에 미리 보여 주는 것이 이 점이다.
+   */
+  private drawForecast(ctx: CanvasRenderingContext2D, tr: Track, hazard: Hazard, it: PanelIntent, age: number): void {
+    if (it.enter < 0.25) return;
+    const x0 = tr.x + tr.vx * age;
+    const z0 = tr.z + tr.vz * age;
+    const moving = Math.hypot(tr.vx, tr.vz) > 0.8;
+    // 서 있는 사람은 건너는 쪽으로 걸음(어른 3.6m/s — 게임의 걸음 배율, pedWalk.ts), 자전거는 그보다 빠르게
+    const pace = tr.cls === 'bike' ? 6 : 3.6;
+    const vx = it.onRoadway && moving ? tr.vx : it.dirX * pace;
+    const vz = it.onRoadway && moving ? tr.vz : it.dirZ * pace;
+    // 건너는 축 방향 성분 — 반대편 연석(CURB 11.2m + 0.6)을 넘는 점은 그리지 않는다
+    const along = vx * (it.dirX !== 0 ? 1 : 0) + vz * (it.dirZ !== 0 ? 1 : 0);
+    const rgb = hazard === 'danger' ? '239,68,68' : hazard === 'caution' ? '245,158,11' : '59,130,246';
+    for (let k = 1; k <= 5; k += 1) {
+      const t = k * 0.4;
+      if (Math.abs(it.axis + along * t) > 11.8) break;
+      const cx = x0 + vx * t;
+      const cz = z0 + vz * t;
+      const a = Math.min(1, it.enter) * (0.9 - 0.13 * (k - 1));
+      const pts: V3[] = [];
+      for (let i = 0; i < 12; i += 1) {
+        const ang = (i / 12) * Math.PI * 2;
+        pts.push({ x: cx + Math.cos(ang) * 0.36, y: 0.03, z: cz + Math.sin(ang) * 0.36 });
+      }
+      this.poly(ctx, pts, `rgba(${rgb},${a.toFixed(3)})`);
+    }
+  }
+
+  /**
+   * **머리 위의 확률** — 의도 예측이 짐작한 '건너려 할 확률'. 보도 위에 선 사람만(차도 위 사람은 이미 건너는 중이다),
+   * 10% 넘을 때만, **넓은 화면(PC)에서만** 단다 — 휴대폰의 작은 그림에서는 사람을 가린다. 신경망의 확률은 1 에 붙어도
+   * 확신이 아니므로 99% 까지만 적는다. 붙어 선 사람의 딱지와 겹치면 한 칸 위로 올리고, 그래도 겹치면 달지 않는다.
+   */
+  private drawIntentLabel(
+    ctx: CanvasRenderingContext2D,
+    tr: Track,
+    hazard: Hazard,
+    it: PanelIntent,
+    x: number,
+    z: number,
+  ): void {
+    if (it.onRoadway || it.yield < 0.1 || this.w / this.dpr < 200) return;
+    const h = tr.cls === 'child' ? CLASS_SIZE.child.height : tr.cls === 'bike' ? CLASS_SIZE.bike.height : CLASS_SIZE.adult.height;
+    const p = this.cam({ x, y: h + 0.55, z });
+    if (p.z < CAM.near) return;
+    const [sx, sy] = this.screen(p);
+    const size = Math.round(9.5 * this.dpr);
+    const label = `건널 ${Math.min(99, Math.round(it.yield * 100))}%`;
+    ctx.font = `800 ${size}px ${this.font}`;
+    const tw = ctx.measureText(label).width;
+    const w = (Number.isFinite(tw) ? tw : size * 3.6) + size * 0.9;
+    const bh = size * 1.45;
+    const hit = (y: number) =>
+      this.labels.some(([x0, y0, x1, y1]) => sx - w / 2 < x1 && sx + w / 2 > x0 && y - bh < y1 && y > y0);
+    let y = sy;
+    if (hit(y)) y -= bh + 2 * this.dpr;
+    if (hit(y)) return;
+    this.labels.push([sx - w / 2, y - bh, sx + w / 2, y]);
+    ctx.fillStyle = hazard === 'danger' ? 'rgba(220,38,38,0.92)' : hazard === 'caution' ? 'rgba(217,119,6,0.92)' : 'rgba(71,85,105,0.82)';
+    ctx.beginPath();
+    ctx.roundRect(sx - w / 2, y - bh, w, bh, bh / 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, sx, y - bh / 2 + size * 0.05);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
   }
 
   private drawObject(ctx: CanvasRenderingContext2D, tr: Track, hazard: Hazard, x: number, z: number): void {

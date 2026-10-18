@@ -13,8 +13,9 @@
  *     처음에 손으로 정한 규칙(ruleClass)과 로지스틱 회귀는 비교 기준으로 남겨 둔다.
  *  3. **추적** — 지난 물체의 예측 자리와 가까운 것끼리 잇고(최근접 연결), **알파-베타 필터**로 자리와 속도를 다듬는다.
  *     한두 바퀴 놓쳐도(가림 · 빗길) 예측 자리로 이어 가다가, 오래 안 보이면 지운다.
- *  4. **위험 평가** — 앞으로 달릴 길에서 얼마나 떨어져 있는가, **2초 뒤**(등속 예측) 그 길에 들어오는가로
- *     주의 · 위험을 가른다.
+ *  4. **위험 평가** — 앞으로 달릴 길 위에 있는가, 그리고 **보행자 횡단 의도 예측 신경망**(ai/intent.ts)이 그 사람을
+ *     어떻게 짐작했는가로 주의 · 위험을 가른다 — AI 가 양보하는 사람은 위험, 2초 안에 차도에 들어설 것 같은 사람은 주의.
+ *     짐작을 붙이지 못한 물체만 예전처럼 **2초 뒤**(등속 예측)로 본다.
  *
  * 순수 모듈이다 — 화면(game/LidarPanel.ts)은 이 결과를 그리기만 한다.
  */
@@ -936,18 +937,36 @@ export function distanceToPath(x: number, z: number, path: ReadonlyArray<{ x: nu
   return best;
 }
 
+/** LiDAR 가 잡은 사람에게 붙인 **보행자 횡단 의도 예측**(ai/intent.ts)의 짐작 */
+export interface HazardGuess {
+  /** AI 가 이 사람에게 양보하는가 (차도 위이거나, 신경망이 건너려 한다고 짐작했다) */
+  yields: boolean;
+  /** 2초 안에 차도에 들어설 확률 */
+  enter: number;
+  /** 그 사람이 선 횡단보도가 앞으로 달릴 길에 걸려 있는가 */
+  onRoute: boolean;
+}
+
 /**
  * 그 물체가 **앞으로 달릴 길**에 대해 얼마나 문제인가.
  *
- *  - 사람 · 자전거가 길 위에 있으면 **위험**, 2초 뒤 길 위에 있을 것 같거나 길가에 붙어 있으면 **주의**
+ *  - 사람 · 자전거가 길 위에 있으면 **위험**
+ *  - 의도 예측이 붙었으면 — 내 길의 횡단보도에서 AI 가 양보하는 사람은 **위험**, 2초 안에 차도에 들어설 것 같으면(확률
+ *    50% 넘게) **주의**. 길가에 붙어 있어도 **주의**
+ *  - 짐작이 없으면(지도의 횡단보도 밖) 예전처럼 2초 뒤(등속 예측) 길 위에 있을 것 같거나 길가에 붙어 있으면 **주의**
  *  - 차가 길 위에 있으면 **앞차** (따라가는 대상)
  */
-export function assessHazard(tr: Track, path: ReadonlyArray<{ x: number; z: number }>): Hazard {
+export function assessHazard(tr: Track, path: ReadonlyArray<{ x: number; z: number }>, guess?: HazardGuess): Hazard {
   if (path.length < 2) return 'none';
   const now = distanceToPath(tr.x, tr.z, path);
   if (tr.cls === 'car') return now < 1.8 ? 'lead' : 'none';
   if (tr.cls === 'unknown') return 'none';
   if (now < CORRIDOR_HALF) return 'danger';
+  if (guess) {
+    if (guess.onRoute && guess.yields) return 'danger';
+    if ((guess.onRoute && guess.enter >= 0.5) || now < WATCH_DISTANCE) return 'caution';
+    return 'none';
+  }
   const later = distanceToPath(tr.x + tr.vx * PREDICT_SECONDS, tr.z + tr.vz * PREDICT_SECONDS, path);
   if (later < CORRIDOR_HALF || now < WATCH_DISTANCE) return 'caution';
   return 'none';
