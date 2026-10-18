@@ -9,7 +9,7 @@ import { handleRecommend } from './server/recommendHandler.mjs';
 import { handleReport } from './server/reportHandler.mjs';
 import { handleScenario } from './server/scenarioHandler.mjs';
 import { handleStatsRead, handleStatsWrite } from './server/statsHandler.mjs';
-import { APP_DESCRIPTION, APP_ICON_SVG, APP_NAME, APP_SITE, APP_TAGLINE, NAVER_SITE_VERIFICATION } from './src/brand';
+import { APP_DESCRIPTION, APP_NAME, APP_SITE, APP_TAGLINE, NAVER_SITE_VERIFICATION } from './src/brand';
 import { CARS } from './src/economy/cars';
 
 /** 전시관 대표 사진을 저장하는 폴더 (server/carPhotoHandler.mjs) */
@@ -46,21 +46,12 @@ function brandHtml(): Plugin {
         APP_TAGLINE,
         APP_DESCRIPTION,
         APP_SITE,
-        /*
-          아이콘은 **SVG 를 그 자리에서 만든다** (brand.ts 의 APP_ICON_SVG) — 그림 파일을 읽던 때와 달리
-          크기마다 흐려지지 않고, 색이 이름의 딱지와 늘 같다.
-
-          **base64 로 싣는다.** 날것으로 넣으면 `<`, 따옴표, 공백이 섞여 브라우저가 data URI 를 읽지 못한다
-          (실제로 그렇게 넣었더니 아이콘이 아예 안 그려졌다). base64 는 그런 글자가 없어 HTML 속성 안에서도
-          그대로 살아남는다 — 500바이트 남짓이라 길이도 문제가 아니다.
-        */
-        APP_ICON: `data:image/svg+xml;base64,${Buffer.from(APP_ICON_SVG, 'utf8').toString('base64')}`,
         // 링크 미리보기 · 검색 결과의 대표 그림 (public/og-image.png, 1200×630) — 절대 주소여야 카카오톡 · 네이버가 읽는다
         OG_IMAGE: `${APP_SITE}/og-image.png`,
         NAVER_VERIFICATION: NAVER_SITE_VERIFICATION,
       };
       const filled = html.replace(
-        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_SITE|APP_ICON|OG_IMAGE|NAVER_VERIFICATION)\}\}/g,
+        /\{\{(APP_NAME|APP_TAGLINE|APP_DESCRIPTION|APP_SITE|OG_IMAGE|NAVER_VERIFICATION)\}\}/g,
         (_, key: string) => escapeHtml(values[key]),
       );
       // 네이버 소유 확인 코드가 비어 있으면 그 줄을 통째로 뺀다 — 빈 content 의 태그는 없느니만 못하다 (brand.ts)

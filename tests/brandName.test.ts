@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { AI_BADGE_HTML, BRAND_NAME_HTML, withAiBadge } from '../src/ui/brandName';
 import {
   APP_DESCRIPTION,
-  APP_ICON_SVG,
   APP_NAME,
   APP_NAME_PARTS,
   APP_SITE,
@@ -98,21 +97,50 @@ describe('홀로 선 AI 배지', () => {
 });
 
 /*
-  **탭 아이콘** — 녹색 네모에 '안' 한 글자 (brand.ts 의 APP_ICON_SVG · 사용자가 정했다).
+  **사이트 아이콘** — 녹색 네모에 '안' 한 글자 (public/favicon.* · 사용자가 정했다).
   이름의 첫 글자이고, 바탕은 제목의 '안전운전' 딱지와 **같은 녹색**이다 — 탭에서 본 색이 화면을 열었을 때 제목에 있다.
+
+  **주소로 내려받을 수 있는 파일**이어야 한다 — data URI 로 HTML 에 심었을 때 구글 · 네이버 검색 결과에 회색 지구본이 떴다
+  (사용자가 짚었다, 2026-10-18). 글자는 외곽선이어야 한다 — 한글 글꼴이 없는 곳에서도 '안' 으로 그려지게.
 */
-describe('탭 아이콘', () => {
-  it("녹색 네모에 '안' 한 글자다", () => {
-    expect(APP_ICON_SVG).toContain('>안<');
+describe('사이트 아이콘', () => {
+  const pub = (f: string) => fileURLToPath(new URL(`../public/${f}`, import.meta.url));
+  const svg = readFileSync(pub('favicon.svg'), 'utf8');
+  const html = readFileSync(fileURLToPath(new URL('../src/index.html', import.meta.url)), 'utf8');
+
+  it("녹색 네모에 '안' 한 글자다 — 글꼴이 없어도 그려지는 외곽선으로", () => {
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain('viewBox="0 0 64 64"');
+    expect(svg).toContain('<title>안</title>');
     // 제목의 '안전운전' 딱지와 같은 녹색 (index.html 의 .brand-green)
-    expect(APP_ICON_SVG).toContain('#117332');
-    expect(APP_ICON_SVG).not.toContain('정<');
-    expect(APP_ICON_SVG).not.toContain('우');
+    expect(svg).toContain('#117332');
+    expect(svg).toContain('<path');
+    expect(svg).not.toContain('<text');
   });
 
-  it('크기를 타지 않는 SVG 다 — 탭 16px 부터 홈 화면 180px 까지', () => {
-    expect(APP_ICON_SVG.startsWith('<svg')).toBe(true);
-    expect(APP_ICON_SVG).toContain('viewBox="0 0 64 64"');
+  it('검색엔진이 내려받을 파일을 HTML 이 가리킨다 — ico(48px 포함) · svg · 96px png · 홈 화면 180px', () => {
+    for (const tag of [
+      '<link rel="icon" href="/favicon.ico"',
+      '<link rel="icon" type="image/svg+xml" href="/favicon.svg"',
+      '<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png"',
+      '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"',
+    ]) {
+      expect(html).toContain(tag);
+    }
+    expect(html).not.toMatch(/rel="icon"[^>]*href="data:/);
+    // PNG 의 가로 · 세로 (IHDR) — 구글은 48px 의 배수인 정사각형을 찾는다
+    const size = (f: string) => {
+      const b = readFileSync(pub(f));
+      return [b.readUInt32BE(16), b.readUInt32BE(20)];
+    };
+    expect(size('favicon-96x96.png')).toEqual([96, 96]);
+    expect(size('apple-touch-icon.png')).toEqual([180, 180]);
+    // ico 머리말 — 그림 수와 그 크기들 (0 은 256)
+    const ico = readFileSync(pub('favicon.ico'));
+    expect(ico.readUInt16LE(2)).toBe(1);
+    const sizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ico[6 + i * 16]);
+    expect(sizes).toContain(48);
+    expect(sizes).toContain(16);
   });
 });
 
@@ -155,7 +183,7 @@ describe('검색 결과와 공유 카드', () => {
   /* 자리표시자는 vite.config.ts 가 갈아 끼운다 — 목록에서 빠지면 `{{…}}` 가 그대로 배포된다 */
   it('자리표시자가 빌드에서 갈아 끼워진다', () => {
     const vite = readFileSync(fileURLToPath(new URL('../vite.config.ts', import.meta.url)), 'utf8');
-    for (const key of ['APP_NAME', 'APP_TAGLINE', 'APP_DESCRIPTION', 'APP_SITE', 'APP_ICON']) {
+    for (const key of ['APP_NAME', 'APP_TAGLINE', 'APP_DESCRIPTION', 'APP_SITE']) {
       expect(vite).toContain(key);
     }
     // HTML 이 쓰는 자리표시자가 하나라도 목록에 빠지면 `{{…}}` 가 그대로 배포된다

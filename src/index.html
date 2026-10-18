@@ -9,10 +9,15 @@
     <!-- 이름·부제·설명은 src/brand.ts 에서 정한다 (vite.config.ts 가 여기에 끼워 넣는다) -->
     <title>{{APP_NAME}} — {{APP_TAGLINE}}</title>
     <!--
-      탭 아이콘 — **주황 바탕에 '우' 한 글자** (brand.ts 의 APP_ICON_SVG · 이름 딱지의 가운데 글자).
-      vite.config.ts 가 SVG 를 data URI 로 끼워 넣는다. 그림 파일을 그대로 가리키면 단일 파일 빌드에서 깨진다.
+      사이트 아이콘 — 녹색 네모에 흰 '안' 한 글자 (public/favicon.* — scripts/build-icons.py 가 만든다, brand.ts 의 주석).
+      **주소로 내려받을 수 있는 파일**이어야 구글 · 네이버 검색 결과에 뜬다 — data URI 로 심었을 때는 회색 지구본이 떴다.
+      구글은 48px 의 배수를 찾으므로 ico 에 48px 을 넣고 96px PNG 를 함께 둔다. 단일 파일 빌드(file://)에서는 이 줄들을
+      favicon.svg 의 data URI 한 줄로 바꾼다 (scripts/build-standalone.mjs).
     -->
-    <link rel="icon" type="image/svg+xml" href="{{APP_ICON}}" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="description" content="{{APP_DESCRIPTION}}" />
     <!--
       **링크를 어디에 붙여도 같은 말이 뜨게 한다** (카카오톡 · 페이스북 · 엑스 · 슬랙).

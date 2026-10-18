@@ -72,6 +72,19 @@ async function main() {
     html = html.replace(link[0], () => `<style>${css}</style>`);
   }
 
+  /*
+    **아이콘은 data URI 로 심는다** — 웹에서는 /favicon.ico · /favicon.svg 파일을 가리키지만(검색엔진이 내려받는다),
+    file:// 로 연 한 장짜리 파일에는 그 주소가 없다. 같은 그림(public/favicon.svg)을 base64 로 한 줄에 넣는다.
+  */
+  const iconLinks = /[ \t]*<link rel="(?:icon|apple-touch-icon)"[^>]*>[ \t]*\n?/g;
+  const svg = await readFile(resolve(ROOT, 'public/favicon.svg'));
+  let first = true;
+  html = html.replace(iconLinks, () => {
+    if (!first) return '';
+    first = false;
+    return `    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,${svg.toString('base64')}" />\n`;
+  });
+
   await mkdir(OUT_DIR, { recursive: true });
   await writeFile(OUT, html);
   console.log(`\n완료: ${OUT}  (${Math.round(html.length / 1024 / 1024 * 10) / 10}MB)`);

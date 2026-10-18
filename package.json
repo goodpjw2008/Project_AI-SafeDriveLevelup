@@ -22,7 +22,8 @@
     "airobot": "node scripts/build-airobot.mjs",
     "train:ai": "vite-node scripts/train-ai.ts",
     "train:lidar": "vite-node scripts/train-lidar.ts",
-    "train:intent": "vite-node scripts/train-intent.ts"
+    "train:intent": "vite-node scripts/train-intent.ts",
+    "icons": "python3 scripts/build-icons.py"
   },
   "dependencies": {
     "three": "^0.169.0"
