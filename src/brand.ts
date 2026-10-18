@@ -189,7 +189,7 @@ export const NAVER_SITE_VERIFICATION = 'a9c534ca1d515d84007c44c27855473a6b9d95fd
  * '※ 주의사항 :' 머리를 달고, PC 첫 화면의 저작권 아래에는 문장만 선다 — 한 곳에서 온다.
  *
  * 2026-10-18 에 "현재 프로토타입 버전으로 교통법규에 대한 정확한 테스트 및 추가 기능 개발 예정입니다." 줄을 뺐다 (사용자가
- * 정했다). README 의 소개 글 아래에는 아직 옛 두 줄이 있다 — 고치라는 말은 없었다.
+ * 정했다). README 의 소개 글 아래도 같은 한 줄이다 — 문구를 바꾸면 README 도 함께 고친다.
  */
 export const APP_NOTICE_TITLE = '주의사항';
 export const APP_NOTICE_LINES: readonly string[] = [
