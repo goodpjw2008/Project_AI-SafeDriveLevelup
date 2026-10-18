@@ -261,6 +261,13 @@ const CAN_UPLOAD_PHOTO = import.meta.env.DEV;
  * 시험용 문이라 배포본(npm run build)에는 첫 화면의 버튼이 없다 — main.ts 의 renderTrial 도 같은 값으로 막는다.
  */
 export const CAN_TRY_MAP = import.meta.env.DEV;
+/**
+ * **맵 체험 버튼은 화면에서도 숨긴다** (사용자가 정했다, 2026-10-18: "첫화면에 맵 체험 버튼은 숨겨줘. 이 기능은 디버깅을 위한
+ * 기능이었어. 기능은 유지하고 화면에만 보이지 않게"). 개발 서버에서 주소 뒤에 `?trial` 을 붙이면 버튼이 다시 선다
+ * (예: http://localhost:5173/?trial) — 기능(renderTrial)은 그대로다.
+ */
+const SHOW_TRIAL_BUTTON =
+  CAN_TRY_MAP && typeof location !== 'undefined' && new URLSearchParams(location.search).has('trial');
 
 /**
  * 이 프로젝트가 쓰는 오픈소스 — package.json 의 dependencies·devDependencies 와 짝을 이룬다.
@@ -847,7 +854,7 @@ export class Screens {
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
           (AI 안전운전 연습 · 안전운전 AI 자율주행 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
         -->
-        ${CAN_TRY_MAP ? `<button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>` : ''}
+        ${SHOW_TRIAL_BUTTON ? `<button class="ghost" id="btn-trial">${icon('play')}맵 체험</button>` : ''}
         <button class="icon ghost" id="btn-settings" title="설정" aria-label="설정">${icon(
           'gear',
         )}</button>
@@ -1014,14 +1021,14 @@ export class Screens {
           `<button class="btn primary" id="btn-generate">${icon('play')}마스터 운행</button>` +
           `<button class="btn" id="btn-ending">엔딩 다시 보기</button>`
         : /*
-            **이름은 하나다 — 'AI 안전운전 연습'** (사용자가 정했다).
+            **이름은 하나다 — 'AI 안전주행 시작'** (사용자가 정했다 — 2026-10-18 에 'AI 안전운전 연습' 에서 바꿨다).
 
             한때 처음인가 이어서인가로 '안전운전 연습 시작' · '이어서 안전운전 연습' 을 갈랐다. 지금은
             무엇을 연습할지까지 AI 가 고르므로(scenarios/trackPick.ts) 이 버튼이 하는 일은 늘 같고,
             같은 일에 두 이름을 붙이면 **처음 온 사람만 다른 버튼을 누르는 것처럼** 읽힌다.
             '몇 판째인가' 는 바로 위의 레벨 · 경험치 막대가 이미 말한다.
           */
-          `<button class="btn primary" id="btn-generate">${icon('play')}AI 안전운전 연습</button>`;
+          `<button class="btn primary" id="btn-generate">${icon('play')}AI 안전주행 시작</button>`;
 
     const resetButton = this.resetCourseButton(save);
 
@@ -2474,9 +2481,9 @@ export class Screens {
         id: 'shop',
         title: '자동차전시관',
         sub:
+          // 좌석 높이 안내 문장은 뺐다 (사용자가 정했다, 2026-10-18) — 톱니바퀴 버튼은 그대로 있다
           '차는 <b>레벨이 오르면 한 대씩 열립니다</b>. ' +
-          `<b>${esc(levelLabel(MAX_LEVEL))}</b>을 달성하면 전시관의 차량이 모두 열립니다. ` +
-          '톱니바퀴를 누르면 그 차의 <b>운전석에 앉아 좌석 높이</b>를 설정할 수 있습니다.',
+          `<b>${esc(levelLabel(MAX_LEVEL))}</b>을 달성하면 전시관의 차량이 모두 열립니다.`,
         right: `<div class="wallet-inline">지금 레벨 : <b>${esc(
           levelLabel(save.curriculum.level),
         )}</b></div>`,
