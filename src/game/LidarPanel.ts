@@ -163,11 +163,12 @@ const TONE = {
   danger: { body: '#ef4444', limb: '#dc2626', head: '#f87171' },
 } as const;
 
-/**
- * 화면 이름 — **'LiDAR(가상)'** (사용자가 정했다: *"수정 전 : LiDAR / 수정 후 : LiDAR(가상)"*). 실제 센서가 아니라 게임 속
- * 장면을 쏘는 흉내(game/lidarSensor.ts)라는 것을 이름에서 밝힌다.
- */
-const PANEL_TITLE = 'LiDAR(가상)';
+/*
+  화면 이름 — **'LiDAR(광선 추적 시뮬레이션 기법)'** 과 그 설명(지도학습 · 신경망 · ※ 두 줄)은 그림 밖의 HTML 설명 칸
+  (index.html 의 #lidar-cap)이 적는다 (사용자가 정했다, 2026-10-18 — 예전 이름 'LiDAR(가상)'). 그림 안에 그리면 줄을 바꾸지
+  못하고, 휴대폰 화면(폭 150px 남짓)에서는 앞길 — 사람이 나타나는 자리 — 을 덮는다. 그림 안에는 스캔 점 · 찾은 물체 수 ·
+  AI 자율주행 표만 남는다 (drawCaption).
+*/
 
 /** 이보다 가까운 신호등은 그리지 않는다 (카메라 깊이, m) */
 const SIGNAL_MIN_DEPTH = 12;
@@ -1067,7 +1068,7 @@ export class LidarPanel {
     }
   }
 
-  /** 왼쪽 위 — 이름('LiDAR(가상)')과 찾은 물체 수 */
+  /** 왼쪽 위 — 스캔 점 · 찾은 물체 수 · (AI 자율주행 중이면) 파란 표. 이름과 설명은 그림 밖 HTML(#lidar-cap)이 적는다 */
   private drawCaption(ctx: CanvasRenderingContext2D, frame: LidarFrame): void {
     const pad = 10 * this.dpr;
     // 글자 크기는 CSS px 로 11~15 (화면 폭의 26분의 1) — 좁은 세로 화면 · 작은 휴대폰 화면에서도 읽히게
@@ -1090,35 +1091,38 @@ export class LidarPanel {
     ctx.beginPath();
     ctx.arc(pad + big * 0.32, pad + big * 0.55, big * 0.26, 0, Math.PI * 2);
     ctx.fill();
+    // 찾은 물체 수 — 신경망 분류기가 가려낸 결과다 (ai/perception.ts)
+    const counts = [`사람 ${people}`, `자전거 ${bikes}`, `차 ${cars}`].join(' · ');
+    const countSize = Math.round(big * 0.9);
     ctx.fillStyle = COLOR.text;
-    ctx.font = `800 ${big}px ${this.font}`;
-    ctx.fillText(PANEL_TITLE, pad + big * 0.8, pad);
+    ctx.font = `700 ${countSize}px ${this.font}`;
+    const cx = pad + big * 0.8;
+    ctx.fillText(counts, cx, pad + (big - countSize) * 0.5);
     if (frame.autopilot) {
-      // 이름 옆 파란 표 — 숨 쉬듯 짙어졌다 옅어진다. 글자 폭을 못 재면(가짜 캔버스) 어림값
-      const measured = ctx.measureText(PANEL_TITLE).width;
-      const x = pad + big * 0.8 + (Number.isFinite(measured) ? measured : big * 5.3) + big * 0.45;
+      // 물체 수 옆 파란 표 — 숨 쉬듯 짙어졌다 옅어진다. **자리가 모자라면(휴대폰) 그리지 않는다** — 둘레의 파란 빛과 모드 카드가
+      // 이미 AI 자율주행 중임을 말한다. 글자 폭을 못 재면(가짜 캔버스) 어림값
+      const measured = ctx.measureText(counts).width;
+      const x = cx + (Number.isFinite(measured) ? measured : countSize * 9) + big * 0.45;
       const label = 'AI 자율주행';
       ctx.font = `800 ${small}px ${this.font}`;
       const tw = ctx.measureText(label).width;
       const w = (Number.isFinite(tw) ? tw : small * 5.2) + small * 1.9;
-      const h = big * 1.12;
-      const y = pad - big * 0.06;
-      ctx.fillStyle = `rgba(${COLOR.badge},${(0.78 + 0.22 * this.breath()).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.roundRect(x, y, w, h, h / 2);
-      ctx.fill();
-      ctx.fillStyle = `rgba(255,255,255,${(0.55 + 0.45 * this.breath()).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(x + small * 0.75, y + h / 2, small * 0.24, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, x + small * 1.25, y + h / 2 + small * 0.04);
-      ctx.textBaseline = 'top';
+      if (x + w <= this.w - pad) {
+        const h = big * 1.12;
+        const y = pad - big * 0.06;
+        ctx.fillStyle = `rgba(${COLOR.badge},${(0.78 + 0.22 * this.breath()).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, h / 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${(0.55 + 0.45 * this.breath()).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(x + small * 0.75, y + h / 2, small * 0.24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x + small * 1.25, y + h / 2 + small * 0.04);
+        ctx.textBaseline = 'top';
+      }
     }
-    ctx.fillStyle = COLOR.textSub;
-    ctx.font = `600 ${small}px ${this.font}`;
-    const parts = [`사람 ${people}`, `자전거 ${bikes}`, `차 ${cars}`];
-    ctx.fillText(parts.join(' · '), pad, pad + big * 1.3);
   }
 }

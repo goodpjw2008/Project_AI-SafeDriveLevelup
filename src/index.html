@@ -3945,7 +3945,7 @@
       }
 
       /*
-        LiDAR(가상) 화면 — AI 자율 주행 · 직접 운전 모두 **늘 뜬다** — 끄는 버튼은 뺐다 (사용자가 정했다: "lidar 끄는 버튼은
+        LiDAR(광선 추적 시뮬레이션 기법) 화면 — AI 자율 주행 · 직접 운전 모두 **늘 뜬다** — 끄는 버튼은 뺐다 (사용자가 정했다: "lidar 끄는 버튼은
         제거해주고, 항상 디폴트로"). 내 차를 가운데 두고 앞길과 뒤차(뒤로 9.5m)를 함께 담는다 (LidarPanel.ts 의 CAM).
 
         **PC 는 화면 오른쪽 위, 과제 상자 오른편에 세로로 긴 3:4** 로 선다 (사용자가 정했다: *"라이다 대시보드가 오른쪽 시야를
@@ -3963,7 +3963,9 @@
       */
       #lidar-box {
         --lidar-top: 14px;
-        --lidar-room: calc(100vh - var(--lidar-top) - 16px - min(30vw, 380px) * 0.332 - 24px);
+        /* 설명 칸(#lidar-cap)이 그림 위에 서는 만큼 높이에서 미리 뺀다 — 폭 240~320px 에서 6~9줄 */
+        --lidar-cap-h: 160px;
+        --lidar-room: calc(100vh - var(--lidar-top) - 16px - min(30vw, 380px) * 0.332 - 24px - var(--lidar-cap-h));
         position: absolute;
         right: 16px;
         top: var(--lidar-top);
@@ -3980,6 +3982,92 @@
       }
       #lidar-box.on {
         opacity: 1;
+      }
+      /*
+        **이름과 기법 설명 칸** (사용자가 정했다, 2026-10-18) — LiDAR 그림과 같은 밝은 색 상자. PC 는 그림 위에 흐름대로 서고
+        (상자가 위에서 아래로 자란다), 그림 밖 아래쪽에서 붙는 화면(휴대폰 · 좁은 화면)은 아래 규칙이 그림 위 · 왼쪽으로 띄운다.
+      */
+      .lidar-cap {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-bottom: 6px;
+        padding: 8px 10px 9px;
+        box-sizing: border-box;
+        border-radius: 12px;
+        background: rgba(241, 243, 246, 0.96);
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.32);
+        color: #1f2937;
+        font-size: 10.5px;
+        line-height: 1.38;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .lidar-title {
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: #111827;
+      }
+      .lidar-sub {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #1d4ed8;
+      }
+      .lidar-note {
+        color: #4b5563;
+      }
+      .lidar-cap .cap-short {
+        display: none;
+      }
+      /*
+        **PC 는 설명 칸과 그림이 한 장의 카드** — 설명 칸이 머리, 그림이 몸이다. AI 자율주행 중 둘레의 파란 빛(#lidar-box::after)이
+        둘을 함께 감싸므로, 사이에 틈이 있으면 빛 안에 바닥이 비쳐 보인다. 그림 밖 아래쪽에 붙는 화면(휴대폰 · 좁은 화면)은
+        설명 칸이 떨어져 있어 아래 규칙들이 모서리를 되돌린다.
+      */
+      @media (min-width: 761px) {
+        body:not(.touch) .lidar-cap {
+          margin-bottom: 0;
+          border-radius: 12px 12px 0 0;
+          box-shadow: none;
+          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+        body:not(.touch) #lidar {
+          border-radius: 0 0 12px 12px;
+        }
+      }
+      /* 휴대폰 — 짧은 ※ 두 줄, 글자를 한 단계 줄이고 그림 바로 위에 띄운다(상자 자리 · 크기는 그대로) */
+      body.touch .lidar-cap .cap-long {
+        display: none;
+      }
+      body.touch .lidar-cap .cap-short {
+        display: block;
+      }
+      body.touch .lidar-cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(100% + 5px);
+        margin: 0;
+        padding: 6px 7px 7px;
+        border-radius: 10px;
+        font-size: 9.5px;
+        line-height: 1.32;
+      }
+      body.touch .lidar-title {
+        font-size: 11px;
+      }
+      body.touch .lidar-sub {
+        font-size: 9.5px;
+      }
+      /* 휴대폰 가로 — 위쪽은 높이가 모자라 그림 **왼쪽**에 붙인다 (오른쪽 아래 방향키 · 그림과 같은 아랫선) */
+      @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+        body.touch .lidar-cap {
+          left: auto;
+          right: calc(100% + 6px);
+          bottom: 0;
+          width: 158px;
+        }
       }
       #lidar {
         display: block;
@@ -6255,6 +6343,14 @@
           bottom: 12px;
           width: min(40vw, 240px);
         }
+        /* 그림이 아래쪽에 붙으니 이름 · 설명 칸은 그림 바로 위로 띄운다 (휴대폰과 같다) */
+        .lidar-cap {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: calc(100% + 5px);
+          margin: 0;
+        }
         #lidar {
           aspect-ratio: 1 / 1;
         }
@@ -7716,7 +7812,21 @@
           자리는 계기판 바로 위다 (사용자가 정했다: "속도기 위 여백부분").
         -->
         <div class="lidar-box" id="lidar-box">
-          <canvas id="lidar" aria-label="LiDAR(가상)로 찾은 주변 물체"></canvas>
+          <!--
+            **이름과 기법 설명** (사용자가 정했다, 2026-10-18 — 예전 이름 'LiDAR(가상)'). PC 는 그림 위, 휴대폰 세로는 그림 바로 위,
+            휴대폰 가로는 그림 왼쪽에 붙는다. ※ 는 PC 가 긴 두 줄(.cap-long), 휴대폰은 짧은 두 줄(.cap-short).
+            숫자(2,880줄 · 10바퀴 · 33,007개 · 96.9%)는 game/lidarSensor.ts 의 LIDAR 와 ai/models/lidar.json 의 meta 에서 왔다 —
+            센서 제원을 바꾸거나 다시 학습하면 여기도 고친다.
+          -->
+          <div class="lidar-cap" id="lidar-cap">
+            <b class="lidar-title">LiDAR(광선 추적 시뮬레이션 기법)</b>
+            <span class="lidar-sub">- 지도학습 및 신경망 기반 추적 및 위협 예측</span>
+            <span class="lidar-note cap-long">※ 실제 LiDAR처럼 레이저 2,880줄을 1초에 10바퀴 쏘아 거리를 재고, 가림 · 빗길 손실까지 계산으로 재현</span>
+            <span class="lidar-note cap-long">※ 시뮬레이터가 정답을 붙인 33,007개 물체로 신경망을 지도학습, 사람 · 자전거 · 차 판별 정확도 96.9%</span>
+            <span class="lidar-note cap-short">※ 레이저 2,880줄을 1초에 10바퀴 쏘아 재현</span>
+            <span class="lidar-note cap-short">※ 시뮬레이터가 정답을 붙인 33,007개 물체로 신경망을 지도학습</span>
+          </div>
+          <canvas id="lidar" aria-label="LiDAR(광선 추적 시뮬레이션 기법)로 찾은 주변 물체"></canvas>
         </div>
 
         <!--

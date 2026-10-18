@@ -1718,7 +1718,7 @@ export class Game {
    */
   /**
    * **가벼운 화면** — 느린 기기를 위해 AI 자율주행 · LiDAR 의 보여 주는 쪽만 덜어 낸다 (사용자가 정했다, 2026-10-18: "저사양에서도
-   * 동작하도록 약간 조정"). LiDAR(가상) 화면은 15fps · 화소 배율 1 · 번짐 · 점 생략(LidarPanel.setLite), 지붕 센서는 그림자를
+   * 동작하도록 약간 조정"). LiDAR 화면은 15fps · 화소 배율 1 · 번짐 · 점 생략(LidarPanel.setLite), 지붕 센서는 그림자를
    * 드리우지 않고(LidarRig.setLite), 화면 테두리 · 모드 카드의 늘 움직이는 빛은 멈춘다(index.html 의 body.lite-fx).
    * 센서 · 인지 · AI 의 판단은 그대로다.
    */
