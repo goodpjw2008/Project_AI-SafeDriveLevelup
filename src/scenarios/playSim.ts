@@ -24,13 +24,21 @@
  * - 보행자와의 충돌은 차체 사각형과 보행자 위치로 잰다 (게임과 같은 식). 앞차와의 추돌은 경로상 간격으로 잰다.
  */
 
-import { IntentEstimator, intentModelReady, type IntentContext, type PedObservation } from '../ai/intent';
+import {
+  IntentEstimator,
+  intentModelReady,
+  perceivedPeople,
+  type IntentContext,
+  type PedObservation,
+} from '../ai/intent';
+import { Tracker, detect } from '../ai/perception';
 import { RunTelemetry } from '../ai/telemetry';
+import { LIDAR, personShapes, scanLidar, type LidarShape } from '../game/lidarSensor';
 import type { ViolationCode } from '../rules/violations';
 import { AutoDriver, type AutoDriveState } from '../game/AutoDriver';
 import { LeadDrive } from '../game/leadDrive';
 import { CURB, PedWalk } from '../game/pedWalk';
-import { WAIT_SLOTS, bodyPosition, pedAcross, stepSetback, wantsCurb } from '../game/pedBody';
+import { WAIT_SLOTS, bodyFacing, bodyPosition, bodyScale, pedAcross, stepSetback, wantsCurb } from '../game/pedBody';
 import { DEFAULT_PACE, Vehicle } from '../game/Vehicle';
 import {
   CROSSWALK_INNER,
@@ -121,30 +129,31 @@ export interface PlayOptions {
    */
   blind?: ReadonlySet<ViolationCode>;
   /**
-   * **AI 가 보행자의 뜻을 어떻게 아는가.** `model` 이면 보행자 의도 예측(ai/intent.ts — 선 자리 · 움직임 · 보행신호를 보는
-   * 신경망과 차도 위 안전장치)으로, `truth` 면 판정과 같은 값(보행자의 속)으로 양보한다.
+   * **AI 가 보행자를 어떻게 보고 뜻을 아는가.**
    *
-   * 기본은 **규정대로 모는 사람(careful — 게임의 AI 자율주행)만 `model`** 이다. 나머지는 사람 운전자를 흉내 내는데,
+   *  - `lidar` — 게임의 AI 자율주행 그대로. LiDAR 를 1초에 열 바퀴 쏘아(game/lidarSensor.ts) 인지(ai/perception.ts — 군집화 ·
+   *    신경망 분류 · 추적)가 찾은 사람만 보고, 보행자 의도 예측(ai/intent.ts)의 짐작으로 양보한다. 게임 속 보행자의 자리 ·
+   *    속은 보지 않는다. 판마다 0.02초쯤 더 든다.
+   *  - `truth` — 판정과 같은 값(보행자의 속)으로 양보한다.
+   *
+   * 기본은 **규정대로 모는 사람(careful — 게임의 AI 자율주행)만 `lidar`** 이다. 나머지는 사람 운전자를 흉내 내는데,
    * 사람은 화면의 느낌표로 그 뜻을 보므로 `truth` 가 맞다. 개념을 모르는 가상 학습자(`blind`)도 사람이라 `truth` 다.
    */
-  pedIntent?: 'model' | 'truth';
-  /** 매 스텝 보행자의 관측(몸의 자리)과 정답(속)을 넘겨받는다 — 의도 예측의 학습 데이터(scripts/train-intent.ts)가 쓴다 */
-  onStep?: (step: PlayStep) => void;
+  pedIntent?: 'lidar' | 'truth';
+  /** 판단과 상관없이 LiDAR 인지를 돌리는가 — 의도 예측의 학습 데이터가 켠다 (`onScan`). `lidar` 면 늘 돈다 */
+  lidar?: boolean;
+  /** LiDAR 가 한 바퀴 돌 때마다 인지가 찾은 사람과 보행자의 정답을 넘겨받는다 — 의도 예측의 학습 데이터가 쓴다 */
+  onScan?: (scan: PlayScan) => void;
 }
 
 /**
- * 한 스텝에 **AI 가 보는 보행자**와 그 사람의 **실제 속** — 의도 예측 학습의 한 줄.
- * 관측은 AI 가 판단하는 그 순간(이번 스텝의 입력을 정하기 전)의 것이다.
+ * LiDAR 한 바퀴 — **인지가 찾은 사람**(추적 번호 · 지도에서 찾은 횡단보도 · 추정한 자리)과, 짝을 맞출 **실제 보행자**
+ * (몸의 자리 · 정답). 학습 쪽이 가까운 몸끼리 짝을 지어 정답을 붙인다.
  */
-export interface PlayStep {
+export interface PlayScan {
   t: number;
-  peds: Array<{
-    obs: PedObservation;
-    /** 정답 — 지금 양보할 사람인가 (판정이 보는 `intendsToCross && onConflictPath`) */
-    yield: boolean;
-    /** 정답 — 지금 차도 위를 건너고 있는가 */
-    onRoad: boolean;
-  }>;
+  people: PedObservation[];
+  walkers: Array<{ id: number; crosswalk: PedObservation['crosswalk']; x: number; z: number; yield: boolean; onRoad: boolean }>;
   ctx: IntentContext;
 }
 
@@ -356,13 +365,23 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
   const prevPed = spawns.map(() => ({ intent: false, imminent: false, state: 'waiting' as string }));
   /*
     **몸이 서는 자리** — 상태기계의 축 좌표에 연석에서 물러선 만큼을 더한다 (game/pedBody.ts — 게임의 Pedestrian 과 같은 셈).
-    판정과 부딪힘은 상태기계의 좌표로 잰다. 이 자리는 AI 의 보행자 의도 예측이 보는 것이다.
+    판정과 부딪힘은 상태기계의 좌표로 잰다. 이 자리는 LiDAR 가 맞히는 몸이다 (아래 'LiDAR' 칸).
   */
   const setbacks = spawns.map(() => 1);
   const acrossOf = spawns.map((p, i) => pedAcross(p.crosswalk, p.bike, offsets[i]));
-  const useModel =
-    (opts.pedIntent ?? (persona === 'careful' && !opts.blind?.size ? 'model' : 'truth')) === 'model' && intentModelReady();
-  const intent = useModel ? new IntentEstimator() : null;
+  // 학습한 모델이 아직 없으면(처음 학습하기 전) 판정과 같은 값으로 양보한다
+  const mode = intentModelReady() ? (opts.pedIntent ?? (persona === 'careful' && !opts.blind?.size ? 'lidar' : 'truth')) : 'truth';
+  const intent = mode === 'truth' ? null : new IntentEstimator();
+  /*
+    **LiDAR 인지** — 게임(Game.updateLidar)과 같은 센서 · 같은 인지 · 같은 박자(1초에 열 바퀴). 센서가 맞히는 것은 보행자의 몸
+    (게임의 Pedestrian 과 같은 자리 · 방향 · 크기)과 앞차다. 게임에 있는 교차 통행 차량 · 뒷차는 이 시뮬레이터에 없다.
+  */
+  const tracker = mode === 'lidar' || opts.lidar ? new Tracker() : null;
+  const scales = spawns.map((p) => bodyScale(p.kind));
+  let lastScan = -Infinity;
+  let scanFrame = 0;
+  /** 인지가 지금 보고 있는 사람 — LiDAR 모드의 AI 가 보는 보행자 전부다 */
+  let lidarPeople: PedObservation[] = [];
 
   /** `human` 이 보는 세계 — `reaction` 초 전의 것 */
   const seen: { t: number; view: Perception }[] = [];
@@ -433,25 +452,6 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
 
     // ── 입력 ── 게임과 같다: 지금 세계를 보고 정한다 (human 은 늦게 본 세계)
     const front = vehicle.front;
-    // AI 가 보는 보행자 — 다 건너 사라진 사람은 없다 (Pedestrian 이 숨긴다)
-    const obs: PedObservation[] = [];
-    walkers.forEach((w, i) => {
-      if (w.done) return;
-      const b = bodyPosition(w.crosswalk, w.axis, w.dir, setbacks[i], acrossOf[i]);
-      obs.push({ id: i, crosswalk: w.crosswalk, x: b.x, z: b.z, bike: w.bike });
-    });
-    const intentCtx: IntentContext = { pedSignal, front, speedKmh: vehicle.speedKmh };
-    intent?.update(t, obs, intentCtx);
-    if (opts.onStep) {
-      opts.onStep({
-        t,
-        peds: obs.map((o) => {
-          const s = walkers[o.id].sample();
-          return { obs: o, yield: s.intendsToCross && s.onConflictPath, onRoad: s.state === 'crossing' && s.onConflictPath };
-        }),
-        ctx: intentCtx,
-      });
-    }
     const now: Perception = {
       vehicleLight: phase.vehicle,
       rightArrow,
@@ -497,6 +497,18 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
       lead: now.lead,
       // AI 자율주행은 보행자의 속을 읽지 않는다 — 의도 예측이 짐작한 것으로 양보한다 (PlayOptions.pedIntent)
       ...(intent ? { pedYield: intent.yieldMap() } : {}),
+      // LiDAR 모드의 AI 가 아는 보행자는 인지가 찾은 사람뿐이다 — 번호는 추적 번호, 속은 모른다
+      ...(mode === 'lidar'
+        ? {
+            pedestrians: lidarPeople.map((p) => ({
+              id: p.id,
+              crosswalk: p.crosswalk,
+              bike: p.bike,
+              intendsToCross: false,
+              onConflictPath: false,
+            })),
+          }
+        : {}),
     };
     let input = driver.decide(blind.size ? blindView(state, blind) : state);
     if (blind.has('NO_TURN_SIGNAL')) input = { ...input, rightSignal: false };
@@ -596,6 +608,43 @@ export function playScenario(spec: ScenarioSpec, opts: PlayOptions): PlayResult 
           log(t, 'lead', `앞차가 ${id} 를 다 지남 — 내 차 ${distanceTo(id, f).toFixed(1)}m 앞 ${vehicle.speedKmh.toFixed(0)}km/h`);
         }
       }
+    }
+
+    // ── LiDAR ── 게임처럼 차 · 사람 · 앞차가 움직인 뒤에 한 바퀴 — 다음 스텝의 AI 가 이것을 본다
+    if (tracker && t - lastScan >= 1 / LIDAR.hz) {
+      lastScan = t;
+      const shapes: LidarShape[] = [];
+      const truth: PlayScan['walkers'] = [];
+      walkers.forEach((w, i) => {
+        if (w.done) return;
+        const b = bodyPosition(w.crosswalk, w.axis, w.dir, setbacks[i], acrossOf[i]);
+        shapes.push(...personShapes({ x: b.x, z: b.z, facing: bodyFacing(w.crosswalk, w.dir), scale: scales[i], bike: w.bike }));
+        if (opts.onScan) {
+          const s = w.sample();
+          truth.push({
+            id: i,
+            crosswalk: w.crosswalk,
+            x: b.x,
+            z: b.z,
+            yield: s.intendsToCross && s.onConflictPath,
+            onRoad: s.state === 'crossing' && s.onConflictPath,
+          });
+        }
+      });
+      if (lead && !lead.gone) {
+        // 앞차 — 배역표 차의 가운데쯤 크기 (게임의 앞차는 배역표에서 뽑는다, Game.buildTraffic)
+        const p = lead.pose();
+        shapes.push({ kind: 'box', x: p.center.x, z: p.center.z, yaw: p.yaw, halfL: LEAD_HALF_LENGTH, halfW: 0.92, height: 1.5 });
+      }
+      const scan = scanLidar({ x: vehicle.x, z: vehicle.z }, vehicle.yaw, shapes, {
+        dropout: spec.weather === 'rain' ? 0.12 : 0,
+        frame: scanFrame++,
+      });
+      tracker.update(detect(scan), t);
+      lidarPeople = perceivedPeople(tracker.confirmed);
+      const ctx: IntentContext = { pedSignal, front: vehicle.front, speedKmh: vehicle.speedKmh };
+      if (mode === 'lidar') intent?.update(t, lidarPeople, ctx, true);
+      opts.onScan?.({ t, people: lidarPeople, walkers: truth, ctx });
     }
 
     // ── 판정 ──

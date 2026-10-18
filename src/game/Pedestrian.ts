@@ -12,7 +12,16 @@
 
 import * as THREE from 'three';
 import { PedWalk, type CarFront, type PedWalkContext } from './pedWalk';
-import { WAIT_SETBACK, WAIT_SLOTS, bodyPosition, pedAcross, stepSetback, wantsCurb } from './pedBody';
+import {
+  WAIT_SETBACK,
+  WAIT_SLOTS,
+  bodyFacing,
+  bodyPosition,
+  bodyScale,
+  pedAcross,
+  stepSetback,
+  wantsCurb,
+} from './pedBody';
 import { personShapes, type LidarShape } from './lidarSensor';
 import type { CrosswalkId, PedSignal, PedestrianSample } from '../rules/lawRules';
 import type { PedSpawn } from '../scenarios/scenarios';
@@ -312,7 +321,8 @@ export class Pedestrian {
 
     this.bike = spawn.bike;
     const kind = spawn.kind ?? 'adult';
-    this.scale = (kind === 'child' ? 0.66 : kind === 'elder' ? 0.92 : 1) * SIZE_SCALE;
+    // 나이 배율은 pedBody.ts 한 곳 — 시뮬레이터의 LiDAR 도 같은 몸을 맞힌다
+    this.scale = bodyScale(kind, SIZE_SCALE);
 
     this.build();
     // 무리(group)째 키운다 — 표식 · 발밑 원 · 자전거까지 같은 배율로 따라온다
@@ -479,13 +489,8 @@ export class Pedestrian {
     const dir = this.walk.dir;
     const p = bodyPosition(this.crosswalk, this.walk.axis, dir, this.setback, this.across());
     this.group.position.set(p.x, 0, p.z);
-    if (this.crosswalk === 'S' || this.crosswalk === 'A' || this.crosswalk === 'B') {
-      // 남북 도로를 가로지름 — x축으로 이동
-      this.group.rotation.y = dir === 1 ? -Math.PI / 2 : Math.PI / 2;
-    } else {
-      // 동서 도로를 가로지름 — z축으로 이동
-      this.group.rotation.y = dir === 1 ? Math.PI : 0;
-    }
+    // 건너는 쪽을 본다 — 남북 도로(S · A · B)는 x 축, 동서 도로(C)는 z 축 (pedBody.ts 의 bodyFacing)
+    this.group.rotation.y = bodyFacing(this.crosswalk, dir);
   }
 
   /**

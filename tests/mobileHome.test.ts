@@ -433,7 +433,8 @@ describe('세로 휴대폰 — 좁은 폭(360px)에서 밀리지 않게', () => 
     expect(block).toMatch(/#screen-menu \.name-word \{\s*display: none;/);
     expect(block).toMatch(/#screen-menu \.lbl-tail \{\s*display: none;/);
     const screens = readFileSync(fileURLToPath(new URL('../src/ui/Screens.ts', import.meta.url)), 'utf8');
-    expect(screens).toContain('온라인<span class="lbl-tail"> 연습</span>');
+    // '온라인 연습' 이름은 뺐다 (사용자가 정했다, 2026-10-18) — 꼬리를 감출 글은 '처음부터 다시 시작' 하나다
+    expect(screens).not.toContain('온라인<span class="lbl-tail"> 연습</span>');
     expect(screens).toContain('처음부터<span class="lbl-tail"> 다시 시작</span>');
     expect(screens).toContain('전체 운전 성공:<b>');
   });

@@ -38,6 +38,20 @@ export const WAIT_SETBACK = 0.8;
 /** 연석까지 한 걸음 나서는 데 걸리는 시간 (초) */
 export const STEP_UP_TIME = 0.55;
 
+/**
+ * **몸의 배율** — 게임의 보행자 크기 배율(Pedestrian.ts 의 SIZE_SCALE, 2.0) × 나이(어린이 0.66 · 어르신 0.92). LiDAR 가 맞히는
+ * 몸의 크기다 (lidarSensor.ts 의 personShapes) — 시뮬레이터가 쏘는 LiDAR 도 게임과 같은 몸을 맞혀야 한다.
+ */
+export function bodyScale(kind: 'adult' | 'child' | 'elder' = 'adult', sizeScale = 2.0): number {
+  return (kind === 'child' ? 0.66 : kind === 'elder' ? 0.92 : 1) * sizeScale;
+}
+
+/** 몸이 돌아선 각 (three.js 의 rotation.y) — 건너는 쪽을 본다. S · A · B 는 x 축, C 는 z 축으로 건넌다 */
+export function bodyFacing(id: CrosswalkId, dir: 1 | -1): number {
+  if (id === 'C') return dir === 1 ? Math.PI : 0;
+  return dir === 1 ? -Math.PI / 2 : Math.PI / 2;
+}
+
 /** 같은 보도에 선 사람끼리의 자리 — 횡단보도 폭 안에서의 좌우 어긋남 (m) */
 export const WAIT_SLOTS = [0, -1.15, 1.15, -1.8, 1.8];
 

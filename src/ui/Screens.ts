@@ -232,6 +232,7 @@ const SHEET_IDS: ReadonlySet<ScreenId> = new Set<ScreenId>(['settings', 'credits
  * **주의사항 상자** — 프로토타입이고 교육용 도구라는 것. About 창과 설정 창 맨 아래(PC · 휴대폰)에 같은 말이 선다
  * (사용자 요청 2026-09-28). 문구는 brand.ts 의 APP_NOTICE_* 한 곳에서 온다 — README 의 소개 글 아래에도 같은 말이 있다.
  */
+/* 프로토타입 줄은 뺐다 (사용자가 정했다, 2026-10-18) — 교육용 도구라는 한 줄만 남는다 */
 const noticeHtml = (): string =>
   `<div class="app-notice"><b>※ ${esc(APP_NOTICE_TITLE)}</b> : ${APP_NOTICE_LINES.map(esc).join('<br>')}</div>`;
 
@@ -343,9 +344,10 @@ function siteFooter(): string {
       <!--
         **주의사항 한 줄 — PC 에서만** (사용자 요청 2026-09-28: "pc 버전에서만 카피라이트 아래에도 한줄로").
         휴대폰은 설정 창 맨 아래에 같은 말이 있고 첫 화면이 길어 여기서는 뺀다 (body.touch · .site-notice).
-        문구는 brand.ts 의 APP_NOTICE_* — About · 설정과 같은 말이다.
+        문구는 brand.ts 의 APP_NOTICE_* — About · 설정과 같은 말이다. **여기서는 '※ 주의사항 :' 머리를 달지 않는다**
+        (사용자가 정했다, 2026-10-18: 저작권 아래에는 문장만).
       -->
-      <span class="site-notice">※ ${esc(APP_NOTICE_TITLE)} : ${APP_NOTICE_LINES.map(esc).join(' ')}</span>
+      <span class="site-notice">${APP_NOTICE_LINES.map(esc).join(' ')}</span>
     </footer>`;
 }
 
@@ -1133,8 +1135,11 @@ export class Screens {
         -->
         <div class="mode-split single">
           <div class="mode-group">
-            <!-- 손에 든 화면(세로 · 가로)에서는 '온라인' 만 (index.html 의 .lbl-tail) — 갤럭시 S21 폭에서 줄이 밀렸다 -->
-            <p class="mode-label">${icon('monitor')}<b>온라인<span class="lbl-tail"> 연습</span></b>${resetButton}</p>
+            <!--
+              이름('온라인 연습')은 뺐다 (사용자가 정했다, 2026-10-18: "온라인 연습 단어 부분을 없애줘") — 길이 하나뿐이라
+              가를 이름이 필요 없다. 줄에는 '처음부터 다시 시작' 작은 버튼만 남는다.
+            -->
+            <p class="mode-label">${resetButton}</p>
             <!--
               **여기서 누를 것은 하나뿐이다.** 무엇을 연습할지 고르는 자리가 여기 있었는데,
               사용자가 정했다: "첫 화면의 이 부분은 나오지 않아도 돼. 사용자는 단순히 운전 연습 버튼만

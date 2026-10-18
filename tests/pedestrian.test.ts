@@ -31,6 +31,8 @@ import {
 } from '../src/game/pedWalk';
 import { CROSSWALK_OUTER as CROSSWALK_OUTER_Z } from '../src/layout';
 import { WAIT_SETBACK } from '../src/game/Pedestrian';
+import { WAIT_SLOTS, bodyFacing, bodyPosition, bodyScale, pedAcross, stepSetback, wantsCurb } from '../src/game/pedBody';
+import { personShapes } from '../src/game/lidarSensor';
 
 /** 횡단보도 A 한가운데 — 차가 '이미 횡단보도 안'인 지점 (치수가 바뀌어도 따라간다) */
 const INSIDE_CROSSWALK_A_Z = (CROSSWALK_INNER + CROSSWALK_OUTER) / 2;
@@ -568,4 +570,41 @@ describe('다가오는 차 앞에서 먼저 나선다 — 코앞에서 튀어나
     // 서행 중인 차가 편안히 서는 거리(반응 1초 + 제동 ≈ 5.3m)보다는 멀다 — 보고 설 수 있다
     expect(stepOffDistance, `발을 뗀 곳 ${stepOffDistance.toFixed(1)}m 앞`).toBeGreaterThan(5.3);
   });
+});
+
+/*
+  **시뮬레이터의 LiDAR 가 게임과 같은 몸을 맞힌다** (game/pedBody.ts). AI 자율주행은 LiDAR 로 본 사람만으로 양보하고, 그 판단을
+  시뮬레이터(scenarios/playSim.ts)가 같은 LiDAR 로 22,818판 검증한다 — 시뮬레이터가 세우는 몸(자리 · 방향 · 크기)이 게임의
+  보행자와 어긋나면 검증한 것과 게임에서 보는 것이 갈린다.
+*/
+describe('LiDAR 가 맞히는 몸 — 게임과 시뮬레이터가 같다', () => {
+  for (const spawn of [
+    { crosswalk: 'A', at: 3, from: 'left', kind: 'adult' },
+    { crosswalk: 'C', at: 3, from: 'right', kind: 'child', bike: 'ride' },
+    { crosswalk: 'S', at: 0.2, from: 'right', kind: 'elder', bike: 'push' },
+    { crosswalk: 'B', at: 1, from: 'left', kind: 'child' },
+  ] as PedSpawn[]) {
+    it(`${spawn.crosswalk} · ${spawn.kind}${spawn.bike ? ` · ${spawn.bike}` : ''} — 서 있을 때도 나서고 건널 때도`, () => {
+      const p = new Pedestrian(spawn, 1);
+      const walk = new PedWalk(spawn);
+      let setback = 1;
+      for (let t = 0; t < 6; t += 1 / 60) {
+        p.update(t, 1 / 60, 'green', { x: 0, z: 60 }, true);
+        walk.update(t, 1 / 60, 'green', { x: 0, z: 60 }, true);
+        const s = walk.sample();
+        if (s.state === 'done') break;
+        setback = stepSetback(setback, wantsCurb(s), 1 / 60);
+        const b = bodyPosition(spawn.crosswalk, walk.axis, walk.dir, setback, pedAcross(spawn.crosswalk, spawn.bike, WAIT_SLOTS[1]));
+        const sim = personShapes({ x: b.x, z: b.z, facing: bodyFacing(spawn.crosswalk, walk.dir), scale: bodyScale(spawn.kind), bike: spawn.bike });
+        const game = p.lidarShapes();
+        expect(game).toHaveLength(sim.length);
+        game.forEach((g, k) => {
+          expect(g.x).toBeCloseTo(sim[k].x, 6);
+          expect(g.z).toBeCloseTo(sim[k].z, 6);
+          expect(g.height).toBeCloseTo(sim[k].height, 6);
+        });
+      }
+      p.dispose();
+    });
+  }
 });

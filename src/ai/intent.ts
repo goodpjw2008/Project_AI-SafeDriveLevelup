@@ -5,24 +5,30 @@
  * 절반 — 건너려는 뜻 — 은 사람의 속에 있다. 게임 속 보행자는 그 뜻을 상태기계의 값(`intendsToCross`)으로 들고 있고,
  * 판정은 그 값으로 잰다. 예전의 AI 자율주행도 **그 값을 그대로 읽었다** — 사람 운전자는 할 수 없는 일이다.
  *
- * 이제 AI 는 그 값을 보지 않는다. 운전자가 보는 것과 같은 것만 본다.
+ * 이제 AI 는 그 값도, 게임 속 보행자의 자리도 보지 않는다. **LiDAR 가 찾은 사람만** 본다 — 센서(game/lidarSensor.ts)가
+ * 1초에 열 바퀴 쏜 점구름을 인지(ai/perception.ts)가 군집으로 묶고, 신경망으로 사람 · 자전거를 가리고, 추적해 자리와
+ * 속도를 잰 결과다(`perceivedPeople`). 그 사람마다 운전자가 보는 것과 같은 것을 본다.
  *
  *  - **선 자리** — 건널 사람은 연석까지 나와 서고, 아닌 사람은 한 걸음 물러서 있다 (game/pedBody.ts 의 WAIT_SETBACK)
  *  - **움직임** — 차도 쪽으로 다가오는가, 물러서는가, 언제부터 가만히 서 있는가 (최근 1초의 자취)
  *  - **보행신호** — 지금 무슨 색이고, 바뀐 지 얼마나 되었는가
  *  - **내 차** — 그 횡단보도까지 얼마나 남았고, 얼마나 빠른가
+ *  - **LiDAR 가 잰 생김새** — 길이 · 폭 (자전거인지, 두 사람이 한 덩어리로 잡혔는지)
  *
- * 이 열다섯 가지를 **작은 신경망**(models/intent.json)이 받아 두 가지를 낸다.
+ * LiDAR 가 못 본 사람(앞차에 가렸거나 분류기가 놓친 사람)은 AI 도 모른다. 그래서 시뮬레이터도 같은 LiDAR 를 돌려
+ * 22,818판을 달려 본다.
+ * 이 열일곱 가지를 **작은 신경망**(models/intent.json)이 받아 두 가지를 낸다.
  *
  *  1. **지금 양보할 사람인가** (`yield`) — 건너고 있거나 건너려 하는가. AI 자율주행이 이것으로 선다.
  *  2. **2초 안에 차도에 들어서는가** (`enter`) — LiDAR 화면의 위협 예측이 이것으로 미리 칠한다.
  *
- * 정답은 시뮬레이터가 안다 — 판마다 보행자의 실제 속(뜻)과 실제로 일어난 미래(2초 뒤 차도에 있었는가)를 기록해
- * 지도학습한다 (scripts/train-intent.ts). 사람이 이름표를 달 필요가 없다.
+ * 정답은 시뮬레이터가 안다 — 판마다 LiDAR 가 찾은 사람을 실제 보행자와 짝지어, 그 사람의 실제 속(뜻)과 실제로 일어난
+ * 미래(2초 뒤 차도에 있었는가)를 기록해 지도학습한다 (scripts/train-intent.ts). 센서가 재는 자리의 흔들림 · 늦음까지 그대로
+ * 배운다. 사람이 이름표를 달 필요가 없다.
  *
  * ## 신경망 + 규칙 안전장치
  *
- * 이미 **차도 위에 있는 사람**은 짐작할 것이 없다 — 몸이 연석선을 넘어 있으면 신경망과 상관없이 양보한다
+ * 이미 **차도 위에 있는 사람**은 짐작할 것이 없다 — LiDAR 가 잰 자리가 연석선을 넘어 있으면 신경망과 상관없이 양보한다
  * (`onRoadway`). 신경망이 맡는 것은 보도 위에 선 사람의 속, 곧 규칙으로는 알 수 없는 부분이다. 학습한 모델이
  * 틀릴 수 있는 곳에 규칙이 받쳐 주는 것 — AI 안전에서 말하는 안전 실드다.
  *
@@ -34,6 +40,7 @@ import { pedAcross, crosswalkCenter } from '../game/pedBody';
 import { CURB } from '../game/pedWalk';
 import { LIDAR } from '../game/lidarSensor';
 import type { CrosswalkId, PedSignal } from '../rules/lawRules';
+import type { Track } from './perception';
 import { crosswalkDistance } from './telemetry';
 import trained from './models/intent.json';
 
@@ -49,7 +56,7 @@ const MOVING_SPEED = 0.5;
 const ROADWAY_MARGIN = 0.05;
 
 /**
- * 신경망의 입력 — 사람마다 열다섯. **센서와 지도로 알 수 있는 것만** 쓴다 (보행자의 속 · 상태기계의 값은 없다).
+ * 신경망의 입력 — 사람마다 열일곱. **센서와 지도로 알 수 있는 것만** 쓴다 (보행자의 속 · 상태기계의 값은 없다).
  *
  *  - `edge` 연석선에서 보도 쪽으로 떨어진 거리 (m, 차도 위면 음수) — 나와 선 사람 0, 물러선 사람 0.8
  *  - `vin` · `vinPast` 차도 한가운데 쪽으로 다가오는 빠르기 — 최근 0.3초 · 그 전 0.7초 (m/s, 물러서면 음수)
@@ -58,6 +65,8 @@ const ROADWAY_MARGIN = 0.05;
  *  - `sigGreen` · `sigFlash` · `sigRed` · `sigNone` 그 횡단보도의 보행신호 · `sigAge` 그 등화가 켜진 지 얼마나 되었는가 (초)
  *  - `carDist` 내 차 앞범퍼에서 그 횡단보도까지 (m) · `carSpeed` 내 차 속도 (m/s)
  *  - `ride` 자전거를 타고 있는가 — 타고 건너면 걸음보다 빠르다
+ *  - `length` · `width` LiDAR 가 잰 물체의 길이 · 폭 (m) — 자전거인지, 붙어 선 두 사람이 한 덩어리로 잡혔는지가 드러난다.
+ *    그런 덩어리는 가운데 자리가 사람의 자리와 어긋나므로, 신경망이 선 자리를 얼마나 믿을지 함께 배운다
  */
 export const INTENT_FEATURES = [
   'edge',
@@ -75,12 +84,14 @@ export const INTENT_FEATURES = [
   'carDist',
   'carSpeed',
   'ride',
+  'length',
+  'width',
 ] as const;
 
 /** 신경망의 출력 — 차례대로 */
 export const INTENT_OUTPUTS = ['yield', 'enter'] as const;
 
-/** 한 사람의 관측 — 몸의 자리(센서가 재는 것)와 지도에서 안 횡단보도 */
+/** 한 사람의 관측 — LiDAR 추적이 잰 자리 · 생김새와 지도에서 안 횡단보도 */
 export interface PedObservation {
   /** 같은 사람을 이어 보는 번호 */
   id: number;
@@ -90,6 +101,9 @@ export interface PedObservation {
   z: number;
   /** 자전거를 타고 있는가 (LiDAR 분류기가 '자전거' 로 가린다) */
   bike?: 'ride' | 'push';
+  /** LiDAR 가 잰 길이 · 폭 (m) */
+  length: number;
+  width: number;
 }
 
 /** 사람 말고 보는 것 — 보행신호와 내 차 */
@@ -109,7 +123,7 @@ export interface IntentEstimate {
   onRoadway: boolean;
   /** AI 가 이 사람에게 양보하는가 — 차도 위이거나, 신경망이 문턱을 넘었다 */
   yields: boolean;
-  /** 그 사람이 선 횡단보도 · 몸의 자리 — LiDAR 화면이 잡은 사람에게 이 짐작을 붙인다 */
+  /** 그 사람이 선 횡단보도 · LiDAR 가 잰 자리 */
   crosswalk: CrosswalkId;
   x: number;
   z: number;
@@ -164,6 +178,8 @@ export function intentProbs(x: readonly number[], model: IntentModel = MODEL): n
 interface Trace {
   crosswalk: CrosswalkId;
   bike?: 'ride' | 'push';
+  length: number;
+  width: number;
   /** 10Hz 자취 — 건너는 축 · 그 직각 축 */
   pts: Array<{ t: number; axis: number; across: number }>;
   firstSeen: number;
@@ -187,16 +203,19 @@ export class IntentEstimator {
 
   /**
    * 한 프레임. `peds` 는 지금 보이는 사람들(다 건너 사라진 사람은 뺀다). 0.1초가 지났으면 짐작을 새로 하고 참을 돌려준다.
+   *
+   * `force` 면 0.1초를 세지 않고 지금 짐작한다 — LiDAR 가 한 바퀴를 돈 바로 그때 부르는 쪽(Game · playSim)이 쓴다. 바퀴와
+   * 짐작의 박자가 어긋나면 같은 바퀴를 두 번 보거나(빠르기 0) 한 바퀴를 건너뛰어(빠르기 두 배) 움직임 특징이 흔들린다.
    */
-  update(t: number, peds: readonly PedObservation[], ctx: IntentContext): boolean {
+  update(t: number, peds: readonly PedObservation[], ctx: IntentContext, force = false): boolean {
     // 등화가 바뀐 때는 매 프레임 본다 — 바뀐 지 얼마나 되었는가(sigAge)가 특징이다
     for (const id of ['A', 'B', 'C', 'S'] as const) {
       const v = ctx.pedSignal[id] ?? null;
       const prev = this.signals.get(id);
       if (!prev || prev.value !== v) this.signals.set(id, { value: v, since: t });
     }
-    if (t < this.nextTick) return false;
-    this.nextTick = (Number.isFinite(this.nextTick) ? this.nextTick : t) + 1 / INTENT_HZ;
+    if (!force && t < this.nextTick) return false;
+    this.nextTick = force || !Number.isFinite(this.nextTick) ? t + 1 / INTENT_HZ : this.nextTick + 1 / INTENT_HZ;
     if (this.nextTick <= t) this.nextTick = t + 1 / INTENT_HZ;
 
     const seen = new Set<number>();
@@ -206,9 +225,13 @@ export class IntentEstimator {
       seen.add(p.id);
       let tr = this.traces.get(p.id);
       if (!tr || tr.crosswalk !== p.crosswalk) {
-        tr = { crosswalk: p.crosswalk, bike: p.bike, pts: [], firstSeen: t, lastMoved: -Infinity };
+        tr = { crosswalk: p.crosswalk, bike: p.bike, length: p.length, width: p.width, pts: [], firstSeen: t, lastMoved: -Infinity };
         this.traces.set(p.id, tr);
       }
+      // 갈래 · 크기는 추적이 다듬어 가는 값이라 바퀴마다 새로 받는다
+      tr.bike = p.bike;
+      tr.length = p.length;
+      tr.width = p.width;
       const axis = crosswalkAxis(p.crosswalk, p.x, p.z);
       const across = p.crosswalk === 'C' ? p.x : p.z;
       const last = tr.pts[tr.pts.length - 1];
@@ -303,8 +326,36 @@ export class IntentEstimator {
       Math.max(-10, Math.min(60, carDist)),
       ctx.speedKmh / 3.6,
       tr.bike === 'ride' ? 1 : 0,
+      Math.min(6, tr.length),
+      Math.min(3, tr.width),
     ];
   }
+}
+
+/**
+ * **LiDAR 가 따라가는 물체 가운데 AI 가 볼 사람** — 확정된 추적 중 분류기가 사람(어른 · 어린이)이나 자전거로 가린 것을,
+ * 지도에서 선 횡단보도를 찾아(`crosswalkAt`) 관측으로 바꾼다. 번호는 추적 번호다 — 놓쳤다가 다시 잡으면 새 사람이 된다.
+ *
+ * AI 자율주행은 **이것만 보고** 양보한다 (Game.ts · scenarios/playSim.ts). 게임 속 보행자의 자리 · 속은 보지 않는다 —
+ * LiDAR 가 못 본 사람(가림 · 분류 실수)은 AI 도 모른다. 그래서 22,818판을 LiDAR 까지 돌려 검증한다.
+ */
+export function perceivedPeople(tracks: readonly Track[]): PedObservation[] {
+  const out: PedObservation[] = [];
+  for (const tr of tracks) {
+    if (!tr.confirmed || (tr.cls !== 'adult' && tr.cls !== 'child' && tr.cls !== 'bike')) continue;
+    const crosswalk = crosswalkAt(tr.x, tr.z);
+    if (!crosswalk) continue;
+    out.push({
+      id: tr.id,
+      crosswalk,
+      x: tr.x,
+      z: tr.z,
+      length: tr.length,
+      width: tr.width,
+      ...(tr.cls === 'bike' ? { bike: 'ride' as const } : {}),
+    });
+  }
+  return out;
 }
 
 /**

@@ -1,21 +1,25 @@
 /**
  * **보행자 횡단 의도 예측 학습 — 시뮬레이터가 기록한 속과 미래로.**
  *
- *   npm run train:intent                                   # 기본: 판 3,000 × 운전자 둘, 2분 남짓
+ *   npm run train:intent                                   # 기본: 판 3,000 × 운전자 둘, 6분 남짓 (재현된다 — 씨앗 고정)
  *   npx vite-node scripts/train-intent.ts --scenarios 600  # 빨리 (검증용)
  *
  * 1. 라이브러리의 판을 시뮬레이터(src/scenarios/playSim.ts)로 달린다 — 규정대로 모는 사람과 1초 늦게 보는 사람 둘이.
  *    운전자에 따라 보행자가 나서는 때가 달라져(차가 서 주면 건너고, 설 수 없는 차 앞에서는 뜻을 거둔다) 장면이 넓어진다.
- * 2. 0.1초마다 사람마다 **AI 가 보는 것**(ai/intent.ts 의 특징 열다섯 — 선 자리 · 움직임 · 보행신호 · 내 차)과
- *    **정답**을 적는다. 정답은 둘이다.
+ *    달리는 동안 **게임과 같은 LiDAR 인지**(센서 · 군집화 · 신경망 분류 · 추적)를 1초에 열 바퀴 돌린다.
+ * 2. 바퀴마다, LiDAR 가 찾은 사람마다 **AI 가 보는 것**(ai/intent.ts 의 특징 열다섯 — 추적이 잰 자리로 셈한 선 자리 ·
+ *    움직임과 보행신호 · 내 차)과 **정답**을 적는다. 추적은 몸끼리 2m 안의 실제 보행자와 짝을 지어 그 사람의 정답을 받고,
+ *    짝이 없으면(헛것) '아무도 아님' 이다. 센서가 재는 자리의 흔들림 · 늦음까지 그대로 배운다. 정답은 둘이다.
  *    - `yield` 그 순간 양보할 사람이었는가 — 판정이 보는 보행자의 속 (`intendsToCross && onConflictPath`)
  *    - `enter` 그 뒤 2초 안에 실제로 차도에 들어섰는가 — 시뮬레이터가 기록한 미래
- * 3. 작은 신경망(은닉 24, tanh · 출력 둘 시그모이드)을 확률적 경사하강으로 맞춘다 — 의존이 없다.
+ * 3. 작은 신경망(은닉 32, tanh · 출력 둘 시그모이드)을 확률적 경사하강으로 맞춘다 — 의존이 없다.
  * 4. **처음 보는 판**(다른 판)으로 손 규칙과 견준다.
  *    - `yield` ↔ "연석에 붙어 서 있으면 건너려는 사람" (자리만 보는 규칙)
  *    - `enter` ↔ "지금 빠르기 그대로 2초 가면 차도" (등속 예측 — 예전 LiDAR 화면의 위협 예측)
  *    그리고 **얼마나 일찍 알아채는가** — 뜻이 생긴 뒤 몇 초 만에 양보로 바뀌는가, 차도에 발을 딛기 몇 초 전에 경보하는가.
- * 5. 양보 문턱은 **놓치는 쪽이 비싸므로** 낮게 잡는다 — 보도 위 '건너려는 사람' 을 99.5% 넘게 잡는 가장 높은 값.
+ * 5. 양보 문턱은 **놓치는 쪽이 비싸므로** 낮게 잡는다 — 보도 위 '건너려는 사람' 을 99% 넘게 잡는 가장 높은 값.
+ *    LiDAR 가 잰 자리는 흔들리므로 오경보가 조금 늘지만(멈출 까닭이 없는데 서는 것), 22,818판을 그 문턱으로 달려 시간이
+ *    늘지 않음을 확인했다.
  *
  * 결과(src/ai/models/intent.json)는 저장소에 커밋한다 — 브라우저는 학습하지 않고 가중치만 읽는다.
  * **특징을 바꾸면 다시 학습해야 한다** — tests/intent.test.ts 가 이름이 어긋나면 잡는다. 문턱 · 모델을 바꾸면
@@ -38,13 +42,14 @@ const arg = (name: string, def: number): number => {
   return i >= 0 ? Number(args[i + 1]) : def;
 };
 const SCENARIOS = arg('scenarios', 3000);
+// 40 에폭은 학습 손실은 더 내려가도 처음 보는 판에서 나빠졌다(보도 위 양보 98.2% → 97.4%) — 24 에서 멈춘다
 const EPOCHS = arg('epochs', 24);
-const HIDDEN = 24;
+const HIDDEN = arg('hidden', 32);
 /** 정답이 바뀌는 때의 앞뒤 이만큼(초)은 다 남긴다 — 알아채는 빠르기를 배우는 곳이다. 나머지는 KEEP 만큼만 */
 const EDGE_WINDOW = 1.5;
 const KEEP = 0.18;
 /** 보도 위 '건너려는 사람' 을 이만큼 넘게 잡는 가장 높은 문턱 */
-const TARGET_RECALL = 0.995;
+const TARGET_RECALL = arg('recall', 0.99);
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, '../src/ai/models/intent.json');
 
@@ -52,7 +57,7 @@ const t0 = Date.now();
 const secs = () => `${((Date.now() - t0) / 1000).toFixed(0)}초`;
 const d = INTENT_FEATURES.length;
 
-// ── 1 · 2. 판을 달려 표본을 모은다 ──
+// ── 1 · 2. 판을 달려 표본을 모은다 — LiDAR 인지가 찾은 사람마다 ──
 interface Rows {
   x: number[][];
   yYield: number[];
@@ -63,8 +68,12 @@ interface Rows {
 const empty = (): Rows => ({ x: [], yYield: [], yEnter: [], info: [] });
 const train = empty();
 const test = empty();
-/** 시험 판의 사람마다의 시간표 — 알아채는 빠르기를 잰다 */
+/** 시험 판의 추적마다의 시간표 — 알아채는 빠르기를 잰다 */
 const testSeries: Array<{ t: number[]; x: number[][]; yield: boolean[]; onRoad: boolean[] }> = [];
+/** 추적과 실제 보행자의 짝 — 몸끼리 이만큼(m) 안이면 같은 사람이다. 없으면 정답은 '아무도 아님' */
+const MATCH = 2.0;
+let tracked = 0;
+let unmatched = 0;
 
 const lib = scenarioLibrary();
 const pick = rng(20261018);
@@ -76,10 +85,10 @@ for (let i = order.length - 1; i > 0; i--) {
 const chosen = order.slice(0, SCENARIOS).filter((i) => lib[i].spec.pedestrians.length > 0);
 const easy = AUTO_DRIVE_RULE;
 const normal = challengeRule(3);
-const drivers: Array<Omit<PlayOptions, 'onStep'>> = [
-  // 판단은 정답으로 — 학습 데이터의 운전자는 사람의 속을 아는 '모범 답안' 이다 (모델이 없을 때의 AI 와 같다)
-  { persona: 'careful', pace: easy.pace, stopZone: easy.stopZone, trace: false, pedIntent: 'truth' },
-  { persona: 'human', reaction: 1, pace: normal.pace, stopZone: normal.stopZone, trace: false, pedIntent: 'truth' },
+const drivers: Array<Omit<PlayOptions, 'onScan'>> = [
+  // 판단은 정답으로 — 학습 데이터의 운전자는 사람의 속을 아는 '모범 답안' 이다. LiDAR 인지는 따로 돌려(`lidar`) 그 결과로 배운다
+  { persona: 'careful', pace: easy.pace, stopZone: easy.stopZone, trace: false, pedIntent: 'truth', lidar: true },
+  { persona: 'human', reaction: 1, pace: normal.pace, stopZone: normal.stopZone, trace: false, pedIntent: 'truth', lidar: true },
 ];
 
 let run = 0;
@@ -88,45 +97,74 @@ for (const [k, li] of chosen.entries()) {
   for (const drv of drivers) {
     run += 1;
     const est = new IntentEstimator(null);
-    const series = new Map<number, { t: number[]; x: number[][]; yield: boolean[]; onRoad: boolean[] }>();
+    /** 추적마다 — 바퀴의 시각 · 특징 · 짝지은 보행자 */
+    const series = new Map<number, { t: number[]; x: number[][]; walker: Array<number | null> }>();
+    /** 보행자마다 — 바퀴의 시각 · 정답 */
+    const truth = new Map<number, { t: number[]; yield: boolean[]; onRoad: boolean[] }>();
     playScenario(lib[li].spec, {
       ...drv,
-      onStep: (step) => {
-        if (!est.update(step.t, step.peds.map((p) => p.obs), step.ctx)) return;
-        for (const p of step.peds) {
-          const x = est.lastFeatures(p.obs.id);
+      onScan: (scan) => {
+        for (const w of scan.walkers) {
+          let s = truth.get(w.id);
+          if (!s) truth.set(w.id, (s = { t: [], yield: [], onRoad: [] }));
+          s.t.push(scan.t);
+          s.yield.push(w.yield);
+          s.onRoad.push(w.onRoad);
+        }
+        est.update(scan.t, scan.people, scan.ctx, true);
+        for (const p of scan.people) {
+          const x = est.lastFeatures(p.id);
           if (!x) continue;
-          let s = series.get(p.obs.id);
-          if (!s) series.set(p.obs.id, (s = { t: [], x: [], yield: [], onRoad: [] }));
-          s.t.push(step.t);
+          let best: number | null = null;
+          let bestD = MATCH;
+          for (const w of scan.walkers) {
+            const d = Math.hypot(w.x - p.x, w.z - p.z);
+            if (d < bestD) {
+              bestD = d;
+              best = w.id;
+            }
+          }
+          let s = series.get(p.id);
+          if (!s) series.set(p.id, (s = { t: [], x: [], walker: [] }));
+          s.t.push(scan.t);
           s.x.push([...x]);
-          s.yield.push(p.yield);
-          s.onRoad.push(p.onRoad);
+          s.walker.push(best);
         }
       },
     });
+    /** 그 보행자의 그 바퀴 정답 — 없으면(짝 없음) 아무도 아니다 */
+    const labelAt = (w: number | null, t: number) => {
+      const s = w === null ? undefined : truth.get(w);
+      if (!s) return { yield: false, onRoad: false, enter: false };
+      let i = s.t.findIndex((v) => Math.abs(v - t) < 1e-6);
+      if (i < 0) i = s.t.length - 1;
+      let enter = false;
+      for (let j = i + 1; j < s.t.length && s.t[j] <= t + 2 + 1e-6; j++) if (s.onRoad[j]) enter = true;
+      return { yield: s.yield[i], onRoad: s.onRoad[i], enter };
+    };
     for (const [ped, s] of series) {
-      if (isTest) testSeries.push(s);
+      const labels = s.t.map((t, i) => labelAt(s.walker[i], t));
+      tracked += s.t.length;
+      unmatched += s.walker.filter((w) => w === null).length;
+      if (isTest) testSeries.push({ t: s.t, x: s.x, yield: labels.map((l) => l.yield), onRoad: labels.map((l) => l.onRoad) });
       const rows = isTest ? test : train;
       for (let i = 0; i < s.t.length; i++) {
-        // 2초 안에 차도에 들어서는가 — 기록된 미래
-        let enter = false;
-        for (let j = i + 1; j < s.t.length && s.t[j] <= s.t[i] + 2 + 1e-6; j++) if (s.onRoad[j]) enter = true;
         // 정답이 바뀌는 때의 앞뒤는 다 남기고, 나머지는 덜어 낸다 (시험은 다 남긴다)
         let near = false;
-        for (let j = Math.max(0, i - 15); j < Math.min(s.t.length, i + 16) && !near; j++) {
-          if (Math.abs(s.t[j] - s.t[i]) <= EDGE_WINDOW && j > 0 && s.yield[j] !== s.yield[j - 1]) near = true;
+        for (let j = Math.max(1, i - 15); j < Math.min(s.t.length, i + 16) && !near; j++) {
+          if (Math.abs(s.t[j] - s.t[i]) <= EDGE_WINDOW && labels[j].yield !== labels[j - 1].yield) near = true;
         }
         if (!isTest && !near && pick() > KEEP) continue;
         rows.x.push(s.x[i]);
-        rows.yYield.push(s.yield[i] ? 1 : 0);
-        rows.yEnter.push(enter ? 1 : 0);
+        rows.yYield.push(labels[i].yield ? 1 : 0);
+        rows.yEnter.push(labels[i].enter ? 1 : 0);
         rows.info.push({ run, ped, t: s.t[i], edge: s.x[i][0], vin: s.x[i][1] });
       }
     }
   }
   if ((k + 1) % 500 === 0) console.log(`  판 ${k + 1}/${chosen.length} · 표본 학습 ${train.x.length} · 시험 ${test.x.length} · ${secs()}`);
 }
+console.log(`  LiDAR 추적 ${tracked} 바퀴 중 실제 보행자와 짝이 없는 것 ${((100 * unmatched) / tracked).toFixed(2)}%`);
 console.log(`표본: 학습 ${train.x.length} · 시험 ${test.x.length} (판 ${chosen.length} × 운전자 ${drivers.length}) · ${secs()}`);
 const rate = (ys: number[]) => `${((100 * ys.reduce((a, b) => a + b, 0)) / ys.length).toFixed(1)}%`;
 console.log(`  양성 비율(학습): 양보 ${rate(train.yYield)} · 2초 안 차도 ${rate(train.yEnter)}`);
@@ -150,7 +188,7 @@ const W2 = init(K, HIDDEN);
 const b2 = Array(K).fill(0);
 const L2 = 1e-5;
 const idx = Z.map((_, i) => i);
-console.log('\n신경망 (은닉 24 · 출력 둘)');
+console.log(`\n신경망 (은닉 ${HIDDEN} · 출력 둘)`);
 for (let ep = 0; ep < EPOCHS; ep++) {
   const lr = 0.04 - (0.032 * ep) / Math.max(1, EPOCHS - 1);
   for (let i = idx.length - 1; i > 0; i--) {
@@ -290,6 +328,9 @@ model.meta = {
   threshold,
   yield: {
     accuracy: round(nnAcc),
+    accuracyAt50: round(nnAcc50),
+    recallAt50: round(recallAt(0.5)),
+    falseAlarmAt50: round(fprAt(0.5)),
     recall: round(recallAt(threshold)),
     falseAlarm: round(fprAt(threshold)),
     ruleAccuracy: round(ruleAcc),

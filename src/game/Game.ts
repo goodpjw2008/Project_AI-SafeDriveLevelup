@@ -31,6 +31,7 @@ import type {
   JudgeResult,
   LeadReport,
   LightColor,
+  PedSignal,
   RightArrowColor,
   WorldSample,
 } from '../rules/lawRules';
@@ -69,7 +70,7 @@ import { LidarPanel, type PanelSignal } from './LidarPanel';
 import { LidarRig } from './LidarRig';
 import { LIDAR, scanLidar, type LidarScan, type LidarShape } from './lidarSensor';
 import { Tracker, assessHazard, detect } from '../ai/perception';
-import { IntentEstimator, intentModelReady, routeCrosses, type IntentEstimate, type PedObservation } from '../ai/intent';
+import { IntentEstimator, intentModelReady, perceivedPeople, routeCrosses, type PedObservation } from '../ai/intent';
 import { SEAT_RANGE, dressCarEnv, loadCarModel, loadedCarIds, seatForwardLimit, type CarModelAnchors, playerLod } from './carModel';
 import { PeripheralView } from './PeripheralView';
 import { sharedRenderer, contextLossCount, gpuName } from './renderer';
@@ -333,11 +334,14 @@ export class Game {
   /** AI 운전자가 이번 프레임에 서기로 했는가 — 사람에게 넘길 때 정지 · 출발 상태를 이어받게 한다 */
   private aiStop = false;
   /**
-   * **보행자 횡단 의도 예측** (ai/intent.ts) — AI 운전자는 보행자의 속(`intendsToCross`)을 읽지 않고, 사람마다 몸이 선 자리 ·
-   * 움직임 · 보행신호를 보고 신경망이 짐작한 것으로 양보한다. LiDAR 화면의 위협 예측(2초 안에 차도에 들어서는가)도 이것이다.
-   * 학습한 모델이 없으면(처음 학습하기 전) 없다 — 그때 AI 는 예전처럼 판정과 같은 값을 본다.
+   * **보행자 횡단 의도 예측** (ai/intent.ts) — AI 운전자는 게임 속 보행자의 자리도 속(`intendsToCross`)도 읽지 않는다.
+   * **LiDAR 인지가 찾은 사람**(`lidarPeople`)마다 선 자리 · 움직임 · 보행신호를 보고 신경망이 짐작한 것으로 양보한다. LiDAR
+   * 화면의 위협 예측(2초 안에 차도에 들어서는가)도 이것이다. 학습한 모델이 없으면(처음 학습하기 전) 없다 — 그때 AI 는 예전처럼
+   * 판정과 같은 값을 본다.
    */
   private readonly intent = intentModelReady() ? new IntentEstimator() : null;
+  /** LiDAR 인지가 지금 보고 있는 사람 — AI 가 아는 보행자 전부다 (updateLidar 가 바퀴마다 바꾼다) */
+  private lidarPeople: PedObservation[] = [];
   /**
    * **LiDAR** — 센서(lidarSensor.ts) · 인지(ai/perception.ts) · 계기판 위 화면(LidarPanel.ts). **늘 켜져 있다** — 끄는 버튼은
    * 뺐다 (사용자가 정했다: "lidar 끄는 버튼은 제거해주고, 항상 디폴트로").
@@ -1648,28 +1652,14 @@ export class Game {
    * 보행자 표본은 이 프레임의 갱신(아래 `p.update`) 전 값이라 한 프레임 뒤처지는데,
    * 16ms 라 판단이 달라지지 않는다.
    *
-   * **보행자의 속(건너려는 뜻)은 넘기지 않는다** — 판정은 그 값으로 재지만, AI 는 사람의 몸이 선 자리 · 움직임과 보행신호를
-   * 보고 신경망이 짐작한 것으로 양보한다 (`pedYield`, ai/intent.ts). 시뮬레이터의 AI(scenarios/playSim.ts 의 careful)도 같은
-   * 짐작으로 22,818판을 달려 검증한다.
+   * **보행자는 LiDAR 로 본 사람만 넘긴다** — 게임 속 보행자의 자리도 속(건너려는 뜻)도 넘기지 않는다. 판정은 그 속으로 재지만,
+   * AI 는 LiDAR 인지가 찾은 사람(`lidarPeople`)마다 신경망이 짐작한 것으로 양보한다 (`pedYield`, ai/intent.ts). 시뮬레이터의
+   * AI(scenarios/playSim.ts 의 careful)도 같은 LiDAR · 같은 짐작으로 22,818판을 달려 검증한다. **신호 · 정지선 · 앞차는 규칙**
+   * 그대로다 (사용자가 정했다, 2026-10-18: "법규 판단(신호 · 정지선)은 일부러 규칙으로").
    */
   private autoState(phase: SignalPhase, exitBlocked: boolean): AutoDriveState {
     const front = this.vehicle.front;
-    const pedSignal = {
-      A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
-      // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
-      B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
-      C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
-      S: this.schoolZonePhase()?.ped ?? null,
-    };
-    const samples = this.pedestrians.map((p, i) => ({ ...p.sample(), id: i }));
-    if (this.intent) {
-      const obs: PedObservation[] = [];
-      for (const p of samples) {
-        if (p.state === 'done' || p.x === undefined || p.z === undefined) continue;
-        obs.push({ id: p.id, crosswalk: p.crosswalk, x: p.x, z: p.z, bike: p.bike });
-      }
-      this.intent.update(this.elapsed, obs, { pedSignal, front, speedKmh: this.vehicle.speedKmh });
-    }
+    const pedSignal = this.pedLights(phase);
     return {
       x: this.vehicle.x,
       z: this.vehicle.z,
@@ -1696,7 +1686,20 @@ export class Game {
           }
         : {}),
       // 밤에는 전조등 범위 안의 사람만 알아본다 (scenarios/conditions.ts) — 시뮬레이터의 운전자와 같은 눈
-      pedestrians: seenPedestrians(samples, front, this.scenario.timeOfDay),
+      pedestrians: this.intent
+        ? this.lidarPeople.map((p) => ({
+            id: p.id,
+            crosswalk: p.crosswalk,
+            bike: p.bike,
+            // 속은 모른다 — 양보는 pedYield 가 정한다
+            intendsToCross: false,
+            onConflictPath: false,
+          }))
+        : seenPedestrians(
+            this.pedestrians.map((p) => p.sample()),
+            front,
+            this.scenario.timeOfDay,
+          ),
       exitBlocked,
       isSchoolZone: this.scenario.isSchoolZone,
       lead:
@@ -1704,6 +1707,17 @@ export class Game {
           ? { gap: this.lead.gapFrom(front.x, front.z), speedKmh: this.lead.speedKmh }
           : null,
       ...(this.intent ? { pedYield: this.intent.yieldMap() } : {}),
+    };
+  }
+
+  /** 횡단보도마다의 보행신호 — 신호기가 없으면 `null` (판정 · AI · 의도 예측이 같은 값을 본다) */
+  private pedLights(phase: SignalPhase): Record<CrosswalkId, PedSignal | null> {
+    return {
+      A: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+      // B 는 A 와 같은 도로를 가로지른다 — 같은 등화, 같은 설치 여부 (lawRules.ts 의 signalCrosswalk)
+      B: this.scenario.pedSignalInstalled.A ? phase.pedA : null,
+      C: this.scenario.pedSignalInstalled.C ? phase.pedC : null,
+      S: this.schoolZonePhase()?.ped ?? null,
     };
   }
 
@@ -1791,12 +1805,22 @@ export class Game {
         frame: L.frame++,
       });
       L.tracker.update(detect(L.scan), L.clock);
+      /*
+        **AI 가 볼 사람** — 이 바퀴에 인지가 찾은 사람마다 의도 예측을 돌린다. 다음 프레임의 AI 판단(autoState)이 이것을 본다.
+        바퀴를 돈 바로 그때 짐작한다(force) — 바퀴와 짐작의 박자가 어긋나면 움직임 특징이 흔들린다.
+      */
+      this.lidarPeople = perceivedPeople(L.tracker.confirmed);
+      this.intent?.update(
+        L.clock,
+        this.lidarPeople,
+        { pedSignal: this.pedLights(phase), front: this.vehicle.front, speedKmh: this.vehicle.speedKmh },
+        true,
+      );
       // 가벼운 화면에서는 바퀴를 돈 프레임에 화면까지 그리지 않는다 — 인지와 그리기가 한 프레임에 겹치면 그 프레임이 튄다
       if (this.lite) return;
     }
 
     const route = auto.routeAhead(45);
-    const guesses = this.intent ? [...this.intent.all().values()] : [];
     L.panel.draw({
       ego: {
         x: this.vehicle.x,
@@ -1807,8 +1831,8 @@ export class Game {
         height: this.carSpec.dims.height,
       },
       tracks: L.tracker.confirmed.map((track) => {
-        // LiDAR 가 잡은 사람에게 의도 예측의 짐작을 붙인다 — 가장 가까운 몸(2m 안)의 것
-        const g = track.cls === 'car' || track.cls === 'unknown' ? undefined : nearestGuess(track, guesses);
+        // 의도 예측이 그 추적에 내린 짐작 — AI 가 판단에 쓴 바로 그 값이다
+        const g = this.intent?.estimate(track.id);
         const hazard = assessHazard(
           track,
           route,
@@ -2867,18 +2891,4 @@ export class Game {
     this.props.length = 0;
     // 렌더러는 버리지 않는다 — 다음 판이 그대로 이어 쓴다 (renderer.ts)
   }
-}
-
-/** LiDAR 가 잡은 물체에 가장 가까운 사람의 짐작 — 2m 안에 없으면 없다 (자전거는 몸과 자전거 가운데가 조금 어긋난다) */
-function nearestGuess(track: { x: number; z: number }, guesses: readonly IntentEstimate[]): IntentEstimate | undefined {
-  let best: IntentEstimate | undefined;
-  let bestD = 2;
-  for (const g of guesses) {
-    const d = Math.hypot(g.x - track.x, g.z - track.z);
-    if (d < bestD) {
-      bestD = d;
-      best = g;
-    }
-  }
-  return best;
 }

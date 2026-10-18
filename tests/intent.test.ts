@@ -45,10 +45,14 @@ describe('보행자 횡단 의도 예측 — 모델', () => {
     expect(model.threshold).toBeLessThanOrEqual(0.5);
   });
 
-  it('처음 보는 판에서 — 건너려는 사람을 손 규칙(연석에 붙어 섰나)보다 잘 가리고, 거의 놓치지 않는다', () => {
-    expect(meta.yield.accuracy).toBeGreaterThan(0.99);
-    expect(meta.yield.accuracy).toBeGreaterThan(meta.yield.ruleAccuracy);
-    expect(meta.yield.recall).toBeGreaterThanOrEqual(0.995);
+  /*
+    LiDAR 가 잰 자리로 배운다 — 몸의 자리를 그대로 볼 때(99.97%)보다 어렵다. 센서가 재는 자리가 흔들리고, 붙어 선 사람이 한
+    덩어리로 잡히고, 자전거는 가운데가 어긋난다. 그래도 손 규칙보다 3%p 넘게 낫고, 문턱을 낮춰 99% 를 잡는다.
+  */
+  it('처음 보는 판에서 — LiDAR 로 본 사람의 뜻을 손 규칙(연석에 붙어 섰나)보다 잘 가리고, 문턱에서는 거의 놓치지 않는다', () => {
+    expect(meta.yield.accuracyAt50).toBeGreaterThan(0.97);
+    expect(meta.yield.accuracyAt50 - meta.yield.ruleAccuracy).toBeGreaterThan(0.03);
+    expect(meta.yield.recall).toBeGreaterThanOrEqual(0.99);
     // 뜻이 생긴 뒤 양보로 바뀌기까지 — 대부분 그 바퀴 안, 늦어도 두 바퀴(0.2초)
     expect(meta.yield.lag95).toBeLessThanOrEqual(0.2);
   });
@@ -56,7 +60,7 @@ describe('보행자 횡단 의도 예측 — 모델', () => {
   it('2초 안에 차도에 들어설 사람을 예전 위협 예측(등속)보다 훨씬 일찍 · 많이 잡는다', () => {
     expect(meta.enter.accuracy).toBeGreaterThan(meta.enter.cvAccuracy);
     expect(meta.enter.recall).toBeGreaterThan(meta.enter.cvRecall + 0.5);
-    expect(meta.enter.leadSeconds).toBeGreaterThan(meta.enter.cvLeadSeconds + 1);
+    expect(meta.enter.leadSeconds).toBeGreaterThan(meta.enter.cvLeadSeconds + 0.5);
   });
 });
 
@@ -69,7 +73,10 @@ function watch(axisAt: (t: number) => number, signal: 'green' | 'red' | null): R
     speedKmh: 25,
   };
   for (let t = 0; t <= 1.5; t += 1 / 60) {
-    est.update(t, [{ id: 0, crosswalk: 'A', x: axisAt(t), z: 16.8 }], ctx);
+    // LiDAR 가 0.1초마다 한 바퀴 — 어른 한 사람의 크기(분류기의 본래 크기 0.9m)로 잡힌다
+    if (Math.abs(t * 10 - Math.round(t * 10)) < 1e-6) {
+      est.update(t, [{ id: 0, crosswalk: 'A', x: axisAt(t), z: 16.8, length: 0.9, width: 0.9 }], ctx, true);
+    }
   }
   return est.estimate(0);
 }
@@ -105,7 +112,7 @@ describe('보행자 횡단 의도 예측 — 보이는 것으로 짐작한다', 
   });
 });
 
-describe('AI 운전자는 보행자의 속 대신 짐작을 쓴다', () => {
+describe('AI 운전자는 보행자의 속 대신 LiDAR 로 본 사람의 짐작을 쓴다', () => {
   /** A 정지선 2m 앞을 서행으로 다가가는 차 · 녹색 · 횡단보도 A 에 '건너려는' 사람 하나 */
   const state = (pedYield?: ReadonlyMap<number, boolean>): AutoDriveState => ({
     x: PLAYER_APPROACH_X,
@@ -135,35 +142,32 @@ describe('AI 운전자는 보행자의 속 대신 짐작을 쓴다', () => {
     expect(new AutoDriver(2.8).decide(state(new Map([[0, false]]))).stop).toBe(false);
   });
 
-  it('처음 보는 판을 짐작으로 달려도 — 위반 없이 끝나고, 짐작은 사람의 속과 거의 늘 같다', () => {
+  it('처음 보는 판을 LiDAR 로만 보고 달려도 — 위반 없이 끝나고, 다가간 횡단보도의 건너려는 사람을 놓치지 않는다', () => {
     const lib = scenarioLibrary().filter((e) => e.spec.pedestrians.length > 0);
-    let ticks = 0;
-    let agree = 0;
-    let missed = 0;
+    let wanted = 0;
+    let caught = 0;
     for (let i = 7; i < lib.length; i += Math.floor(lib.length / 40)) {
+      // 시뮬레이터 안의 AI 와 같은 것을 같은 바퀴로 돌린다 — 그 짐작이 실제 보행자의 속과 맞는지 본다
       const est = new IntentEstimator();
       const r = playScenario(lib[i].spec, {
         persona: 'careful',
         pace: AUTO_DRIVE_RULE.pace,
         stopZone: AUTO_DRIVE_RULE.stopZone,
         trace: false,
-        onStep: (step) => {
-          if (!est.update(step.t, step.peds.map((p) => p.obs), step.ctx)) return;
-          for (const p of step.peds) {
-            const e = est.estimate(p.obs.id);
-            if (!e) continue;
-            ticks += 1;
-            if (e.yields === p.yield) agree += 1;
-            else if (p.yield) missed += 1;
+        onScan: (scan) => {
+          est.update(scan.t, scan.people, scan.ctx, true);
+          for (const w of scan.walkers) {
+            // 내 차 앞 25m 안 — 서야 할지 정할 거리 — 의 건너려는 사람
+            if (!w.yield || Math.hypot(w.x - scan.ctx.front.x, w.z - scan.ctx.front.z) > 25) continue;
+            wanted += 1;
+            if (scan.people.some((p) => Math.hypot(p.x - w.x, p.z - w.z) < 2 && est.estimate(p.id)?.yields)) caught += 1;
           }
         },
       });
       expect(r.result.violations.map((v) => v.code), `#${lib[i].spec.id}`).toEqual([]);
       expect(r.result.completed, `#${lib[i].spec.id}`).toBe(true);
     }
-    expect(ticks).toBeGreaterThan(5000);
-    expect(agree / ticks).toBeGreaterThan(0.995);
-    // 놓친 바퀴 — 뜻이 생긴 그 바퀴처럼 몸이 아직 움직이지 않은 때뿐이다
-    expect(missed / ticks).toBeLessThan(0.003);
+    expect(wanted).toBeGreaterThan(2000);
+    expect(caught / wanted).toBeGreaterThan(0.97);
   });
 });
