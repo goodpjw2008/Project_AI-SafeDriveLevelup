@@ -35,12 +35,21 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('판 표로 센다', () => {
   it('처음은 0 · 0 이고, 판을 마치면 그 결과가 하나 오른다', async () => {
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0, ai: 0 });
     const t = await start();
-    expect((await finish(t, 'success')).body).toEqual({ success: 1, fail: 0 });
+    expect((await finish(t, 'success')).body).toEqual({ success: 1, fail: 0, ai: 0 });
     const u = await start();
-    expect((await finish(u, 'fail')).body).toEqual({ success: 1, fail: 1 });
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 1, fail: 1 });
+    expect((await finish(u, 'fail')).body).toEqual({ success: 1, fail: 1, ai: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 1, fail: 1, ai: 0 });
+  });
+
+  /* AI 자율주행이 몬 판은 'AI주행' 으로 따로 센다 — 사람이 몬 판의 성공 · 실패에 섞이지 않는다 (사용자가 더했다, 2026-10-20) */
+  it("AI 가 몬 판은 'ai' 로 따로 오른다 — 성공 · 실패는 그대로", async () => {
+    const t = await start();
+    expect((await finish(t, 'ai')).body).toEqual({ success: 0, fail: 0, ai: 1 });
+    const u = await start();
+    expect((await finish(u, 'success')).body).toEqual({ success: 1, fail: 0, ai: 1 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 1, fail: 0, ai: 1 });
   });
 
   it('같은 판 표를 두 번 내면 두 번째는 세지 않는다 (409)', async () => {
@@ -48,7 +57,7 @@ describe('판 표로 센다', () => {
     expect((await finish(t, 'success')).status).toBe(200);
     const again = await finish(t, 'success');
     expect(again.status).toBe(409);
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 1, fail: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 1, fail: 0, ai: 0 });
   });
 
   /*
@@ -60,13 +69,13 @@ describe('판 표로 센다', () => {
     const replies = await Promise.all(tickets.flatMap((t) => [finish(t, 'success'), finish(t, 'success')]));
     expect(replies.filter((r) => r.status === 200)).toHaveLength(10);
     expect(replies.filter((r) => r.status === 409)).toHaveLength(10);
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 10, fail: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 10, fail: 0, ai: 0 });
   });
 
   it('성공과 실패가 동시에 섞여 들어와도 하나도 빠지지 않는다', async () => {
     const tickets = await Promise.all(Array.from({ length: 30 }, () => start()));
     await Promise.all(tickets.map((t, i) => finish(t, i % 3 === 0 ? 'fail' : 'success')));
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 20, fail: 10 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 20, fail: 10, ai: 0 });
   });
 
   it('받자마자 낸 표(너무 짧은 판)는 세지 않고, 그 표는 다시 쓸 수 없다', async () => {
@@ -74,7 +83,7 @@ describe('판 표로 센다', () => {
     expect((await finish(t, 'success', T0 + MIN_RUN_MS - 1)).status).toBe(422);
     // 기다렸다 다시 내도 안 된다 — 짧다고 거절할 때 표도 지운다
     expect((await finish(t, 'success', T0 + 60_000)).status).toBe(409);
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0, ai: 0 });
   });
 
   it('만료된 표는 세지 않는다 — 판 도중 떠난 사람의 표는 저절로 사라진다', async () => {
@@ -89,7 +98,7 @@ describe('판 표로 센다', () => {
     expect((await finish(t, 'perfect')).status).toBe(400);
     expect((await handleStatsWrite({ action: 'reset' }, DEV, T0)).status).toBe(400);
     expect((await handleStatsWrite(null, DEV, T0)).status).toBe(400);
-    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0 });
+    expect((await handleStatsRead(DEV)).body).toEqual({ success: 0, fail: 0, ai: 0 });
   });
 });
 
@@ -98,7 +107,7 @@ describe('환경', () => {
     const t = await start(DEV);
     await finish(t, 'success', T0 + 20_000, DEV);
     const prod = { VERCEL_ENV: 'production' };
-    expect((await handleStatsRead(prod)).body).toEqual({ success: 0, fail: 0 });
+    expect((await handleStatsRead(prod)).body).toEqual({ success: 0, fail: 0, ai: 0 });
     // 다른 환경의 표로는 셀 수 없다
     expect((await finish(await start(DEV), 'success', T0 + 20_000, prod)).status).toBe(409);
   });
@@ -141,11 +150,19 @@ describe('Upstash 저장소', () => {
     expect(sent[0]).toEqual(['SET', `stats:prod:run:${r.body.ticket}`, String(T0), 'NX', 'EX', String(RUN_TTL_SEC)]);
   });
 
+  it("스크립트는 'ai' 칸까지 세 칸을 돌려준다", async () => {
+    stubUpstash(() => ({ body: { result: ['ok', '12', '5', '7'] } }));
+    const ticket = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const r = await handleStatsWrite({ action: 'finish', ticket, outcome: 'ai' }, UP, T0);
+    expect(r).toEqual({ status: 200, body: { success: 12, fail: 5, ai: 7 } });
+    expect(FINISH_SCRIPT).toContain("'HMGET', KEYS[2], 'success', 'fail', 'ai'");
+  });
+
   it('표 내기와 더하기는 스크립트 하나로 간다 — 저장소 안에서 한 덩어리', async () => {
     const sent = stubUpstash(() => ({ body: { result: ['ok', '12', '5'] } }));
     const ticket = '0f8fad5b-d9cb-469f-a165-70867728950e';
     const r = await handleStatsWrite({ action: 'finish', ticket, outcome: 'success' }, UP, T0);
-    expect(r).toEqual({ status: 200, body: { success: 12, fail: 5 } });
+    expect(r).toEqual({ status: 200, body: { success: 12, fail: 5, ai: 0 } });
     expect(sent[0]).toEqual([
       'EVAL',
       FINISH_SCRIPT,
@@ -169,10 +186,10 @@ describe('Upstash 저장소', () => {
     expect((await handleStatsWrite({ action: 'finish', ticket, outcome: 'fail' }, UP, T0)).status).toBe(422);
   });
 
-  it('읽기는 두 칸을 한 번에(HMGET) — 비어 있으면 0', async () => {
+  it('읽기는 세 칸을 한 번에(HMGET) — 비어 있으면 0', async () => {
     const sent = stubUpstash(() => ({ body: { result: [null, '3'] } }));
-    expect((await handleStatsRead(UP)).body).toEqual({ success: 0, fail: 3 });
-    expect(sent[0]).toEqual(['HMGET', 'stats:prod:totals', 'success', 'fail']);
+    expect((await handleStatsRead(UP)).body).toEqual({ success: 0, fail: 3, ai: 0 });
+    expect(sent[0]).toEqual(['HMGET', 'stats:prod:totals', 'success', 'fail', 'ai']);
   });
 
   it('저장소가 오류를 내거나 닿지 않으면 502 — 숫자는 건드리지 않는다', async () => {
@@ -204,7 +221,7 @@ describe('Upstash 저장소', () => {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ result: ['1', '2'] }) });
     });
     const env = { UPSTASH_REDIS_REST_URL: 'https://other.upstash.io', UPSTASH_REDIS_REST_TOKEN: 't', VERCEL: '1' };
-    expect((await handleStatsRead(env)).body).toEqual({ success: 1, fail: 2 });
+    expect((await handleStatsRead(env)).body).toEqual({ success: 1, fail: 2, ai: 0 });
     expect(sent).toEqual(['https://other.upstash.io']);
   });
 });
@@ -241,7 +258,7 @@ describe('api/stats.js', () => {
     const { res, out } = fakeRes();
     await handler({ method: 'GET', headers: {} }, res);
     expect(out.status).toBe(200);
-    expect(out.body).toEqual({ success: 0, fail: 0 });
+    expect(out.body).toEqual({ success: 0, fail: 0, ai: 0 });
     expect(out.headers['Cache-Control']).toContain('s-maxage=');
   });
 

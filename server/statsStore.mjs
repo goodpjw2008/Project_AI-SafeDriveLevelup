@@ -1,5 +1,6 @@
 /**
- * **사이트 전체의 안전운전 성공 · 실패 횟수를 담는 곳** — 첫 화면 오른쪽 위의 두 숫자 (사용자 요청).
+ * **사이트 전체의 안전운전 성공 · 실패 · AI주행 횟수를 담는 곳** — 첫 화면 오른쪽 위의 숫자 (사용자 요청). AI주행(`ai`)은
+ * AI 자율주행이 몬 판이다 — 사람이 몬 판의 성공 · 실패와 따로 센다 (2026-10-20 사용자가 더했다).
  *
  * 배포(Vercel)의 함수는 요청이 끝나면 사라지고, 여러 개가 동시에 뜬다. 메모리에 두면 함수마다 다른 숫자를 세다가
  * 사라진다. 그래서 **바깥의 저장소**에 둔다 — Vercel 에서 무료로 붙는 **Upstash Redis** 다 (REST 로 부르므로 새 의존이
@@ -35,7 +36,7 @@ const STORE_TIMEOUT_MS = 4_000;
 /**
  * 표를 내고 센다 — **한 덩어리로** 돈다 (Redis 는 스크립트를 도는 동안 다른 명령을 끼우지 않는다).
  *
- * KEYS[1] 판 표 · KEYS[2] 누적 숫자(해시) · ARGV[1] success | fail · ARGV[2] 지금(ms) · ARGV[3] 가장 짧은 판(ms)
+ * KEYS[1] 판 표 · KEYS[2] 누적 숫자(해시) · ARGV[1] success | fail | ai · ARGV[2] 지금(ms) · ARGV[3] 가장 짧은 판(ms)
  *
  * 너무 짧은 판도 **표는 지운다** — 남겨 두면 기다렸다가 다시 내서 셀 수 있다.
  */
@@ -49,8 +50,8 @@ if tonumber(ARGV[2]) - tonumber(started) < tonumber(ARGV[3]) then
   return {'short'}
 end
 redis.call('HINCRBY', KEYS[2], ARGV[1], 1)
-local t = redis.call('HMGET', KEYS[2], 'success', 'fail')
-return {'ok', t[1] or '0', t[2] or '0'}
+local t = redis.call('HMGET', KEYS[2], 'success', 'fail', 'ai')
+return {'ok', t[1] or '0', t[2] or '0', t[3] or '0'}
 `;
 
 const toCount = (v) => {
@@ -137,11 +138,11 @@ function upstashStore(url, token) {
       const r = await call(['EVAL', FINISH_SCRIPT, '2', key, totals, outcome, String(now), String(MIN_RUN_MS)]);
       if (!Array.isArray(r)) throw new Error('저장소가 알 수 없는 답을 했다');
       if (r[0] !== 'ok') return { state: r[0] === 'short' ? 'short' : 'gone' };
-      return { state: 'ok', success: toCount(r[1]), fail: toCount(r[2]) };
+      return { state: 'ok', success: toCount(r[1]), fail: toCount(r[2]), ai: toCount(r[3]) };
     },
     async totals(totals) {
-      const r = await call(['HMGET', totals, 'success', 'fail']);
-      return { success: toCount(r?.[0]), fail: toCount(r?.[1]) };
+      const r = await call(['HMGET', totals, 'success', 'fail', 'ai']);
+      return { success: toCount(r?.[0]), fail: toCount(r?.[1]), ai: toCount(r?.[2]) };
     },
   };
 }
@@ -165,14 +166,14 @@ const memoryStore = {
     memRuns.delete(key);
     if (!run || run.expires <= now) return { state: 'gone' };
     if (now - run.started < MIN_RUN_MS) return { state: 'short' };
-    const t = memTotals.get(totals) ?? { success: 0, fail: 0 };
-    t[outcome] += 1;
+    const t = memTotals.get(totals) ?? { success: 0, fail: 0, ai: 0 };
+    t[outcome] = (t[outcome] ?? 0) + 1;
     memTotals.set(totals, t);
-    return { state: 'ok', success: t.success, fail: t.fail };
+    return { state: 'ok', success: t.success, fail: t.fail, ai: t.ai ?? 0 };
   },
   async totals(totals) {
-    const t = memTotals.get(totals) ?? { success: 0, fail: 0 };
-    return { success: t.success, fail: t.fail };
+    const t = memTotals.get(totals) ?? { success: 0, fail: 0, ai: 0 };
+    return { success: t.success, fail: t.fail, ai: t.ai ?? 0 };
   },
 };
 

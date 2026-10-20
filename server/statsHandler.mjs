@@ -1,19 +1,20 @@
 /**
- * `/api/stats` — **사이트 전체의 안전운전 성공 · 실패 횟수** (첫 화면 오른쪽 위).
+ * `/api/stats` — **사이트 전체의 안전운전 성공 · 실패 · AI주행 횟수** (첫 화면 오른쪽 위).
  *
- *  - 읽기(GET) — `{ success, fail }`
+ *  - 읽기(GET) — `{ success, fail, ai }`
  *  - 판 시작(POST `{ action: 'start' }`) — `{ ticket }`
- *  - 판 끝(POST `{ action: 'finish', ticket, outcome: 'success' | 'fail' }`) — 올린 뒤의 `{ success, fail }`
+ *  - 판 끝(POST `{ action: 'finish', ticket, outcome: 'success' | 'fail' | 'ai' }`) — 올린 뒤의 `{ success, fail, ai }`
+ *    (`ai` 는 AI 자율주행이 몬 판 — 사람이 몬 판의 성공 · 실패와 따로 센다)
  *
  * 한 판을 정확히 한 번만 세는 방법(판 표)과 동시에 들어와도 숫자가 빠지지 않는 이유는 statsStore.mjs 에 있다.
  * 개발 서버(vite.config.ts)와 배포(api/stats.js)가 이 알맹이를 같이 쓴다.
  *
- * **개인정보는 남기지 않는다** — 저장소에는 두 숫자와, 15분 뒤 사라지는 무작위 판 표뿐이다.
+ * **개인정보는 남기지 않는다** — 저장소에는 세 숫자와, 15분 뒤 사라지는 무작위 판 표뿐이다.
  */
 
 import { namespaceOf, newTicket, runKey, storeFor, totalsKey } from './statsStore.mjs';
 
-const OUTCOMES = ['success', 'fail'];
+const OUTCOMES = ['success', 'fail', 'ai'];
 /** randomUUID 가 만드는 모양만 받는다 — 저장소 이름에 엉뚱한 글자가 끼지 않게 */
 const TICKET_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -64,7 +65,7 @@ export async function handleStatsWrite(body, env, now = Date.now()) {
       // 이미 센 판 · 사라진 표 — 다시 보낸 것이다. 숫자는 그대로 둔다
       if (r.state === 'gone') return { status: 409, body: { error: 'TICKET_USED_OR_EXPIRED' } };
       if (r.state === 'short') return { status: 422, body: { error: 'RUN_TOO_SHORT' } };
-      return { status: 200, body: { success: r.success, fail: r.fail } };
+      return { status: 200, body: { success: r.success, fail: r.fail, ai: r.ai } };
     }
   } catch {
     return unreachable();

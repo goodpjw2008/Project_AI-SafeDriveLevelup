@@ -8,10 +8,10 @@ export interface StatsStore {
   finish(
     key: string,
     totals: string,
-    outcome: 'success' | 'fail',
+    outcome: 'success' | 'fail' | 'ai',
     now: number,
-  ): Promise<{ state: 'ok'; success: number; fail: number } | { state: 'gone' | 'short' }>;
-  totals(totals: string): Promise<{ success: number; fail: number }>;
+  ): Promise<{ state: 'ok'; success: number; fail: number; ai: number } | { state: 'gone' | 'short' }>;
+  totals(totals: string): Promise<{ success: number; fail: number; ai: number }>;
 }
 
 export declare const RUN_TTL_SEC: number;

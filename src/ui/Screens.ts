@@ -721,7 +721,8 @@ export class Screens {
   // ── 메인 메뉴 ────────────────────────────────────────────────────────────
 
   /**
-   * 첫 화면 오른쪽 위의 **안전운전 성공 · 실패 횟수** — 성공은 녹색, 실패는 붉은색 (사용자가 정했다).
+   * 첫 화면 오른쪽 위의 **AI주행 · 안전운전 성공 · 실패 횟수** — AI주행은 파란색, 성공은 녹색, 실패는 붉은색 (사용자가 정했다).
+   * AI주행은 2026-10-20 에 앞에 더했다 — 이름도 짧게 '전체 성공' · '전체 실패' 로 (사용자가 정했다).
    * 첫 화면이 떠 있지 않으면(판이 끝나 숫자가 온 사이 다른 화면으로 갔으면) 아무 일도 하지 않는다.
    */
   showSiteStats(s: SiteStats): void {
@@ -730,9 +731,13 @@ export class Screens {
     const n = (v: number): string => v.toLocaleString('ko-KR');
     el.innerHTML =
       // 짧게 — '전체 운전 성공:164회' (사용자가 정했다: 갤럭시 S21 폭에서 두 알약이 밀렸다, 2026-09-26)
-      `<span class="site-stat ok">전체 운전 성공:<b>${n(s.success)}</b>회</span>` +
-      `<span class="site-stat bad">전체 운전 실패:<b>${n(s.fail)}</b>회</span>`;
-    el.setAttribute('aria-label', `이 사이트 전체의 운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`);
+      `<span class="site-stat ai">AI주행:<b>${n(s.ai)}</b>회</span>` +
+      `<span class="site-stat ok">전체 성공:<b>${n(s.success)}</b>회</span>` +
+      `<span class="site-stat bad">전체 실패:<b>${n(s.fail)}</b>회</span>`;
+    el.setAttribute(
+      'aria-label',
+      `이 사이트 전체의 AI주행 ${n(s.ai)}회, 운전 성공 ${n(s.success)}회, 실패 ${n(s.fail)}회`,
+    );
     el.hidden = false;
   }
 

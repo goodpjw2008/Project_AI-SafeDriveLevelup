@@ -1,5 +1,5 @@
 /**
- * **사이트 전체의 안전운전 성공 · 실패 횟수** — 첫 화면 오른쪽 위 (사용자 요청).
+ * **사이트 전체의 AI주행 · 안전운전 성공 · 실패 횟수** — 첫 화면 오른쪽 위 (사용자 요청).
  *
  * 이 사이트에서 누가 달렸든 한 판이 끝날 때마다 하나씩 오르는 숫자다. 서버의 저장소에 있다
  * (server/statsStore.mjs) — 내 기록(economy/save.ts)은 이 브라우저에만 있지만, 이 숫자는 모두가 같은 것을 본다.
@@ -10,7 +10,9 @@
  * 센다 — 같은 판을 두 번 알려도(두 탭 · 다시 보내기) 숫자는 하나만 오른다. 판 도중에 첫 화면으로 나가면 표를 내지
  * 않으므로 세지 않는다 (끝나지 않은 판은 성공도 실패도 아니다).
  *
- * **무엇을 세지 않는가** — AI 자율 주행 시범(사람이 몬 판이 아니다)과 맵 체험(시험용)은 부르는 쪽(main.ts)이 뺀다.
+ * **AI 가 몬 판은 'AI주행' 으로 따로 센다** (사용자가 더했다, 2026-10-20: "AI주행:??회, 전체 성공:??회, 전체 실패:??회").
+ * AI 자율주행으로 몬 판 · 주행 중 AI 에게 넘긴 판 · AI 시범 주행은 사람이 몬 판이 아니라 성공 · 실패에 넣지 않고, 마치면
+ * `ai` 로 하나 오른다. 맵 체험(시험용)은 어디에도 세지 않는다 — 부르는 쪽(main.ts)이 뺀다.
  *
  * **실패해도 조용하다.** 서버가 없는 배포(정적 호스팅 · 단일 파일)나 저장소를 붙이지 않은 배포에서는 숫자 칸이
  * 아예 뜨지 않을 뿐, 게임은 그대로 돈다.
@@ -21,9 +23,11 @@ import type { Grade } from './rules/lawRules';
 export interface SiteStats {
   success: number;
   fail: number;
+  /** AI 자율주행이 몬 판 */
+  ai: number;
 }
 
-export type RunOutcome = 'success' | 'fail';
+export type RunOutcome = 'success' | 'fail' | 'ai';
 
 /** 서버를 이만큼만 기다린다 — 첫 화면의 숫자 때문에 아무것도 붙잡히지 않게 */
 export const STATS_TIMEOUT_MS = 5_000;
@@ -45,16 +49,25 @@ let ticket: Promise<string | null> | null = null;
  */
 function keepNewest(next: SiteStats): SiteStats {
   latest = latest
-    ? { success: Math.max(latest.success, next.success), fail: Math.max(latest.fail, next.fail) }
+    ? {
+        success: Math.max(latest.success, next.success),
+        fail: Math.max(latest.fail, next.fail),
+        ai: Math.max(latest.ai, next.ai),
+      }
     : next;
   return latest;
 }
 
-const isStats = (v: unknown): v is SiteStats =>
-  typeof v === 'object' &&
-  v !== null &&
-  Number.isFinite((v as SiteStats).success) &&
-  Number.isFinite((v as SiteStats).fail);
+/**
+ * 서버의 답 → 숫자. `ai` 가 없으면 0 이다 — 배포하는 사이 가장자리(CDN)에 담겨 있던 옛 답(성공 · 실패 둘뿐)을 받아도
+ * 칸이 사라지지 않게.
+ */
+function asStats(v: unknown): SiteStats | null {
+  if (typeof v !== 'object' || v === null) return null;
+  const { success, fail, ai } = v as Partial<SiteStats>;
+  if (!Number.isFinite(success) || !Number.isFinite(fail)) return null;
+  return { success: success!, fail: fail!, ai: Number.isFinite(ai) ? ai! : 0 };
+}
 
 async function call(init?: RequestInit): Promise<unknown> {
   const res = await fetch('/api/stats', { ...init, signal: AbortSignal.timeout(STATS_TIMEOUT_MS) });
@@ -71,8 +84,8 @@ export const cachedSiteStats = (): SiteStats | null => latest;
 /** 서버에서 숫자를 읽는다. 못 읽으면 가지고 있던 것(없으면 null) */
 export async function loadSiteStats(): Promise<SiteStats | null> {
   try {
-    const body = await call();
-    return isStats(body) ? keepNewest(body) : latest;
+    const body = asStats(await call());
+    return body ? keepNewest(body) : latest;
   } catch {
     return latest;
   }
@@ -93,8 +106,8 @@ export async function endRun(outcome: RunOutcome): Promise<SiteStats | null> {
   const t = pending ? await pending : null;
   if (!t) return null;
   try {
-    const body = await post({ action: 'finish', ticket: t, outcome });
-    return isStats(body) ? keepNewest(body) : null;
+    const body = asStats(await post({ action: 'finish', ticket: t, outcome }));
+    return body ? keepNewest(body) : null;
   } catch {
     return null;
   }

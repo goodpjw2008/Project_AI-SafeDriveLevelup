@@ -1453,8 +1453,11 @@ async function startRun(id: number): Promise<void> {
     **사이트 전체 안전운전 횟수의 판 표** (siteStats.ts) — 사람이 모는 판만 받는다. AI 자율 주행 시범은 AI 가 몬
     판이고, 맵 체험은 시험용이라 세지 않는다 (둘 다 finishRun 에서 기록을 남기지 않는 것과 같은 선).
   */
-  // AI 자율주행으로 시작한 판도 세지 않는다 — 중간에 넘겨받아도 AI 가 몬 판의 길로 끝난다 (aiAssisted)
-  if (!startAi && !mapTrial) beginRun();
+  /*
+    AI 자율주행으로 시작한 판도 표를 받는다 — 마치면 성공 · 실패가 아니라 'AI주행' 으로 센다 (finishDemoRun ·
+    finishAssistedRun 앞의 endRun('ai') — 사용자가 더했다, 2026-10-20). 맵 체험만 어디에도 세지 않는다.
+  */
+  if (!mapTrial) beginRun();
   // 판은 가는 상태로 시작한다 (controls.reset) — ↑ 에 불을 켠다
   syncGoStop();
 
@@ -1747,11 +1750,14 @@ function finishRun(result: JudgeResult): void {
     채워진다. 결과 화면만 잠깐 보여 주고 다음 교육 코스로 넘어간다.
   */
   if (aiDriving) {
+    // 사이트 전체 'AI주행' 횟수 — AI 가 몬 판은 성공 · 실패가 아니라 따로 센다 (siteStats.ts)
+    void endRun('ai');
     finishDemoRun(sc, result);
     return;
   }
-  // 주행 중 AI 에게 넘긴 판 — 기록하지 않는다 (위 aiAssisted)
+  // 주행 중 AI 에게 넘긴 판 — 학습자의 기록은 남기지 않는다 (위 aiAssisted). 사이트 숫자는 'AI주행' 으로
   if (aiAssisted) {
+    void endRun('ai');
     finishAssistedRun(sc, result);
     return;
   }

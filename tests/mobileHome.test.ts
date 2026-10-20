@@ -436,7 +436,7 @@ describe('세로 휴대폰 — 좁은 폭(360px)에서 밀리지 않게', () => 
     // '온라인 연습' 이름은 뺐다 (사용자가 정했다, 2026-10-18) — 꼬리를 감출 글은 '처음부터 다시 시작' 하나다
     expect(screens).not.toContain('온라인<span class="lbl-tail"> 연습</span>');
     expect(screens).toContain('처음부터<span class="lbl-tail"> 다시 시작</span>');
-    expect(screens).toContain('전체 운전 성공:<b>');
+    expect(screens).toContain('전체 성공:<b>');
   });
   it('레벨 길은 칸을 줄이고, 주행 중 AI 말풍선은 화면 폭 안에서 줄을 바꾼다', () => {
     const block = rulesOnly();
