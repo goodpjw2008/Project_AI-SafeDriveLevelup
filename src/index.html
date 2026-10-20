@@ -4055,7 +4055,7 @@
           border-radius: 0 0 12px 12px;
         }
       }
-      /* 휴대폰 — 짧은 이름과 둘째 줄만(※ 는 뺀다 — 우측 시야를 가렸다), 글자를 한 단계 줄이고 그림 바로 위에 띄운다 */
+      /* 휴대폰 — 짧은 이름 한 줄만(둘째 줄 · ※ 는 뺀다 — 우측 시야를 가렸다), 글자를 한 단계 줄이고 그림 바로 위에 띄운다 */
       body.touch .lidar-cap .cap-long {
         display: none;
       }
@@ -4085,7 +4085,9 @@
           left: auto;
           right: calc(100% + 6px);
           bottom: 0;
-          width: 158px;
+          /* 이름 한 줄이라 글자 길이만큼만 (2026-10-20 — 둘째 줄을 뺐다) */
+          width: max-content;
+          max-width: 158px;
         }
       }
       #lidar {
@@ -5081,6 +5083,16 @@
       body.touch:not(.ai-drive) #lidar-box {
         bottom: calc(max(12px, env(safe-area-inset-bottom)) + 200px);
         width: min(36vw, 240px, 100vh - 330px);
+      }
+      /*
+        **휴대폰 가로는 작게** (사용자가 정했다, 2026-10-20: "라이다 부분이 너무 커서 우측시야를 가리게 돼"). 화면 높이가 410px 남짓인데
+        AI 자율주행 중에는 폭 36vw(최대 240px)라 높이의 6할을 차지했다 — 오른쪽으로 꺾어 들어갈 길을 덮는다. 높이의 4할(최대 160px)로
+        줄인다. 직접 운전할 때(방향키 위)는 아래 규칙이 원래 더 작다.
+      */
+      @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+        body.touch.ai-drive #lidar-box {
+          width: min(26vw, 160px, 40vh);
+        }
       }
       /* 조건을 pointer 부터 적는다 — 세로 · 가로 덩어리를 찾는 검사(tests/mobileHome 등)가 이 줄을 그 덩어리로 오인하지 않게 */
       @media (pointer: coarse) and (orientation: portrait) and (max-width: 720px),
@@ -7833,8 +7845,9 @@
         <div class="lidar-box" id="lidar-box">
           <!--
             **이름과 기법 설명** (사용자가 정했다, 2026-10-18 — 예전 이름 'LiDAR(가상)'). PC 는 그림 위, 휴대폰 세로는 그림 바로 위,
-            휴대폰 가로는 그림 왼쪽에 붙는다. PC 는 긴 판(.cap-long — 이름 · 둘째 줄 · ※ 두 줄), 휴대폰은 **이름과 둘째 줄만** 짧게
-            (.cap-short — 사용자가 정했다: "모바일에서 라이더 설명이 너무 많아서 우측시야를 가려 … 줄여줘").
+            휴대폰 가로는 그림 왼쪽에 붙는다. PC 는 긴 판(.cap-long — 이름 · 둘째 줄 · ※ 두 줄), 휴대폰은 **짧은 이름 한 줄만**
+            (.cap-short — 사용자가 정했다: "모바일에서 라이더 설명이 너무 많아서 우측시야를 가려 … 줄여줘", 이어서 2026-10-20
+            "모바일에서 - 지도학습 및 신경망 기반 추적 및 예측 삭제").
             숫자(2,880줄 · 10바퀴 · 33,007개 · 96.9%)는 game/lidarSensor.ts 의 LIDAR 와 ai/models/lidar.json 의 meta 에서 왔다 —
             센서 제원을 바꾸거나 다시 학습하면 여기도 고친다.
           -->
@@ -7842,10 +7855,7 @@
             <b class="lidar-title"
               ><span class="cap-long">LiDAR(광선 추적 시뮬레이션 기법)</span><span class="cap-short">LiDAR(광선추적기법)</span></b
             >
-            <span class="lidar-sub"
-              ><span class="cap-long">- 지도학습 및 신경망 기반 추적 및 위협 예측</span
-              ><span class="cap-short">- 지도학습 및 신경망 기반 추적 및 예측</span></span
-            >
+            <span class="lidar-sub cap-long">- 지도학습 및 신경망 기반 추적 및 위협 예측</span>
             <span class="lidar-note cap-long">※ 실제 LiDAR처럼 레이저 2,880줄을 1초에 10바퀴 쏘아 거리를 재고, 가림 · 빗길 손실까지 계산으로 재현</span>
             <span class="lidar-note cap-long">※ 시뮬레이터가 정답을 붙인 33,007개 물체로 신경망을 지도학습, 사람 · 자전거 · 차 판별 정확도 96.9%</span>
           </div>
