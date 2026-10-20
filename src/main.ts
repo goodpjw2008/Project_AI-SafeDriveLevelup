@@ -747,13 +747,16 @@ function toggleAutoDrive(): void {
   if (on) aiAssisted = true;
   // 바꾼 모드가 다음 판에도 이어진다 (위 autoDrivePreferred) — 맵 체험에서 바꾼 것은 체험 안의 일이라 남기지 않는다
   if (!mapTrial) autoDrivePreferred = on;
-  controls.setEnabled(!on);
+  // 멈춘 동안 모드를 바꾸면 조작은 '계속' 을 누를 때 켠다 (setRunPaused)
+  controls.setEnabled(!on && !paused);
   if (!on) {
     controls.setStopped(game.aiWantsStop);
     syncGoStop();
   }
   document.body.classList.toggle('ai-drive', on);
   showAutoDriveButton(on);
+  // AI 자율주행으로 바뀌면 멈춤 단추가 새로 선다 — 그려진 뒤에 자리를 잰다
+  requestAnimationFrame(() => placePauseButton());
 }
 /*
   **운전 모드 카드의 스위치** — 오른쪽에 적힌 모드로 바꾼다: 일반모드에서는 'AI 자율주행', AI 자율주행에서는 '일반모드'
@@ -1379,6 +1382,7 @@ function disposeGame(): void {
   game?.dispose();
   game = null;
   paused = false;
+  syncPauseButton();
   // 준비 중에 나갔을 수 있다 — 덮개를 걷지 않으면 메뉴가 가려진 채로 남는다
   hideLoading();
 }
@@ -1610,6 +1614,8 @@ async function startRun(id: number): Promise<void> {
   }
   hideLoading();
   started.start();
+  // HUD 가 그려진 뒤에 멈춤 단추를 홈으로 옆에 맞춘다
+  requestAnimationFrame(() => placePauseButton());
 }
 
 /**
@@ -1672,9 +1678,19 @@ function togglePause(): void {
     nav.back();
     return;
   }
+  setRunPaused(!paused);
+}
+
+/**
+ * **판을 멈추거나 잇는다** — Esc 와 HUD 의 멈춤 · 계속 단추(#btn-hud-pause)가 함께 쓴다.
+ *
+ * 이을 때 **AI 가 몰고 있으면 조작을 켜지 않는다.** 예전에는 늘 켜서, AI 자율주행 중 Esc 로 멈췄다 이으면 사람의 방향키까지
+ * 살아났다(판단은 AI 가 해도 키 입력이 쌓였다).
+ */
+function setRunPaused(on: boolean): void {
   if (!game) return;
-  paused = !paused;
-  if (paused) {
+  paused = on;
+  if (on) {
     game.pause();
     controls.setEnabled(false);
     /*
@@ -1682,12 +1698,42 @@ function togglePause(): void {
       (정지선 앞에서 완전히 서는 것)를 가리키는 말로 쓴다 — HUD 의 판단 표시가
       그것이다. 게임을 멈춘 것과 같은 이름으로 부르면 배우는 말이 흐려진다.
     */
-    hud.toast('게임을 멈췄습니다 — Esc로 재개, R로 재시작');
+    hud.toast(
+      document.body.classList.contains('touch')
+        ? "게임을 멈췄습니다 — '계속' 을 누르면 이어 갑니다"
+        : "게임을 멈췄습니다 — Esc 나 '계속' 으로 재개, R로 재시작",
+    );
   } else {
-    controls.setEnabled(true);
+    controls.setEnabled(!game.autoDriving);
     game.resumeRun();
   }
+  syncPauseButton();
 }
+
+/** 멈춤 · 계속 단추를 지금 상태에 맞춘다 — 글은 CSS 가 body.run-paused 로 바꾼다 (index.html 의 .hud-pause) */
+function syncPauseButton(): void {
+  document.body.classList.toggle('run-paused', paused && game !== null);
+  document.getElementById('btn-hud-pause')?.setAttribute('aria-pressed', String(paused));
+  placePauseButton();
+}
+
+/**
+ * **멈춤 단추는 홈으로 바로 오른쪽** — 홈으로의 자리 · 폭은 화면(PC · 휴대폰 세로 · 가로)마다 CSS 가 달리 정하므로, 그려진 홈으로를
+ * 재어 그 오른쪽 8px 에 둔다. 아래쪽 높이는 같은 알약(.hud-home)이라 CSS 가 같은 값으로 맞춘다.
+ */
+function placePauseButton(): void {
+  const home = document.getElementById('btn-hud-home');
+  const pause = document.getElementById('btn-hud-pause');
+  if (!home || !pause || home.offsetWidth === 0) return;
+  pause.style.left = `${home.offsetLeft + home.offsetWidth + 8}px`;
+}
+window.addEventListener('resize', () => placePauseButton());
+document.getElementById('btn-hud-pause')?.addEventListener('click', (e) => {
+  // 포커스를 뗀다 — 남아 있으면 Space(정지 별칭)가 이 단추를 다시 눌러 곧바로 풀린다 (모드 카드의 스위치와 같다)
+  (e.currentTarget as HTMLElement).blur();
+  if (screens.active !== 'none') return;
+  setRunPaused(!paused);
+});
 
 function finishRun(result: JudgeResult): void {
   if (!currentScenario) return;

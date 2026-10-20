@@ -4147,6 +4147,40 @@
         color: var(--text);
         border-color: rgba(255, 255, 255, 0.24);
       }
+      /*
+        **멈춤 · 계속** — 홈으로와 같은 알약, 홈으로 바로 오른쪽 (left 는 main.ts 의 placePauseButton). AI 자율주행 중에만 서고,
+        멈춘 동안에는 직접주행이어도 남아 '계속' 을 누를 수 있게 한다(body.run-paused). 멈춘 동안은 녹색으로 또렷하게 — 눌러야 할 단추다.
+      */
+      .hud-home.hud-pause {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35em;
+      }
+      body:not(.ai-drive):not(.run-paused) .hud-pause {
+        display: none;
+      }
+      .hud-pause svg {
+        width: 0.8em;
+        height: 0.8em;
+        fill: currentColor;
+        flex: 0 0 auto;
+      }
+      .hud-pause .resume-ico,
+      .hud-pause .resume-label,
+      body.run-paused .hud-pause .pause-ico,
+      body.run-paused .hud-pause .pause-label {
+        display: none;
+      }
+      body.run-paused .hud-pause .resume-ico,
+      body.run-paused .hud-pause .resume-label {
+        display: inline;
+      }
+      body.run-paused .hud-home.hud-pause {
+        opacity: 1;
+        color: #05210f;
+        background: rgba(46, 224, 106, 0.94);
+        border-color: transparent;
+      }
 
       /*
         **운전 모드 카드 — 홈으로 바로 위, 크게** (index.html 의 #drive-mode · main.ts 의 showAutoDriveButton).
@@ -5100,6 +5134,19 @@
         body.touch:not(.ai-drive) #lidar-box {
           bottom: calc(max(16px, env(safe-area-inset-bottom)) + 135px);
           width: min(36vw, 200px, 100vh - 250px);
+        }
+      }
+      /*
+        **휴대폰 세로는 조금 크게** (사용자가 정했다, 2026-10-20: "모바일 세로화면에서 라이다지도를 조금만 크게"). 폭 36vw(412px 폰에서
+        148px)를 42vw(173px)까지 — 단, 왼쪽의 운전 모드 카드(왼쪽 12px + 폭 199px 남짓)와 겹치지 않을 만큼만 자란다(100vw − 236px).
+        좁은 폰(360px)은 자리가 없어 예전 크기 그대로다. 직접 운전할 때(방향키 위)도 같은 셈에 원래의 상한을 건다.
+      */
+      @media (pointer: coarse) and (orientation: portrait) and (max-width: 720px) {
+        body.touch #lidar-box {
+          width: max(36vw, min(42vw, 100vw - 236px));
+        }
+        body.touch:not(.ai-drive) #lidar-box {
+          width: min(max(36vw, min(42vw, 100vw - 236px)), 200px, 100vh - 250px);
         }
       }
       body.touch .hud-home {
@@ -7877,6 +7924,16 @@
 
         <!-- 주행을 그만두고 첫 화면으로. HUD 는 pointer-events:none 이라 버튼만 auto 로 켠다 -->
         <button class="hud-home" id="btn-hud-home">홈으로</button>
+        <!--
+          **멈춤 · 계속** — AI 자율주행 중에 판을 잠깐 세워 둔다 (사용자가 정했다, 2026-10-20: "ai주행시 일시정지를 할수 있게 해줘").
+          '일시정지' 라고 적지 않는다 — 이 게임에서 그 말은 정지선 앞에서 완전히 서는 도로교통법의 일시정지다 (main.ts 의 togglePause).
+          자리는 홈으로 바로 오른쪽이다 — 홈으로의 폭은 화면마다 달라 main.ts 의 placePauseButton 이 재어 left 를 정한다.
+        -->
+        <button class="hud-home hud-pause" id="btn-hud-pause" type="button" aria-pressed="false">
+          <svg class="pause-ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1" /><rect x="9.4" y="2" width="3.6" height="12" rx="1" /></svg>
+          <svg class="resume-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.2 L13.6 8 L4 13.8 Z" /></svg>
+          <span class="pause-label">멈춤</span><span class="resume-label">계속</span>
+        </button>
         <!--
           **운전 모드 카드 — 홈으로 바로 위에 크게** (사용자가 정했다: "일반주행 모드일경우 : 현재상태 아이콘 + 일반모드 |
           AI 자율주행 [토글] / AI 자율주행 모드일경우 : 현재상태 아이콘 + AI 자율주행 | 일반모드 [토글]"). data-mode 가 지금의
