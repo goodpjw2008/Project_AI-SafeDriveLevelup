@@ -193,6 +193,16 @@ describe('검색 결과와 공유 카드', () => {
     }
   });
 
+  /* 검색 결과의 사이트 이름 — 네이버가 'ai.kr' 로 적었다 (2026-10-20). 이름을 표준(schema.org WebSite)으로 알린다 */
+  it('사이트 이름을 WebSite 구조화 데이터로 알린다', () => {
+    const block = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1]))
+      .find((d) => d['@type'] === 'WebSite');
+    expect(block).toBeDefined();
+    expect(block.name).toBe('{{APP_NAME}}');
+    expect(block.url).toBe('{{APP_SITE}}/');
+  });
+
   it('공개 주소는 https 한 벌이다 — 끝에 빗금을 두지 않는다', () => {
     expect(APP_SITE).toBe('https://safedrive.ai.kr');
   });

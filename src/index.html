@@ -67,6 +67,20 @@
         "author": { "@type": "Person", "name": "박진우" }
       }
     </script>
+    <!--
+      **사이트 이름** — 검색 결과의 주소 위에 뜨는 이름 (schema.org 의 WebSite). 네이버가 이름을 모르는 사이트에는 도메인을
+      대신 적는데, 'ai.kr' 이 '.co.kr' 같은 국가 도메인 꼬리라는 것을 몰라 우리 사이트를 'ai.kr' 로 적었다(사용자가 짚었다,
+      2026-10-20). 이름을 표준 방식으로 알려 둔다 — 구글은 이 값을 사이트 이름으로 쓴다고 밝히고 있다.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "{{APP_NAME}}",
+        "alternateName": ["safedrive.ai.kr"],
+        "url": "{{APP_SITE}}/"
+      }
+    </script>
 
     <!--
       본문 글꼴 (Pretendard, SIL OFL 1.1).
