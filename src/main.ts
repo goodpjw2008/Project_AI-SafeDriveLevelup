@@ -372,6 +372,7 @@ async function makeAiScenario(): Promise<void> {
       recentIds,
       (n) => (counts = n),
       history.map((r) => r.st),
+      saveData.settings.recommendAi,
     );
     /*
       **답이 오는 순간 분석 화면의 제목에 그 AI 이름을 띄운다** (ui/AiPick.ts 의 setAnalyst).
@@ -403,11 +404,22 @@ async function makeAiScenario(): Promise<void> {
           OUTCOME_MODEL
             ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
             : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
-        { tag: '2차', heading: '최신 AI LLM 으로 최종 맵 선택 중' },
-        () =>
-          many
-            ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`
-            : `AI 가 최종 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+        /*
+          **2차는 설정을 따른다** (save.ts 의 recommendAi) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
+          로컬은 1차의 모델 점수가 가장 높은 코스를 고른다 (recommend.ts 의 rulePick).
+        */
+        ...(saveData.settings.recommendAi === 'llm'
+          ? [
+              { tag: '2차', heading: '최신 AI LLM 으로 최종 맵 선택 중' },
+              () =>
+                many
+                  ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`
+                  : `AI 가 최종 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
+            ]
+          : [
+              { tag: '2차', heading: '브라우저 안의 모델로 최종 맵 선택 중' },
+              () => `최종 후보 ${counts.courses}개 중 모델 점수가 가장 높은 코스를 고르는 중`,
+            ]),
       ],
       picking,
     );
@@ -1097,6 +1109,12 @@ function renderSettings(): void {
       commit();
       renderSettings();
     },
+    // 다음 판을 무엇이 고를지 (save.ts 의 recommendAi) — 다음 추천부터 그 길로 간다 (makeAiScenario)
+    onRecommendAi: (mode) => {
+      saveData.settings.recommendAi = mode;
+      commit();
+      renderSettings();
+    },
     onDifficulty: (c) => {
       saveData.settings.difficulty = c;
       commit();
@@ -1135,7 +1153,7 @@ function renderSettings(): void {
       const ok = await screens.confirm({
         title: '설정을 처음 값으로 되돌립니다.',
         lines: [
-          [{ em: '난이도 · 연습 · 시점 · 화질 · 소리' }, '가 모두 처음 값이 됩니다.'],
+          [{ em: '난이도 · 연습 · 추천 AI · 시점 · 화질 · 소리' }, '가 모두 처음 값이 됩니다.'],
           '레벨 · 경험치 · 운전 습관 · 기록은 그대로입니다.',
         ],
         ok: '초기화',

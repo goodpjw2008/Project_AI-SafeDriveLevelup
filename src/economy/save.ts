@@ -15,6 +15,9 @@ import { TRACK_CHOICES, type TrackChoice } from '../scenarios/tracks';
 import { habitsTestedBy, libraryEntry } from '../scenarios/library';
 import { badgesFromHistory, freshBadges, normalizeBadges, type BadgeState } from './badges';
 
+/** 다음 판 추천을 무엇이 하는가 (settings.recommendAi) — 브라우저 안의 모델 · 외부 LLM */
+export type RecommendAi = 'local' | 'llm';
+
 const KEY = 'turn-right:save:v1';
 
 /** 저장된 연습 갈래를 받아 준다 — 모르는 값과 v13 이전의 '둘 다' 는 '자동' 이 된다 */
@@ -201,6 +204,13 @@ export interface SaveData {
      */
     track: TrackChoice;
     /**
+     * **다음 판을 무엇이 고르는가** (scenarios/recommend.ts) — 브라우저 안의 모델만(`local`) 또는 외부 LLM 까지(`llm`).
+     *
+     * **기본은 로컬이다** (사용자가 정했다). LLM 은 키 · 한도 · 망이 있어야 돌고, 없으면 어차피 코드가 고른다 —
+     * 기본을 바깥에 기대지 않게 한다. 외부 LLM 을 고르면 예전처럼 서버에 묻고, 답이 없을 때만 로컬로 돌아온다.
+     */
+    recommendAi: RecommendAi;
+    /**
      * 고른 소리 (soundAssets.ts 의 각 목록에 있는 id).
      *
      * 후보를 여럿 두고 고르게 하는 이유는, **어떤 소리가 좋은지는 들어 봐야 알기**
@@ -259,6 +269,7 @@ export function defaultSave(): SaveData {
       autoNextStage: true,
       difficulty: DEFAULT_CHALLENGE,
       track: 'auto',
+      recommendAi: 'local',
       graphics: defaultGraphics(),
       sounds: { ...DEFAULT_SOUNDS },
     },
@@ -326,6 +337,8 @@ export function load(): SaveData {
           지금까지 쓰던 사람만 자동을 못 만난다. 손으로 '우회전' · '어린이보호구역' 을 고른 것은 그대로 둔다.
         */
         track: migrateTrack(parsed.settings?.track, from),
+        // 모르는 값이면 기본(로컬)으로 — 손으로 고친 저장본이 서버에 묻는 쪽으로 새지 않게
+        recommendAi: parsed.settings?.recommendAi === 'llm' ? 'llm' : 'local',
       },
       stats: { ...base.stats, ...(parsed.stats ?? {}) },
       /*

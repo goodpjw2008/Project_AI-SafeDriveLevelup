@@ -50,6 +50,7 @@ import { difficultyOf, successProbability } from '../ai/difficulty';
 import { reviewDue } from '../ai/forgetting';
 import { SKILL_ORDER, SKILL_SHORT, effectiveMastery, wasTested, weakSkills, type Knowledge } from '../ai/knowledge';
 import { judgeCandidate, topPredictions, type CandidateVerdict } from '../ai/outcome';
+import type { RecommendAi } from '../economy/save';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
@@ -1022,6 +1023,12 @@ export async function recommendScenario(
    * 추천만 되고 아직 안 탄 판이 섞여 있어(main.ts), 그것을 "겪었다" 로 세면 거짓이 된다.
    */
   playedIds: readonly number[] = recentIds,
+  /**
+   * **무엇이 고르는가** (설정 '다음판 추천 AI 설정' — save.ts 의 recommendAi). `local` 이면 서버에 묻지 않고
+   * 브라우저 안의 모델 점수로 고른다. 기본값이 `llm` 인 것은 이 함수의 예전 동작(테스트)을 지키려는 것이고,
+   * 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
+   */
+  mode: RecommendAi = 'llm',
 ): Promise<RecommendOutcome> {
   // 최근에 나온 모양을 깎아 **번호만 다른 같은 장면**이 이어지지 않게 한다 (위 REPEAT_PENALTY)
   const seen = seenShapes(recentIds);
@@ -1034,7 +1041,8 @@ export async function recommendScenario(
   for (const g of byHabit.groups) if (g.habit) for (const e of g.courses) habitOf.set(e.spec.id, g.habit);
   const priority = byHabit.groups.length >= 2;
   onCandidates?.({ candidates: byHabit.candidates, courses: courses.length });
-  const reply = await askAi(recommendPayload(plan, habits, recent, courses, cover, priority ? habitOf : undefined));
+  const reply =
+    mode === 'llm' ? await askAi(recommendPayload(plan, habits, recent, courses, cover, priority ? habitOf : undefined)) : null;
 
   // **고른 번호가 후보에 있을 때만** 받는다 — 모델이 지어낸 번호는 버리고 코드가 고른다
   const answer = reply && reply !== 'no-server' && reply !== 'quota' ? reply : null;

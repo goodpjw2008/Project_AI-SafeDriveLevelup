@@ -317,6 +317,20 @@ describe('recommendScenario — 가짜 서버', () => {
     expect(out.source).toBe('rule');
     expect(out.scenario.id).not.toBe(1);
   });
+
+  /*
+    **설정 '다음판 추천 AI 설정' 이 로컬이면 서버에 묻지 않는다** (save.ts 의 recommendAi) — 키 · 한도 · 망과 상관없이
+    브라우저 안에서 끝나야 한다. 서버가 멀쩡히 답할 수 있어도 묻지 않는다.
+  */
+  it('로컬이면 서버에 묻지 않고 브라우저 안의 모델이 고른다', async () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('로컬은 서버에 묻지 않는다')));
+    vi.stubGlobal('fetch', fetch);
+    const out = await recommendScenario(plan(), habits, [], [], undefined, [], 'local');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(out.source).toBe('rule');
+    expect(out.picker).toBe('rule');
+    expect(libraryEntry(out.scenario.id)).toBeDefined();
+  });
 });
 
 describe('서버 — 입력 · 답', () => {

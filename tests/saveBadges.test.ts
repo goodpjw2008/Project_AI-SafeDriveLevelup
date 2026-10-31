@@ -54,3 +54,26 @@ describe('처음부터 다시 시작', () => {
     expect(fresh.badges.earned).toEqual([]);
   });
 });
+
+/*
+  **다음판 추천 AI 설정** (save.ts 의 recommendAi) — 기본은 로컬이다 (사용자가 정했다). 이 값이 없던 저장본도
+  로컬로 읽고, 모르는 값은 서버에 묻는 쪽으로 새지 않게 로컬로 돌린다.
+*/
+describe('다음판 추천 AI 설정', () => {
+  it('새 저장본과 이 값이 없던 저장본은 로컬이다', () => {
+    expect(defaultSave().settings.recommendAi).toBe('local');
+    const old = defaultSave() as unknown as { settings: Record<string, unknown> };
+    delete old.settings.recommendAi;
+    store(JSON.stringify(old));
+    expect(load().settings.recommendAi).toBe('local');
+  });
+
+  it('외부 LLM 을 고른 값은 남고, 모르는 값은 로컬이 된다', () => {
+    const llm = defaultSave();
+    llm.settings.recommendAi = 'llm';
+    store(JSON.stringify(llm));
+    expect(load().settings.recommendAi).toBe('llm');
+    store(JSON.stringify({ ...defaultSave(), settings: { ...defaultSave().settings, recommendAi: 'gpt' } }));
+    expect(load().settings.recommendAi).toBe('local');
+  });
+});

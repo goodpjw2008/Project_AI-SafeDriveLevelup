@@ -23,7 +23,7 @@ import qrSite from '../assets/qr-site.png';
 import { fetchCoaching, fetchHabitReport, toCoachRequest } from '../coach/client';
 import { MIN_RUNS, summarize, weakestPoint, type HabitSummary } from '../coach/habits';
 import { CARS_BY_LEVEL, getCar, isCarUnlocked, type CarSpec } from '../economy/cars';
-import { hasProgress, type SaveData } from '../economy/save';
+import { hasProgress, type RecommendAi, type SaveData } from '../economy/save';
 import { GRADE_TEXT, type JudgeResult } from '../rules/lawRules';
 import { VIOLATIONS, fineOf, penaltyPointsOf, type ViolationCode } from '../rules/violations';
 import type { ViewMode } from '../game/CameraRig';
@@ -1444,6 +1444,8 @@ export class Screens {
       onDifficulty(c: Challenge): void;
       /** 무엇을 연습할지 (scenarios/tracks.ts) — '자동' 이면 AI 가 고른다 */
       onTrack(track: TrackChoice): void;
+      /** 다음 판 추천을 무엇이 할지 (save.ts 의 recommendAi) */
+      onRecommendAi(mode: RecommendAi): void;
       /** 화질 항목 하나를 바꾼다 */
       onGraphics(patch: Partial<GraphicsSettings>): void;
       /** 프리셋 — 네 항목을 한 번에 맞춘다 */
@@ -1504,6 +1506,20 @@ export class Screens {
             TRACK_CHOICES.map((t) => [t, CHOICE_LABEL[t] + (t === 'auto' ? ' ·기본' : '')]),
             save.settings.track,
             { note: '자동은 고칠 습관과 기록을 보고 AI 가 우회전, 어린이보호구역, 우회전+어린이보호구역 을 선택' },
+          )}
+          <!--
+            **다음 판을 무엇이 고를까** (save.ts 의 recommendAi · 사용자가 정한 이름과 기본값).
+            로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이 없으면 로컬로 돌아온다.
+          -->
+          ${this.optionRow(
+            'rec',
+            '다음판 추천 AI 설정',
+            [
+              ['local', '로컬 신경망 기반 ·기본'],
+              ['llm', '외부 LLM 기반'],
+            ],
+            save.settings.recommendAi,
+            { note: '로컬은 브라우저 안의 학습 모델이 고르고, 외부 LLM 은 서버의 AI 에게 묻습니다 (답이 없으면 로컬)' },
           )}
           ${
             /*
@@ -1654,6 +1670,7 @@ export class Screens {
       document.getElementById(`view-${v.id}`)?.addEventListener('click', () => handlers.onStartView(v.id));
     }
     this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
+    this.bindOptions('rec', ['local', 'llm'], (v) => handlers.onRecommendAi(v as RecommendAi));
     this.bindOptions('drv', ['on', 'off'], (v) => handlers.onDriverView(v === 'on'));
 
     for (const t of ['ultra', 'high', 'medium', 'low'] as const) {
