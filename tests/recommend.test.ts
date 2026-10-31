@@ -20,11 +20,13 @@ import type { HabitSummary } from '../src/coach/habits';
 import type { Plan } from '../src/scenarios/generate';
 import type { Difficulty } from '../src/scenarios/curriculum';
 import { libraryEntry } from '../src/scenarios/library';
+import { recommendModelReady } from '../src/ai/recommendNet';
 import { isCombinedLevel, levelGuide } from '../src/scenarios/library';
 import {
   candidatesFor,
   coursesByHabit,
   coverageOf,
+  localPick,
   priorityHabits,
   recommendPayload,
   masterPick,
@@ -53,6 +55,7 @@ describe('고른 쪽 이름', () => {
       'cerebras',
       'gemini',
       'groq',
+      'local',
       'nvidia',
       'openai',
       'openrouter',
@@ -322,14 +325,18 @@ describe('recommendScenario — 가짜 서버', () => {
     **설정 '다음판 추천 AI 설정' 이 로컬이면 서버에 묻지 않는다** (save.ts 의 recommendAi) — 키 · 한도 · 망과 상관없이
     브라우저 안에서 끝나야 한다. 서버가 멀쩡히 답할 수 있어도 묻지 않는다.
   */
-  it('로컬이면 서버에 묻지 않고 브라우저 안의 모델이 고른다', async () => {
+  it('로컬이면 서버에 묻지 않고 브라우저의 추천 신경망이 고른다', async () => {
     const fetch = vi.fn(() => Promise.reject(new Error('로컬은 서버에 묻지 않는다')));
     vi.stubGlobal('fetch', fetch);
     const out = await recommendScenario(plan(), habits, [], [], undefined, [], 'local');
     expect(fetch).not.toHaveBeenCalled();
-    expect(out.source).toBe('rule');
-    expect(out.picker).toBe('rule');
+    // 학습한 모델이 없으면(학습 전 · 특징이 바뀜) 프로그램 점수로 고르고 그렇게 말한다 — 신경망이라고 하지 않는다
+    const by = recommendModelReady() ? 'local' : 'rule';
+    expect(out.source).toBe(by);
+    expect(out.picker).toBe(by);
+    expect(out.scenario.recommended).toBe(by);
     expect(libraryEntry(out.scenario.id)).toBeDefined();
+    if (by === 'local') expect(out.scenario.why).toContain('신경망');
   });
 });
 
@@ -486,7 +493,15 @@ describe('두 번째 횡단보도 보행자가 오는 쪽', () => {
  *
  * 흔들림은 고정 난수로 둔다 — **다양해지는 까닭이 운이 아니라 점수라는 것**을 보이려는 것이다.
  */
-describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () => {
+/*
+  **로컬 신경망도 같은 약속을 지킨다** (ai/recommendNet.ts — 설정의 로컬 신경망 기반). 신경망은 최종 후보 안에서만 고르지만,
+  그 안에서 늘 같은 종류만 고르면 다양성 · 무신호 보호구역 비율 같은 사용자가 정한 약속이 깨질 수 있다. 그래서 아래
+  다양성 검사를 프로그램과 신경망 둘 다로 돌린다. 모델이 없으면 신경망 쪽도 프로그램으로 고른다(localPick 이 null).
+*/
+describe.each([
+  ['프로그램', 'rule'],
+  ['로컬 신경망', 'local'],
+] as const)('이어 달리면 다양해진다 — 고칠 습관이 없어도 (%s)', (_name, picker) => {
   const fixed = () => {
     let seed = 7;
     return () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -510,7 +525,8 @@ describe('이어 달리면 다양해진다 — 고칠 습관이 없어도', () =
       const seen = seenShapes(played);
       const cover = coverageOf(played, level);
       const list = shortlist(p, candidatesFor(p, played), rnd, seen, cover);
-      const e = rulePick(p, list.length ? list : candidatesFor(p, played), rnd, seen, cover);
+      const pool = list.length ? list : candidatesFor(p, played);
+      const e = (picker === 'local' ? localPick(p, pool, seen, cover)?.entry : undefined) ?? rulePick(p, pool, rnd, seen, cover);
       played.push(e.spec.id);
       out.push(e);
     }

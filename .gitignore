@@ -17,6 +17,9 @@ dist/
 .dev-server.pid
 .dev-server.log
 
+# npm run train:recommend 가 일꾼끼리 주고받는 중간 결과 — 학습이 끝나면 쓸모없다 (결과는 src/ai/models/recommend.json)
+/.train-recommend/
+
 # 이 컴퓨터에서만 쓰는 개발 도구 설정 — 게임 · 빌드 · 배포와 무관하다
 /.claude/
 

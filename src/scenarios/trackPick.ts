@@ -6,7 +6,7 @@
  * 후보를 거른다 — 두 곳이 따로 셈하면 적힌 것과 나오는 것이 갈린다.
  */
 
-import type { SaveData } from '../economy/save';
+import type { PlanSource } from './nextPlan';
 import { currentTarget } from './curriculum';
 import { recentTracks } from './scenarioCode';
 import { pickTrack, TRACK_BRIEF, type TrackPick } from './tracks';
@@ -16,7 +16,7 @@ export interface ChosenTrack extends TrackPick {
   auto: boolean;
 }
 
-export function practiceTrack(save: SaveData): ChosenTrack {
+export function practiceTrack(save: PlanSource): ChosenTrack {
   const choice = save.settings.track;
   // 손으로 고른 갈래는 그대로 쓴다 — 고른 사람의 뜻이 AI 의 판단보다 앞선다
   if (choice !== 'auto') return { track: choice, why: TRACK_BRIEF[choice], auto: false };

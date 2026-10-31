@@ -39,9 +39,6 @@ import {
   GENERATED_ID_BASE,
   getScenario,
   prepareScenario,
-  rollLeadTurn,
-  rollSchoolZoneTurn,
-  rollZoneNoSignalTurn,
   SCENARIOS,
   stageLabel,
   type ScenarioSpec,
@@ -56,11 +53,10 @@ import {
 import { zoneCourse } from './scenarios/zoneCourse';
 import { scenarioByCode, scenarioCode } from './scenarios/scenarioCode';
 import { masterBadge } from './ui/badges';
-import { practiceTrack } from './scenarios/trackPick';
+import { nextPlan } from './scenarios/nextPlan';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
   masterPick,
-  noSignalZoneDue,
   priorityHabits,
   recommendScenario,
   type Picker,
@@ -68,7 +64,6 @@ import {
 } from './scenarios/recommend';
 import {
   advance,
-  currentTarget,
   levelLabel,
   observe,
   recordHabits,
@@ -76,6 +71,7 @@ import {
   type CurriculumState,
 } from './scenarios/curriculum';
 import { abilityPriorFor, difficultyOf } from './ai/difficulty';
+import { recommendModelReady } from './ai/recommendNet';
 import { riskOf } from './ai/risk';
 import { modelStep } from './ai/report';
 import { OUTCOME_MODEL, learnerVector, predictOutcome } from './ai/outcome';
@@ -267,56 +263,11 @@ async function makeAiScenario(): Promise<void> {
     ]);
     await warmLibrary();
   }
-  const zoneTurn = rollSchoolZoneTurn();
   /*
-    **신호기 없는 보호구역이 몇 판째 없었으면 이번 판은 반드시 그 판이다** (recommend.ts 의 `noSignalZoneDue`).
-    사용자가 "10판 넘게 했는데 한번도 나오지 않았어" 라고 짚었다 — 차례 확률과 고칠 습관 때문에 연달아 빠질 수 있었다.
+    **다음 판의 계획** — 갈래 · 보호구역 · 앞차 · 신호기 차례와 학습자 모델 (scenarios/nextPlan.ts).
+    추천 신경망의 학습(scripts/train-recommend.ts)도 같은 함수로 가상 운전자의 계획을 세운다.
   */
-  const noSignalDue = noSignalZoneDue(saveData.history.map((r) => r.st));
-  /*
-    **무엇을 연습하는 갈래인가** (scenarios/tracks.ts) — 기본은 **자동**이고, AI 가 고칠 습관과 기록을
-    보고 고른다. 우회전 전용이면 보호구역 차례를 아예 굴리지 않는다: 그 갈래에는 보호구역 판이 없어,
-    차례만 서고 판은 안 나오면 "보호구역 차례인데 우회전 판" 이라는 어긋난 설명이 화면에 뜬다.
-  */
-  const track = practiceTrack(saveData).track;
-  const zoneDueHere = noSignalDue && track !== 'turn';
-  const plan = {
-    level: c.level,
-    track,
-    target: currentTarget(c),
-    badHabits: c.badHabits,
-    /*
-      **보호구역은 네 판에 한 판이다** (scenarios.ts 의 `SCHOOL_ZONE_CHANCE`).
-
-      AI 에게 고르기를 맡기기 **전에** 굴린다 — 비율은 여러 판에 걸쳐 나타나는 성질이라
-      판 하나를 고르는 모델이 맞출 수 있는 것이 아니다.
-    */
-    schoolZone: track === 'turn' ? false : zoneTurn || zoneDueHere,
-    /*
-      **보호구역이 나올 차례면 신호기 유무도 여기서 굴린다** (scenarios.ts 의 `ZONE_NO_SIGNAL_CHANCE`).
-
-      이 게임의 핵심은 제27조 제7항 — 신호기 없는 보호구역 횡단보도는 사람이 없어도 선다 — 인데,
-      고르는 쪽이 보호구역을 불리언 하나로만 보아 절반이 신호 있는 판이었다 (사용자가 짚었다).
-
-      **차례가 아닐 때도 굴린다.** 새 개념을 여는 레벨과 종합 레벨에서는 보호구역 차례가 아니어도
-      보호구역 판이 섞여 들어오기 때문이다 (recommend.ts 의 `zoneOk` 예외).
-    */
-    zoneNoSignal: track === 'turn' ? undefined : zoneDueHere || rollZoneNoSignalTurn(),
-    noSignalZoneDue: zoneDueHere,
-    /* **앞차 차례도 여기서 굴린다** (scenarios.ts 의 `rollLeadTurn`) — 보호구역과 같은 이유다 */
-    lead: rollLeadTurn(),
-    /* 설정의 난이도 1~5 — 같은 레벨 안에서 얼마나 복잡한 코스를 고를지 (scenarios/challenge.ts) */
-    challenge: saveData.settings.difficulty,
-    // 필요한 양이 나중에 줄면(곡선 · 난이도를 바꿨을 때) 저장된 값이 넘친다 — AI 에게도 잘라서 준다 (ui/playerCard.ts)
-    xp: Math.min(c.xp ?? 0, xpToNext(c.level, challengeRule(saveData.settings.difficulty))),
-    xpNeed: xpToNext(c.level, challengeRule(saveData.settings.difficulty)),
-    cleanStreak: c.cleanStreak,
-    missStreak: c.missStreak,
-    // 학습자 모델 · 능력 (ai/knowledge.ts · ai/difficulty.ts) — 후보 점수와 AI 프롬프트가 읽는다
-    skills: c.skills ?? {},
-    ability: c.ability ?? abilityPriorFor(c.level),
-    outcomeBias: c.outcomeBias,
-  };
+  const plan = nextPlan(saveData);
   /*
     **AI 가 시나리오 라이브러리에서 고른다** (scenarios/recommend.ts).
 
@@ -406,7 +357,8 @@ async function makeAiScenario(): Promise<void> {
             : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
         /*
           **2차는 설정을 따른다** (save.ts 의 recommendAi) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
-          로컬은 1차의 모델 점수가 가장 높은 코스를 고른다 (recommend.ts 의 rulePick).
+          로컬은 추천 신경망이 최종 후보를 채점해 고른다 (ai/recommendNet.ts). 모델이 없으면(학습 전) 1차의 모델 점수가
+          가장 높은 코스를 고르므로(recommend.ts 의 rulePick) 그렇게 말한다.
         */
         ...(saveData.settings.recommendAi === 'llm'
           ? [
@@ -416,10 +368,18 @@ async function makeAiScenario(): Promise<void> {
                   ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`
                   : `AI 가 최종 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
             ]
-          : [
-              { tag: '2차', heading: '브라우저 안의 모델로 최종 맵 선택 중' },
-              () => `최종 후보 ${counts.courses}개 중 모델 점수가 가장 높은 코스를 고르는 중`,
-            ]),
+          : recommendModelReady()
+            ? [
+                { tag: '2차', heading: '로컬 신경망으로 최종 맵 선택 중' },
+                () =>
+                  many
+                    ? `신경망이 최종 후보 ${counts.courses}개를 채점해 먼저 고칠 습관과 코스를 고르는 중`
+                    : `신경망이 최종 후보 ${counts.courses}개를 채점해 가장 많이 배울 코스를 고르는 중`,
+              ]
+            : [
+                { tag: '2차', heading: '브라우저 안의 모델로 최종 맵 선택 중' },
+                () => `최종 후보 ${counts.courses}개 중 모델 점수가 가장 높은 코스를 고르는 중`,
+              ]),
       ],
       picking,
     );

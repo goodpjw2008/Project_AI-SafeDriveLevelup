@@ -46,11 +46,19 @@ import {
 import { inTrack } from './tracks';
 import { zoneEntries } from './zoneCourse';
 import { challengeRule } from './challenge';
-import { difficultyOf, successProbability } from '../ai/difficulty';
+import { difficultyOf, levelMeanDifficulty, successProbability } from '../ai/difficulty';
 import { reviewDue } from '../ai/forgetting';
 import { SKILL_ORDER, SKILL_SHORT, effectiveMastery, wasTested, weakSkills, type Knowledge } from '../ai/knowledge';
 import { judgeCandidate, topPredictions, type CandidateVerdict } from '../ai/outcome';
 import type { RecommendAi } from '../economy/save';
+import {
+  explainPick,
+  recommendFeatures,
+  recommendModelReady,
+  scoreCourses,
+  type CourseInputs,
+  type ReasonGroup,
+} from '../ai/recommendNet';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
@@ -341,8 +349,8 @@ export interface RecentRun {
 
 export interface RecommendOutcome {
   scenario: GeneratedScenario;
-  /** 누가 골랐는가 — `ai` 면 AI 가, `rule` 이면 서버가 없거나 답이 없어 코드가 골랐다 */
-  source: 'ai' | 'rule';
+  /** 누가 골랐는가 — `ai` 면 외부 LLM 이, `local` 이면 브라우저의 추천 신경망이, `rule` 이면 코드가 점수로 골랐다 */
+  source: 'ai' | 'local' | 'rule';
   /**
    * **고른 쪽의 이름** — 화면이 그대로 말한다 ("Gemini 가 골라 줬습니다!").
    *
@@ -371,7 +379,8 @@ export interface RecommendOutcome {
 }
 
 /**
- * 고른 쪽 — AI 제공자들, **한도 초과**(`quota`), 코드(`rule`), 마스터 운행의 무작위(`random`).
+ * 고른 쪽 — 외부 LLM 제공자들, 브라우저의 추천 신경망(`local` — 설정의 로컬 신경망 기반), **한도 초과**(`quota`), 코드(`rule`),
+ * 마스터 운행의 무작위(`random`).
  *
  * `quota` 와 `rule` 은 **둘 다 코드가 고른 판**이지만 까닭이 다르다. 화면이 다른 말을 해야 해서 나눈다 —
  * 한도를 다 쓴 것(429)은 "오늘 치를 다 썼다" 이고, 서버·키가 없는 배포는 처음부터 AI 가 없는 것이다.
@@ -384,6 +393,7 @@ export type Picker =
   | 'openrouter'
   | 'nvidia'
   | 'openai'
+  | 'local'
   | 'quota'
   | 'rule'
   | 'random';
@@ -396,6 +406,8 @@ export const PICKER_LABEL: Record<Picker, string> = {
   openrouter: 'OpenRouter',
   nvidia: 'NVIDIA',
   openai: 'OpenAI',
+  // 설정 '다음판 추천 AI 설정' 의 로컬 신경망 기반 (ai/recommendNet.ts) — 서버 없이 브라우저 안에서 고른다
+  local: '로컬 신경망',
   quota: 'AI',
   rule: '우회전 규칙',
   random: '무작위 뽑기',
@@ -735,11 +747,8 @@ function scoreOf(
   verdict?: (e: LibraryEntry) => CandidateVerdict | null,
 ): number {
   const habits = new Set(plan.badHabits.map((h) => h.code));
-  let s = 0;
   // 최근에 나온 모양은 깎는다 (위 REPEAT_PENALTY) — 번호만 다른 같은 장면을 막는다
-  for (const axis of Object.keys(REPEAT_PENALTY) as (keyof typeof REPEAT_PENALTY)[]) {
-    s -= (seen.get(`${axis}=${axisValue(e, axis)}`) ?? 0) * REPEAT_PENALTY[axis] * NONE_EXTRA(axis, e) * CORE_REPEAT(axis, e);
-  }
+  let s = -repeatOf(e, seen);
   if (plan.target && e.targets.includes(plan.target as ViolationCode)) s += 6;
   for (const t of e.targets) if (habits.has(t)) s += 1;
   const rule = challengeRule(plan.challenge);
@@ -791,11 +800,27 @@ function scoreOf(
     겪은 값을 찾아 주지는 못한다.** 그 일을 여기서 한다. 고칠 습관이 있으면 덜 세게 친다 (NOVELTY_GAIN).
   */
   const gain = plan.badHabits.length || plan.target ? NOVELTY_GAIN.withHabit : NOVELTY_GAIN.clean;
-  for (const axis of COVER_AXES) {
-    s += NEW_BONUS[axis] * novelty(cover.get(`${axis}=${axisValue(e, axis)}`) ?? 0) * gain;
-  }
-  return s;
+  return s + noveltyOf(e, cover) * gain;
 }
+
+/** 최근에 탄 모양과 겹친 정도 — `scoreOf` 가 이만큼 깎는다 (위 REPEAT_PENALTY) */
+function repeatOf(e: LibraryEntry, seen: SeenShapes): number {
+  let r = 0;
+  for (const axis of Object.keys(REPEAT_PENALTY) as (keyof typeof REPEAT_PENALTY)[]) {
+    r += (seen.get(`${axis}=${axisValue(e, axis)}`) ?? 0) * REPEAT_PENALTY[axis] * NONE_EXTRA(axis, e) * CORE_REPEAT(axis, e);
+  }
+  return r;
+}
+
+/** 이 레벨에서 아직 안 겪은 축 값의 무게 — 습관에 따른 배율(NOVELTY_GAIN)을 곱하기 전 (위 NEW_BONUS) */
+function noveltyOf(e: LibraryEntry, cover: Coverage): number {
+  let n = 0;
+  for (const axis of COVER_AXES) n += NEW_BONUS[axis] * novelty(cover.get(`${axis}=${axisValue(e, axis)}`) ?? 0);
+  return n;
+}
+
+/** 이 판이 겪게 하는 축 값들 — 경험 커버리지(`coverageOf`)가 세는 열쇠와 같다. 학습 스크립트가 '새로 겪은 것' 을 센다 */
+export const coverKeys = (e: LibraryEntry): string[] => COVER_AXES.map((axis) => `${axis}=${axisValue(e, axis)}`);
 
 /** AI 를 쓸 수 없을 때 코드가 고른다 — 점수가 가장 높은 판. 동점은 `random` 으로 가른다 */
 export function rulePick(
@@ -825,6 +850,99 @@ function ruleWhy(plan: Plan, e: LibraryEntry): string {
     return `'${habitTitle(top.code)}' 을(를) ${top.count}번 했습니다. 그 상황을 다시 연습하는 코스입니다.`;
   }
   return `L${plan.level} ${levelTier(plan.level)} 단계에 맞춘 코스입니다.`;
+}
+
+// ── 3-1. 로컬 신경망이 고르기 (ai/recommendNet.ts) ─────────────────────────────
+
+/** 후보 하나를 신경망의 입력으로 — 학습 스크립트(scripts/train-recommend.ts)도 이 함수로 센다 */
+export function courseInputs(
+  plan: Plan,
+  e: LibraryEntry,
+  seen: SeenShapes,
+  cover: Coverage,
+  verdict: (e: LibraryEntry) => CandidateVerdict | null,
+): CourseInputs {
+  const k = plan.skills ?? {};
+  const mastery = {} as Record<ViolationCode, number>;
+  const tested = {} as Record<ViolationCode, boolean>;
+  for (const c of SKILL_ORDER) {
+    mastery[c] = effectiveMastery(k, c);
+    tested[c] = wasTested(k, c);
+  }
+  const habits: Partial<Record<ViolationCode, number>> = {};
+  for (const h of plan.badHabits) habits[h.code] = (habits[h.code] ?? 0) + h.count;
+  const v = verdict(e);
+  return {
+    level: plan.level,
+    challenge: plan.challenge ?? 3,
+    xpFrac: plan.xpNeed ? (plan.xp ?? 0) / plan.xpNeed : 0,
+    cleanStreak: plan.cleanStreak ?? 0,
+    missStreak: plan.missStreak ?? 0,
+    habits,
+    target: (plan.target as ViolationCode | null) ?? null,
+    abilityRel: plan.ability === undefined ? 0 : plan.ability - levelMeanDifficulty(plan.level),
+    mastery,
+    tested,
+    tests: new Set(e.targets),
+    predict: v?.predict ?? null,
+    clean: v?.clean ?? null,
+    success: plan.ability === undefined ? undefined : successProbability(plan.ability, difficultyOf(e)),
+    info: v?.info ?? 0,
+    weak: !!v?.labels.includes('weak'),
+    zpd: !!v?.labels.includes('zpd'),
+    review: !!v?.labels.includes('review'),
+    levelDiff: e.level - plan.level,
+    cost: e.cost,
+    repeat: repeatOf(e, seen),
+    novelty: noveltyOf(e, cover),
+    program: scoreOf(plan, e, seen, cover, verdict),
+    zone: e.tags.zone === 'yes' || e.tags.approach !== 'none',
+    noSignalZone: isNoSignalZone(e.tags),
+    lead: e.tags.lead !== 'none',
+  };
+}
+
+/**
+ * **로컬 신경망이 고른다** — 최종 후보마다 점수를 내어 가장 높은 판. 모델이 없으면(학습 전 · 특징이 바뀜) null 이고,
+ * 부르는 쪽이 프로그램 점수로 고른다. `why` 는 가려 보기(explainPick)로 찾은 가장 큰 근거를 문장으로 옮긴 것이다.
+ */
+export function localPick(
+  plan: Plan,
+  courses: readonly LibraryEntry[],
+  seen: SeenShapes = NO_SHAPES,
+  cover: Coverage = NO_COVER,
+): { entry: LibraryEntry; why: string; scores: number[] } | null {
+  if (!courses.length || !recommendModelReady()) return null;
+  const verdict = verdictsFor(plan, cover);
+  const inputs = courses.map((e) => courseInputs(plan, e, seen, cover, verdict));
+  const rows = inputs.map(recommendFeatures);
+  const scores = scoreCourses(rows);
+  let best = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
+  const reason = explainPick(rows, best);
+  return { entry: courses[best], why: localWhy(plan, inputs[best], reason?.group ?? null), scores };
+}
+
+/** 가려 보기로 찾은 근거 → 추천 카드의 한 문장. 근거에 맞는 값이 없으면 다음 근거로 내려간다 */
+function localWhy(plan: Plan, x: CourseInputs, group: ReasonGroup | null): string {
+  const pctOf = (v: number) => Math.round(v * 100);
+  const weakest = [...x.tests]
+    .filter((c) => x.tested[c] && SKILL_ORDER.includes(c))
+    .sort((a, b) => x.mastery[a] - x.mastery[b])[0];
+  const habit = plan.badHabits.find((h) => x.tests.has(h.code));
+  const lines: Record<ReasonGroup, string | null> = {
+    habit: habit ? `'${habitTitle(habit.code)}' 을(를) ${habit.count}번 했습니다. 신경망이 그 습관을 고치는 데 가장 도움이 될 코스로 골랐습니다.` : null,
+    weak:
+      weakest && x.mastery[weakest] < 0.85
+        ? `'${SKILL_SHORT[weakest]}' 숙달이 ${pctOf(x.mastery[weakest])}%라, 신경망이 그 판단을 다시 묻는 코스를 골랐습니다.`
+        : null,
+    fit: x.success !== undefined ? `예상 성공률 ${pctOf(x.success)}% — 신경망이 지금 실력에서 가장 많이 배울 난이도로 골랐습니다.` : null,
+    novel: x.novelty > 0 ? '이 레벨에서 아직 겪어 보지 않은 상황이 들어 있어, 신경망이 이 코스를 골랐습니다.' : null,
+    review: x.review ? '한동안 연습하지 않아 흐려졌을 판단을 다시 묻는 코스라, 신경망이 골랐습니다.' : null,
+  };
+  const order: ReasonGroup[] = group ? [group, 'habit', 'weak', 'novel', 'fit', 'review'] : ['habit', 'weak', 'novel', 'fit', 'review'];
+  for (const g of order) if (lines[g]) return lines[g]!;
+  return `L${plan.level} ${levelTier(plan.level)} 단계에 맞춰 신경망이 고른 코스입니다.`;
 }
 
 // ── 4. 서버에 묻기 ───────────────────────────────────────────────────────────
@@ -1025,8 +1143,8 @@ export async function recommendScenario(
   playedIds: readonly number[] = recentIds,
   /**
    * **무엇이 고르는가** (설정 '다음판 추천 AI 설정' — save.ts 의 recommendAi). `local` 이면 서버에 묻지 않고
-   * 브라우저 안의 모델 점수로 고른다. 기본값이 `llm` 인 것은 이 함수의 예전 동작(테스트)을 지키려는 것이고,
-   * 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
+   * 브라우저의 추천 신경망이 고른다 (ai/recommendNet.ts — 모델이 없으면 프로그램 점수). 기본값이 `llm` 인 것은 이
+   * 함수의 예전 동작(테스트)을 지키려는 것이고, 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
    */
   mode: RecommendAi = 'llm',
 ): Promise<RecommendOutcome> {
@@ -1086,7 +1204,25 @@ export async function recommendScenario(
       habitBy: aiHabit ? 'ai' : 'rule',
     };
   }
-  const entry = rulePick(plan, courses.length ? courses : candidatesFor(plan, recentIds), Math.random, seen, cover);
+  const pool = courses.length ? courses : candidatesFor(plan, recentIds);
+  /*
+    **로컬이면 추천 신경망이 고른다** (ai/recommendNet.ts). 습관이 여럿이면 묶음을 가리지 않고 모든 후보를 함께 채점하므로,
+    고른 판이 든 묶음의 습관이 곧 신경망이 먼저 고치기로 한 습관이다 — 외부 LLM 이 정할 때와 같은 자리에 적는다.
+    모델이 없으면(학습 전 · 특징이 바뀜) 아래 프로그램 점수로 고른다.
+  */
+  const local = mode === 'local' ? localPick(plan, pool, seen, cover) : null;
+  if (local) {
+    const e = local.entry;
+    const habit = habitOf.get(e.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
+    return {
+      scenario: withVerdict(toScenario(e, plan.level, local.why, '', 'local', 'local', undefined, successPercent(plan, e)), e),
+      source: 'local',
+      picker: 'local',
+      habit,
+      habitBy: priority && habit ? 'ai' : 'rule',
+    };
+  }
+  const entry = rulePick(plan, pool, Math.random, seen, cover);
   // 한도를 다 써서 코드가 고른 판은 그렇게 말한다 (위 Picker 주석)
   const why: Picker = reply === 'quota' ? 'quota' : 'rule';
   return {
@@ -1145,7 +1281,7 @@ function toScenario(
   level: Difficulty,
   why: string,
   focus: string,
-  source: 'ai' | 'rule',
+  source: 'ai' | 'local' | 'rule',
   picker: Picker,
   model?: string,
   success?: number,

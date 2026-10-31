@@ -73,10 +73,10 @@ export interface GeneratedScenario extends ScenarioSpec {
   level: Difficulty | null;
   /**
    * 시나리오 라이브러리에서 **추천받은** 판이면 누가 골랐는가 (recommend.ts).
-   * `ai` — AI 가 습관을 보고 골랐다 · `rule` — AI 를 쓸 수 없어 코드가 골랐다.
+   * `ai` — 외부 LLM 이 습관을 보고 골랐다 · `local` — 브라우저의 추천 신경망이 골랐다 · `rule` — 코드가 점수로 골랐다.
    * 없으면 모델이 새로 만든 판이다.
    */
-  recommended?: 'ai' | 'rule';
+  recommended?: 'ai' | 'local' | 'rule';
   /**
    * **누가 골랐는가** — 'gemini' · 'groq' · 'openai' · 'rule' · 'random' (scenarios/recommend.ts 의 Picker).
    * 준비 화면이 "Gemini 가 골라 줬습니다!" 라고 적는다 — 판을 다시 태울 때도 같은 말을 해야 해서 판에 싣는다.
