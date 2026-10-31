@@ -23,6 +23,8 @@ import {
 import { habitsTestedBy, scenarioLibrary, libraryNumber } from '../src/scenarios/library';
 import { validateScenario } from '../src/scenarios/validate';
 import { playScenario } from '../src/scenarios/playSim';
+import { simulate } from '../src/scenarios/driveSim';
+import { SPAWN_Z_SCHOOL_ZONE } from '../src/layout';
 
 const courses = zoneCourses();
 
@@ -179,6 +181,27 @@ describe('어린이보호구역 전용 도로', () => {
   직진 코스에는 우회전에만 있는 습관(방향지시등 · 대회전 · 교차로 서행)이 **없다.** 그것을 시험한다고
   적어 두면, 그 습관이 보호구역 판 몇 번으로 '고쳐졌다' 가 된다 (scenarios/library.ts 의 habitsTestedBy).
 */
+/*
+  **정지선에서 선다 — 경찰청 답변 4.** 이 길의 횡단보도 셋 앞에는 모두 정지선이 그어져 있다(game/Intersection.ts). 예전에는
+  횡단보도 앞 2m 안이면 어디서 서도 인정했다 — 교차로 정지선과 같은 자(허용 오차 0.5m)로 바꿨다.
+*/
+describe('보호구역 도로의 정지선', () => {
+  const world = { vehicleLight: 'green' as const, isSchoolZone: true, zoneLights: () => ({ A: 'green' as const, B: 'green' as const }) };
+  const run = (gap: number) =>
+    simulate(world, { drive: 'zoneOnly', startZ: SPAWN_Z_SCHOOL_ZONE, turnSignal: 'never', waitForGreen: true, stopAtSchoolZoneLine: 2, schoolZoneLineGap: gap })
+      .violations.map((v) => v.code);
+
+  it('첫 횡단보도(신호기 없음)의 정지선 앞에 서면 통과한다', () => {
+    expect(run(0.4)).not.toContain('OVER_STOP_LINE');
+    expect(run(0.4)).not.toContain('SCHOOL_ZONE_NO_STOP');
+  });
+
+  it('정지선을 넘어 횡단보도 앞에 서면 정지선 위반이다 — 섰으니 무정지는 아니다', () => {
+    expect(run(-1.2)).toContain('OVER_STOP_LINE');
+    expect(run(-1.2)).not.toContain('SCHOOL_ZONE_NO_STOP');
+  });
+});
+
 describe('이 코스가 시험하는 습관', () => {
   it('우회전 습관은 시험하지 않는다', () => {
     for (const spec of courses) {
@@ -214,6 +237,17 @@ describe('이 코스가 시험하는 습관', () => {
         const signalled = s.zoneSignals?.[p.crosswalk as 'S' | 'A' | 'B'] !== undefined;
         if (signalled) expect(p.obeysSignal, `${s.title} · ${p.crosswalk}`).toBe(false);
       }
+    }
+  });
+
+  /*
+    **횡단보도 셋 모두 앞에 정지선이 있다** — 신호기 없는 자리에서 반드시 서므로 정지선 준수도 시험한다 (경찰청 답변 4).
+    정지선을 넘어 서면 정지선 위반으로 잡히는데(rules/lawRules.ts 의 trackZoneRoad), 시험한다고 적지 않으면 그 습관을 이
+    코스에서는 고칠 수 없다.
+  */
+  it('신호기 없는 횡단보도가 있으면 정지선 준수도 시험한다', () => {
+    for (const s of courses) {
+      if (Object.keys(s.zoneSignals ?? {}).length < 3) expect(habitsTestedBy(s).has('OVER_STOP_LINE'), s.title).toBe(true);
     }
   });
 

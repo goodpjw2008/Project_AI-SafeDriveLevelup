@@ -248,6 +248,34 @@ describe('신호기 없는 횡단보도 — 제27조 제7항', () => {
   });
 });
 
+/*
+  **정지선이 있으면 그 정지선에서 선다** — 경찰청 답변 4 (2026-10, 사용자가 받은 답): "정지선이 있으면 그 정지선에서,
+  없으면 횡단보도를 넘지 않는 범위에서 일시정지 — 일정 거리 기준은 없음". 이 횡단보도 앞에는 정지선이 그어져 있다.
+  예전에는 횡단보도 앞 2m 안이면 어디서 서도 인정했다 — 교차로 정지선과 같은 자(허용 오차 0.5m)로 바꿨다.
+*/
+describe('정지선에서 선다 — 경찰청 답변 4', () => {
+  it('정지선 앞에 서면 그대로 통과한다', () => {
+    expect(codes(drive(noSignal(), { stopAtSchoolZoneLine: 2, stopAtLine: 2 }))).toEqual([]);
+  });
+
+  it('허용 오차(0.5m) 안으로 넘은 것은 봐준다', () => {
+    expect(codes(drive(noSignal(), { stopAtSchoolZoneLine: 2, schoolZoneLineGap: -0.3, stopAtLine: 2 }))).toEqual([]);
+  });
+
+  it('정지선을 넘어 횡단보도 앞에 서면 정지선 위반이다 — 섰으니 무정지는 아니다', () => {
+    const r = drive(noSignal(), { stopAtSchoolZoneLine: 2, schoolZoneLineGap: -1.2, stopAtLine: 2 });
+    expect(STOP_LINE_S - 1.2).toBeGreaterThan(CROSSWALK_S_OUTER);
+    expect(codes(r)).toContain('OVER_STOP_LINE');
+    expect(codes(r)).not.toContain('SCHOOL_ZONE_NO_STOP');
+  });
+
+  it('신호 있는 횡단보도의 적색도 정지선에서 기다린다', () => {
+    const r = drive(withSignal('red'), { stopAtSchoolZoneLine: 2, schoolZoneLineGap: -1.2, stopAtLine: 2 });
+    expect(codes(r)).toContain('OVER_STOP_LINE');
+    expect(codes(r)).not.toContain('SCHOOL_ZONE_RED');
+  });
+});
+
 describe('신호기 있는 횡단보도', () => {
   it('녹색이면 서지 않아도 된다', () => {
     const r = drive(withSignal('green'), { stopAtSchoolZoneLine: 0, stopAtLine: 2 });

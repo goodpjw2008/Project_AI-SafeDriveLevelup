@@ -28,6 +28,7 @@ import {
 import { CAR_HALF_LENGTH, arcLengths, buildPath, buildStraightPath, poseAt, type TurnStyle } from './turnPath';
 import {
   RightTurnJudge,
+  ZONE_ROAD_EDGES,
   type CrosswalkId,
   type DriveMode,
   type JudgeResult,
@@ -122,6 +123,11 @@ export interface DriverConfig {
    * 아니고, 검증기의 '모범 운전' 이 그 판을 통과 불가능으로 판정하게 된다.
    */
   stopAtSchoolZoneLine?: number;
+  /**
+   * `stopAtSchoolZoneLine` 으로 설 때 S 의 정지선에서 얼마나 떨어져 서는가 (m). 기본 0.4 — 정지선에 붙여 선다.
+   * 음수면 정지선을 넘어 선다 (−0.5 보다 넘으면 정지선 위반 — 경찰청 답변 4, rules/lawRules.ts).
+   */
+  schoolZoneLineGap?: number;
   /** 교차로 회전 속도 (km/h) */
   turnKmh?: number;
   /** 정지선 앞에서 멈출지, 멈춘다면 몇 초 */
@@ -194,6 +200,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     stopAtLine = 0,
     lineGap = 0.4,
     stopAtSchoolZoneLine = 0,
+    schoolZoneLineGap = 0.4,
     stopPastLine = 0,
     pastLineDepth = 1.0,
     stopBeforeExitCrosswalk = 0,
@@ -241,7 +248,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
   */
   if (stopAtSchoolZoneLine > 0) {
     stops.push({
-      atDistance: distanceWhereFrontZ(STOP_LINE_S + 0.4),
+      atDistance: distanceWhereFrontZ(STOP_LINE_S + schoolZoneLineGap),
       seconds: stopAtSchoolZoneLine,
     });
   }
@@ -254,14 +261,20 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
       seconds: stopPastLine,
     });
   }
+  /*
+    **세 번째로 만나는 횡단보도(B · C) 앞에서 서는 자리.** 교차로를 지나 만나는 횡단보도에는 내 쪽 정지선이 없어 횡단보도 1m
+    앞에 선다(경찰청 답변 4 — 정지선이 없으면 횡단보도를 넘지 않는 범위에서). **사거리 없는 보호구역 도로의 B 앞에는 정지선이
+    그어져 있어** 그 정지선 앞에 선다 — 1m 앞에 서면 정지선을 1m 넘은 것이라 정지선 위반이다 (rules/lawRules.ts 의 trackZoneRoad).
+  */
+  const exitStop =
+    drive === 'zoneOnly'
+      ? distanceWhereFrontZ(ZONE_ROAD_EDGES.B.stopLine + 0.4)
+      : goesStraight
+        ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
+        : distanceWhereFrontX(CROSSWALK_INNER - 1);
   if (stopBeforeExitCrosswalk > 0 || yieldUntilClear) {
     // 교차로를 지나 만나는 횡단보도 직전에서 멈춘다 — 우회전이면 C, 직진이면 B
-    stops.push({
-      atDistance: goesStraight
-        ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
-        : distanceWhereFrontX(CROSSWALK_INNER - 1),
-      seconds: stopBeforeExitCrosswalk,
-    });
+    stops.push({ atDistance: exitStop, seconds: stopBeforeExitCrosswalk });
   }
   stops.sort((p, q) => p.atDistance - q.atDistance);
 
@@ -285,9 +298,7 @@ export function simulate(world: WorldConfig, driver: DriverConfig = {}): JudgeRe
     매 스텝 다시 재면 판 하나에 수천 번 돌고, 검증기가 몰기 서른여섯 가지를 돌리는 동안
     판 하나에 4초가 걸렸다.
   */
-  const gateC = goesStraight
-    ? distanceWhereFrontZ(CROSSWALK_B_INNER + 1)
-    : distanceWhereFrontX(CROSSWALK_INNER - 1);
+  const gateC = exitStop;
 
   const judge = new RightTurnJudge(world.stopZone, drive);
   const resolve = <T>(v: T | ((t: number) => T), t: number): T =>

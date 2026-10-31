@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { advisedBy, analyzingBy, pickedByCard, pickedByHud } from '../src/ui/pickedBy';
+import { recommendModelReady } from '../src/ai/recommendNet';
 
 describe('추천 카드의 한 줄', () => {
   // 사용자가 정했다 (2026-09-27): "세부 모델명은 적지 말아줘 — Gemini 분석, Groq 분석 정도로"
@@ -23,15 +24,20 @@ describe('추천 카드의 한 줄', () => {
   it('최종 후보 수를 주면 "최종 후보 10개 중" 이라고 말한다 — 규칙 N개 → 최종 10개 → 하나 (사용자가 헷갈렸다)', () => {
     expect(pickedByCard('gemini', 'gemini-3.1-flash-lite', 10)).toContain('최종 후보 10개 중 운전자에 맞는 맵을 골라 줬어요');
     expect(pickedByCard('rule', undefined, 10)).toContain('최종 후보 10개 중');
-    expect(pickedByCard('quota', undefined, 10)).toContain('프로그램으로 추천했어요 (최종 후보 10개 중)');
+    expect(pickedByCard('quota', undefined, 10)).toContain('이 추천했어요 (최종 후보 10개 중)');
     // 후보가 없는 무작위 마스터 운행은 그대로
     expect(pickedByCard('random', undefined, 0)).not.toContain('최종 후보');
   });
 
-  it('한도를 다 썼으면 그렇게 말한다 — 모델 이름은 쓰지 않는다', () => {
+  /*
+    **한도를 다 쓰면 추천 신경망이 대신 고르고 그렇게 말한다** (사용자가 정했다, 2026-10-31 — 예전에는 프로그램이 골랐다).
+    학습한 모델이 없으면 프로그램이 고르므로 그렇게 말한다 — 고르지 않은 쪽의 이름을 쓰면 거짓말이다.
+  */
+  it('한도를 다 썼으면 그렇게 말하고, 대신 고른 쪽을 밝힌다 — 모델 이름은 쓰지 않는다', () => {
     const line = pickedByCard('quota');
     expect(line).toContain('일일 사용량이 초과됐어요');
-    expect(line).toContain('프로그램으로 추천했어요');
+    expect(line).toContain(recommendModelReady() ? '대신 로컬 신경망이 추천했어요' : '대신 프로그램이 추천했어요');
+    expect(pickedByHud('quota')).toContain(recommendModelReady() ? '로컬 신경망이 고른 맵' : '프로그램이 고른 맵');
   });
 
   it('고른 쪽이 없으면 줄을 비운다 (손으로 쓴 판 · 시범 주행)', () => {

@@ -242,6 +242,12 @@ export const PEDESTRIAN_TOLERANCE_SECONDS = 0.15;
  */
 export const STOP_LINE_TOLERANCE = 0.5;
 
+/** 정지선 앞에서 선 자리를 한 줄로 — `gap` 은 앞범퍼에서 정지선까지(음수면 넘었다) */
+const lineGap = (gap: number): string =>
+  gap >= -0.02
+    ? `정지선까지 ${Math.max(0, gap).toFixed(2)}m`
+    : `정지선을 ${(-gap).toFixed(2)}m 넘었지만 허용 오차(${STOP_LINE_TOLERANCE.toFixed(1)}m) 안`;
+
 // ────────────────────────────────────────────────────────────────────────────
 // 결과 타입
 // ────────────────────────────────────────────────────────────────────────────
@@ -462,8 +468,10 @@ export class RightTurnJudge {
   /** 횡단보도별로 '보행자를 방해한 채 움직인' 시간. PEDESTRIAN_TOLERANCE_SECONDS 를 넘으면 확정한다. */
   private pedConflictTimer: Record<CrosswalkId, number> = { A: 0, B: 0, C: 0, S: 0 };
 
-  /** 진입부 보호구역 횡단보도(S) 앞에서 완전히 섰는가 */
+  /** 진입부 보호구역 횡단보도(S)의 정지선 앞(허용 오차 안)에서 완전히 섰는가 */
   private stoppedBeforeS = false;
+  /** S 의 정지선을 넘어(허용 오차 밖) 횡단보도 앞에서 섰는가 — 섰으니 무정지는 아니지만 정지선 위반이다 */
+  private lateStopBeforeS = false;
   /** "앞차 뒤에서 정지 — 인정 안 함" 을 한 번만 적는다 */
   private queuedNoted = false;
   /** 정지 구역보다 멀리서 선 것을 한 번만 적는다 (trackStopTimer) */
@@ -476,8 +484,10 @@ export class RightTurnJudge {
   private stopBeforeB = false;
   private enteredCrosswalkB = false;
 
-  /** 사거리 없는 보호구역 도로의 횡단보도별 상태 (drive: 'zoneOnly') */
+  /** 사거리 없는 보호구역 도로의 횡단보도별 상태 (drive: 'zoneOnly') — 횡단보도 앞에서 섰는가(정지선을 넘었어도) */
   private zoneStopped: Record<CrosswalkId, boolean> = { S: false, A: false, B: false, C: false };
+  /** 그 정지선 앞(허용 오차 안)에서 섰는가 — 아니면서 `zoneStopped` 면 정지선 위반이다 */
+  private zoneCleanStop: Record<CrosswalkId, boolean> = { S: false, A: false, B: false, C: false };
   private zoneEntered: Record<CrosswalkId, boolean> = { S: false, A: false, B: false, C: false };
 
   private cleanStopBeforeA = false;
@@ -593,7 +603,7 @@ export class RightTurnJudge {
     return {
       stoppedBeforeA: this.stoppedBeforeA(),
       stoppedBeforeC: this.stopBeforeC,
-      stoppedBeforeS: this.stoppedBeforeS,
+      stoppedBeforeS: this.stoppedBeforeS || this.lateStopBeforeS,
       enteredIntersection: this.enteredIntersection,
       enteredCrosswalkA: this.enteredCrosswalkA,
       enteredCrosswalkC: this.enteredCrosswalkC,
@@ -757,7 +767,7 @@ export class RightTurnJudge {
           this.note(
             s.t,
             'warn',
-            `횡단보도 위에서 정지 — 정지선을 ${(STOP_LINE - s.frontZ).toFixed(2)}m 넘었다`,
+            `정지선을 ${(STOP_LINE - s.frontZ).toFixed(2)}m 넘어 정지 — 정지선에서 서야 합니다`,
           );
         }
         this.lateStopBeforeA = true;
@@ -946,21 +956,39 @@ export class RightTurnJudge {
     if (!s.approachZone) return;
 
     /*
-      정지선 앞 정지 구역에서 완전히 선 적이 있는가. 교차로 정지선과 같은 규칙이다 —
-      너무 멀리서 선 것은 이 횡단보도 앞에 선 것으로 보지 않는다(STOP_ZONE_DEPTH).
+      **정지선에서 섰는가** — 교차로 정지선(A)과 같은 규칙이다 (trackStopTimer). 정지선 앞 정지 구역 안이어야 하고
+      (너무 멀리서 선 것은 이 횡단보도 앞에 선 것이 아니다, STOP_ZONE_DEPTH), 앞차 뒤에 줄 서서 선 것은 치지 않는다.
+
+      **정지선을 넘어 횡단보도 앞에 선 것은 정지선 위반이다** (경찰청 답변 4 — "정지선이 있으면 그 정지선에서, 없으면
+      횡단보도를 넘지 않는 범위에서 일시정지", 2026-10). 이 횡단보도 앞에는 정지선이 그어져 있다(game/Intersection.ts 의
+      drawApproachZone). 예전에는 횡단보도 앞 2m 안이면 어디서 서도 인정했다. 섰다는 사실은 남으므로 무정지 · 적색 통과로는
+      잡지 않고, 횡단보도에 들어설 때 정지선 위반 하나로 잡는다 — 교차로 정지선과 같다.
     */
     if (
-      !this.stoppedBeforeS &&
-      // 앞차 뒤에 줄 서서 선 것은 이 횡단보도 앞에 선 것이 아니다 (WorldSample.queuedBehind)
+      !this.enteredCrosswalkS &&
       !s.queuedBehind &&
       s.frontZ >= CROSSWALK_S_OUTER &&
       s.frontZ <= STOP_LINE_S + this.stopZoneDepth &&
       this.stopTimer >= STOP_HOLD_SECONDS
     ) {
-      this.stoppedBeforeS = true;
+      if (s.frontZ >= STOP_LINE_S - STOP_LINE_TOLERANCE) {
+        if (!this.stoppedBeforeS) this.note(s.t, 'ok', `어린이보호구역 횡단보도 정지선 앞 일시정지 인정 — ${lineGap(s.frontZ - STOP_LINE_S)}`);
+        this.stoppedBeforeS = true;
+      } else {
+        if (!this.lateStopBeforeS && !this.stoppedBeforeS) {
+          this.note(s.t, 'warn', `어린이보호구역 횡단보도 정지선을 ${(STOP_LINE_S - s.frontZ).toFixed(2)}m 넘어 정지 — 정지선에서 서야 합니다`);
+        }
+        this.lateStopBeforeS = true;
+      }
     }
+    const stoppedS = this.stoppedBeforeS || this.lateStopBeforeS;
 
-    const withinBand = s.frontZ <= CROSSWALK_S_OUTER && s.frontZ >= CROSSWALK_S_INNER;
+    /*
+      **보행자 방해는 정지선부터 본다** — 교차로 정지선(A)과 같다(trackCrosswalkA). 서야 할 자리가 정지선이므로, 보행자가
+      건너는데 정지선을 넘어 움직인 것이 곧 방해다. 예전에는 횡단보도 위에서만 봤다 — 그때는 정지선을 넘어 횡단보도 앞에
+      서는 것도 인정했기 때문이다.
+    */
+    const withinBand = s.frontZ <= STOP_LINE_S && s.frontZ >= CROSSWALK_S_INNER;
 
     if (!this.enteredCrosswalkS && s.frontZ <= CROSSWALK_S_OUTER) {
       this.enteredCrosswalkS = true;
@@ -970,13 +998,16 @@ export class RightTurnJudge {
         'info',
         `어린이보호구역 횡단보도 진입 — ${s.speedKmh.toFixed(0)}km/h · ` +
           (light === null ? '신호기 없음' : `차량신호 ${LIGHT_TEXT[light]}`) +
-          ` · 일시정지 ${this.stoppedBeforeS ? '함' : '안 함'}` +
+          ` · 일시정지 ${this.stoppedBeforeS ? '함' : this.lateStopBeforeS ? '정지선 넘어 함' : '안 함'}` +
           ` · ${this.describePedestrians(this.conflictingPedestrians(s, 'S'))}`,
       );
 
+      if (this.lateStopBeforeS && !this.stoppedBeforeS) {
+        this.record('OVER_STOP_LINE', s, '어린이보호구역 횡단보도 · 정지선을 넘어 정지 (허용 오차 초과)');
+      }
       if (light === null) {
         // 제27조 제7항 — 신호기 없는 횡단보도는 보행자가 없어도 일시정지
-        if (!this.stoppedBeforeS) {
+        if (!stoppedS) {
           this.record('SCHOOL_ZONE_NO_STOP', s, '어린이보호구역 · 신호기 없는 횡단보도 앞 무정지');
         }
       } else if (light !== 'green') {
@@ -985,7 +1016,7 @@ export class RightTurnJudge {
           빠져나갈 곳도 없다 — 정지선 앞에서 설 수 있으면 서야 한다(제5조 · [별표 2]).
           이미 선 뒤라면 걸지 않는다: 서서 기다리는 중인 차를 위반으로 볼 수 없다.
         */
-        if (!this.stoppedBeforeS) {
+        if (!stoppedS) {
           this.record('SCHOOL_ZONE_RED', s, `어린이보호구역 횡단보도 ${LIGHT_TEXT[light]} 통과`);
         }
       }
@@ -1009,8 +1040,10 @@ export class RightTurnJudge {
     for (const id of ZONE_ROAD_ORDER) {
       const { near, far, stopLine } = ZONE_ROAD_EDGES[id];
       /*
-        **그 횡단보도 앞에서 완전히 섰는가.** 정지선 앞 정지 구역 안이어야 하고(난이도가 정한
+        **그 횡단보도의 정지선에서 완전히 섰는가.** 정지선 앞 정지 구역 안이어야 하고(난이도가 정한
         stopZoneDepth), **앞차 뒤에 줄 서서 선 것은 치지 않는다** — 교차로 정지선과 같은 규칙이다.
+        세 횡단보도 모두 앞에 정지선이 그어져 있어(game/Intersection.ts 의 drawStopLines · drawApproachZone),
+        **정지선을 넘어(허용 오차 밖) 횡단보도 앞에 선 것은 정지선 위반이다** (경찰청 답변 4, 진입로 횡단보도 S 와 같다).
       */
       if (
         !this.zoneEntered[id] &&
@@ -1019,8 +1052,13 @@ export class RightTurnJudge {
         s.frontZ >= near &&
         s.frontZ <= stopLine + this.stopZoneDepth
       ) {
-        if (!this.zoneStopped[id]) {
-          this.note(s.t, 'ok', `${ZONE_ROAD_NAME[id]} 앞 일시정지 인정 — 횡단보도까지 ${(s.frontZ - near).toFixed(2)}m`);
+        if (s.frontZ >= stopLine - STOP_LINE_TOLERANCE) {
+          if (!this.zoneCleanStop[id]) {
+            this.note(s.t, 'ok', `${ZONE_ROAD_NAME[id]} 정지선 앞 일시정지 인정 — ${lineGap(s.frontZ - stopLine)}`);
+          }
+          this.zoneCleanStop[id] = true;
+        } else if (!this.zoneStopped[id]) {
+          this.note(s.t, 'warn', `${ZONE_ROAD_NAME[id]} 정지선을 ${(stopLine - s.frontZ).toFixed(2)}m 넘어 정지 — 정지선에서 서야 합니다`);
         }
         this.zoneStopped[id] = true;
       }
@@ -1033,9 +1071,12 @@ export class RightTurnJudge {
           'info',
           `${ZONE_ROAD_NAME[id]} 진입 — ${s.speedKmh.toFixed(0)}km/h · ` +
             (light === null ? '신호기 없음' : `차량신호 ${LIGHT_TEXT[light]}`) +
-            ` · 일시정지 ${this.zoneStopped[id] ? '함' : '안 함'}` +
+            ` · 일시정지 ${this.zoneCleanStop[id] ? '함' : this.zoneStopped[id] ? '정지선 넘어 함' : '안 함'}` +
             ` · ${this.describePedestrians(this.conflictingPedestrians(s, id))}`,
         );
+        if (this.zoneStopped[id] && !this.zoneCleanStop[id]) {
+          this.record('OVER_STOP_LINE', s, `어린이보호구역 ${ZONE_ROAD_NAME[id]} · 정지선을 넘어 정지 (허용 오차 초과)`);
+        }
         if (light === null) {
           // 제27조 제7항 — 신호기 없는 보호구역 횡단보도는 보행자가 없어도 일시정지
           if (!this.zoneStopped[id]) {
@@ -1055,12 +1096,12 @@ export class RightTurnJudge {
       /*
         제27조 제1항 — 보행자가 통행 중이거나 통행하려는데 밀고 들어갔는가.
 
-        **횡단보도 위에 있을 때만 본다** (진입로 보호구역 횡단보도와 같은 기준). 정지선부터 보면
-        **서려고 속도를 줄이는 중인 차**가 걸린다 — 실제로 규정대로 몬 AI 자율 주행이 횡단보도 1.9m 앞에서
-        2km/h 로 굴러가다 '방해' 로 잡혔다. 교차로의 A 가 정지선부터 보는 것은 거기에 정지선이 실제로
-        그어져 있고 그 앞에서 서야 하기 때문이다.
+        **정지선부터 본다** — 교차로의 A 와 같다. 서야 할 자리가 정지선이므로(경찰청 답변 4), 보행자가 건너는데 정지선을
+        넘어 움직인 것이 곧 방해다. 예전에는 횡단보도 위에서만 봤다 — 정지선을 넘어 횡단보도 앞에 서는 것도 인정하던 때라,
+        정지선부터 보면 그 자리로 서려고 속도를 줄이던 AI 자율 주행이 횡단보도 1.9m 앞에서 2km/h 로 굴러가다 '방해' 로
+        잡혔다. 이제 AI 는 정지선 앞에 선다(game/AutoDriver.ts 의 ZONE_GATES).
       */
-      this.trackPedestrianConflict(s, dt, id, s.frontZ <= near && s.frontZ >= far);
+      this.trackPedestrianConflict(s, dt, id, s.frontZ <= stopLine && s.frontZ >= far);
     }
   }
 
@@ -1123,6 +1164,13 @@ export class RightTurnJudge {
       if (s.vehicleLight === 'red' || s.vehicleLight === 'redFlash') {
         this.record('STRAIGHT_RED', s, `정면신호 ${LIGHT_TEXT[s.vehicleLight]}에 직진 통과`);
       }
+      /*
+        **직진도 정지선을 넘어 서면 정지선 위반이다** (경찰청 답변 4). 우회전처럼 섰는지는 위에서(trackStopTimer) 같은 자로
+        재는데, 예전에는 여기서 곧장 돌아가 직진 코스만 정지선을 넘어 서도 잡히지 않았다.
+      */
+      if (this.lateStopBeforeA && !this.cleanStopBeforeA) {
+        this.record('OVER_STOP_LINE', s, '정지선을 넘어 정지 (허용 오차 초과)');
+      }
       return;
     }
     if (s.rightArrow !== null) {
@@ -1145,7 +1193,7 @@ export class RightTurnJudge {
     // 녹색·황색의 등화에서는 일시정지 의무가 없다. (황색은 보행자 횡단 방해만 금지)
 
     if (this.lateStopBeforeA && !this.cleanStopBeforeA) {
-      this.record('OVER_STOP_LINE', s, '횡단보도를 밟고 정지 (허용 오차 초과)');
+      this.record('OVER_STOP_LINE', s, '정지선을 넘어 정지 (허용 오차 초과)');
     }
 
     // 제25조 제5항 — 꼬리물기

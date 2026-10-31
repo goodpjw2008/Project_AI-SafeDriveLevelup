@@ -15,6 +15,13 @@
  */
 
 import { PICKER_LABEL, type Picker } from '../scenarios/recommend';
+import { recommendModelReady } from '../ai/recommendNet';
+
+/**
+ * 외부 LLM 이 답하지 않았을 때 대신 고른 쪽 — 추천 신경망(학습한 모델이 있으면)이고, 없으면 프로그램이다
+ * (scenarios/recommend.ts 의 recommendScenario). 한도 초과 화면이 이것을 그대로 말한다.
+ */
+const fallbackName = (): string => (recommendModelReady() ? '로컬 신경망' : '프로그램');
 
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -45,7 +52,7 @@ const chip = (picker: Picker): string =>
 export function pickedByCard(picker?: Picker, _model?: string, courses?: number): string {
   if (!picker) return '';
   const among = courses && courses > 0 ? `최종 후보 ${courses}개 중 ` : '';
-  if (picker === 'quota') return `${chip(picker)} 일일 사용량이 초과됐어요. 아쉽지만 프로그램으로 추천했어요${among ? ` (${among.trim()})` : ''}.`;
+  if (picker === 'quota') return `${chip(picker)} 일일 사용량이 초과됐어요. 대신 ${fallbackName()}이 추천했어요${among ? ` (${among.trim()})` : ''}.`;
   if (picker === 'rule') return `${chip(picker)}이 ${among}운전자에 맞는 맵을 골라 줬어요!`;
   if (picker === 'random') return `${chip(picker)}가 운전자에 맞는 맵을 골라 줬어요!`;
   return `${chip(picker)} 분석 — ${among}운전자에 맞는 맵을 골라 줬어요!`;
@@ -96,7 +103,10 @@ export function pickedByHud(picker?: Picker, _model?: string): string {
   */
   const pair = (long: string, short: string): string =>
     `${head}<span class="pick-long">${long}</span><span class="pick-short">${short}</span>`;
-  if (picker === 'quota') return pair(' : 일일 사용량 초과로 프로그램이 고른 맵', ' 한도 초과 · 프로그램 맵');
+  if (picker === 'quota')
+    return recommendModelReady()
+      ? pair(' : 일일 사용량 초과로 로컬 신경망이 고른 맵', ' 한도 초과 · 신경망 맵')
+      : pair(' : 일일 사용량 초과로 프로그램이 고른 맵', ' 한도 초과 · 프로그램 맵');
   if (picker === 'rule') return pair(' : 프로그램이 고른 맵', ' 프로그램 맵');
   if (picker === 'random') return pair(' : 무작위로 고른 마스터 운행 맵', ' 무작위 마스터 맵');
   return pair(' 분석 · 추천해준 맵', ' 추천 맵');

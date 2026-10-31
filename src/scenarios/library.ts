@@ -1284,6 +1284,13 @@ function targetsOf(t: LibraryTags): ViolationCode[] {
   if (t.a === 'bikeRide' || (x.rideA && t.a === 'none')) out.add('BIKE_BLOCKED');
   if ((t.a !== 'bikeRide' && hasPeds(t)) || hasApproachPed(t) || x.pushA || x.pushC || x.pedS || x.pair) out.add('PEDESTRIAN_BLOCKED');
   if ((t.zone === 'yes' && (t.sigA === 'no' || t.sigC === 'no')) || t.approach === 'noSignal') out.add('SCHOOL_ZONE_NO_STOP');
+  /*
+    **정지선이 그어진 곳에서 반드시 서는 판은 정지선 준수도 시험한다** (경찰청 답변 4 — 정지선이 있으면 그 정지선에서).
+    진입로의 신호기 없는 보호구역 횡단보도(S)와, 보호구역 교차로의 신호기 없는 첫 횡단보도(A) 앞에는 정지선이 있고 사람이
+    없어도 선다 — 정지선을 넘어 서면 정지선 위반이다 (rules/lawRules.ts). 예전에는 S 앞은 횡단보도 앞 2m 안이면 어디든
+    인정해 시험할 수 없었고, A 는 시험할 수 있었는데 적지 않았다.
+  */
+  if (t.approach === 'noSignal' || (t.zone === 'yes' && t.sigA === 'no')) out.add('OVER_STOP_LINE');
   if (t.approach === 'signal' && t.lead === 'none') out.add('SCHOOL_ZONE_RED');
   if (t.lead === 'rolling') out.add('RED_NO_STOP');
   if (t.lead === 'straight') out.add('WIDE_TURN');
@@ -1971,13 +1978,15 @@ export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
         있으면 '사람이 없어도 선다' 를, 있는 자리가 하나라도 있으면 '적색은 서서 기다린다' 를 시험한다.
       */
       const signalled = Object.keys(spec.zoneSignals ?? {}).length;
-      if (signalled < 3) zone.add('SCHOOL_ZONE_NO_STOP');
+      // 세 횡단보도 모두 앞에 정지선이 있다 — 반드시 서는 자리(신호기 없음)가 있으면 정지선 준수도 시험한다 (경찰청 답변 4)
+      if (signalled < 3) zone.add('SCHOOL_ZONE_NO_STOP').add('OVER_STOP_LINE');
       if (signalled > 0) zone.add('SCHOOL_ZONE_RED');
       if (spec.pedestrians.length) zone.add('PEDESTRIAN_BLOCKED');
       return zone;
     }
     const noSignalCrosswalk = spec.approachSchoolZone?.signal === false || !spec.pedSignalInstalled.A;
-    if (noSignalCrosswalk) zone.add('SCHOOL_ZONE_NO_STOP');
+    // 그 횡단보도(진입로 S · 교차로 A) 앞에는 정지선이 있다 — 정지선을 넘어 서면 정지선 위반이다 (경찰청 답변 4)
+    if (noSignalCrosswalk) zone.add('SCHOOL_ZONE_NO_STOP').add('OVER_STOP_LINE');
     if (spec.approachSchoolZone?.signal === true) zone.add('SCHOOL_ZONE_RED');
     if ((STANDARD_PROGRAM[spec.startPhase] ?? STANDARD_PROGRAM[0]).vehicle !== 'green') zone.add('STRAIGHT_RED');
     if (spec.pedestrians.length) zone.add('PEDESTRIAN_BLOCKED');
@@ -2000,6 +2009,8 @@ export function habitsTestedBy(spec: ScenarioSpec): Set<ViolationCode> {
   if (spec.pedestrians.length || (spec.leadCar && spec.leadCar.path !== 'straight')) out.add('PEDESTRIAN_BLOCKED');
   const unsignaled = !spec.pedSignalInstalled.A || !spec.pedSignalInstalled.C;
   if ((spec.isSchoolZone && unsignaled) || spec.approachSchoolZone?.signal === false) out.add('SCHOOL_ZONE_NO_STOP');
+  // 정지선이 그어진 곳(진입로 S · 교차로 A)에서 반드시 서는 판 — 위 targetsOf 와 같다 (경찰청 답변 4)
+  if ((spec.isSchoolZone && !spec.pedSignalInstalled.A) || spec.approachSchoolZone?.signal === false) out.add('OVER_STOP_LINE');
   if (spec.approachSchoolZone?.signal === true) out.add('SCHOOL_ZONE_RED');
   if (spec.exitBlocked) out.add('BLOCKING_INTERSECTION');
   return out;

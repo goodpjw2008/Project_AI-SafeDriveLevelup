@@ -1143,8 +1143,9 @@ export async function recommendScenario(
   playedIds: readonly number[] = recentIds,
   /**
    * **무엇이 고르는가** (설정 '다음판 추천 AI 설정' — save.ts 의 recommendAi). `local` 이면 서버에 묻지 않고
-   * 브라우저의 추천 신경망이 고른다 (ai/recommendNet.ts — 모델이 없으면 프로그램 점수). 기본값이 `llm` 인 것은 이
-   * 함수의 예전 동작(테스트)을 지키려는 것이고, 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
+   * 브라우저의 추천 신경망이 고른다 (ai/recommendNet.ts). `llm` 이면 서버의 AI 에게 묻고, 답이 없으면 신경망이 고른다
+   * (모델이 없으면 둘 다 프로그램 점수). 기본값이 `llm` 인 것은 이 함수의 예전 동작(테스트)을 지키려는 것이고,
+   * 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
    */
   mode: RecommendAi = 'llm',
 ): Promise<RecommendOutcome> {
@@ -1206,18 +1207,23 @@ export async function recommendScenario(
   }
   const pool = courses.length ? courses : candidatesFor(plan, recentIds);
   /*
-    **로컬이면 추천 신경망이 고른다** (ai/recommendNet.ts). 습관이 여럿이면 묶음을 가리지 않고 모든 후보를 함께 채점하므로,
-    고른 판이 든 묶음의 습관이 곧 신경망이 먼저 고치기로 한 습관이다 — 외부 LLM 이 정할 때와 같은 자리에 적는다.
-    모델이 없으면(학습 전 · 특징이 바뀜) 아래 프로그램 점수로 고른다.
+    **추천 신경망이 고른다** (ai/recommendNet.ts) — 로컬이면 처음부터, 외부 LLM 이면 **답이 없을 때**(서버 · 키 없음, 응답
+    없음, 한도 초과, 후보에 없는 번호). 예전에는 그때 프로그램 점수(rulePick)로 골랐는데, 신경망이 같은 후보에서 더 낫게
+    고르므로 바꿨다 (사용자가 정했다, 2026-10-31). 한도 초과는 화면이 그 사실을 말해야 하므로 고른 쪽 이름을 `quota` 로
+    남긴다 (ui/pickedBy.ts 가 "대신 로컬 신경망이" 라고 적는다).
+
+    습관이 여럿이면 묶음을 가리지 않고 모든 후보를 함께 채점하므로, 고른 판이 든 묶음의 습관이 곧 신경망이 먼저 고치기로
+    한 습관이다 — 외부 LLM 이 정할 때와 같은 자리에 적는다. 모델이 없으면(학습 전 · 특징이 바뀜) 아래 프로그램 점수로 고른다.
   */
-  const local = mode === 'local' ? localPick(plan, pool, seen, cover) : null;
+  const local = localPick(plan, pool, seen, cover);
   if (local) {
     const e = local.entry;
     const habit = habitOf.get(e.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
+    const by: Picker = reply === 'quota' ? 'quota' : 'local';
     return {
-      scenario: withVerdict(toScenario(e, plan.level, local.why, '', 'local', 'local', undefined, successPercent(plan, e)), e),
+      scenario: withVerdict(toScenario(e, plan.level, local.why, '', 'local', by, undefined, successPercent(plan, e)), e),
       source: 'local',
-      picker: 'local',
+      picker: by,
       habit,
       habitBy: priority && habit ? 'ai' : 'rule',
     };

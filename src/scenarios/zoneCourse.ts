@@ -443,6 +443,8 @@ export function zoneTargets(t: ZoneTags): ViolationCode[] {
   const out = new Set<ViolationCode>();
   // 두 길 모두 **무신호 횡단보도가 한 곳**이다 — '사람이 없어도 선다' 를 늘 시험한다 (제27조 제7항)
   out.add('SCHOOL_ZONE_NO_STOP');
+  // 그 앞에는 정지선이 있다 — 정지선을 넘어 서면 정지선 위반이다 (경찰청 답변 4 · rules/lawRules.ts 의 trackZoneRoad)
+  out.add('OVER_STOP_LINE');
   // 그리고 **신호 횡단보도가 두 곳** — 그 적색은 서서 기다리는 것이다
   out.add('SCHOOL_ZONE_RED');
   /*

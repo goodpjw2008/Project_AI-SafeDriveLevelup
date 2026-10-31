@@ -84,13 +84,14 @@ describe('고른 쪽 이름', () => {
     ask(502, JSON.stringify({ error: 'UPSTREAM_ERROR', status: 429 }));
     expect((await recommendScenario(plan, habits, [], [])).picker).toBe('quota');
 
-    // 못 닿은 것은 한도 초과가 아니다
+    // 못 닿은 것은 한도 초과가 아니다 — 대신 고른 쪽(추천 신경망, 모델이 없으면 프로그램)의 이름을 그대로 쓴다
+    const fallback = recommendModelReady() ? 'local' : 'rule';
     ask(502, JSON.stringify({ error: 'UPSTREAM_UNREACHABLE', status: 0 }));
-    expect((await recommendScenario(plan, habits, [], [])).picker).toBe('rule');
+    expect((await recommendScenario(plan, habits, [], [])).picker).toBe(fallback);
 
     // 서버·키가 없는 배포 (503) — 처음부터 AI 가 없다
     ask(503, '');
-    expect((await recommendScenario(plan, habits, [], [])).picker).toBe('rule');
+    expect((await recommendScenario(plan, habits, [], [])).picker).toBe(fallback);
     vi.unstubAllGlobals();
   });
 
@@ -306,18 +307,22 @@ describe('recommendScenario — 가짜 서버', () => {
     expect(out.scenario.recommended).toBe('ai');
   });
 
-  it('서버가 없으면 코드가 고른다 — 판은 늘 나온다', async () => {
+  /*
+    **외부 LLM 이 답하지 않으면 추천 신경망이 고른다** (사용자가 정했다, 2026-10-31 — 예전에는 프로그램 점수였다).
+    모델이 없으면(학습 전 · 특징이 바뀜) 프로그램 점수로 고르고 그렇게 말한다.
+  */
+  it('서버가 없으면 추천 신경망이 고른다 — 판은 늘 나온다', async () => {
     answer({ error: 'NO_KEY' }, 503);
     const out = await recommendScenario(plan(), habits, [], []);
-    expect(out.source).toBe('rule');
+    expect(out.source).toBe(recommendModelReady() ? 'local' : 'rule');
     expect(libraryEntry(out.scenario.id)).toBeDefined();
     expect(out.scenario.why.length).toBeGreaterThan(0);
   });
 
-  it('후보에 없는 번호를 대면 버리고 코드가 고른다', async () => {
+  it('후보에 없는 번호를 대면 버리고 추천 신경망이 고른다', async () => {
     answer({ id: 1, why: 'x', focus: '' });
     const out = await recommendScenario(plan(), habits, [], []);
-    expect(out.source).toBe('rule');
+    expect(out.source).toBe(recommendModelReady() ? 'local' : 'rule');
     expect(out.scenario.id).not.toBe(1);
   });
 
@@ -755,13 +760,18 @@ describe('먼저 고칠 습관 — AI 가 정한다', () => {
     expect(out.habitBy).toBe('rule');
   });
 
-  it('AI 가 없으면 코드가 고르고, 가장 많이 한 습관의 코스를 먼저 본다', async () => {
+  /*
+    외부 LLM 이 없으면 추천 신경망이 모든 묶음의 후보를 함께 채점해 고른다 — 고른 코스의 묶음 습관이 먼저 고칠 습관이고,
+    그것은 신경망이 정한 것이라 카드가 "AI 판단" 이라고 적는다. 모델이 없으면 프로그램이 가장 많이 한 습관의 코스를 먼저 본다.
+  */
+  it('AI 가 없으면 추천 신경망이 고르고, 고른 코스가 시험하는 습관이 먼저 고칠 습관이다', async () => {
     vi.stubGlobal('fetch', () =>
       Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('{}') } as unknown as Response),
     );
     const out = await recommendScenario(two(), habits, [], []);
-    expect(out.source).toBe('rule');
-    expect(out.habitBy).toBe('rule');
+    const ready = recommendModelReady();
+    expect(out.source).toBe(ready ? 'local' : 'rule');
+    expect(out.habitBy).toBe(ready ? 'ai' : 'rule');
     expect(libraryEntry(out.scenario.id)!.targets).toContain(out.habit);
   });
 });

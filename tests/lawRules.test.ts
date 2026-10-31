@@ -77,6 +77,17 @@ describe('전방 적색, 보행자 없음 (가장 많이 틀리는 경우)', () 
     expect(codes(r)).not.toContain('RED_NO_STOP');
   });
 
+  /*
+    **직진 코스도 정지선을 넘어 서면 정지선 위반이다** (경찰청 답변 4 — 정지선이 있으면 그 정지선에서). 예전에는 직진의
+    진입 판정이 정지선 검사 앞에서 돌아가, 직진만 정지선을 넘어 서도 잡히지 않았다.
+  */
+  it('직진 코스도 정지선을 넘어 서면 정지선 위반이다', () => {
+    const r = simulate({ vehicleLight: 'green' }, { drive: 'straight', turnSignal: 'never', stopAtLine: 0, stopPastLine: 1.0 });
+    expect(codes(r)).toContain('OVER_STOP_LINE');
+    const ok = simulate({ vehicleLight: 'green' }, { drive: 'straight', turnSignal: 'never', stopAtLine: 1.0 });
+    expect(codes(ok)).not.toContain('OVER_STOP_LINE');
+  });
+
   it('정지선을 조금 넘었어도 횡단보도를 밟지 않았으면 정지선 위반이 아니다', () => {
     // 정지선(16.5m)과 횡단보도(16.0m) 사이 = 허용 오차 구간
     const r = simulate({ vehicleLight: 'red' }, { stopAtLine: 0, stopPastLine: 1.0, pastLineDepth: 0.25 });
