@@ -58,6 +58,8 @@ export interface PickResult {
   /** 규칙이 추린 후보 수 → 모델 점수로 고른 최종 후보 수 (scenarios/recommend.ts 의 onCandidates) — 카드가 "몇 개 중" 을 말한다 */
   candidates?: number;
   courses?: number;
+  /** 후보를 추천 신경망이 추렸는가 — 아니면 규칙이 추린 것이다 */
+  aiNarrowed?: boolean;
 }
 
 export class AiPickOverlay {
@@ -225,7 +227,14 @@ export class AiPickOverlay {
     const success = $('ai-pick-success');
     const parts: string[] = [];
     // 후보가 어떻게 줄었는지 — 규칙 N개 → 모델 점수 최종 10개 (사용자가 "최종 10개라는 말이 없어 헷갈렸다" 고 했다)
-    if (r.candidates && r.courses) parts.push(`후보 · 규칙으로 ${r.candidates.toLocaleString()}개 → 모델 점수로 최종 ${r.courses}개`);
+    if (r.candidates && r.courses) {
+      // 신경망이 추렸으면 그렇게 말한다 (scenarios/recommend.ts 의 aiCourses) — 탈 수 있는 판에서 뽑아 채점한 수 → 최종 10개
+      parts.push(
+        r.aiNarrowed
+          ? `후보 · 신경망이 ${r.candidates.toLocaleString()}개 채점 → 최종 ${r.courses}개`
+          : `후보 · 규칙으로 ${r.candidates.toLocaleString()}개 → 모델 점수로 최종 ${r.courses}개`,
+      );
+    }
     if (r.success !== undefined) parts.push(`AI 난이도 모델 · 예상 성공률 ${r.success}%`);
     if (r.predict?.length) {
       parts.push(`결과 예측 모델 · ${r.predict.map((x) => `${SKILL_SHORT[x.code as ViolationCode] ?? x.code} ${x.p}%`).join(' · ')}`);

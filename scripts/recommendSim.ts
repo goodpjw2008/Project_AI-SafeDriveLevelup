@@ -39,7 +39,7 @@ import { learnerVector, predictOutcome } from '../src/ai/outcome';
 import type { JudgeResult } from '../src/rules/lawRules';
 import type { ViolationCode } from '../src/rules/violations';
 import { challengeRule, type Challenge } from '../src/scenarios/challenge';
-import { advance, freshCurriculum, xpToNext, type CurriculumState } from '../src/scenarios/curriculum';
+import { advance, freshCurriculum, xpToNext, type CurriculumState, type Difficulty } from '../src/scenarios/curriculum';
 import type { Plan } from '../src/scenarios/generate';
 import { habitsTestedBy, libraryEntry, scenarioLibrary, type LibraryEntry } from '../src/scenarios/library';
 import { nextPlan } from '../src/scenarios/nextPlan';
@@ -49,15 +49,19 @@ import {
   coursesByHabit,
   coverageOf,
   coverKeys,
+  eligibleFor,
   masterPick,
   rulePick,
   seenShapes,
+  turnClassOf,
+  turnContext,
+  turnInputs,
   verdictsFor,
   type Coverage,
   type SeenShapes,
 } from '../src/scenarios/recommend';
 import type { TrackChoice } from '../src/scenarios/tracks';
-import { recommendFeatures } from '../src/ai/recommendNet';
+import { recommendFeatures, turnFeatures, type TurnContext } from '../src/ai/recommendNet';
 
 // ── 난수 · 시계 ────────────────────────────────────────────────────────────
 
@@ -268,6 +272,20 @@ export interface Episode {
   frustration: number;
   runs: number;
   violations: number;
+  /** 이 레벨에 머문다 — 레벨이 올라도 되돌린다 (아래 pinEpisode) */
+  pin?: Difficulty;
+}
+
+/**
+ * **한 레벨에 오래 머무는 운전자** — 그 레벨에서 처음 시작해 레벨이 올라도 그 자리로 되돌린다. 학습 자료에만 섞는다.
+ *
+ * 가상 운전자는 대개 몇 판 만에 레벨을 지나가서, 신경망이 '한 레벨에 오래 머문 뒤' 를 거의 보지 못했다. 그런데 습관이 남으면
+ * 사람도 한 레벨에 오래 머물고, 다양성 검사(tests/recommend.test.ts — 한 레벨에서 400판을 이어 달린다)가 바로 그 자리를 잰다.
+ * 이 운전자들 없이 배운 차례 신경망은 그 검사에서 L4 보호구역의 84% 를 신호기 없는 판으로, L10 의 93% 를 보호구역으로 골랐다.
+ */
+export function pinEpisode(ep: Episode, level: Difficulty): void {
+  ep.pin = level;
+  ep.save.curriculum = { ...ep.save.curriculum, level };
 }
 
 const CHALLENGE_WEIGHTS: [Challenge, number][] = [
@@ -290,9 +308,13 @@ export function makeEpisode(seed: number, kind: LearnerKind = TRAIN_KIND): Episo
     }
     u -= w;
   }
-  // 대부분은 기본(자동)이고, 몇 명은 한 갈래를 붙잡는다
+  /*
+    대부분은 기본(자동)이고, 몇 명은 한 갈래를 붙잡는다. **'섞어서'(both) 를 넉넉히 둔다** — 신경망은 갈래 설정마다 후보 묶음이 달라
+    (자동은 보호구역 전용 도로가 함께 들어온다) 설정마다 따로 배워야 한다. 5% 였을 때는 '섞어서' 에서 신호기 없는 보호구역 비율이
+    L2 ~ L4 에서 33 ~ 42% 로 떨어졌다 (tests/recommend.test.ts 의 레벨마다 고르게 — 문턱 50%).
+  */
   const t = r();
-  const track: TrackChoice = t < 0.85 ? 'auto' : t < 0.9 ? 'turn' : t < 0.95 ? 'zone' : 'both';
+  const track: TrackChoice = t < 0.6 ? 'auto' : t < 0.675 ? 'turn' : t < 0.75 ? 'zone' : 'both';
   return {
     learner,
     save: { curriculum: freshCurriculum(), history: [], settings: { track, difficulty } },
@@ -341,7 +363,17 @@ export interface Decision {
   cover: Coverage;
   /** 지금까지 탄 판 번호 — 마스터 운행의 프로그램(masterPick)이 최근 판을 뺀다 */
   ids: number[];
+  /**
+   * **탈 수 있는 판 전부** (recommend.ts 의 eligibleFor) — 차례 신경망은 이 가운데 어느 갈래의 판이 있는지를 보고, 추천 신경망은
+   * 뽑힌 갈래에서 고르게 `POOL` 판을 채점한다. `courses` 는 예전 프로그램(규칙 + 프로그램 점수)이 추린 최종 후보다.
+   */
+  pool: LibraryEntry[];
+  /** 최근 판의 차례 (recommend.ts 의 turnContext) */
+  turns: TurnContext;
 }
+
+/** 학습 · 견주기에서 추천 신경망이 한 번에 채점하는 판의 수 (게임은 recommend.ts 의 AI_SAMPLE). 게임은 2,000판이지만 학습 · 견주기는 수만 번 고르므로 줄인다 */
+export const POOL = 500;
 
 /**
  * 다음 판의 계획을 세우고 후보를 추린다 — 게임과 같은 함수 (fast 면 교사의 빠른 근사판).
@@ -357,15 +389,36 @@ export function decide(ep: Episode, fast = false): Decision {
   const ids = ep.save.history.map((h) => h.st);
   const seen = seenShapes(ids);
   const cover = coverageOf(ids, plan.level);
+  const turns = turnContext(ids);
   if (fast) {
     // 교사가 미리 달려 볼 때의 프로그램 — 규칙이 추린 후보에서 120개만 뽑아 점수로 고른다 (전부 채점하면 너무 느리다)
     const all = candidatesFor(plan, ids);
     const courses = all.length > FAST_SAMPLE ? sample(all, FAST_SAMPLE) : all;
-    return { plan, courses, seen, cover, ids };
+    return { plan, courses, seen, cover, ids, pool: courses, turns };
   }
   const by = coursesByHabit(plan, ids, Math.random, seen, cover);
-  return { plan, courses: by.groups.flatMap((g) => g.courses), seen, cover, ids };
+  const pool = eligibleFor(plan, ids);
+  return { plan, courses: by.groups.flatMap((g) => g.courses), seen, cover, ids, pool, turns };
 }
+
+/**
+ * **행동 복제의 후보** — 과정 전문가(예전 규칙 · 프로그램 점수, 아래 programPick)가 고른 판을 맨 앞에, 탈 수 있는 판 가운데 **같은
+ * 갈래**의 판에서 고르게 `k` 판을 뒤에 둔다. 추천 신경망은 맨 앞 판의 확률이 가장 높도록 배운다 (scripts/train-recommend.ts). 갈래는
+ * 차례 신경망이 따로 배우므로(아래 turnRow), 추천 신경망은 갈래 안에서 고르는 것만 배운다 — 게임에서도 그렇게 쓴다.
+ */
+export function bcSet(d: Decision, expert: LibraryEntry, k: number, r: () => number): LibraryEntry[] {
+  const cls = turnClassOf(expert);
+  const same = d.pool.filter((e) => e !== expert && turnClassOf(e) === cls);
+  const out: LibraryEntry[] = [expert];
+  for (let tries = 0; out.length < k + 1 && same.length && tries < k * 4; tries++) {
+    const e = same[Math.floor(r() * same.length)];
+    if (!out.includes(e)) out.push(e);
+  }
+  return out;
+}
+
+/** 차례 신경망의 입력 — 브라우저와 같은 함수 (recommend.ts 의 turnInputs) */
+export const turnRow = (d: Decision): number[] => turnFeatures(turnInputs(d.plan, d.turns, d.cover));
 
 /**
  * **게임의 프로그램이 고르는 판** — 모델이 없을 때 게임이 쓰는 것과 같다 (recommend.ts 의 recommendScenario 끝). 마스터 운행이면
@@ -417,7 +470,8 @@ export function play(ep: Episode, e: LibraryEntry): { violated: ViolationCode[] 
     abilityPrior: abilityPriorFor(before.level),
     predicted,
   });
-  ep.save.curriculum = next;
+  ep.save.curriculum =
+    ep.pin !== undefined && (next.level > ep.pin || next.mastered) ? { ...next, level: ep.pin, mastered: false, xp: 0 } : next;
   ep.save.history.push({ st: e.spec.id });
   if (!violated.length) ep.cleared.add(e.spec.id);
   if (next.missStreak >= 3) ep.frustration += 1;
@@ -450,6 +504,9 @@ export function play(ep: Episode, e: LibraryEntry): { violated: ViolationCode[] 
  *  - 레벨 0.15 · 새 상황 0.02 (간격 효과 전): 아는 개념을 많이 묻는 복잡한 판으로 몰려 L7 40판에 정면 녹색 · 녹색 화살표를
  *    한 번도 겪지 않았다 (tests/recommend.test.ts 의 커버리지 검사). 원인은 무게가 아니라 운전자 쪽이었다 — drive 의 간격 효과.
  *  - 습관 빚 0.6 배: 레벨은 프로그램보다 2.3 높고 마스터가 두 배였지만 진짜 익힌 개념이 0.35 적었다. 0.3 배가 그 사이다.
+ *  - **후보 추리기 · 차례까지 이 교사로 배우게 했더니**(2026-11-01) 신경망이 쉬운 아래 레벨 판으로 몰려 프로그램보다 익힌 개념
+ *    −0.37 · 레벨 −1.25 였다 (프로그램 점수를 입력에 넣어도 같았다). 한 판 앞만 보는 이 교사에게는 '이 레벨의 판 · 습관을 시험하는
+ *    판' 이 여러 판 뒤에 주는 값이 보이지 않는다. 그래서 그 일은 과정 전문가를 따라 배우게 했다 (train-recommend.ts 의 행동 복제).
  *  - **다양성 약속(tests/recommend.test.ts)은 학습마다 아슬아슬하다.** 마스터 운행 차례를 더하고 입력에 '마스터인가' 를 넣어
  *    다시 학습하자(2026-11-01) L7 40판에 정면 녹색이 한 번도 없었고 L2 보호구역 판의 97% 가 무신호였다(검사는 80% 이하).
  *    마스터 차례를 빼고 같은 자료로 배워도 85% 였다. 고르는 자리에 '새 상황 − 되풀이' 고정 항을 더해 보니 신경망 점수의
@@ -543,9 +600,9 @@ export function teacherScores(ep: Episode, courses: readonly LibraryEntry[], see
 }
 
 /** 후보들을 신경망의 입력으로 — 브라우저와 같은 함수 (recommend.ts 의 courseInputs) */
-export function featureRows(d: Decision): number[][] {
+export function featureRows(d: Decision, courses: readonly LibraryEntry[] = d.courses): number[][] {
   const verdict = verdictsFor(d.plan, d.cover);
-  return d.courses.map((e) => recommendFeatures(courseInputs(d.plan, e, d.seen, d.cover, verdict)));
+  return courses.map((e) => recommendFeatures(courseInputs(d.plan, e, d.seen, d.cover, verdict, d.turns)));
 }
 
 export { knownCount };

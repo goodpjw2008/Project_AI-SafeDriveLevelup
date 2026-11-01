@@ -41,7 +41,7 @@ import {
   type LevelRule,
 } from './curriculum';
 import type { ViolationCode } from '../rules/violations';
-import type { PracticeTrack } from './tracks';
+import type { PracticeTrack, TrackChoice } from './tracks';
 import { COST_TABLE, freeKitFor, type ConditionKey } from './difficulty';
 import { checkSchema, describeIssues, validateScenario, type Issue } from './validate';
 import { runsToClear, type BadHabit } from '../coach/badHabits';
@@ -466,6 +466,11 @@ export interface Plan {
    * 후보는 L10 코스뿐이고(recommend.ts 의 candidatesFor), 고르는 쪽은 여느 판처럼 설정을 따른다.
    */
   master?: boolean;
+  /**
+   * **설정의 연습 구분** (save.ts 의 settings.track) — `auto` 면 갈래도 추천 신경망이 정한다 (recommend.ts 의 eligibleFor).
+   * `track` 은 예전 규칙이 이번 판에 정한 갈래다 (trackPick.ts) — 추천 신경망이 없을 때 쓴다.
+   */
+  trackSetting?: TrackChoice;
   /**
    * **무엇을 연습하는 판인가** (scenarios/tracks.ts) — 우회전만 · 보호구역만 · 둘 다. 없으면 '둘 다'.
    *

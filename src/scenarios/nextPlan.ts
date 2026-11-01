@@ -44,6 +44,7 @@ export function nextPlan(save: PlanSource): Plan {
   return {
     level: c.level,
     master: c.mastered,
+    trackSetting: save.settings.track,
     track,
     target: currentTarget(c),
     badHabits: c.badHabits,

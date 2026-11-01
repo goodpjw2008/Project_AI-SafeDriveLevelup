@@ -26,7 +26,7 @@ import {
   candidatesFor,
   coursesByHabit,
   coverageOf,
-  localPick,
+  aiCourses,
   priorityHabits,
   recommendPayload,
   masterPick,
@@ -553,9 +553,10 @@ describe('두 번째 횡단보도 보행자가 오는 쪽', () => {
  * 흔들림은 고정 난수로 둔다 — **다양해지는 까닭이 운이 아니라 점수라는 것**을 보이려는 것이다.
  */
 /*
-  **로컬 신경망도 같은 약속을 지킨다** (ai/recommendNet.ts — 설정의 로컬 신경망 기반). 신경망은 최종 후보 안에서만 고르지만,
-  그 안에서 늘 같은 종류만 고르면 다양성 · 무신호 보호구역 비율 같은 사용자가 정한 약속이 깨질 수 있다. 그래서 아래
-  다양성 검사를 프로그램과 신경망 둘 다로 돌린다. 모델이 없으면 신경망 쪽도 프로그램으로 고른다(localPick 이 null).
+  **로컬 신경망도 같은 약속을 지킨다** (ai/recommendNet.ts — 설정의 로컬 신경망 기반). 신경망은 탈 수 있는 판에서 스스로 후보를
+  추리고 보호구역 · 앞차 · 신호기 차례까지 정하므로(사용자가 정했다, 2026-11-01: *"모든걸 ai로 하고 싶어"*), 다양성 · 무신호
+  보호구역 비율 같은 사용자가 정한 약속을 신경망이 지키는지 아래 검사를 프로그램과 신경망 둘 다로 돌린다. 모델이 없으면 신경망
+  쪽도 프로그램으로 고른다(aiCourses 가 null).
 */
 describe.each([
   ['프로그램', 'rule'],
@@ -573,19 +574,32 @@ describe.each([
     const out: LibraryEntry[] = [];
     for (let i = 0; i < n; i++) {
       const zoneTurn = rnd() < SCHOOL_ZONE_CHANCE;
+      /*
+        **신호기 없는 보호구역의 바닥도 게임처럼 건다** (nextPlan.ts 의 noSignalZoneDue — 세 판째 없으면 반드시). 한때 이 검사는
+        바닥을 켜지 않아, 게임과 달리 L3 ~ L7 에서 무신호 보호구역이 판의 15 ~ 19% 뿐이었다(바닥이 있으면 31 ~ 35%). 차례 신경망은
+        게임의 바닥을 따라 배웠으므로(위 '로컬 신경망'), 두 쪽이 같은 흐름에서 재려면 프로그램 쪽에도 바닥이 있어야 한다.
+      */
+      const due = noSignalZoneDue(played);
       const p = plan({
         level,
         target: null,
         badHabits: [],
-        schoolZone: zoneTurn,
-        zoneNoSignal: rnd() < ZONE_NO_SIGNAL_CHANCE,
+        schoolZone: zoneTurn || due,
+        zoneNoSignal: rnd() < ZONE_NO_SIGNAL_CHANCE || due,
+        noSignalZoneDue: due,
         lead: rnd() < 1 / 3 ? (['lawful', 'rolling', 'straight'] as const)[Math.floor(rnd() * 3)] : null,
       });
       const seen = seenShapes(played);
       const cover = coverageOf(played, level);
-      const list = shortlist(p, candidatesFor(p, played), rnd, seen, cover);
+      /*
+        신경망은 규칙이 추린 후보가 아니라 **탈 수 있는 판 전부에서** 스스로 추리고, 보호구역 · 앞차 · 신호기 차례도 스스로
+        정한다(위에서 굴린 차례를 보지 않는다 — recommend.ts 의 aiCourses). 게임은 2,000판을 채점하지만 여기서는 시간 때문에
+        400판을 채점한다.
+      */
+      const ai = picker === 'local' ? aiCourses(p, played, played, rnd, seen, cover, 400) : null;
+      const list = ai ? [] : shortlist(p, candidatesFor(p, played), rnd, seen, cover);
       const pool = list.length ? list : candidatesFor(p, played);
-      const e = (picker === 'local' ? localPick(p, pool, seen, cover)?.entry : undefined) ?? rulePick(p, pool, rnd, seen, cover);
+      const e = ai?.pick.entry ?? rulePick(p, pool, rnd, seen, cover);
       played.push(e.spec.id);
       out.push(e);
     }
@@ -642,22 +656,33 @@ describe.each([
     고치기 전(레벨마다 300판 모의 주행)은 L1 · L2 0% · L3 30% · L5 73% 였다. 신호기 없는 보호구역을 보호구역과 같은
     개념 단계로 두고(library.ts 의 conceptStage), 되풀이 감점을 절반만 걸어(CORE_REPEAT) 레벨마다 60% 안팎이 되었다.
     보호구역이 열리는 L2 부터 본다.
+
+    **바닥을 켠 뒤(위 run) 고른 정도는 '판 가운데 신호기 없는 보호구역의 비율' 로 잰다.** 바닥은 네 판에 한 판 이상을 무신호
+    보호구역으로 만들므로, 보호구역 판이 적은 레벨(L3 ~ L7, 판의 40% 안팎)에서는 보호구역 판 가운데 무신호 비율이 셈만으로 80%
+    가까이 오른다 — 프로그램도 L7 에서 81% 였다. 보호구역 판 가운데 비율은 보호구역 판이 얼마나 나왔는가에 따라 출렁이고, 사용자가
+    짚은 것은 '나오는가' 였다. 그래서 그 비율은 위아래 문턱(절반 이상 · 신호 있는 보호구역도 남게 90% 이하)만 보고, 고른 정도는
+    판 가운데 비율로 본다 (2026-11-01, 바닥: 프로그램 31 ~ 51% · 신경망 28 ~ 46%).
   */
-  it('보호구역 판 중 신호기 없는 판의 비율이 L2 ~ L10 에서 고르다', () => {
-    const ratios = ([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((level) => {
-      const zone = run(level, 400).filter((e) => zoneKindOf(e.tags) !== 'none');
-      return zone.filter((e) => zoneKindOf(e.tags) === 'noSignal').length / zone.length;
+  it('보호구역 판 중 신호기 없는 판이 L2 ~ L10 어느 레벨에서나 절반이 넘고, 판 가운데 그 비율이 레벨마다 고르다', () => {
+    const per = ([2, 3, 4, 5, 6, 7, 8, 9, 10] as const).map((level) => {
+      const runs = run(level, 400);
+      const zone = runs.filter((e) => zoneKindOf(e.tags) !== 'none');
+      const noSig = zone.filter((e) => zoneKindOf(e.tags) === 'noSignal').length;
+      return { ofZone: noSig / zone.length, ofRuns: noSig / runs.length };
     });
-    const shown = ratios.map((r, i) => `L${i + 2} ${(r * 100).toFixed(0)}%`).join(' · ');
-    for (const r of ratios) {
-      expect(r, shown).toBeGreaterThanOrEqual(0.5);
-      expect(r, shown).toBeLessThanOrEqual(0.8);
+    const ratios = per.map((x) => x.ofRuns);
+    const shown = per
+      .map((x, i) => `L${i + 2} ${(x.ofZone * 100).toFixed(0)}%(판의 ${(x.ofRuns * 100).toFixed(0)}%)`)
+      .join(' · ');
+    for (const x of per) {
+      expect(x.ofZone, shown).toBeGreaterThanOrEqual(0.5);
+      expect(x.ofZone, shown).toBeLessThanOrEqual(0.9);
     }
     /*
       **표본을 160 → 400판으로 늘렸다.** 160판이면 한 레벨에서 보호구역 판이 35판 남짓뿐이라 비율이 ±10%p 씩
       튀었다 — 실제로 라이브러리에 판을 더하자 같은 L5 가 한 번은 85%, 한 번은 46% 로 나와 위아래 문턱을
       번갈아 넘었다. 레벨마다 1,000판으로 재면 L2 ~ L10 이 **61 ~ 69%** 로 고르다(고른 것은 추천이지 표본이
-      아니다). 400판이면 그 흔들림이 문턱 안에 든다.
+      아니다 — 바닥을 켜기 전, 보호구역 판 가운데 비율). 400판이면 그 흔들림이 문턱 안에 든다.
     */
     expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.25);
   });

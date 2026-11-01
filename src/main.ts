@@ -70,7 +70,7 @@ import {
   type CurriculumState,
 } from './scenarios/curriculum';
 import { abilityPriorFor, difficultyOf } from './ai/difficulty';
-import { recommendModelReady } from './ai/recommendNet';
+import { TURN_LABEL, recommendModelReady, type TurnClass } from './ai/recommendNet';
 import { riskOf } from './ai/risk';
 import { modelStep } from './ai/report';
 import { OUTCOME_MODEL, learnerVector, predictOutcome } from './ai/outcome';
@@ -296,7 +296,9 @@ async function makeAiScenario(): Promise<void> {
       **AI 가 하는 일을 순서대로 보여 준다** (ui/AiPick.ts) — 숫자와 습관 이름은 실제 값이다.
       마지막 단계는 AI 의 답이 올 때까지 돈다.
     */
-    let counts = { candidates: 0, courses: 0 };
+    let counts: { candidates: number; courses: number; eligible?: number; turn?: TurnClass } = { candidates: 0, courses: 0 };
+    // 추천 신경망이 후보도 추리는가 (recommend.ts 의 aiCourses) — 학습한 모델이 없으면 예전처럼 규칙이 추린다
+    const aiNarrows = recommendModelReady();
     // 후보 채점(recommendScenario 의 동기 앞부분)이 도는 동안에도 덮개가 보이게 — 먼저 띄우고 한 프레임 넘긴다
     aiPick.prepare([
       { tag: '1차', heading: '전통 기계학습(지도학습) 기반 예측 모델 맵 추천' },
@@ -339,17 +341,25 @@ async function makeAiScenario(): Promise<void> {
           사용자가 짚었다 (2026-09-27): "화면에 최종 10개라는 말이 없어서 헷갈렸어. 후보 몇 개 중 최종 10개를 골랐다는
           말도 나오게 해 줘." 규칙이 추린 수는 습관 · 레벨 · 차례에 따라 열 개에서 이천 개까지 오르내린다.
         */
+        /*
+          **신경망이 추리면 그렇게 말한다** (사용자가 정했다, 2026-11-01: *"모든걸 ai로 하고 싶어"*) — 탈 수 있는 판(갈래 · 레벨 ·
+          최근에 안 탄 판) 가운데 차례 신경망이 이번 판의 갈래를 뽑고, 그 갈래의 판(많으면 2,000개)을 추천 신경망이 채점한다.
+        */
         () =>
-          many
-            ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개`
-            : master
-              ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 마스터 운행 ${levelLabel(c.level)} 코스 ${counts.candidates.toLocaleString()}개`
-              : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
+          aiNarrows
+            ? `신경망으로 후보 채점 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${master ? `마스터 운행 ${levelLabel(c.level)} 코스` : '탈 수 있는'} ${(counts.eligible ?? counts.candidates).toLocaleString()}개에서 차례 신경망이 '${counts.turn ? TURN_LABEL[counts.turn] : '갈래'}' 를 골라 ${counts.candidates.toLocaleString()}개 (습관 · 약한 개념 · 난이도를 봄)`
+            : many
+              ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개`
+              : master
+                ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 마스터 운행 ${levelLabel(c.level)} 코스 ${counts.candidates.toLocaleString()}개`
+                : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
         // 결과 예측 모델(ai/outcome.ts) — 후보마다 어길 확률과 표를 붙인다. 학습자 모델이 시험된 개념이 없는 첫 판에도 돈다
         () =>
-          OUTCOME_MODEL
-            ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
-            : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
+          aiNarrows
+            ? `신경망 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 · 난이도 모델의 값도 입력으로 봄)`
+            : OUTCOME_MODEL
+              ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
+              : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
         /*
           **2차는 설정을 따른다** (save.ts 의 aiMode) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
           로컬은 추천 신경망이 최종 후보를 채점해 고른다 (ai/recommendNet.ts). 모델이 없으면(학습 전) 1차의 모델 점수가
@@ -368,8 +378,8 @@ async function makeAiScenario(): Promise<void> {
                 { tag: '2차', heading: '로컬 신경망으로 최종 맵 선택 중' },
                 () =>
                   many
-                    ? `신경망이 최종 후보 ${counts.courses}개를 채점해 먼저 고칠 습관과 코스를 고르는 중`
-                    : `신경망이 최종 후보 ${counts.courses}개를 채점해 가장 많이 배울 코스를 고르는 중`,
+                    ? `신경망이 최종 후보 ${counts.courses}개 중 먼저 고칠 습관과 코스를 고르는 중`
+                    : `신경망이 최종 후보 ${counts.courses}개 중 가장 많이 배울 코스를 고르고 까닭을 찾는 중`,
               ]
             : [
                 { tag: '2차', heading: '브라우저 안의 모델로 최종 맵 선택 중' },
@@ -394,6 +404,7 @@ async function makeAiScenario(): Promise<void> {
       predict: rec.scenario.predict,
       // 규칙 N개 → 최종 10개 — 카드가 "최종 후보 10개 중" 이라고 말한다 (ui/pickedBy.ts)
       candidates: counts.candidates,
+      aiNarrowed: counts.eligible !== undefined,
       courses: counts.courses,
     });
     outcome = { scenario: rec.scenario, tries: 1, rejected: [], reason: 'ok' };

@@ -77,7 +77,7 @@ export const CHOICE_LABEL: Record<TrackChoice, string> = { auto: '자동', ...TR
  * 보호구역이 섞이지 않은 판에서 그 하나만 보게 된다. 나머지(적색 일시정지 · 보행자 먼저 · 정지선 ·
  * 자전거)는 **어느 갈래에서나** 나오므로 갈래를 좁히지 않는다 — 좁혀 봤자 얻는 것이 없고 판만 줄어든다.
  */
-const HABIT_TRACK: Partial<Record<ViolationCode, PracticeTrack>> = {
+export const HABIT_TRACK: Partial<Record<ViolationCode, PracticeTrack>> = {
   SCHOOL_ZONE_NO_STOP: 'zone',
   SCHOOL_ZONE_RED: 'zone',
   STRAIGHT_RED: 'zone',
@@ -97,7 +97,7 @@ const HABIT_TRACK: Partial<Record<ViolationCode, PracticeTrack>> = {
 export const ZONE_GAP = 5;
 
 /** 어린이보호구역이 열리는 레벨 — 라이브러리가 정한다 (library.ts 의 levelGuide) */
-const zoneOpensAt = (): number => {
+export const zoneOpensAt = (): number => {
   for (let l = 1; l <= 10; l++) if (levelGuide(l).includes('zone')) return l;
   return 1;
 };
