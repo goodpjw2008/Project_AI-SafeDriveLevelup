@@ -8,7 +8,9 @@
  * 하는 일은 둘뿐이다. 속도는 차가 알아서 줄이므로(Vehicle.ts) 신경 쓰지 않는다.
  *
  *   1. **조향** — 우측 가장자리 차로를 따라가다 안쪽 코너에 붙여 돈다 (제25조 제1항)
- *   2. **정지 판단** — 언제 멈추고 언제 다시 갈 것인가
+ *   2. **정지 판단** — 언제 멈추고 언제 다시 갈 것인가. 관문마다 신호 · 정지선은 **신호 판단 신경망**(ai/signalPolicy.ts)이,
+ *      보행자는 LiDAR 와 **의도 예측 신경망**(ai/intent.ts)이 정한다. 여기 남은 것은 관문을 차례로 지나는 일과 어디서 브레이크를
+ *      밟을지(물리)다
  *
  * 판단 기준은 판정 엔진(rules/lawRules.ts)이 위반으로 잡는 것과 **같은 조문**이다.
  * 다만 이쪽은 판정이 아니라 행동이라, 경계에서는 늘 **안전한 쪽으로** 기운다 —
@@ -40,6 +42,7 @@ import type {
   RightArrowColor,
 } from '../rules/lawRules';
 import { STOP_HOLD_SECONDS, ZONE_ROAD_EDGES } from '../rules/lawRules';
+import { signalDecision, type SignalGate, type SignalQuery } from '../ai/signalPolicy';
 import type { VehicleInput } from './Vehicle';
 
 /** 이번 프레임의 세계 — Game 이 채워 준다 (판정에 쓰는 값과 같은 출처다) */
@@ -290,11 +293,12 @@ export class AutoDriver {
     if (this.zoneGate >= AutoDriver.ZONE_GATES.length) return false;
 
     const { id, stopLine } = AutoDriver.ZONE_GATES[this.zoneGate];
-    const light = s.zoneLights?.[id] ?? null;
     // 정지선까지 — 정지선을 넘어 횡단보도 앞에 있으면 음수다(그래도 사람이 나서면 그 자리에서 선다)
     const distance = s.frontZ - stopLine;
-    const blocked = (light !== null && light !== 'green') || pedConflict(s, id);
-    const needHold = light === null;
+    // 신호기가 있으면 녹색까지 기다리고, 없으면 사람이 없어도 한 번 선다 — 신호 판단 신경망이 정한다
+    const signal = signalDecision(this.signalQuery(s, 'zone', id));
+    const blocked = signal.wait || pedConflict(s, id);
+    const needHold = signal.hold;
 
     // 그 횡단보도 앞에서 완전히 섰으면 일시정지 의무는 끝난 것이다 (판정과 같은 기준)
     if (s.speedKmh <= 0.5 && s.stopHold >= HOLD_TARGET && distance <= this.brakeDistance(0) + 0.5) {
@@ -339,8 +343,20 @@ export class AutoDriver {
     }
     if (this.gate === 'clear') return false;
 
-    const blocked = this.gateBlocked(s);
-    const needHold = this.gateNeedsFullStop(s);
+    /*
+      **기다림 · 일시정지는 신호 판단 신경망이 정한다** (ai/signalPolicy.ts) — 신호 · 우회전 신호등 · 보호구역 · 신호기 유무 ·
+      꼬리물기를 보고. 사람이 건너거나 건너려 하면 어느 관문이든 기다린다 (아래 pedConflict — 의도 예측 신경망).
+
+      **교차로 정지선에서는 진입 전 횡단보도(A)의 사람만 본다** — 진출 쪽 횡단보도(C)까지 함께 보면 서로 기다리다 아무도
+      움직이지 않는다. C 앞에 선 보행자는 차가 가까이 와야 건너기 시작하는데(Pedestrian 의 startWithin), 차는 그 사람이 건널
+      때까지 정지선에서 기다린다 — 08번처럼 조건이 무작위인 판에서 실제로 100초를 서 있다가 시간 초과로 끝났다. 법으로 봐도
+      일시정지는 **내가 건너려는 횡단보도 앞**에서 하는 것이다 (제27조 제1항).
+    */
+    const gate: SignalGate = this.gate === 'schoolZone' ? 'S' : this.gate === 'stopLine' ? 'line' : 'exit';
+    const signal = signalDecision(this.signalQuery(s, gate));
+    const crosswalk: CrosswalkId = gate === 'S' ? 'S' : gate === 'line' ? 'A' : this.drive === 'straight' ? 'B' : 'C';
+    const blocked = signal.wait || pedConflict(s, crosswalk);
+    const needHold = signal.hold;
 
     // 관문까지 남은 거리 — 아직 멀면 굳이 서지 않고 서행으로 다가간다
     const distance =
@@ -373,79 +389,20 @@ export class AutoDriver {
     return stop;
   }
 
-  /** 지금은 어떤 경우에도 갈 수 없다 (사라질 때까지 기다린다) */
-  private gateBlocked(s: AutoDriveState): boolean {
-    if (this.gate === 'schoolZone') {
-      /*
-        **여기 적색은 서서 기다리는 것이다.** 교차로 적색처럼 "서고 나서 통행" 이
-        아니라, 녹색으로 바뀔 때까지 갈 수 없다 (violations.ts 의 SCHOOL_ZONE_RED).
-      */
-      const light = s.approachZone?.light ?? null;
-      if (light !== null && light !== 'green') return true;
-      return pedConflict(s, 'S');
-    }
-    if (this.gate === 'stopLine') {
-      // 진출로가 막혔는데 들어가면 교차로 안에 갇힌다 (제25조 제5항 · 꼬리물기)
-      if (s.exitBlocked) return true;
-      /*
-        **직진은 적색에 갈 수 없다.** 우회전은 서고 나서 갈 수 있지만(별표 2 적색의 등화 제2호)
-        직진에는 그 단서가 없다 — 녹색이 될 때까지 기다린다 (violations.ts 의 STRAIGHT_RED).
-        우회전 신호등은 직진과 무관하므로 보지 않는다.
-      */
-      if (this.drive === 'straight') {
-        if (s.vehicleLight !== 'green') return true;
-        return pedConflict(s, 'A');
-      }
-      /*
-        우회전 신호등이 있으면 **다른 신호등에도 불구하고 이 등화를 따른다**
-        (시행규칙 [별표 2] 비고 제3호). 녹색 화살표가 아니면 우회전 자체가 금지다.
-      */
-      if (s.rightArrow !== null && s.rightArrow !== 'greenArrow') return true;
-      // 진입 전 횡단보도를 건너는 사람 (제27조 제1항)
-      return pedConflict(s, 'A');
-      /*
-        **진출 쪽 횡단보도(C)는 여기서 보지 않는다.**
-
-        한때 정지선에서 서는 김에 C 까지 함께 봤는데, 그러면 **서로 기다리다 아무도
-        움직이지 않는다.** C 앞에 선 보행자는 차가 가까이 와야 건너기 시작하는데
-        (Pedestrian 의 startWithin), 차는 그 사람이 건널 때까지 정지선에서 기다린다.
-        08번처럼 조건이 무작위인 판에서 실제로 100초를 서 있다가 시간 초과로 끝났다.
-
-        법으로 봐도 이쪽이 맞다 — 일시정지는 **내가 건너려는 횡단보도 앞**에서 하는
-        것이지(제27조 제1항) 두 정거장 앞에서 하는 것이 아니다.
-      */
-    }
-    // 교차로를 지나 만나는 횡단보도 — 보행신호 색이 아니라 **보행자의 통행 여부**가 기준이다
-    return pedConflict(s, this.drive === 'straight' ? 'B' : 'C');
-  }
-
-  /** 갈 수는 있으나 **한 번은 완전히 서야** 한다 */
-  private gateNeedsFullStop(s: AutoDriveState): boolean {
-    if (this.gate === 'stopLine' && this.drive === 'straight') {
-      /*
-        직진의 적색은 '서고 나서 통행' 이 아니라 **기다림**이라 위 gateBlocked 가 맡는다.
-        여기서 남는 것은 보호구역의 신호기 없는 횡단보도뿐이다 (제27조 제7항).
-      */
-      return s.isSchoolZone && s.pedSignal.A === null;
-    }
-    if (this.gate === 'stopLine') {
-      /*
-        우회전 신호등이 있으면 그것이 정면 차량신호등을 대신한다 — 녹색 화살표는
-        "화살표시 방향으로 진행할 수 있다" 는 뜻이라 정지 의무가 없다.
-      */
-      if (s.rightArrow !== null) return false;
-      // 정면 적색이면 보행자 유무와 관계없이 일시정지 (시행규칙 [별표 2] 적색의 등화 제2호)
-      if (s.vehicleLight === 'red' || s.vehicleLight === 'redFlash') return true;
-      // 황색은 정지선 직전에서 멈출 수 있으면 멈춘다 — 정답 주행이므로 무리해서 들어가지 않는다
-      if (s.vehicleLight === 'yellow') return true;
-      // 어린이보호구역의 신호기 없는 횡단보도 (제27조 제7항)
-      return s.isSchoolZone && s.pedSignal.A === null;
-    }
-    if (this.gate === 'schoolZone') {
-      // 신호기가 없으면 보행자 유무와 무관하게 일시정지 (제27조 제7항)
-      return s.approachZone !== null && s.approachZone.light === null;
-    }
-    return s.isSchoolZone && s.pedSignal[this.drive === 'straight' ? 'B' : 'C'] === null;
+  /** 이 관문에서 신호 판단 신경망에게 보여 주는 것 — 신호기와 지도로 알 수 있는 값만 (ai/signalPolicy.ts) */
+  private signalQuery(s: AutoDriveState, gate: SignalGate, zoneCrosswalk?: CrosswalkId): SignalQuery {
+    const exit: CrosswalkId = this.drive === 'straight' ? 'B' : 'C';
+    return {
+      gate,
+      drive: this.drive === 'straight' ? 'straight' : 'rightTurn',
+      vehicleLight: s.vehicleLight,
+      rightArrow: s.rightArrow,
+      approach: s.approachZone ? (s.approachZone.light ?? 'noSignal') : 'none',
+      zoneLight: zoneCrosswalk ? (s.zoneLights?.[zoneCrosswalk] ?? 'noSignal') : 'noSignal',
+      schoolZone: s.isSchoolZone,
+      crosswalkSignal: gate === 'line' ? s.pedSignal.A !== null : gate === 'exit' ? s.pedSignal[exit] !== null : false,
+      exitBlocked: s.exitBlocked,
+    };
   }
 
   // ── 조향 ─────────────────────────────────────────────────────────────────
