@@ -1381,11 +1381,11 @@ export class Screens {
         ${body}
       </div>`;
 
-    // 마스터 — 오를 레벨은 없고, L10 코스가 무작위로 이어진다 (마스터 운행). 새로 생긴 습관은 아래처럼 그대로 보인다
+    // 마스터 — 오를 레벨은 없고, L10 코스가 이어진다 (마스터 운행 — 고르는 것은 설정의 추천 AI). 새로 생긴 습관은 아래처럼 그대로 보인다
     if (mastered && !habits.length) {
       return wrap(`<div class="ai-note"><b>나쁜 운전 습관을 모두 고쳤습니다.</b> 마스터 운행에서는 ${esc(
         levelLabel(MAX_LEVEL),
-      )} 코스가 무작위로 이어집니다 — <b>처음부터 다시 시작</b>을 누르기 전까지 계속됩니다.</div>`);
+      )} 코스가 이어집니다 — <b>처음부터 다시 시작</b>을 누르기 전까지 계속됩니다.</div>`);
     }
     if (!habits.length) {
       return wrap(`<div class="ai-note">기록된 <b>나쁜 운전 습관이 없습니다.</b>
