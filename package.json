@@ -25,6 +25,7 @@
     "train:intent": "vite-node scripts/train-intent.ts",
     "train:recommend": "vite-node scripts/train-recommend.ts",
     "train:signal": "vite-node scripts/train-signal.ts",
+    "train:coach": "vite-node scripts/train-coach.ts",
     "icons": "python3 scripts/build-icons.py"
   },
   "dependencies": {

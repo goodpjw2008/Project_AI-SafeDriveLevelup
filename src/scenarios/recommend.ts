@@ -50,7 +50,7 @@ import { difficultyOf, levelMeanDifficulty, successProbability } from '../ai/dif
 import { reviewDue } from '../ai/forgetting';
 import { SKILL_ORDER, SKILL_SHORT, effectiveMastery, wasTested, weakSkills, type Knowledge } from '../ai/knowledge';
 import { judgeCandidate, topPredictions, type CandidateVerdict } from '../ai/outcome';
-import type { RecommendAi } from '../economy/save';
+import type { AiMode } from '../economy/save';
 import {
   explainPick,
   recommendFeatures,
@@ -1151,12 +1151,12 @@ export async function recommendScenario(
    */
   playedIds: readonly number[] = recentIds,
   /**
-   * **무엇이 고르는가** (설정 '다음판 추천 AI 설정' — save.ts 의 recommendAi). `local` 이면 서버에 묻지 않고
+   * **무엇이 고르는가** (설정 'AI 사용 설정' — save.ts 의 aiMode). `local` 이면 서버에 묻지 않고
    * 브라우저의 추천 신경망이 고른다 (ai/recommendNet.ts). `llm` 이면 서버의 AI 에게 묻고, 답이 없으면 신경망이 고른다
    * (모델이 없으면 둘 다 프로그램 점수). 기본값이 `llm` 인 것은 이 함수의 예전 동작(테스트)을 지키려는 것이고,
    * 게임의 기본은 부르는 쪽(main.ts)이 넘기는 설정값이다.
    */
-  mode: RecommendAi = 'llm',
+  mode: AiMode = 'llm',
 ): Promise<RecommendOutcome> {
   // 최근에 나온 모양을 깎아 **번호만 다른 같은 장면**이 이어지지 않게 한다 (위 REPEAT_PENALTY)
   const seen = seenShapes(recentIds);

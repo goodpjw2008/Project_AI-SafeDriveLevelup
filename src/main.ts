@@ -314,7 +314,7 @@ async function makeAiScenario(): Promise<void> {
       recentIds,
       (n) => (counts = n),
       history.map((r) => r.st),
-      saveData.settings.recommendAi,
+      saveData.settings.aiMode,
     );
     /*
       **답이 오는 순간 분석 화면의 제목에 그 AI 이름을 띄운다** (ui/AiPick.ts 의 setAnalyst).
@@ -351,11 +351,11 @@ async function makeAiScenario(): Promise<void> {
             ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
             : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
         /*
-          **2차는 설정을 따른다** (save.ts 의 recommendAi) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
+          **2차는 설정을 따른다** (save.ts 의 aiMode) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
           로컬은 추천 신경망이 최종 후보를 채점해 고른다 (ai/recommendNet.ts). 모델이 없으면(학습 전) 1차의 모델 점수가
           가장 높은 코스를 고르므로(recommend.ts 의 rulePick) 그렇게 말한다.
         */
-        ...(saveData.settings.recommendAi === 'llm'
+        ...(saveData.settings.aiMode === 'llm'
           ? [
               { tag: '2차', heading: '최신 AI LLM 으로 최종 맵 선택 중' },
               () =>
@@ -400,12 +400,17 @@ async function makeAiScenario(): Promise<void> {
   } catch (e) {
     console.error('[recommend] 추천 중 예외 — 판을 새로 만든다', e);
     aiPick.hide();
-    showLoading('AI 가 맵을 새로 만드는 중', { title: 'AI가 운전습관을 분석해 맵을 만들고 있습니다…', immediate: true });
-    try {
-      outcome = await generateScenario(summarize(saveData.history), aiTraining.made, plan);
-    } catch (e2) {
-      console.error('[scenario] 판 만들기 중 예외', e2);
+    if (saveData.settings.aiMode === 'local') {
+      // AI 사용 설정이 로컬이면 서버의 LLM 에게 판을 만들게 하지 않는다 (save.ts 의 aiMode) — 메뉴로 돌아가 다시 누르게 한다
       outcome = { scenario: null, tries: 0, rejected: [], reason: 'invalid' };
+    } else {
+      showLoading('AI 가 맵을 새로 만드는 중', { title: 'AI가 운전습관을 분석해 맵을 만들고 있습니다…', immediate: true });
+      try {
+        outcome = await generateScenario(summarize(saveData.history), aiTraining.made, plan);
+      } catch (e2) {
+        console.error('[scenario] 판 만들기 중 예외', e2);
+        outcome = { scenario: null, tries: 0, rejected: [], reason: 'invalid' };
+      }
     }
   } finally {
     aiTraining.busy = false;
@@ -1064,9 +1069,9 @@ function renderSettings(): void {
       commit();
       renderSettings();
     },
-    // 다음 판을 무엇이 고를지 (save.ts 의 recommendAi) — 다음 추천부터 그 길로 간다 (makeAiScenario)
-    onRecommendAi: (mode) => {
-      saveData.settings.recommendAi = mode;
+    // AI 기능을 무엇으로 돌릴지 (save.ts 의 aiMode) — 다음 추천 · 다음 결과 화면부터 그 길로 간다
+    onAiMode: (mode) => {
+      saveData.settings.aiMode = mode;
       commit();
       renderSettings();
     },
@@ -1108,7 +1113,7 @@ function renderSettings(): void {
       const ok = await screens.confirm({
         title: '설정을 처음 값으로 되돌립니다.',
         lines: [
-          [{ em: '난이도 · 연습 · 추천 AI · 시점 · 화질 · 소리' }, '가 모두 처음 값이 됩니다.'],
+          [{ em: '난이도 · 연습 · AI 사용 · 시점 · 화질 · 소리' }, '가 모두 처음 값이 됩니다.'],
           '레벨 · 경험치 · 운전 습관 · 기록은 그대로입니다.',
         ],
         ok: '초기화',

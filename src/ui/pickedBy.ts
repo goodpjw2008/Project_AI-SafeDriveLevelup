@@ -88,6 +88,17 @@ export function advisedBy(picker?: Picker, _model?: string): string {
 }
 
 /**
+ * 외부 LLM 을 골랐는데 답이 없어 **로컬 신경망이 대신 쓴** 코칭 · 진단 — 그렇다고 밝힌다 (ai/localCoach.ts). 누가 쓴 글인지
+ * 밝히는 줄이라, 외부 LLM 이 쓴 것처럼 보이면 안 된다.
+ */
+export function advisedInstead(): string {
+  return (
+    `${chip('local')}<span class="pick-long"> 분석 — 외부 LLM 이 답하지 않아 대신 쓴 코칭이에요</span>` +
+    `<span class="pick-short"> AI 코칭</span>`
+  );
+}
+
+/**
  * 주행 화면 상단 첫 줄 — 이미 달리는 중.
  *
  * **짧게 적는다** (사용자가 두 번 줄였다): `Gemini : <모델> 모델이 분석해서 추천해준 맵`.

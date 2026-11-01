@@ -23,7 +23,7 @@ import qrSite from '../assets/qr-site.png';
 import { fetchCoaching, fetchHabitReport, toCoachRequest } from '../coach/client';
 import { MIN_RUNS, summarize, weakestPoint, type HabitSummary } from '../coach/habits';
 import { CARS_BY_LEVEL, getCar, isCarUnlocked, type CarSpec } from '../economy/cars';
-import { hasProgress, type RecommendAi, type SaveData } from '../economy/save';
+import { hasProgress, type AiMode, type SaveData } from '../economy/save';
 import { GRADE_TEXT, type JudgeResult } from '../rules/lawRules';
 import { VIOLATIONS, fineOf, penaltyPointsOf, type ViolationCode } from '../rules/violations';
 import type { ViewMode } from '../game/CameraRig';
@@ -76,7 +76,8 @@ import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
 import { TRACK_CHOICES, CHOICE_LABEL, type TrackChoice } from '../scenarios/tracks';
 import type { SiteStats } from '../siteStats';
-import { advisedBy } from './pickedBy';
+import { advisedBy, advisedInstead } from './pickedBy';
+import { coachSituation, localCoaching, localHabitReport, reportSituation } from '../ai/localCoach';
 import type { Picker } from '../scenarios/recommend';
 import {
   HABIT_CLEARED_AFTER,
@@ -1444,8 +1445,8 @@ export class Screens {
       onDifficulty(c: Challenge): void;
       /** 무엇을 연습할지 (scenarios/tracks.ts) — '자동' 이면 AI 가 고른다 */
       onTrack(track: TrackChoice): void;
-      /** 다음 판 추천을 무엇이 할지 (save.ts 의 recommendAi) */
-      onRecommendAi(mode: RecommendAi): void;
+      /** AI 기능을 무엇으로 돌릴지 (save.ts 의 aiMode) — 다음판 추천 · 주행결과 분석 · 습관 진단 */
+      onAiMode(mode: AiMode): void;
       /** 화질 항목 하나를 바꾼다 */
       onGraphics(patch: Partial<GraphicsSettings>): void;
       /** 프리셋 — 네 항목을 한 번에 맞춘다 */
@@ -1508,18 +1509,19 @@ export class Screens {
             { note: '자동은 고칠 습관과 기록을 보고 AI 가 우회전, 어린이보호구역, 우회전+어린이보호구역 을 선택' },
           )}
           <!--
-            **다음 판을 무엇이 고를까** (save.ts 의 recommendAi · 사용자가 정한 이름과 기본값).
-            로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이 없으면 추천 신경망이 고른다.
+            **AI 사용 설정** (save.ts 의 aiMode · 사용자가 정한 이름과 기본값, 2026-11-01: *"주행분석등 모든것을 신경망으로 동작
+            하거나 llm으로 동작하게 설정을 심플하게"*). 로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이
+            없으면 로컬 신경망이 한다.
           -->
           ${this.optionRow(
-            'rec',
-            '다음판 추천 AI 설정',
+            'ai',
+            'AI 사용 설정',
             [
               ['local', '로컬 신경망 기반 ·기본'],
-              ['llm', '외부 LLM 기반'],
+              ['llm', '외부 LLM'],
             ],
-            save.settings.recommendAi,
-            { note: '로컬은 브라우저 안의 추천 신경망이 고르고, 외부 LLM 은 서버의 AI 에게 묻습니다 (답이 없으면 로컬 신경망이 고름)' },
+            save.settings.aiMode,
+            { note: '다음판 추천, 주행결과 분석, 습관 진단을 브라우저 안의 신경망으로 할지 외부 LLM 으로 할지 정합니다 (외부 LLM 이 답하지 않으면 로컬 신경망)' },
           )}
           ${
             /*
@@ -1670,7 +1672,7 @@ export class Screens {
       document.getElementById(`view-${v.id}`)?.addEventListener('click', () => handlers.onStartView(v.id));
     }
     this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
-    this.bindOptions('rec', ['local', 'llm'], (v) => handlers.onRecommendAi(v as RecommendAi));
+    this.bindOptions('ai', ['local', 'llm'], (v) => handlers.onAiMode(v as AiMode));
     this.bindOptions('drv', ['on', 'off'], (v) => handlers.onDriverView(v === 'on'));
 
     for (const t of ['ultra', 'high', 'medium', 'low'] as const) {
@@ -2178,7 +2180,7 @@ export class Screens {
     }
 
     // 카드를 그리지 않았으면 부르지도 않는다 (위 needsCoach 주석 참고)
-    if (needsCoach) this.loadCoaching(sc, result, handlers.onCoachReady);
+    if (needsCoach) this.loadCoaching(sc, result, save.settings.aiMode, handlers.onCoachReady);
     else handlers.onCoachReady?.();
 
     this.bindBack('debrief', handlers.onMenu);
@@ -2203,10 +2205,12 @@ export class Screens {
    */
   private coachRun = 0;
 
-  private loadCoaching(sc: ScenarioSpec, result: JudgeResult, onReady?: () => void): void {
+  private loadCoaching(sc: ScenarioSpec, result: JudgeResult, mode: AiMode, onReady?: () => void): void {
     const mine = ++this.coachRun;
 
-    void fetchCoaching(toCoachRequest(sc.id, sc.title, result)).then((advice) => {
+    // **AI 사용 설정이 로컬이면 서버에 묻지 않는다** (save.ts 의 aiMode) — 브라우저 안에서 정리한다
+    const asking = mode === 'llm' ? fetchCoaching(toCoachRequest(sc.id, sc.title, result)) : Promise.resolve(null);
+    void asking.then((advice) => {
       if (mine !== this.coachRun) return; // 그 사이 다른 판이 그려졌다
       const card = document.getElementById('coach-card');
       const body = document.getElementById('coach-body');
@@ -2218,8 +2222,21 @@ export class Screens {
       */
       if (!advice) {
         /*
-          **칸을 지우지 않고, AI 글이 아니라고 밝힌 뒤 판정 기록으로 채운다** (위 fallbackCoach). 제목에서 'AI' 를 빼고,
-          누가 썼는지 적는 자리에 까닭을 적는다 — AI 가 쓰지 않은 글을 AI 이름으로 내보내면 거짓말이 된다.
+          **로컬 신경망이 쓴다** (ai/localCoach.ts) — 설정이 로컬이면 처음부터, 외부 LLM 이면 답이 없을 때. 외부 LLM 이 미리 쓴 문장
+          은행에서 이 판에 실제로 있었던 위반 · 자리 · 조건의 문장만 후보로 두고, 신경망이 무엇을 먼저 말할지 고른다.
+        */
+        const local = localCoaching(coachSituation(result, libraryEntry(sc.id)?.tags, sc.drive ?? 'rightTurn'));
+        if (local) {
+          card.classList.remove('loading');
+          body.innerHTML = coachLines(local);
+          const by = document.getElementById('coach-by');
+          if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedBy('local');
+          onReady?.();
+          return;
+        }
+        /*
+          **학습한 모델도 없으면 칸을 지우지 않고, AI 글이 아니라고 밝힌 뒤 판정 기록으로 채운다** (위 fallbackCoach). 제목에서
+          'AI' 를 빼고, 누가 썼는지 적는 자리에 까닭을 적는다 — AI 가 쓰지 않은 글을 AI 이름으로 내보내면 거짓말이 된다.
         */
         card.classList.remove('loading');
         const head = document.getElementById('coach-head');
@@ -2363,23 +2380,34 @@ export class Screens {
     `;
 
     this.bindBack('report', onBack);
-    this.loadHabitReport(s);
+    this.loadHabitReport(s, save.settings.aiMode);
   }
 
   /** 진단 문단 — 코치 카드와 같은 규칙이다 (늦게 오면 버리고, 못 받으면 지운다) */
   private reportRun = 0;
 
-  private loadHabitReport(summary: HabitSummary): void {
+  private loadHabitReport(summary: HabitSummary, mode: AiMode): void {
     const mine = ++this.reportRun;
 
-    void fetchHabitReport(summary).then((advice) => {
+    // AI 사용 설정이 로컬이면 서버에 묻지 않는다 (save.ts 의 aiMode)
+    const asking = mode === 'llm' ? fetchHabitReport(summary) : Promise.resolve(null);
+    void asking.then((advice) => {
       if (mine !== this.reportRun) return;
       const card = document.getElementById('report-coach');
       const body = document.getElementById('report-coach-body');
       if (!card || !body) return;
 
       if (!advice) {
-        card.remove();
+        // 로컬 신경망이 쓴다 (ai/localCoach.ts) — 숫자는 집계의 값을 빈칸에 그대로 넣는다. 모델도 없으면 칸을 지운다
+        const local = localHabitReport(reportSituation(summary));
+        if (!local) {
+          card.remove();
+          return;
+        }
+        card.classList.remove('loading');
+        body.innerHTML = coachLines(local);
+        const by = document.getElementById('report-coach-by');
+        if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedBy('local');
         return;
       }
       card.classList.remove('loading');
