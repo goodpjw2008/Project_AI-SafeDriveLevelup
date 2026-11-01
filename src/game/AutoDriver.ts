@@ -7,10 +7,10 @@
  *
  * 하는 일은 둘뿐이다. 속도는 차가 알아서 줄이므로(Vehicle.ts) 신경 쓰지 않는다.
  *
- *   1. **조향** — 우측 가장자리 차로를 따라가다 안쪽 코너에 붙여 돈다 (제25조 제1항)
+ *   1. **조향** — 우측 가장자리 차로를 따라가다 안쪽 코너에 붙여 돈다 (제25조 제1항). 핸들은 **주행 정책 신경망**이 정한다
  *   2. **정지 판단** — 언제 멈추고 언제 다시 갈 것인가. 관문마다 신호 · 정지선은 **신호 판단 신경망**(ai/signalPolicy.ts)이,
- *      보행자는 LiDAR 와 **의도 예측 신경망**(ai/intent.ts)이 정한다. 여기 남은 것은 관문을 차례로 지나는 일과 어디서 브레이크를
- *      밟을지(물리)다
+ *      보행자는 LiDAR 와 **의도 예측 신경망**(ai/intent.ts)이, 관문 앞 · 앞차 뒤에서 언제 밟을지는 **주행 정책 신경망**
+ *      (ai/drivePolicy.ts)이 정한다. 여기 남은 것은 길 위 내 자리를 찾는 일과 관문을 차례로 지나는 일 — 지도 기록이다
  *
  * 판단 기준은 판정 엔진(rules/lawRules.ts)이 위반으로 잡는 것과 **같은 조문**이다.
  * 다만 이쪽은 판정이 아니라 행동이라, 경계에서는 늘 **안전한 쪽으로** 기운다 —
@@ -43,6 +43,7 @@ import type {
 } from '../rules/lawRules';
 import { STOP_HOLD_SECONDS, ZONE_ROAD_EDGES } from '../rules/lawRules';
 import { signalDecision, type SignalGate, type SignalQuery } from '../ai/signalPolicy';
+import { gateBrake, leadBrake, steerPolicy } from '../ai/drivePolicy';
 import type { VehicleInput } from './Vehicle';
 
 /** 이번 프레임의 세계 — Game 이 채워 준다 (판정에 쓰는 값과 같은 출처다) */
@@ -92,17 +93,10 @@ export interface AutoDriveState {
   pedYield?: ReadonlyMap<number, boolean>;
 }
 
-/**
- * 앞차 뒤에서 **서야 하는 간격** (m).
- *
- * 속도가 붙어 있을수록 멀리서 선다 — 제동 거리(v²/2a, 감속도 4.8)에 여유 2.5m 를 더한다.
- * 서행(12km/h)이면 3.6m, 앞차가 이미 서 있으면 2.5m 뒤에 선다. 정답 주행이므로
- * 판정이 봐주는 한계까지 붙지 않는다.
- */
-const followStopGap = (speedKmh: number): number => {
-  const v = speedKmh / 3.6;
-  return 2.5 + (v * v) / (2 * 4.8);
-};
+/*
+  앞차 뒤에서 언제 밟을지 · 관문 앞에서 언제 밟을지 · 핸들은 **주행 정책 신경망**이 정한다 (ai/drivePolicy.ts). 예전 공식(앞차 뒤
+  2.5m + 제동 거리 · 관문 앞 제동 거리 + 여유 · 순수 추종)은 그 신경망의 정답이자, 모델이 없을 때의 대신이다.
+*/
 
 /**
  * 일시정지를 유지할 시간 (초).
@@ -179,8 +173,10 @@ function buildPath(): Array<{ x: number; z: number }> {
 const TURN_PATH = buildPath();
 const STRAIGHT_PATH = buildStraightLine();
 
-/** 조향 최대각 (Vehicle 의 MAX_STEER 와 같아야 -1~1 로 정규화된다) */
-const MAX_STEER = 0.62;
+/** 코스마다 따라갈 길 — 주행 정책 신경망의 학습(scripts/train-drive.ts)도 이 길 둘레에서 차 자리를 짓는다 */
+export const drivePath = (drive: DriveMode): ReadonlyArray<{ x: number; z: number }> =>
+  drive === 'rightTurn' ? TURN_PATH : STRAIGHT_PATH;
+
 
 export class AutoDriver {
   /** 지금 어느 관문 앞인가 */
@@ -249,7 +245,7 @@ export class AutoDriver {
     private brakeDecel = 4.8,
     private readonly drive: DriveMode = 'rightTurn',
   ) {
-    this.path = drive === 'rightTurn' ? TURN_PATH : STRAIGHT_PATH;
+    this.path = drivePath(drive) as Array<{ x: number; z: number }>;
   }
 
   /** 따라갈 길 — 코스마다 다르다 (위 buildPath · buildStraightLine) */
@@ -282,7 +278,7 @@ export class AutoDriver {
    * ② 신호기가 있으면 녹색이 아닌 동안 갈 수 없다. 사람이 건너고 있으면 어느 쪽이든 선다(제27조 제1항).
    */
   private zoneShouldStop(s: AutoDriveState): boolean {
-    if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) {
+    if (s.lead && leadBrake(s.lead.gap, Math.max(0, s.speedKmh - s.lead.speedKmh))) {
       this.holdDistance = Math.max(0, s.lead.gap - 2.5);
       return true;
     }
@@ -337,7 +333,7 @@ export class AutoDriver {
       **앞차가 먼저다.** 신호가 녹색이어도 앞차가 서면 선다 — 어떤 관문에 있든, 관문을 다
       지난 뒤든 같다. 앞차가 속도를 줄이는 중이면 그 차의 속도만큼만 여유를 덜어 준다.
     */
-    if (s.lead && s.lead.gap < followStopGap(Math.max(0, s.speedKmh - s.lead.speedKmh))) {
+    if (s.lead && leadBrake(s.lead.gap, Math.max(0, s.speedKmh - s.lead.speedKmh))) {
       this.holdDistance = Math.max(0, s.lead.gap - 2.5);
       return true;
     }
@@ -384,7 +380,8 @@ export class AutoDriver {
 
   /** 관문 앞에서 서는가 — 선다면 그 자리를 적어 둔다 (판단은 예전과 같은 한 줄이다) */
   private holdAt(distance: number, speedKmh: number): boolean {
-    const stop = distance <= this.brakeDistance(speedKmh);
+    // 지금 밟을까 — 주행 정책 신경망 (ai/drivePolicy.ts — 예전 공식은 제동 거리 + 여유)
+    const stop = gateBrake(distance, speedKmh, this.brakeDecel);
     if (stop) this.holdDistance = Math.max(0, distance);
     return stop;
   }
@@ -408,16 +405,11 @@ export class AutoDriver {
   // ── 조향 ─────────────────────────────────────────────────────────────────
 
   /**
-   * 순수 추종(pure pursuit) — 길 위에서 **앞을 내다본 한 점**을 향해 핸들을 감는다.
-   *
-   * 지금 위치의 오차만 보고 감으면 코너에서 늘 늦게 돌아 바깥으로 밀린다. 앞의 점을
-   * 보면 코너가 오기 전에 미리 감기 시작해, 사람이 도는 것과 같은 선이 나온다.
-   * 내다보는 거리는 속도에 비례한다 — 빠를수록 멀리 봐야 흔들리지 않는다.
+   * 핸들 — 길 위 내 자리를 찾고, 그 앞의 길을 주행 정책 신경망에 보여 준다. 신경망이 따라 배운 예전 공식은 순수 추종(pure
+   * pursuit)이다 — 지금 위치의 오차만 보고 감으면 코너에서 늘 늦게 돌아 바깥으로 밀려서, **앞을 내다본 한 점**을 향해 감았다
+   * (ai/drivePolicy.ts 의 steerRule). 신경망도 2~12m 앞의 길을 함께 본다.
    */
   private steer(s: AutoDriveState): number {
-    const speed = s.speedKmh / 3.6;
-    const lookahead = Math.max(3, Math.min(8, 2.5 + speed * 0.6));
-
     /*
       길 위에서 지금 가장 가까운 점 — 앞으로만 찾는다 (되돌아가면 코너에서 갇힌다). 첫 프레임만은 길 전체를 본다:
       길은 가장 먼 스폰 뒤에서 시작하므로, 가까운 스폰(68)에서 출발하면 내 자리가 길 앞쪽 60점 너머에 있다.
@@ -435,32 +427,11 @@ export class AutoDriver {
     }
     this.pathIndex = best;
 
-    // 거기서부터 내다보는 거리만큼 더 간 점
-    let target = this.path[this.path.length - 1];
-    let walked = 0;
-    for (let i = best; i < this.path.length - 1; i += 1) {
-      walked += Math.hypot(this.path[i + 1].x - this.path[i].x, this.path[i + 1].z - this.path[i].z);
-      if (walked >= lookahead) {
-        target = this.path[i + 1];
-        break;
-      }
-    }
-
-    // 차 기준으로 그 점이 얼마나 옆에 있는가 (오른쪽이 +)
-    const fx = -Math.sin(s.yaw);
-    const fz = -Math.cos(s.yaw);
-    const rx = Math.cos(s.yaw);
-    const rz = -Math.sin(s.yaw);
-    const dx = target.x - s.x;
-    const dz = target.z - s.z;
-    const lateral = dx * rx + dz * rz;
-    const ahead = dx * fx + dz * fz;
-
-    // 자전거 모델의 조향각 — κ = 2·lateral / L², δ = atan(wheelbase·κ)
-    const L = Math.max(1, Math.hypot(ahead, lateral));
-    const curvature = (2 * lateral) / (L * L);
-    const angle = Math.atan(this.wheelbase * curvature);
-    return Math.max(-1, Math.min(1, angle / MAX_STEER));
+    /*
+      **핸들은 주행 정책 신경망이 정한다** (ai/drivePolicy.ts) — 내 자리부터 앞의 길이 차에서 어디에 보이는가 · 속도 · 축간거리를
+      보고. 예전에는 내다본 한 점을 향해 감는 순수 추종 공식이었다 (그 공식이 신경망의 정답이다). 길은 앞 60점이면 12m 를 넘는다.
+    */
+    return steerPolicy(this.path.slice(best, best + 60), { x: s.x, z: s.z, yaw: s.yaw }, s.speedKmh / 3.6, this.wheelbase);
   }
 }
 
