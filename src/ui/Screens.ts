@@ -80,8 +80,9 @@ import { advisedBy, advisedInstead } from './pickedBy';
 import { coachSituation, localCoaching, localHabitReport, reportSituation } from '../ai/localCoach';
 import type { Picker } from '../scenarios/recommend';
 import {
-  HABIT_CLEARED_AFTER,
   habitTitle,
+  masteryOfKnowledge,
+  primaryHabit,
   runsToClear,
   type BadHabit,
   type HabitChange,
@@ -1110,7 +1111,7 @@ export class Screens {
         -->
         <div class="ai-split">
           ${this.activeCarStrip(save)}
-          ${this.habitList(c.badHabits, c.level, c.mastered)}
+          ${this.habitList(c.badHabits, c.level, c.mastered, c.skills)}
         </div>
 
         <!--
@@ -1374,7 +1375,7 @@ export class Screens {
       </div>`;
   }
 
-  private habitList(habits: BadHabit[], level: Difficulty, mastered = false): string {
+  private habitList(habits: BadHabit[], level: Difficulty, mastered = false, skills?: Knowledge): string {
     // 학습자 모델(개념별 숙달) 카드는 여기 아래가 아니라 두 시작 버튼 아래에 선다 (renderMenu 의 skillCard — 사용자가 정했다)
     const wrap = (body: string): string => `
       <div class="ai-habits">
@@ -1393,21 +1394,31 @@ export class Screens {
         위반하지 않으면 경험치가 쌓여 다음 레벨로 올라갑니다. 위반하면 AI 가 분석을 해서 그 습관을 고치는 맵을 추천해 줍니다.</div>`);
     }
 
-    const rows = habits
+    /*
+      **다음 판이 시험할 습관이 맨 위** — 학습자 모델이 익혔을 확률을 가장 낮게 보는 습관이다 (coach/badHabits.ts 의 primaryHabit).
+      나머지는 많이 저지른 차례 그대로다.
+    */
+    const masteryOf = skills ? masteryOfKnowledge(skills) : undefined;
+    const target = primaryHabit(habits, masteryOf);
+    const ordered = target ? [target, ...habits.filter((h) => h !== target)] : habits;
+    const rows = ordered
       .map((h, i) => {
-        const left = runsToClear(h);
-        // 고치기까지 남은 판을 칸으로 — 채워질수록 사라짐에 가까워진다
-        const pips = Array.from({ length: HABIT_CLEARED_AFTER }, (_, k) =>
+        // 고치기까지 남은 판 — 학습자 모델이 앞을 내다본 수 (위험 없이 깨끗하게 지킨다면). 지킨 판과 남은 판을 칸으로
+        const left = runsToClear(h, skills);
+        const pips = Array.from({ length: h.cleanRuns + left }, (_, k) =>
           k < h.cleanRuns ? '<span class="pip on"></span>' : '<span class="pip"></span>',
         ).join('');
+        const p = masteryOf?.(h.code) ?? null;
         return `<li class="habit ${i === 0 ? 'target' : ''}">
             <div class="habit-name">
               ${esc(habitTitle(h.code))}
               ${i === 0 ? '<span class="habit-tag">다음 판이 시험</span>' : ''}
             </div>
             <div class="habit-meta">
-              ${h.count}회 저지름 · 그 상황에서 <b>${left}판</b>만 더 지키면 사라집니다
-              <span class="pips" aria-label="${h.cleanRuns}/${HABIT_CLEARED_AFTER}">${pips}</span>
+              ${h.count}회 저지름 · 그 상황에서 <b>${left}판</b>쯤 더 지키면 사라집니다${
+                p === null ? '' : ` · AI 학습자 모델 익힘 ${Math.round(p * 100)}%`
+              }
+              <span class="pips" aria-label="${h.cleanRuns}/${h.cleanRuns + left}">${pips}</span>
             </div>
           </li>`;
       })
@@ -2116,7 +2127,7 @@ export class Screens {
                   (c2) =>
                     `<div class="hc cleared">${icon('info')} <b>${esc(
                       habitTitle(c2),
-                    )}</b> 습관이 사라졌습니다 — ${HABIT_CLEARED_AFTER}판 연속으로 지켰습니다</div>`,
+                    )}</b> 습관이 사라졌습니다 — AI 학습자 모델이 고쳤다고 판단했습니다</div>`,
                 )
                 .join('')}
               ${course.change.added

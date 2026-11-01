@@ -451,7 +451,8 @@ function toRequest(
       code: h.code,
       count: h.count,
       cleanRuns: h.cleanRuns,
-      toClear: runsToClear(h),
+      // 고치기까지 남은 판 — 학습자 모델이 앞을 내다본 수 (coach/badHabits.ts)
+      toClear: runsToClear(h, plan?.skills),
     })),
     retryOf,
   };

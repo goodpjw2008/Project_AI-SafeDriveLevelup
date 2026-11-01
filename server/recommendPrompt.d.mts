@@ -6,5 +6,5 @@
 export declare const SYSTEM_PROMPT: string;
 export declare function buildUserPrompt(req: unknown): string;
 
-/** 습관이 풀리는 데 필요한 무위반 판 수 — src/coach/badHabits.ts 와 같은 값이어야 한다 */
-export declare const HABIT_CLEARED_AFTER: number;
+/** 습관이 풀리는 학습자 모델의 익힘 확률 — src/coach/badHabits.ts 의 HABIT_MASTERY 와 같은 값이어야 한다 */
+export declare const HABIT_MASTERY: number;

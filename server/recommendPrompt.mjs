@@ -98,13 +98,13 @@ export const SYSTEM_PROMPT = [
 ].join('\n');
 
 /**
- * 습관이 풀리는 데 필요한 **무위반 판 수**.
+ * 습관이 풀리는 **학습자 모델의 익힘 확률** — 이 값을 넘으면 풀린다 (2026-11-01 부터 횟수가 아니라 AI 학습자 모델이 정한다).
  *
- * 원본은 `src/coach/badHabits.ts` 의 `HABIT_CLEARED_AFTER` 다 — 서버는 브라우저 코드를 가져다 쓰지
- * 않으므로 값을 옮겨 적는다(coachPrompt 의 `SLOW_KMH` 와 같은 사정). **어긋나면 프롬프트가 학습자
- * 화면과 다른 수를 말하므로**, `tests/recommend.test.ts` 가 둘이 같은지 본다.
+ * 원본은 `src/coach/badHabits.ts` 의 `HABIT_MASTERY` 다 — 서버는 브라우저 코드를 가져다 쓰지 않으므로 값을 옮겨
+ * 적는다(coachPrompt 의 `SLOW_KMH` 와 같은 사정). **어긋나면 프롬프트가 학습자 화면과 다른 말을 하므로**,
+ * `tests/recommend.test.ts` 가 둘이 같은지 본다. 풀리기까지 남은 판은 브라우저가 그 모델로 내다봐 `toClear` 로 보낸다.
  */
-export const HABIT_CLEARED_AFTER = 2;
+export const HABIT_MASTERY = 0.9;
 
 const pct = (kept, total) => (total ? `${Math.round((kept / total) * 100)}%` : '-');
 
@@ -205,13 +205,13 @@ export function buildUserPrompt(req) {
     );
     lines.push(
       req.priority
-        ? `  일어날 수 있는 코스에서 ${HABIT_CLEARED_AFTER}번 지켜야 풀립니다. **먼저 고칠 습관을 정하십시오** — 후보는 습관마다 따로 추렸고, 줄 앞 \`[코드]\` 가 그 코스가 고치는 습관입니다.`
-        : `  일어날 수 있는 코스에서 ${HABIT_CLEARED_AFTER}번 지켜야 풀립니다. 후보는 모두 첫째 습관을 시험하는 코스입니다.`,
+        ? `  일어날 수 있는 코스에서 지킬 때마다 AI 학습자 모델이 익혔을 확률을 고쳐 쓰고, ${Math.round(HABIT_MASTERY * 100)}% 를 넘으면 풀립니다 (위험하게 지킨 판은 덜 칩니다). **먼저 고칠 습관을 정하십시오** — 후보는 습관마다 따로 추렸고, 줄 앞 \`[코드]\` 가 그 코스가 고치는 습관입니다.`
+        : `  일어날 수 있는 코스에서 지킬 때마다 AI 학습자 모델이 익혔을 확률을 고쳐 쓰고, ${Math.round(HABIT_MASTERY * 100)}% 를 넘으면 풀립니다 (위험하게 지킨 판은 덜 칩니다). 후보는 모두 첫째 습관을 시험하는 코스입니다.`,
     );
-    lines.push('- 나쁜 운전 습관 (많이 한 순서, 첫째가 가장 굳은 것, "지킨 판" 은 풀리기까지 센 수):');
+    lines.push('- 나쁜 운전 습관 (많이 한 순서, "남은 판" 은 학습자 모델이 내다본, 깨끗하게 지키면 풀리기까지의 판 수):');
     for (const h of req.badHabits) {
       lines.push(
-        `  - ${h.code} (${VIOLATION_TEXT[h.code] ?? h.code}): ${h.count}회 · 그 뒤 지킨 판 ${h.cleanRuns}/${HABIT_CLEARED_AFTER}`,
+        `  - ${h.code} (${VIOLATION_TEXT[h.code] ?? h.code}): ${h.count}회 · 그 뒤 지킨 판 ${h.cleanRuns} · 남은 판 ${h.toClear}`,
       );
     }
   } else if (req.master) {

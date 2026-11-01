@@ -24,6 +24,7 @@
  */
 
 import {
+  masteryOfKnowledge,
   primaryHabit,
   updateHabits,
   type BadHabit,
@@ -427,9 +428,6 @@ export function advance(
     무엇을 고쳤는지는 그대로 남아야 한다 (coach/badHabits.ts).
   */
   const codes = result.violations.map((v) => v.code as ViolationCode);
-  const { habits, change } = updateHabits(state.badHabits, codes, runs, tested, result.failReason !== null);
-  const habitsLeft = habits.length > 0;
-
   /*
     **학습자 모델의 관측** (ai/knowledge.ts) — 이 판이 시험한 개념마다 지켰는가를 넣는다. 지킨 개념도 이 판의
     위험도(opts.risk)가 높았으면 반쯤 지킨 것으로 본다 (위반이 난 판의 나머지 개념도 같은 위험도로 본다 — 위반 하나로
@@ -438,6 +436,18 @@ export function advance(
   */
   const testedCodes: readonly ViolationCode[] = tested ? [...tested] : SKILL_ORDER;
   const skills = updateKnowledge(state.skills ?? {}, testedCodes, codes, { risk: opts.risk, now: opts.now });
+  /*
+    **습관 기록** (coach/badHabits.ts) — 고쳤는지는 방금 고쳐 쓴 학습자 모델이 정한다 (익혔을 확률 90% 넘으면 지움).
+  */
+  const { habits, change } = updateHabits(
+    state.badHabits,
+    codes,
+    runs,
+    tested,
+    result.failReason !== null,
+    masteryOfKnowledge(skills),
+  );
+  const habitsLeft = habits.length > 0;
   const ability =
     opts.difficulty === undefined
       ? state.ability
@@ -642,7 +652,6 @@ export function recordHabits(
   opts: Pick<AdvanceOptions, 'risk' | 'now' | 'predicted'> = {},
 ): CurriculumState {
   const codes = result.violations.map((v) => v.code as ViolationCode);
-  const { habits } = updateHabits(state.badHabits, codes, state.runs, tested, result.failReason !== null);
   const outcomeBias = opts.predicted
     ? calibrateOutcome(state.outcomeBias ?? {}, opts.predicted, tested ? [...tested] : SKILL_ORDER, codes)
     : state.outcomeBias;
@@ -651,6 +660,8 @@ export function recordHabits(
     risk: opts.risk,
     now: opts.now,
   });
+  // 고쳤는지는 방금 고쳐 쓴 학습자 모델이 정한다 (coach/badHabits.ts — advance 와 같다)
+  const { habits } = updateHabits(state.badHabits, codes, state.runs, tested, result.failReason !== null, masteryOfKnowledge(skills));
   return { ...state, badHabits: habits, skills, ...(outcomeBias === undefined ? {} : { outcomeBias }) };
 }
 
@@ -660,7 +671,7 @@ export function recordHabits(
  * 이 값이 프롬프트로 넘어가 "이 상황을 다시 만나게 하라" 가 된다.
  */
 export function currentTarget(state: CurriculumState): string | null {
-  return primaryHabit(state.badHabits)?.code ?? null;
+  return primaryHabit(state.badHabits, state.skills ? masteryOfKnowledge(state.skills) : undefined)?.code ?? null;
 }
 
 

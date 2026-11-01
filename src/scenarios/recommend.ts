@@ -26,7 +26,7 @@
  */
 
 import type { BadHabit } from '../coach/badHabits';
-import { habitTitle } from '../coach/badHabits';
+import { habitTitle, runsToClear } from '../coach/badHabits';
 import type { HabitSummary } from '../coach/habits';
 import type { ViolationCode } from '../rules/violations';
 import { MAX_LEVEL, levelLabel, levelTier, type Difficulty } from './curriculum';
@@ -1049,6 +1049,8 @@ export function recommendPayload(
       code: h.code,
       count: h.count,
       cleanRuns: h.cleanRuns,
+      // 고치기까지 남은 판 — 학습자 모델이 앞을 내다본 수 (coach/badHabits.ts 의 runsToClear)
+      toClear: runsToClear(h, plan.skills),
     })),
     runs: habits.runs,
     points: habits.points.map((p) => ({ label: p.label, kept: p.kept, total: p.total })),

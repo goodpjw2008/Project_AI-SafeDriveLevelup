@@ -108,6 +108,8 @@ export function sanitize(body) {
     code: oneOf(h?.code, CODES, 'badHabits.code'),
     count: Math.max(0, Math.round(num(h?.count, 'badHabits.count'))),
     cleanRuns: Math.max(0, Math.round(num(h?.cleanRuns ?? 0, 'badHabits.cleanRuns'))),
+    // 풀리기까지 남은 판 — 브라우저의 학습자 모델이 내다본 수 (예전 브라우저는 보내지 않으므로 지킨 판으로 어림한다)
+    toClear: Math.min(9, Math.max(0, Math.round(num(h?.toClear ?? Math.max(0, 2 - (h?.cleanRuns ?? 0)), 'badHabits.toClear')))),
   }));
   /*
     **먼저 고칠 습관을 모델이 정하는 판인가.** 브라우저가 습관마다 후보를 따로 추렸을 때만 켠다 — 그래도

@@ -19,7 +19,18 @@
  *
  * 목록이 비면 AI 는 이 게임이 교정하려는 흔한 오해 중 하나를 골라 시험한다.
  *
- * ## 2번인 이유
+ * ## 고쳤는지는 학습자 모델이 정한다
+ *
+ * 2026-11-01 부터 **고쳤다는 판단은 학습자 모델(ai/knowledge.ts 의 베이즈 지식 추적)이 한다** — 사용자가 정했다 (*"교통법규 준수 등
+ * 정말 어쩔수 없는경우는 프로그램으로 남기고 나머지는 모두 AI 기법으로"*). 그 위반이 일어날 수 있었던 판을 지킬 때마다 모델이
+ * 그 개념을 익혔을 확률을 고쳐 쓰고, 그 확률이 `HABIT_MASTERY`(90%)를 넘으면 목록에서 지운다. 어긴 직후(약 20%)에서 두 번
+ * 깨끗하게 지키면 95% 라 예전의 '2번' 과 같은 길이지만, **위험하게 지킨 판**(위험도 모델이 높게 본 판 — 보행자 코앞에서 겨우
+ * 선 것 등)은 반쯤만 쳐서 세 번을 위험하게 지켜도 48% 에 머문다 — 횟수 규칙은 그 둘을 가르지 못했다. 학습자 모델이 보지 않는
+ * 개념(방향지시등 — 판을 시작하면 저절로 켜진다)만 예전처럼 `HABIT_CLEARED_AFTER` 번 지키면 지운다.
+ *
+ * 먼저 고칠 습관도 모델이 정한다 — **익혔을 확률이 가장 낮은 것** (`primaryHabit`). 예전에는 가장 많이 저지른 것이었다.
+ *
+ * ## 2번인 이유 (학습자 모델이 보지 않는 개념)
  *
  * 한 번은 운이다 — 그 판이 그 위반을 시험조차 하지 않았을 수 있다. 다섯 번은 길어서,
  * 고친 뒤에도 한참 같은 상황을 만나게 된다.
@@ -31,9 +42,15 @@
  */
 
 import { VIOLATIONS, type ViolationCode } from '../rules/violations';
+import { SKILL_ORDER, mastery, observe, type Knowledge } from '../ai/knowledge';
 
-/** 이 횟수만큼 그 위반 없이 몰면 습관이 사라진다 */
+/** 학습자 모델이 보지 않는 개념은 이 횟수만큼 그 위반 없이 몰면 습관이 사라진다 */
 export const HABIT_CLEARED_AFTER = 2;
+/** 학습자 모델이 이 확률 넘게 익혔다고 보면 습관이 사라진다 (위 '고쳤는지는 학습자 모델이 정한다') */
+export const HABIT_MASTERY = 0.9;
+
+/** 개념마다 학습자 모델이 본 '익혔을 확률' — 모델이 보지 않는 개념이면 null */
+export type MasteryOf = (code: ViolationCode) => number | null;
 
 /** 한 사람에게 동시에 붙어 있는 습관의 상한 — 많으면 무엇을 고쳐야 할지 흐려진다 */
 const MAX_HABITS = 6;
@@ -80,6 +97,8 @@ export function updateHabits(
   tested?: ReadonlySet<ViolationCode>,
   /** 사고 · 이탈 · 시간 초과로 **끝내지 못한 판** — 무엇을 지켰는지 알 수 없어 세지 않는다 */
   failed = false,
+  /** 이 판을 넣은 뒤의 학습자 모델 (curriculum.ts 의 advance) — 생략하면 모든 개념을 횟수로 지운다 */
+  masteryOf?: MasteryOf,
 ): { habits: BadHabit[]; change: HabitChange } {
   const hit = new Set(violated);
   const change = emptyChange();
@@ -99,7 +118,8 @@ export function updateHabits(
       continue;
     }
     const cleanRuns = h.cleanRuns + 1;
-    if (cleanRuns >= HABIT_CLEARED_AFTER) {
+    const p = masteryOf?.(h.code) ?? null;
+    if (p !== null ? p >= HABIT_MASTERY : cleanRuns >= HABIT_CLEARED_AFTER) {
       change.cleared.push(h.code);
       continue; // 목록에서 빠진다
     }
@@ -125,14 +145,35 @@ export function updateHabits(
 /**
  * AI 가 이번 판에서 **정면으로 시험할** 습관. 없으면 `null`.
  *
- * 가장 많이 저지른 것을 고른다 — 고쳐야 할 것이 여럿이면 가장 굳은 것부터다.
+ * 학습자 모델이 **익혔을 확률이 가장 낮게 보는** 습관이다 (같으면 많이 저지른 것). 모델이 없으면 가장 많이 저지른 것이다 —
+ * 목록이 그 차례로 서 있다.
  */
-export function primaryHabit(habits: readonly BadHabit[]): BadHabit | null {
-  return habits.length ? habits[0] : null;
+export function primaryHabit(habits: readonly BadHabit[], masteryOf?: MasteryOf): BadHabit | null {
+  if (!habits.length) return null;
+  if (!masteryOf) return habits[0];
+  const p = (h: BadHabit) => masteryOf(h.code) ?? 1;
+  return [...habits].sort((a, b) => p(a) - p(b) || b.count - a.count)[0];
 }
 
 /** 화면과 프롬프트가 함께 쓰는 이름 */
 export const habitTitle = (code: ViolationCode): string => VIOLATIONS[code]?.title ?? code;
 
-/** 이 습관을 고치려면 앞으로 몇 판을 더 깨끗하게 몰아야 하는가 */
-export const runsToClear = (h: BadHabit): number => Math.max(0, HABIT_CLEARED_AFTER - h.cleanRuns);
+/**
+ * 이 습관을 고치려면 앞으로 몇 판을 더 깨끗하게 몰아야 하는가 — 학습자 모델이 있으면 **그 모델로 앞을 내다본다**: 위험 없이
+ * 깨끗하게 지킨 판을 한 번씩 넣어 보며 `HABIT_MASTERY` 를 넘을 때까지 센다 (ai/knowledge.ts 의 observe).
+ */
+export function runsToClear(h: BadHabit, k?: Knowledge): number {
+  if (!k || !SKILL_ORDER.includes(h.code)) return Math.max(0, HABIT_CLEARED_AFTER - h.cleanRuns);
+  let s = k;
+  for (let n = 0; n < 6; n += 1) {
+    if (mastery(s, h.code) >= HABIT_MASTERY) return n;
+    s = observe(s, h.code, true);
+  }
+  return 6;
+}
+
+/** 학습자 모델 → 습관을 지우는 판단에 쓰는 '익혔을 확률' (모델이 보지 않는 개념은 null) */
+export const masteryOfKnowledge =
+  (k: Knowledge): MasteryOf =>
+  (code) =>
+    SKILL_ORDER.includes(code) ? mastery(k, code) : null;

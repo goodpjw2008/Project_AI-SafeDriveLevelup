@@ -13,9 +13,9 @@ import { challengeRule } from '../src/scenarios/challenge';
 import { SCHOOL_ZONE_CHANCE, ZONE_NO_SIGNAL_CHANCE } from '../src/scenarios/scenarios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildUserPrompt, HABIT_CLEARED_AFTER as PROMPT_HABIT_CLEARED } from '../server/recommendPrompt.mjs';
+import { buildUserPrompt, HABIT_MASTERY as PROMPT_HABIT_MASTERY } from '../server/recommendPrompt.mjs';
 import { parseReply, sanitize } from '../server/recommendHandler.mjs';
-import { HABIT_CLEARED_AFTER } from '../src/coach/badHabits';
+import { HABIT_MASTERY } from '../src/coach/badHabits';
 import type { HabitSummary } from '../src/coach/habits';
 import type { Plan } from '../src/scenarios/generate';
 import type { Difficulty } from '../src/scenarios/curriculum';
@@ -688,18 +688,22 @@ describe.each([
  * 가져다 쓰지 않아 값을 옮겨 적는다. 한쪽만 고치면 화면은 "2판 남음" 이라 적고 AI 는 "3번 지켜야
  * 풀린다" 고 말하게 된다 — 그 어긋남을 여기서 잡는다.
  */
-describe('습관이 풀리는 판 수 — 화면과 프롬프트가 같은 수를 말한다', () => {
+/*
+  **습관이 풀리는 기준은 AI 학습자 모델이다** (coach/badHabits.ts 의 HABIT_MASTERY — 사용자가 정했다, 2026-11-01). 서버의 프롬프트가
+  그 기준과 브라우저가 내다본 '남은 판' 을 그대로 말해야 화면과 어긋나지 않는다.
+*/
+describe('습관이 풀리는 기준 — 화면과 프롬프트가 같은 말을 한다', () => {
   it('서버가 옮겨 적은 값이 원본과 같다', () => {
-    expect(PROMPT_HABIT_CLEARED).toBe(HABIT_CLEARED_AFTER);
+    expect(PROMPT_HABIT_MASTERY).toBe(HABIT_MASTERY);
   });
 
-  it('프롬프트에 그 수가 그대로 실린다', () => {
+  it('프롬프트에 그 기준과 학습자 모델이 내다본 남은 판이 실린다', () => {
     const p = plan({ badHabits: [{ code: 'RED_NO_STOP', count: 3, cleanRuns: 1, lastRun: 8 }] });
     const text = buildUserPrompt(
       sanitize(JSON.parse(JSON.stringify(recommendPayload(p, habits, [], shortlist(p, candidatesFor(p, []), () => 0.5))))),
     );
-    expect(text).toContain(`${HABIT_CLEARED_AFTER}번 지켜야 풀립니다`);
-    expect(text).toContain(`지킨 판 1/${HABIT_CLEARED_AFTER}`);
+    expect(text).toContain(`${Math.round(HABIT_MASTERY * 100)}% 를 넘으면 풀립니다`);
+    expect(text).toMatch(/지킨 판 1 · 남은 판 \d/);
   });
 });
 
