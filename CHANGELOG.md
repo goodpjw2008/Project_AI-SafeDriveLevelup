@@ -1,14 +1,6 @@
 # Changelog
 
-이 프로젝트의 바뀐 점을 버전별로 적습니다.
-
-형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를, 버전 번호는 [유의적 버전(Semantic Versioning)](https://semver.org/lang/ko/)을 따릅니다.
-
-- **추가** — 새로 생긴 기능
-- **변경** — 바뀐 기능
-- **수정** — 고친 오류
-
-## [Unreleased]
+## [1.0.6] - 2026-11-01
 
 ### 추가
 
@@ -660,7 +652,7 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.5...HEAD
+[1.0.6]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.0...v1.0.5
 [1.0.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/releases/tag/v0.5.0
