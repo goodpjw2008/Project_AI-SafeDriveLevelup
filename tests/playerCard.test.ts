@@ -58,7 +58,7 @@ describe('플레이어 칸', () => {
     // 마스터의 뱃지는 숫자 10 이 아니라 M — 첫 화면 레벨 길의 마지막 칸과 같은 그림이다
     expect(done).toContain('>M</text>');
     expect(done).not.toContain('>10</text>');
-    expect(playerFoot({ ...l10, mastered: true })).toContain('Level10 코스가 무작위로');
+    expect(playerFoot({ ...l10, mastered: true })).toContain('Level10 코스가 이어집니다');
   });
 });
 

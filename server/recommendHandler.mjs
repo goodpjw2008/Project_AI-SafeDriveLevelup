@@ -118,6 +118,8 @@ export function sanitize(body) {
   return {
     level,
     tier: str(body.tier ?? '', 20, 'tier'),
+    // **안전운전 마스터** — L10 을 마쳐 오를 레벨이 없다 (src/scenarios/recommend.ts 의 recommendPayload)
+    master: Boolean(body.master),
     challenge: Math.min(5, Math.max(1, Math.round(num(body.challenge ?? 3, 'challenge')))),
     target: body.target == null ? null : oneOf(body.target, CODES, 'target'),
     /*

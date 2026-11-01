@@ -178,6 +178,16 @@ export function buildUserPrompt(req) {
   lines.push(`## 학습자`);
   const streak = req.missStreak > 1 ? ` · **이어 ${req.missStreak}판 틀림**` : req.cleanStreak > 2 ? ` · 이어 ${req.cleanStreak}판 무위반` : '';
   lines.push(`- 지금 레벨: Level${req.level} (${req.tier}) · 지금까지 ${req.runs}판${streak}`);
+  /*
+    **안전운전 마스터** — L10 을 마쳐 오를 레벨이 없고, 후보는 모두 Level10 코스다. '다음 레벨을 준비하는 단계' 라고 하면
+    모델이 "다음 레벨까지 얼마 남았습니다" 같은 없는 사실을 이유에 쓴다.
+  */
+  if (req.master) {
+    lines.push(
+      '- **안전운전 마스터입니다** — Level10 을 마쳐 더 오를 레벨이 없고, 후보는 모두 Level10 코스입니다. 익힌 판단을 잊지 않게',
+    );
+    lines.push('  하는 연습이므로 학습자 모델의 약한 개념 · 복습 차례와 `새:` 를 보고 고르십시오. 경험치 · 다음 레벨은 말하지 않습니다.');
+  }
   const CH = [
     '',
     '1 쉬움 — 중간 정도로 복잡한 코스',
@@ -189,7 +199,9 @@ export function buildUserPrompt(req) {
   lines.push(`- 학습자가 고른 난이도: ${CH[req.challenge] ?? '3 보통'} — 이 난이도에 맞는 코스를 고르십시오`);
   if (req.badHabits.length) {
     lines.push(
-      '- **지금은 습관을 고치는 단계입니다** — 나쁜 습관이 모두 풀려야 다음 레벨로 올라갑니다. 습관은 그 위반이',
+      req.master
+        ? '- **나쁜 습관이 남아 있습니다** — 마스터라 레벨은 그대로지만 먼저 고칩니다. 습관은 그 위반이'
+        : '- **지금은 습관을 고치는 단계입니다** — 나쁜 습관이 모두 풀려야 다음 레벨로 올라갑니다. 습관은 그 위반이',
     );
     lines.push(
       req.priority
@@ -202,6 +214,8 @@ export function buildUserPrompt(req) {
         `  - ${h.code} (${VIOLATION_TEXT[h.code] ?? h.code}): ${h.count}회 · 그 뒤 지킨 판 ${h.cleanRuns}/${HABIT_CLEARED_AFTER}`,
       );
     }
+  } else if (req.master) {
+    lines.push('- 기록된 나쁜 운전 습관: 없음');
   } else {
     const need = req.xpNeed ?? 0;
     lines.push(

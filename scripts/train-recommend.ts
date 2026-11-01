@@ -26,7 +26,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { REC_FEATURES, scoreCourses, type RecommendModel } from '../src/ai/recommendNet';
-import { rulePick } from '../src/scenarios/recommend';
+import type { LibraryEntry } from '../src/scenarios/library';
 import {
   SHIFTED_KIND,
   TRAIN_KIND,
@@ -36,6 +36,7 @@ import {
   knownCount,
   makeEpisode,
   play,
+  programPick,
   rng,
   seedGame,
   teacherScores,
@@ -87,16 +88,16 @@ interface Labeled {
 
 type Policy = 'random' | 'program' | 'net';
 
-function choose(policy: Policy, d: NonNullable<ReturnType<typeof decide>>, model: RecommendModel | null, r: () => number): number {
-  if (policy === 'random') return Math.floor(r() * d.courses.length);
+/** 고른 판 — 프로그램은 게임과 같다(마스터 운행이면 후보 밖의 L10 에서도 고른다 — recommendSim.ts 의 programPick) */
+function choose(policy: Policy, d: ReturnType<typeof decide>, model: RecommendModel | null, r: () => number): LibraryEntry {
+  if (policy === 'random') return d.courses[Math.floor(r() * d.courses.length)];
   if (policy === 'net' && model) {
     const s = scoreCourses(featureRows(d), model);
     let best = 0;
     for (let i = 1; i < s.length; i++) if (s[i] > s[best]) best = i;
-    return best;
+    return d.courses[best];
   }
-  const pick = rulePick(d.plan, d.courses, Math.random, d.seen, d.cover);
-  return d.courses.indexOf(pick);
+  return programPick(d);
 }
 
 /** 과정을 밟으며 교사의 점수를 모은다 */
@@ -109,7 +110,7 @@ function collect(worker: number, round: number, model: RecommendModel | null): L
     seedGame(seed);
     for (let run = 0; run < MAX_RUNS; run++) {
       const d = decide(ep);
-      if (!d || !d.courses.length) break;
+      if (!d.courses.length) break;
       if (d.courses.length > 1 && r() < LABEL_P) {
         const rows = featureRows(d);
         const q = teacherScores(ep, d.courses, seed * 1000 + run, { rollouts: ROLLOUTS, horizon: HORIZON });
@@ -117,7 +118,7 @@ function collect(worker: number, round: number, model: RecommendModel | null): L
         seedGame(seed * 1000 + run + 1); // 교사가 쓴 난수 뒤에서 과정의 난수를 다시 세운다
       }
       const policy: Policy = r() < EXPLORE ? 'random' : model ? 'net' : 'program';
-      play(ep, d.courses[choose(policy, d, model, r)]);
+      play(ep, choose(policy, d, model, r));
     }
   }
   return out;
@@ -152,7 +153,7 @@ function evaluate(worker: number, model: RecommendModel): EvalRow[] {
         const level: number[] = [];
         for (let run = 0; run < EVAL_RUNS; run++) {
           const d = decide(ep);
-          if (d && d.courses.length) play(ep, d.courses[choose(policy, d, model, r)]);
+          if (d.courses.length) play(ep, choose(policy, d, model, r));
           if (run === EVAL_RUNS / 2 - 1 || run === EVAL_RUNS - 1) {
             known.push(knownCount(ep.learner));
             level.push(ep.save.curriculum.level + (ep.save.curriculum.mastered ? 1 : 0));

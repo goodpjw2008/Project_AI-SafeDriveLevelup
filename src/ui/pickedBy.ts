@@ -47,7 +47,7 @@ const chip = (picker: Picker): string =>
  * `courses` 는 **최종 후보 수**(모델 점수로 추린 10개 안팎, scenarios/recommend.ts 의 SHORTLIST_SIZE). 사용자가 짚었다
  * (2026-09-27): "화면에 최종 10개라는 말이 없어서 헷갈렸어 — 후보 몇 개 중 최종 10개를 골랐다는 말과, 그 10개 중
  * Gemini 나 Groq 가 이것을 골랐다는 것을 알 수 있게 해 줘." 분석 화면의 단계 글이 "규칙 N개 → 최종 10개" 를 말하고,
- * 이 줄이 "그 10개 중 누가 골랐나" 를 말한다. 무작위 마스터 운행처럼 후보가 없으면 예전 문장 그대로다.
+ * 이 줄이 "그 10개 중 누가 골랐나" 를 말한다. 모델이 없을 때의 무작위 마스터 운행처럼 후보가 없으면 예전 문장 그대로다.
  */
 export function pickedByCard(picker?: Picker, _model?: string, courses?: number): string {
   if (!picker) return '';

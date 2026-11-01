@@ -484,8 +484,15 @@ export function candidatesFor(plan: Plan, recentIds: readonly number[]): Library
     **보호구역 전용 갈래는 다른 판 묶음에서 고른다** (scenarios/zoneCourse.ts) — 우회전 없이 보호구역을
     직진으로 통과하는 156판이다. 기존 라이브러리에는 그런 판이 하나도 없으므로 거르는 것이 아니라 **갈아 끼운다.**
   */
-  const all =
+  const inTrackAll =
     track === 'zone' ? zoneEntries() : scenarioLibrary().filter((e) => inTrack(e.tags, track));
+  /*
+    **마스터 운행은 L10 코스에서만 고른다** (사용자가 정했다: *"처음부터 다시 시작을 누르기 전까지는 랜덤으로 10 단계의
+    문제들이 계속 돌아가게"*). 고르는 쪽은 여느 판처럼 설정을 따르므로(사용자가 정했다, 2026-11-01: *"마스터도 설정을
+    따름"*) 아래 차례 · 습관 거르기도 그대로 건다. 보호구역 전용 갈래의 판은 모두 L1 이라 그 갈래는 그대로 쓴다.
+  */
+  const top = plan.master ? inTrackAll.filter((e) => e.level === MAX_LEVEL) : [];
+  const all = top.length ? top : inTrackAll;
   const lib = plan.level === 1 ? all.filter((e) => !L1_EXCLUDES(e.tags)) : all;
   const recent = new Set(recentIds.slice(-RECENT_EXCLUDE));
 
@@ -1029,6 +1036,8 @@ export function recommendPayload(
   return {
     level: plan.level,
     tier: levelTier(plan.level),
+    // **안전운전 마스터** — 오를 레벨이 없어 프롬프트가 '다음 레벨 준비' 대신 '잊지 않게' 라고 말한다 (server/recommendPrompt.mjs)
+    master: !!plan.master,
     challenge: challengeRule(plan.challenge).id,
     // 경험치가 얼마나 찼는가 — 추천 이유가 "얼마 남았는지" 를 틀리지 않게 (curriculum.ts 의 XP_TO_NEXT)
     xp: plan.xp ?? 0,
@@ -1221,16 +1230,37 @@ export async function recommendScenario(
     const habit = habitOf.get(e.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
     const by: Picker = reply === 'quota' ? 'quota' : 'local';
     return {
-      scenario: withVerdict(toScenario(e, plan.level, local.why, '', 'local', by, undefined, successPercent(plan, e)), e),
+      scenario: withVerdict(
+        toScenario(
+          e,
+          plan.level,
+          // 마스터 운행이면 프로그램이 고를 때(masterPick)와 같은 머리말 — 카드만 보고도 마스터 운행인 줄 안다
+          plan.master ? `안전운전 마스터 — ${local.why}` : local.why,
+          plan.master ? MASTER_FOCUS : '',
+          'local',
+          by,
+          undefined,
+          successPercent(plan, e),
+        ),
+        e,
+      ),
       source: 'local',
       picker: by,
       habit,
       habitBy: priority && habit ? 'ai' : 'rule',
     };
   }
-  const entry = rulePick(plan, pool, Math.random, seen, cover);
   // 한도를 다 써서 코드가 고른 판은 그렇게 말한다 (위 Picker 주석)
   const why: Picker = reply === 'quota' ? 'quota' : 'rule';
+  /*
+    **마스터 운행에서 프로그램이 고를 때는 예전 그대로** — 가장 옅어진 개념을 시험하는 L10 코스 가운데 무작위 (아래
+    masterPick). 신경망 · 외부 LLM 이 고를 때만 위에서 이 후보들을 채점한다.
+  */
+  if (plan.master) {
+    const pick = masterPick(recentIds, Math.random, plan.skills);
+    return why === 'quota' ? { ...pick, picker: why, scenario: { ...pick.scenario, picker: why } } : pick;
+  }
+  const entry = rulePick(plan, pool, Math.random, seen, cover);
   return {
     scenario: withVerdict(
       toScenario(entry, plan.level, ruleWhy(plan, entry), '', 'rule', why, undefined, successPercent(plan, entry)),
@@ -1244,12 +1274,19 @@ export async function recommendScenario(
   };
 }
 
+/** 마스터 운행 카드의 👉 줄 */
+const MASTER_FOCUS = '처음부터 다시 시작하기 전까지 마스터 운행이 이어집니다';
+
 /**
- * **마스터 운행** — L10 코스를 무작위로 하나 고른다.
+ * **마스터 운행의 프로그램 고르기** — L10 코스를 무작위로 하나 고른다.
  *
  * 사용자가 "10 단계를 끝내면 마스터 단계가 되고, 처음부터 다시 시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이
- * 계속 돌아가게 해 줘" 라고 했다. 마스터에게는 고칠 습관도 오를 레벨도 없으므로 AI 에게 고르게 하지 않고, L10 코스
- * 전체에서 **고르게 무작위로** 뽑는다(최근에 탄 판은 뺀다 — 같은 판이 곧바로 다시 나오지 않게).
+ * 계속 돌아가게 해 줘" 라고 했다. L10 코스 전체에서 **고르게 무작위로** 뽑는다(최근에 탄 판은 뺀다 — 같은 판이 곧바로
+ * 다시 나오지 않게).
+ *
+ * 한때는 마스터 운행 전부를 이것이 골라, 설정 '다음판 추천 AI 설정' 을 바꿔도 마스터에서는 똑같이 '무작위 뽑기' 가
+ * 나왔다 — 사용자가 짚었다 (2026-11-01: *"구분이 안되서 설정이 제대로 먹힌건지 알수가 없어"*). 이제 마스터도
+ * recommendScenario 를 거쳐 신경망 · 외부 LLM 이 고르고, 이것은 모델이 없을 때의 프로그램 몫이다.
  */
 export function masterPick(
   recentIds: readonly number[],
@@ -1274,7 +1311,7 @@ export function masterPick(
       ? `안전운전 마스터 — 학습자 모델이 가장 옅어진 개념 '${SKILL_SHORT[weakest.code]}'(실효 숙달 ${Math.round(weakest.p * 100)}%)을 다시 시험하는 ${levelLabel(MAX_LEVEL)} 코스입니다.`
       : `안전운전 마스터 — ${levelLabel(MAX_LEVEL)} 코스 ${pool.length.toLocaleString()}개 중에서 무작위로 골랐습니다.`;
   return {
-    scenario: toScenario(entry, MAX_LEVEL, why, '처음부터 다시 시작하기 전까지 마스터 운행이 이어집니다', 'rule', 'random'),
+    scenario: toScenario(entry, MAX_LEVEL, why, MASTER_FOCUS, 'rule', 'random'),
     source: 'rule',
     picker: 'random',
     habit: null,

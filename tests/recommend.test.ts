@@ -41,7 +41,8 @@ import {
 import { isNoSignalZone, scenarioLibrary, zoneKindOf, type LibraryEntry } from '../src/scenarios/library';
 
 /*
-  **마스터 운행** — L10 을 마치면 '처음부터 다시 시작' 전까지 L10 코스가 무작위로 이어진다 (masterPick).
+  **마스터 운행** — L10 을 마치면 '처음부터 다시 시작' 전까지 L10 코스가 이어진다. 고르는 것은 여느 판처럼 설정의 추천 AI 이고,
+  모델이 없을 때만 프로그램(masterPick)이 무작위로 고른다.
   사용자가 "마스터 단계가 되고, 처음부터 다시 시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게" 라고 했다.
 */
 /*
@@ -155,6 +156,59 @@ const plan = (over: Partial<Plan> = {}): Plan => ({
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+/*
+  **마스터 운행도 설정의 추천 AI 가 고른다** — 사용자가 짚었다 (2026-11-01): 로컬 신경망 · 외부 LLM 으로 각각 달려도 마스터에서는
+  똑같이 '무작위 뽑기' 가 나와 *"설정이 제대로 먹힌건지 알수가 없어"*. 후보는 L10 코스뿐이고, 고른 쪽 이름이 카드에 나온다.
+*/
+describe('마스터 운행 — 설정을 따른다', () => {
+  const master = (over: Partial<Plan> = {}) =>
+    plan({ level: 10, master: true, target: null, badHabits: [], ...over });
+
+  it('후보는 L10 코스뿐이다 — 습관 · 갈래가 있어도', () => {
+    for (const p of [master(), master({ target: 'RED_NO_STOP', badHabits: plan().badHabits }), master({ track: 'turn' })]) {
+      const cands = candidatesFor(p, []);
+      expect(cands.length).toBeGreaterThan(0);
+      for (const e of cands) expect(e.level).toBe(10);
+    }
+    // 보호구역 전용 갈래의 판은 모두 L1 이라 그 갈래 그대로다 — 빈손이 되지 않는다
+    expect(candidatesFor(master({ track: 'zone' }), []).length).toBeGreaterThan(0);
+  });
+
+  it('로컬이면 추천 신경망이 고르고 그렇게 말한다 (모델이 없으면 예전처럼 무작위)', async () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('로컬은 서버에 묻지 않는다')));
+    vi.stubGlobal('fetch', fetch);
+    const out = await recommendScenario(master(), habits, [], [], undefined, [], 'local');
+    expect(fetch).not.toHaveBeenCalled();
+    const by = recommendModelReady() ? 'local' : 'random';
+    expect(out.picker).toBe(by);
+    expect(out.scenario.picker).toBe(by);
+    expect(libraryEntry(out.scenario.id)?.level).toBe(10);
+    expect(out.scenario.focus).toContain('마스터 운행');
+  });
+
+  it('외부 LLM 이면 서버에 묻고, 답이 없으면 신경망이 고른다', async () => {
+    const fetch = vi.fn(() => Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') }));
+    vi.stubGlobal('fetch', fetch);
+    const out = await recommendScenario(master(), habits, [], [], undefined, [], 'llm');
+    expect(fetch).toHaveBeenCalled();
+    expect(out.picker).toBe(recommendModelReady() ? 'local' : 'random');
+    expect(libraryEntry(out.scenario.id)?.level).toBe(10);
+  });
+
+  it('외부 LLM 에게 마스터라고 알린다 — 다음 레벨 이야기를 하지 않게', () => {
+    const p = master();
+    const payload = recommendPayload(p, habits, [], shortlist(p, candidatesFor(p, []), () => 0.5));
+    expect(payload.master).toBe(true);
+    const text = buildUserPrompt(sanitize(JSON.parse(JSON.stringify(payload))));
+    expect(text).toContain('안전운전 마스터입니다');
+    expect(text).not.toContain('다음 레벨을 준비');
+    // 마스터가 아니면 그 줄이 없다
+    const q = plan({ level: 10 });
+    const plain = buildUserPrompt(sanitize(JSON.parse(JSON.stringify(recommendPayload(q, habits, [], shortlist(q, candidatesFor(q, []), () => 0.5))))));
+    expect(plain).not.toContain('안전운전 마스터입니다');
+  });
+});
 
 describe('후보 추리기', () => {
   it('이 레벨까지 연 개념의 판만 · 보호구역/앞차 차례를 지킨다', () => {

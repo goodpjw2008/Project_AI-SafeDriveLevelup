@@ -1010,9 +1010,9 @@ export class Screens {
     }).join('') +
       /*
         **마지막 칸은 M(마스터)** — 사용자가 "1~10 단계 이후에 M 을 추가해 줘" 라고 했다. L10 을 마치면 이 칸이 '지금'
-        이 되고, 그때부터는 '처음부터 다시 시작' 전까지 L10 코스가 무작위로 이어진다 (recommend.ts 의 masterPick).
+        이 되고, 그때부터는 '처음부터 다시 시작' 전까지 L10 코스가 이어진다 (고르는 것은 여느 판처럼 설정의 추천 AI).
       */
-      `<div class="level-step master ${c.mastered ? 'now' : 'todo'}" title="마스터 — ${esc(levelLabel(MAX_LEVEL))} 코스 무작위 운행">${masterBadge({
+      `<div class="level-step master ${c.mastered ? 'now' : 'todo'}" title="마스터 — ${esc(levelLabel(MAX_LEVEL))} 코스 운행">${masterBadge({
         labelled: false,
       })}</div>`;
 
@@ -1020,7 +1020,7 @@ export class Screens {
       ? `<button class="btn" id="btn-generate" disabled>다음 판을 만드는 중…</button>`
       : c.mastered
         ? /*
-            **마스터 운행** — L10 코스가 무작위로 이어진다(main.ts 의 makeAiScenario). 엔딩은 옆 버튼으로 다시 본다.
+            **마스터 운행** — L10 코스가 이어진다(main.ts 의 makeAiScenario). 엔딩은 옆 버튼으로 다시 본다.
             '처음부터 다시 시작' 을 누르기 전까지 이 상태가 이어진다.
           */
           `<button class="btn primary" id="btn-generate">${icon('play')}마스터 운행</button>` +

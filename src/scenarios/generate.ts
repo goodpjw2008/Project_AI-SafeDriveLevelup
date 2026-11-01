@@ -461,6 +461,11 @@ function toRequest(
 export interface Plan {
   level: Difficulty;
   /**
+   * **안전운전 마스터인가** — L10 을 마친 뒤 '처음부터 다시 시작' 전까지 (curriculum.ts 의 mastered). 오를 레벨이 없어
+   * 후보는 L10 코스뿐이고(recommend.ts 의 candidatesFor), 고르는 쪽은 여느 판처럼 설정을 따른다.
+   */
+  master?: boolean;
+  /**
    * **무엇을 연습하는 판인가** (scenarios/tracks.ts) — 우회전만 · 보호구역만 · 둘 다. 없으면 '둘 다'.
    *
    * 레벨과는 따로다 (사용자가 정했다: 레벨 · 경험치는 셋이 함께 쓴다). 이 값은 **후보의 범위**만 좁힌다.

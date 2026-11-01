@@ -43,6 +43,7 @@ export function nextPlan(save: PlanSource): Plan {
   const rule = challengeRule(save.settings.difficulty);
   return {
     level: c.level,
+    master: c.mastered,
     track,
     target: currentTarget(c),
     badHabits: c.badHabits,

@@ -41,7 +41,7 @@ import type { ViolationCode } from '../src/rules/violations';
 import { challengeRule, type Challenge } from '../src/scenarios/challenge';
 import { advance, freshCurriculum, xpToNext, type CurriculumState } from '../src/scenarios/curriculum';
 import type { Plan } from '../src/scenarios/generate';
-import { habitsTestedBy, scenarioLibrary, type LibraryEntry } from '../src/scenarios/library';
+import { habitsTestedBy, libraryEntry, scenarioLibrary, type LibraryEntry } from '../src/scenarios/library';
 import { nextPlan } from '../src/scenarios/nextPlan';
 import {
   candidatesFor,
@@ -49,6 +49,7 @@ import {
   coursesByHabit,
   coverageOf,
   coverKeys,
+  masterPick,
   rulePick,
   seenShapes,
   verdictsFor,
@@ -332,18 +333,26 @@ export function cloneEpisode(ep: Episode, rand: () => number): Episode {
   };
 }
 
-/** 고를 차례 — 계획과 후보. 마스터가 됐으면 null */
+/** 고를 차례 — 계획과 후보 */
 export interface Decision {
   plan: Plan;
   courses: LibraryEntry[];
   seen: SeenShapes;
   cover: Coverage;
+  /** 지금까지 탄 판 번호 — 마스터 운행의 프로그램(masterPick)이 최근 판을 뺀다 */
+  ids: number[];
 }
 
-/** 다음 판의 계획을 세우고 후보를 추린다 — 게임과 같은 함수 (fast 면 교사의 빠른 근사판) */
-export function decide(ep: Episode, fast = false): Decision | null {
+/**
+ * 다음 판의 계획을 세우고 후보를 추린다 — 게임과 같은 함수 (fast 면 교사의 빠른 근사판).
+ *
+ * **마스터가 된 뒤에도 이어 간다** — 게임의 마스터 운행도 설정의 추천 AI 가 L10 후보에서 고르므로(사용자가 정했다,
+ * 2026-11-01) 학습 · 견주기도 그 차례를 겪어야 한다. 한때는 마스터가 되면 과정을 끝냈다. 마스터에게는 레벨 값이 더 오르지
+ * 않으므로 교사의 점수는 남을 실력 · 습관 · 새 상황 · 연패로만 갈린다 (아래 value). 지금 모델은 이 변경 전에 배웠지만 마스터
+ * 차례에서도 잘 고른다 (아래 교사의 무게 주석의 마지막 항).
+ */
+export function decide(ep: Episode, fast = false): Decision {
   clock.ms = ep.clockMs;
-  if (ep.save.curriculum.mastered) return null;
   const plan = nextPlan(ep.save);
   const ids = ep.save.history.map((h) => h.st);
   const seen = seenShapes(ids);
@@ -352,10 +361,23 @@ export function decide(ep: Episode, fast = false): Decision | null {
     // 교사가 미리 달려 볼 때의 프로그램 — 규칙이 추린 후보에서 120개만 뽑아 점수로 고른다 (전부 채점하면 너무 느리다)
     const all = candidatesFor(plan, ids);
     const courses = all.length > FAST_SAMPLE ? sample(all, FAST_SAMPLE) : all;
-    return { plan, courses, seen, cover };
+    return { plan, courses, seen, cover, ids };
   }
   const by = coursesByHabit(plan, ids, Math.random, seen, cover);
-  return { plan, courses: by.groups.flatMap((g) => g.courses), seen, cover };
+  return { plan, courses: by.groups.flatMap((g) => g.courses), seen, cover, ids };
+}
+
+/**
+ * **게임의 프로그램이 고르는 판** — 모델이 없을 때 게임이 쓰는 것과 같다 (recommend.ts 의 recommendScenario 끝). 마스터 운행이면
+ * masterPick(가장 옅어진 개념을 시험하는 L10 코스 가운데 무작위 — 후보 밖에서도 고른다), 아니면 최종 후보에서 rulePick.
+ */
+export function programPick(d: Decision): LibraryEntry {
+  if (d.plan.master) {
+    const id = masterPick(d.ids, Math.random, d.plan.skills).scenario.id;
+    const e = libraryEntry(id);
+    if (e) return e;
+  }
+  return rulePick(d.plan, d.courses, Math.random, d.seen, d.cover);
 }
 
 const FAST_SAMPLE = 120;
@@ -428,6 +450,13 @@ export function play(ep: Episode, e: LibraryEntry): { violated: ViolationCode[] 
  *  - 레벨 0.15 · 새 상황 0.02 (간격 효과 전): 아는 개념을 많이 묻는 복잡한 판으로 몰려 L7 40판에 정면 녹색 · 녹색 화살표를
  *    한 번도 겪지 않았다 (tests/recommend.test.ts 의 커버리지 검사). 원인은 무게가 아니라 운전자 쪽이었다 — drive 의 간격 효과.
  *  - 습관 빚 0.6 배: 레벨은 프로그램보다 2.3 높고 마스터가 두 배였지만 진짜 익힌 개념이 0.35 적었다. 0.3 배가 그 사이다.
+ *  - **다양성 약속(tests/recommend.test.ts)은 학습마다 아슬아슬하다.** 마스터 운행 차례를 더하고 입력에 '마스터인가' 를 넣어
+ *    다시 학습하자(2026-11-01) L7 40판에 정면 녹색이 한 번도 없었고 L2 보호구역 판의 97% 가 무신호였다(검사는 80% 이하).
+ *    마스터 차례를 빼고 같은 자료로 배워도 85% 였다. 고르는 자리에 '새 상황 − 되풀이' 고정 항을 더해 보니 신경망 점수의
+ *    후보 사이 폭(0.5)이 그 항의 폭(12)에 묻혀, 검사를 넘기는 무게(0.05 이상)에서 교사 1등 일치가 39% → 28%(0.2 면 21%,
+ *    그때 60판 견주기는 익힌 개념 −0.26 · 레벨 −0.46 으로 프로그램보다 못했다). 그래서 모델은 그대로 두었다 — 마스터 운행을
+ *    보지 않고 배운 모델이 이 시뮬레이터의 마스터 차례 7,938번에서도 교사 1등을 46% 고른다(무작위 22%, 마스터 입력을 넣은 모델은 검증 43%).
+ *    다시 학습할 때 다양성 검사가 깨지면 새 상황의 무게(NOVEL_VALUE)부터 본다.
  */
 /** 레벨 하나가 나아간 값 — 진짜 실력 개념 하나를 1 로 칠 때 */
 export const LEVEL_VALUE = 0.15;
@@ -504,8 +533,8 @@ export function teacherScores(ep: Episode, courses: readonly LibraryEntry[], see
       play(sim, e);
       for (let h = 0; h < opt.horizon; h++) {
         const d = decide(sim, true);
-        if (!d || !d.courses.length) break;
-        play(sim, rulePick(d.plan, d.courses, Math.random, d.seen, d.cover));
+        if (!d.courses.length) break;
+        play(sim, programPick(d));
       }
       total += value(sim) - v0;
     }

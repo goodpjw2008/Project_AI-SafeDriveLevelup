@@ -84,7 +84,7 @@ const branded = (text: string): string =>
  */
 export function playerFoot(given: PlayerInfo): string {
   const p = withinNeed(given);
-  if (p.mastered) return `마스터 운행 — 처음부터 다시 시작하기 전까지 ${levelLabel(MAX_LEVEL)} 코스가 무작위로 이어집니다`;
+  if (p.mastered) return `마스터 운행 — 처음부터 다시 시작하기 전까지 ${levelLabel(MAX_LEVEL)} 코스가 이어집니다`;
   const target = p.level >= MAX_LEVEL ? '안전운전 마스터' : levelLabel((p.level + 1) as Difficulty);
   if (p.xp >= p.need) {
     return p.habitsLeft

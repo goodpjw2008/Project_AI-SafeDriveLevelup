@@ -56,7 +56,6 @@ import { masterBadge } from './ui/badges';
 import { nextPlan } from './scenarios/nextPlan';
 import { generateScenario, type GeneratedScenario } from './scenarios/generate';
 import {
-  masterPick,
   priorityHabits,
   recommendScenario,
   type Picker,
@@ -279,20 +278,12 @@ async function makeAiScenario(): Promise<void> {
   */
   let outcome: Awaited<ReturnType<typeof generateScenario>>;
   /*
-    **마스터 운행** — L10 을 마치면 '처음부터 다시 시작' 을 누르기 전까지 L10 코스가 무작위로 이어진다 (recommend.ts 의
-    masterPick). 고칠 습관도 오를 레벨도 없어 AI 분석 연출은 건너뛰고, 곧바로 고른 판의 카드를 띄운다(startRun).
+    **마스터 운행도 여느 판처럼 고른다** — L10 을 마치면 '처음부터 다시 시작' 을 누르기 전까지 L10 코스가 이어지는데,
+    한때는 분석 연출 없이 프로그램이 무작위로 골라(recommend.ts 의 masterPick) 설정 '다음판 추천 AI 설정' 을 바꿔도 똑같이
+    '무작위 뽑기' 가 나왔다. 사용자가 짚었다 (2026-11-01: *"구분이 안되서 설정이 제대로 먹힌건지 알수가 없어"* → *"마스터도
+    설정을 따름"*). 이제 계획(nextPlan 의 master)이 후보를 L10 으로 좁히고, 고르는 것은 설정대로 신경망 · 외부 LLM 이다.
   */
-  if (c.mastered) {
-    const recentIds = [...saveData.history.map((r) => r.st), ...aiTraining.made.map((s) => s.id)];
-    // 마스터 운행 — 학습자 모델이 가장 옅어진 개념을 시험하는 코스에서 고른다 (recommend.ts)
-    const pick = masterPick(recentIds, Math.random, c.skills);
-    aiPick.hide(); // 라이브러리 준비 덮개가 떠 있었을 수 있다 — 마스터 운행은 분석 연출 없이 바로 달린다
-    aiTraining.busy = false;
-    aiTraining.made.push(pick.scenario);
-    aiCourse = true;
-    goRun(pick.scenario.id, continuing());
-    return;
-  }
+  const master = c.mastered;
   try {
     const history = saveData.history;
     const recent: RecentRun[] = history.slice(-8).map((r) => ({
@@ -334,7 +325,9 @@ async function makeAiScenario(): Promise<void> {
     const many = priorityHabits(plan).length >= 2;
     const habitsText = c.badHabits.length
       ? c.badHabits.slice(0, 2).map((h) => habitTitle(h.code)).join(' · ') + (c.badHabits.length > 2 ? ' 외' : '')
-      : '기록된 나쁜 습관 없음 — 다음 레벨 준비';
+      : master
+        ? '기록된 나쁜 습관 없음 — 익힌 판단을 잊지 않게 복습'
+        : '기록된 나쁜 습관 없음 — 다음 레벨 준비';
     await aiPick.analyze(
       [
         // 장표의 두 단계와 같은 구분 (사용자가 정했다, 2026-09-27) — ① 브라우저의 예측 모델, ② 외부 LLM
@@ -349,7 +342,9 @@ async function makeAiScenario(): Promise<void> {
         () =>
           many
             ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개`
-            : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
+            : master
+              ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 마스터 운행 ${levelLabel(c.level)} 코스 ${counts.candidates.toLocaleString()}개`
+              : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
         // 결과 예측 모델(ai/outcome.ts) — 후보마다 어길 확률과 표를 붙인다. 학습자 모델이 시험된 개념이 없는 첫 판에도 돈다
         () =>
           OUTCOME_MODEL
@@ -856,7 +851,7 @@ function renderMenu(): void {
     onSettings: () => nav.go({ name: 'settings', enter: renderSettings }),
     onFullscreen: toggleFullscreen,
     onReport: () => nav.go({ name: 'report', enter: renderReport }),
-    // 마스터면 L10 코스를 무작위로 이어 달린다 (makeAiScenario 의 마스터 운행)
+    // 마스터면 L10 코스를 이어 달린다 (makeAiScenario 의 마스터 운행)
     onGenerate: () => {
       enterFullscreenOnHandheld();
       void makeAiScenario();
@@ -1907,7 +1902,7 @@ function finishRun(result: JudgeResult): void {
   */
   const nextId = sc.id + 1;
   /*
-    AI 과정에서는 **다음 판이 늘 있다** — 만들면 되기 때문이다. 마스터가 된 뒤에도 마스터 운행(L10 무작위)이 이어진다.
+    AI 과정에서는 **다음 판이 늘 있다** — 만들면 되기 때문이다. 마스터가 된 뒤에도 마스터 운행(L10 코스)이 이어진다.
     **마스터가 된 그 판만은** 자동으로 넘기지 않는다 — 엔딩이 결과 화면 위에 뜨는 자리라서다.
   */
   const canAdvance = aiCourse
@@ -1962,7 +1957,7 @@ function finishRun(result: JudgeResult): void {
  *
  * 한때 엔딩에서 게임이 끝났다(첫 화면에 '엔딩 다시 보기' 만 남음). 그 뒤 사용자가 "마스터 단계가 되고, 처음부터 다시
  * 시작을 누르기 전까지는 랜덤으로 10 단계의 문제들이 계속 돌아가게 해 줘" 라고 해서, 첫 화면의 '마스터 운행' 으로 L10
- * 코스를 무작위로 이어 달린다 (makeAiScenario · recommend.ts 의 masterPick).
+ * 코스를 이어 달린다 (makeAiScenario — 고르는 것은 여느 판처럼 설정의 추천 AI, 모델이 없으면 recommend.ts 의 masterPick).
  *
  * 예전에는 작은 축하 창을 띄우고 첫 화면으로 보낸 뒤 "한 판 더" 로 계속 달릴 수 있었다 — 과정이 끝났다는 것이
  * 드러나지 않았다. 사용자가 짚었다: "레벨 10 이후에는 마스터를 하며 게임의 엔딩이 되는 거야. AI 로봇이 normal.webp
