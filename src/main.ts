@@ -71,6 +71,7 @@ import {
 } from './scenarios/curriculum';
 import { abilityPriorFor, difficultyOf } from './ai/difficulty';
 import { TURN_LABEL, recommendModelReady, type TurnClass } from './ai/recommendNet';
+import { attentionModelReady, attentionTopK } from './ai/recommendAttention';
 import { riskOf } from './ai/risk';
 import { modelStep } from './ai/report';
 import { OUTCOME_MODEL, learnerVector, predictOutcome } from './ai/outcome';
@@ -298,7 +299,8 @@ async function makeAiScenario(): Promise<void> {
     */
     let counts: { candidates: number; courses: number; eligible?: number; turn?: TurnClass } = { candidates: 0, courses: 0 };
     // 추천 신경망이 후보도 추리는가 (recommend.ts 의 aiCourses) — 학습한 모델이 없으면 예전처럼 규칙이 추린다
-    const aiNarrows = recommendModelReady();
+    const attention = saveData.settings.aiMode === 'attention' && attentionModelReady();
+    const aiNarrows = recommendModelReady() || attention;
     // 후보 채점(recommendScenario 의 동기 앞부분)이 도는 동안에도 덮개가 보이게 — 먼저 띄우고 한 프레임 넘긴다
     aiPick.prepare([
       { tag: '1차', heading: '전통 기계학습(지도학습) 기반 예측 모델 맵 추천' },
@@ -373,9 +375,19 @@ async function makeAiScenario(): Promise<void> {
                   ? `AI 가 먼저 고칠 습관을 정하고 최종 후보 ${counts.courses}개 중 코스를 고르는 중`
                   : `AI 가 최종 후보 ${counts.courses}개 중 가장 필요한 코스를 고르는 중`,
             ]
+          : attention
+            ? [
+                /*
+                  **로컬 신경망 어텐션** (ai/recommendAttention.ts) — 판마다 읽은 뒤 갈래마다 위 판들이 서로를 보게 해(트랜스포머의
+                  셀프 어텐션) 고른다. 최종 후보 10개는 그 점수 순으로 모양마다 하나다.
+                */
+                { tag: '2차', heading: '로컬 신경망(어텐션)으로 최종 맵 선택 중' },
+                () =>
+                  `어텐션 신경망이 후보 ${counts.candidates.toLocaleString()}개 중 위 ${Math.min(attentionTopK(), counts.candidates)}개를 서로 견주며 가장 많이 배울 코스를 고르는 중`,
+              ]
           : recommendModelReady()
             ? [
-                { tag: '2차', heading: '로컬 신경망으로 최종 맵 선택 중' },
+                { tag: '2차', heading: '로컬 신경망(MLP)으로 최종 맵 선택 중' },
                 () =>
                   many
                     ? `신경망이 최종 후보 ${counts.courses}개 중 먼저 고칠 습관과 코스를 고르는 중`
@@ -411,8 +423,8 @@ async function makeAiScenario(): Promise<void> {
   } catch (e) {
     console.error('[recommend] 추천 중 예외 — 판을 새로 만든다', e);
     aiPick.hide();
-    if (saveData.settings.aiMode === 'local') {
-      // AI 사용 설정이 로컬이면 서버의 LLM 에게 판을 만들게 하지 않는다 (save.ts 의 aiMode) — 메뉴로 돌아가 다시 누르게 한다
+    if (saveData.settings.aiMode !== 'llm') {
+      // AI 사용 설정이 로컬(어텐션 포함)이면 서버의 LLM 에게 판을 만들게 하지 않는다 (save.ts 의 aiMode) — 메뉴로 돌아가 다시 누르게 한다
       outcome = { scenario: null, tries: 0, rejected: [], reason: 'invalid' };
     } else {
       showLoading('AI 가 맵을 새로 만드는 중', { title: 'AI가 운전습관을 분석해 맵을 만들고 있습니다…', immediate: true });

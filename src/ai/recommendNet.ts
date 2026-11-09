@@ -105,6 +105,15 @@ export interface CourseInputs {
   master: boolean;
   /** 보호구역 전용 도로(사거리 없이 횡단보도 셋)의 판인가 (scenarios/zoneCourse.ts) */
   zoneCourse: boolean;
+  /** 최근 20판에 탄 판인가 — 고칠 습관을 시험하는 판이면 되풀이할 수 있다 (scenarios/recommend.ts 의 eligibleFor) */
+  replay: boolean;
+  /**
+   * **학습자 모델이 가장 옅어졌다고 보는 개념**(시험된 개념 가운데 실효 숙달이 가장 낮은 것 — ai/knowledge.ts 의 weakSkills)을
+   * 이 판이 시험하는가. 마스터 운행의 예전 프로그램(recommend.ts 의 masterPick)은 그 개념을 시험하는 L10 판에서 골랐다 — 잊지 않게.
+   * 개념마다의 숙달(m:*)만 주면 신경망이 열두 값 가운데 가장 낮은 것을 스스로 찾아야 해서, 마스터 운행에서 익힌 개념을 0.14 잃었다
+   * (2026-11-02, 가상 운전자 2,000명 — 마스터 운행만 프로그램이 고르면 신경망이 프로그램과 같았다).
+   */
+  weakest: boolean;
   zone: boolean;
   noSignalZone: boolean;
   lead: boolean;
@@ -262,7 +271,7 @@ export interface TurnNet {
   b2: readonly number[];
 }
 
-const turnReady = (net: TurnNet | undefined): boolean =>
+export const turnModelReady = (net: TurnNet | undefined): boolean =>
   !!net &&
   net.names.length === TURN_FEATURES.length &&
   net.names.every((n, i) => n === TURN_FEATURES[i]) &&
@@ -272,7 +281,7 @@ const turnReady = (net: TurnNet | undefined): boolean =>
 /**
  * **갈래마다의 확률** — 탈 수 있는 판이 있는 갈래(`available`)만으로 다시 나눈다. 순서는 `TURN_CLASSES` 다.
  */
-export function turnProbs(x: TurnInputs, available: ReadonlySet<TurnClass>, model: RecommendModel = MODEL): number[] {
+export function turnProbs(x: TurnInputs, available: ReadonlySet<TurnClass>, model: { turn?: TurnNet } = MODEL): number[] {
   const net = model.turn!;
   const z = turnFeatures(x);
   const h = net.W1.map((row, q) => Math.tanh(row.reduce((s, w, j) => s + w * z[j], net.b1[q])));
@@ -333,6 +342,8 @@ export const REC_FEATURES: readonly string[] = [
   'master',
   'zoneCourse',
   'sinceZoneCourse',
+  'replay',
+  'weakest',
 ];
 
 export function recommendFeatures(x: CourseInputs): number[] {
@@ -391,6 +402,8 @@ export function recommendFeatures(x: CourseInputs): number[] {
     x.master ? 1 : 0,
     x.zoneCourse ? 1 : 0,
     Math.min(SINCE_CAP, t.sinceZoneCourse) / SINCE_CAP,
+    x.replay ? 1 : 0,
+    x.weakest ? 1 : 0,
   );
   return row;
 }
@@ -417,7 +430,7 @@ export const recommendModelReady = (model: RecommendModel = MODEL): boolean =>
   model.meta?.trained === true &&
   model.names.length === REC_FEATURES.length &&
   model.names.every((n, i) => n === REC_FEATURES[i]) &&
-  turnReady(model.turn);
+  turnModelReady(model.turn);
 
 const standardize = (x: readonly number[], model: RecommendModel): number[] =>
   x.map((v, j) => (v - model.mean[j]) / (model.std[j] || 1));
@@ -443,13 +456,15 @@ export function scoreCourses(rows: ReadonlyArray<readonly number[]>, model: Reco
 export type ReasonGroup = 'habit' | 'weak' | 'fit' | 'novel' | 'review' | 'turn';
 const GROUPS: Record<ReasonGroup, (name: string) => boolean> = {
   habit: (n) => n === 'targetHit' || n === 'habitHits',
-  weak: (n) => n.startsWith('gap:') || n.startsWith('p:') || n === 'info' || n === 'weak',
+  weak: (n) => n.startsWith('gap:') || n.startsWith('p:') || n === 'info' || n === 'weak' || n === 'weakest',
   fit: (n) => n === 'success' || n === 'clean' || n === 'zpd' || n === 'levelDiff' || n === 'cost',
   novel: (n) => n === 'novelty' || n === 'repeat',
   review: (n) => n === 'review',
   // 최근 판의 차례를 맞추는 쪽인가 — 보호구역 · 무신호 · 앞차가 한동안 없었으면 그 판
   turn: (n) => n.endsWith('Balance') || n === 'noSignalDue',
 };
+/** 설명의 특징 무리 — 어텐션 신경망도 같은 무리로 가려 본다 (ai/recommendAttention.ts 의 explainAttention) */
+export const REASON_GROUPS: Readonly<Record<ReasonGroup, (name: string) => boolean>> = GROUPS;
 
 /**
  * **왜 이 판인가 — 가려 보기(occlusion).** 고른 판의 특징 무리를 하나씩 후보들의 평균으로 바꿔 점수가 얼마나

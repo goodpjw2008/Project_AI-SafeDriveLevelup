@@ -76,7 +76,7 @@ import type { BadgeEvent } from '../economy/badges';
 import { BRAND_NAME_HTML, withAiBadge } from './brandName';
 import { TRACK_CHOICES, CHOICE_LABEL, type TrackChoice } from '../scenarios/tracks';
 import type { SiteStats } from '../siteStats';
-import { advisedBy, advisedInstead } from './pickedBy';
+import { advisedBy, advisedInstead, advisedLocal } from './pickedBy';
 import { coachSituation, localCoaching, localHabitReport, reportSituation } from '../ai/localCoach';
 import type { Picker } from '../scenarios/recommend';
 import {
@@ -1522,17 +1522,27 @@ export class Screens {
           <!--
             **AI 사용 설정** (save.ts 의 aiMode · 사용자가 정한 이름과 기본값, 2026-11-01: *"주행분석등 모든것을 신경망으로 동작
             하거나 llm으로 동작하게 설정을 심플하게"*). 로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이
-            없으면 로컬 신경망이 한다.
+            없으면 로컬 신경망이 한다. 세 가지로 나눈 것도 사용자가 정했다 (2026-11-02, 이름은 11-05 — 로컬 신경망(MLP) · 로컬 신경망(어텐션) ·
+            로컬 신경망 + 외부 LLM. 어텐션은 공모전에 뜻이 있어 함께 둔다).
           -->
           ${this.optionRow(
             'ai',
             'AI 사용 설정',
             [
-              ['local', '로컬 신경망 기반 ·기본'],
-              ['llm', '외부 LLM'],
+              /*
+                한 줄 장단점 — 사용자가 정한 꼴 (2026-11-05). 가상 운전자로 잰 값이다: 정확도는 학습자에게 도움이 되는 판을 고른 비율(새로 배움 · 더 연습 ·
+                복습 · 교육 약속 · 더 나은 판이 없는 자리), 다양성은 60판에서 만난 서로 다른 상황 수. MLP · 어텐션은 1,008명(다양성 500명), LLM 은 Gemini 24명.
+                LLM 의 비용은 추정이다 — 한 게임 입력 5,600 · 출력 230 토큰을 Gemini 유료 가격으로 치면 약 3원 (지금은 무료 키라 실제로는 0원).
+              */
+              ['local', '로컬 신경망(MLP)', '정확도 96.9%, 다양성 36.4가지, 1게임 비용 0원'],
+              ['attention', '로컬 신경망(어텐션) ·기본', '정확도 96.5%, 다양성 37.3가지, 1게임 비용 0원'],
+              ['llm', '로컬 신경망 + 외부 LLM', '정확도 96.7%, 다양성 36.7가지, 1게임 비용 약 3원'],
             ],
             save.settings.aiMode,
-            { note: '다음판 추천, 주행결과 분석, 습관 진단을 브라우저 안의 신경망으로 할지 외부 LLM 으로 할지 정합니다 (외부 LLM 이 답하지 않으면 로컬 신경망)' },
+            {
+              note:
+                '다음판 추천, 주행결과 분석, 습관 진단을 무엇으로 할지 정합니다 — MLP 는 판마다 점수를 매겨, 어텐션은 후보 판들을 함께 견주어(트랜스포머의 셀프 어텐션) 고릅니다. 외부 LLM 은 로컬 신경망이 추린 후보에서 고릅니다 (외부 LLM 이 답하지 않으면 로컬 신경망). 정확도는 학습자에게 도움이 되는 판을 고른 비율, 다양성은 60판에서 만난 서로 다른 상황 수입니다 (가상 운전자로 측정)',
+            },
           )}
           ${
             /*
@@ -1683,7 +1693,7 @@ export class Screens {
       document.getElementById(`view-${v.id}`)?.addEventListener('click', () => handlers.onStartView(v.id));
     }
     this.bindOptions('track', [...TRACK_CHOICES], (v) => handlers.onTrack(v as TrackChoice));
-    this.bindOptions('ai', ['local', 'llm'], (v) => handlers.onAiMode(v as AiMode));
+    this.bindOptions('ai', ['local', 'attention', 'llm'], (v) => handlers.onAiMode(v as AiMode));
     this.bindOptions('drv', ['on', 'off'], (v) => handlers.onDriverView(v === 'on'));
 
     for (const t of ['ultra', 'high', 'medium', 'low'] as const) {
@@ -1719,8 +1729,8 @@ export class Screens {
   private optionRow(
     id: string,
     label: string,
-    /** [값, 표시 이름] — **배열이다.** 순서를 그대로 지키려면 객체여서는 안 된다 */
-    choices: Array<[string, string]>,
+    /** [값, 표시 이름, 이름 아래 한 줄] — **배열이다.** 순서를 그대로 지키려면 객체여서는 안 된다 */
+    choices: Array<[string, string, string?]>,
     value: string,
     opts: { note?: string } = {},
   ): string {
@@ -1733,10 +1743,10 @@ export class Screens {
         <div class="opt-choices">
           ${choices
             .map(
-              ([key, text]) =>
-                `<button class="opt ${key === value ? 'on' : ''}" id="${id}-${key}">${esc(
-                  text,
-                )}</button>`,
+              ([key, text, line]) =>
+                `<button class="opt ${key === value ? 'on' : ''}" id="${id}-${key}">${esc(text)}${
+                  line ? `<small class="opt-line">${esc(line)}</small>` : ''
+                }</button>`,
             )
             .join('')}
         </div>
@@ -2241,7 +2251,7 @@ export class Screens {
           card.classList.remove('loading');
           body.innerHTML = coachLines(local);
           const by = document.getElementById('coach-by');
-          if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedBy('local');
+          if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedLocal();
           onReady?.();
           return;
         }
@@ -2418,7 +2428,7 @@ export class Screens {
         card.classList.remove('loading');
         body.innerHTML = coachLines(local);
         const by = document.getElementById('report-coach-by');
-        if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedBy('local');
+        if (by) by.innerHTML = mode === 'llm' ? advisedInstead() : advisedLocal();
         return;
       }
       card.classList.remove('loading');

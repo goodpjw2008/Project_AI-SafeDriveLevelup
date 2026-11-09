@@ -21,6 +21,7 @@ import type { Plan } from '../src/scenarios/generate';
 import type { Difficulty } from '../src/scenarios/curriculum';
 import { libraryEntry } from '../src/scenarios/library';
 import { recommendModelReady } from '../src/ai/recommendNet';
+import { attentionModelReady } from '../src/ai/recommendAttention';
 import { isCombinedLevel, levelGuide } from '../src/scenarios/library';
 import {
   candidatesFor,
@@ -29,6 +30,8 @@ import {
   aiCourses,
   priorityHabits,
   recommendPayload,
+  eligibleFor,
+  masterFrame,
   masterPick,
   noSignalZoneDue,
   NO_SIGNAL_ZONE_GAP,
@@ -39,6 +42,7 @@ import {
   shortlist,
 } from '../src/scenarios/recommend';
 import { isNoSignalZone, scenarioLibrary, zoneKindOf, type LibraryEntry } from '../src/scenarios/library';
+import { inTrack } from '../src/scenarios/tracks';
 
 /*
   **마스터 운행** — L10 을 마치면 '처음부터 다시 시작' 전까지 L10 코스가 이어진다. 고르는 것은 여느 판처럼 설정의 추천 AI 이고,
@@ -53,6 +57,7 @@ import { isNoSignalZone, scenarioLibrary, zoneKindOf, type LibraryEntry } from '
 describe('고른 쪽 이름', () => {
   it('이름표는 아는 값만 — 모르는 값이 화면에 나오지 않는다', () => {
     expect(Object.keys(PICKER_LABEL).sort()).toEqual([
+      'attention',
       'cerebras',
       'gemini',
       'groq',
@@ -132,6 +137,25 @@ describe('마스터 운행', () => {
 
   it('왜 이 판인지 — 무작위라고 말한다', () => {
     expect(masterPick([]).scenario.why).toContain('무작위');
+  });
+
+  /*
+    **마스터도 설정을 따른다** (사용자가 정했다, 2026-11-01) — '우회전' 만 고른 사람의 마스터 운행은 우회전 갈래의 L10 판에서,
+    '어린이보호구역' 만 고른 사람은 그 갈래의 판에서. 예전에는 프로그램(masterPick)만 갈래를 보지 않았다.
+  */
+  it('설정의 갈래를 따른다 — 우회전만 · 어린이보호구역만', () => {
+    const turn = masterFrame(eligibleFor(plan({ level: 10, master: true, badHabits: [], target: null, track: 'turn', trackSetting: 'turn' }), []));
+    expect(turn.length).toBeGreaterThan(0);
+    expect(turn.every((e) => e.level === 10 && inTrack(e.tags, 'turn'))).toBe(true);
+    for (let i = 0; i < 50; i++) {
+      const id = masterPick([], Math.random, undefined, Date.now(), turn).scenario.id;
+      expect(turn.some((e) => e.spec.id === id)).toBe(true);
+    }
+    const zone = masterFrame(eligibleFor(plan({ level: 10, master: true, badHabits: [], target: null, track: 'zone', trackSetting: 'zone' }), []));
+    expect(zone.length).toBeGreaterThan(0);
+    const id = masterPick([], Math.random, undefined, Date.now(), zone).scenario.id;
+    expect(zone.some((e) => e.spec.id === id)).toBe(true);
+    expect(scenarioLibrary().some((e) => e.spec.id === id)).toBe(false);
   });
 });
 
@@ -397,6 +421,21 @@ describe('recommendScenario — 가짜 서버', () => {
     expect(libraryEntry(out.scenario.id)).toBeDefined();
     if (by === 'local') expect(out.scenario.why).toContain('신경망');
   });
+
+  /*
+    **'로컬 신경망 어텐션' 도 서버에 묻지 않는다** — 다음판만 어텐션 신경망이 고른다 (ai/recommendAttention.ts). 어텐션 모델이 없으면
+    지금 신경망으로 고르고, 고른 쪽 이름도 그대로 말한다 (어텐션이라고 하지 않는다).
+  */
+  it('로컬 신경망 어텐션이면 서버에 묻지 않고 어텐션 신경망이 고른다', async () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('어텐션도 서버에 묻지 않는다')));
+    vi.stubGlobal('fetch', fetch);
+    const out = await recommendScenario(plan(), habits, [], [], undefined, [], 'attention');
+    expect(fetch).not.toHaveBeenCalled();
+    const by = attentionModelReady() ? 'attention' : recommendModelReady() ? 'local' : 'rule';
+    expect(out.picker).toBe(by);
+    expect(libraryEntry(out.scenario.id)).toBeDefined();
+    if (by !== 'rule') expect(out.scenario.why).toContain('신경망');
+  });
 });
 
 describe('서버 — 입력 · 답', () => {
@@ -557,21 +596,31 @@ describe('두 번째 횡단보도 보행자가 오는 쪽', () => {
   추리고 보호구역 · 앞차 · 신호기 차례까지 정하므로(사용자가 정했다, 2026-11-01: *"모든걸 ai로 하고 싶어"*), 다양성 · 무신호
   보호구역 비율 같은 사용자가 정한 약속을 신경망이 지키는지 아래 검사를 프로그램과 신경망 둘 다로 돌린다. 모델이 없으면 신경망
   쪽도 프로그램으로 고른다(aiCourses 가 null).
+  **어텐션 신경망도 같은 검사를 받는다** (설정 '로컬 신경망 어텐션' — ai/recommendAttention.ts, 2026-11-02). 어텐션은 갈래 신경망
+  없이 모든 갈래의 판을 한꺼번에 보고 고르므로 무신호 보호구역의 바닥 · 갈래의 섞임도 스스로 지켜야 한다. 어텐션 모델이 없으면
+  (학습 전) 지금 로컬 신경망으로 고른다.
 */
 describe.each([
   ['프로그램', 'rule'],
   ['로컬 신경망', 'local'],
+  ['로컬 신경망 어텐션', 'attention'],
 ] as const)('이어 달리면 다양해진다 — 고칠 습관이 없어도 (%s)', (_name, picker) => {
   const fixed = () => {
     let seed = 7;
     return () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
   };
 
-  /** 실제 흐름대로 n 판을 이어 달린다 (main.ts 의 plan 만들기와 같은 순서) */
-  const run = (level: Difficulty, n: number) => {
+  /** 같은 레벨 · 판 수면 같은 흐름이다(난수가 고정) — 검사마다 다시 달리지 않는다 */
+  const memo = new Map<string, { runs: LibraryEntry[]; due: boolean[] }>();
+  /** 실제 흐름대로 n 판을 이어 달린다 (main.ts 의 plan 만들기와 같은 순서). due — 그 판이 무신호 보호구역의 바닥 차례였는가 */
+  const drive = (level: Difficulty, n: number) => {
+    const key = `${level}:${n}`;
+    const hit = memo.get(key);
+    if (hit) return hit;
     const rnd = fixed();
     const played: number[] = [];
     const out: LibraryEntry[] = [];
+    const dues: boolean[] = [];
     for (let i = 0; i < n; i++) {
       const zoneTurn = rnd() < SCHOOL_ZONE_CHANCE;
       /*
@@ -596,15 +645,19 @@ describe.each([
         정한다(위에서 굴린 차례를 보지 않는다 — recommend.ts 의 aiCourses). 게임은 2,000판을 채점하지만 여기서는 시간 때문에
         400판을 채점한다.
       */
-      const ai = picker === 'local' ? aiCourses(p, played, played, rnd, seen, cover, 400) : null;
+      const ai = picker === 'rule' ? null : aiCourses(p, played, played, rnd, seen, cover, 400, picker === 'attention');
       const list = ai ? [] : shortlist(p, candidatesFor(p, played), rnd, seen, cover);
       const pool = list.length ? list : candidatesFor(p, played);
       const e = ai?.pick.entry ?? rulePick(p, pool, rnd, seen, cover);
       played.push(e.spec.id);
       out.push(e);
+      dues.push(due);
     }
-    return out;
+    const got = { runs: out, due: dues };
+    memo.set(key, got);
+    return got;
   };
+  const run = (level: Difficulty, n: number) => drive(level, n).runs;
 
   it('40판에서 두 횡단보도의 상황이 모두 여러 가지다', () => {
     const runs = run(7, 40);
@@ -685,6 +738,27 @@ describe.each([
       아니다 — 바닥을 켜기 전, 보호구역 판 가운데 비율). 400판이면 그 흔들림이 문턱 안에 든다.
     */
     expect(Math.max(...ratios) - Math.min(...ratios), shown).toBeLessThan(0.25);
+  });
+
+  /*
+    **바닥 차례에 고른 판 그 자체를 본다** — 세 판째 신호기 없는 보호구역이 없으면 그 판이다(nextPlan.ts 의 noSignalZoneDue,
+    사용자: "10판 넘게 했는데 한번도 나오지 않았어"). 프로그램은 그 판만 후보에 올리니 늘 지키고, 로컬 신경망은 차례 신경망이
+    따라 배웠다(recommendNet.test.ts 는 그 확률을 잰다). 어텐션은 갈래 신경망이 없으므로 고른 판으로만 잴 수 있다.
+    문턱은 차례 신경망 검사의 '습관 없음' 문턱(85%)과 같다 — 2026-11-04 에 프로그램 488번 · 로컬 신경망 605번 모두 100% 였다.
+  */
+  it('무신호 보호구역이 세 판째 없으면 거의 늘 그 판을 고른다 — L2 ~ L10', () => {
+    let due = 0;
+    let met = 0;
+    for (const level of [2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+      const got = drive(level, 400);
+      got.due.forEach((d, i) => {
+        if (!d) return;
+        due += 1;
+        if (zoneKindOf(got.runs[i].tags) === 'noSignal') met += 1;
+      });
+    }
+    expect(due, '바닥 차례가 오긴 한다').toBeGreaterThanOrEqual(50);
+    expect(met / due, `바닥 차례 ${due}번 중 ${met}번`).toBeGreaterThanOrEqual(0.85);
   });
 
   /*

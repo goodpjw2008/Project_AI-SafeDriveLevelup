@@ -59,6 +59,7 @@ import {
   recommendModelReady,
   scoreCourses,
   turnClass,
+  turnFeatures,
   turnProbs,
   type CourseInputs,
   type ReasonGroup,
@@ -66,6 +67,7 @@ import {
   type TurnContext,
   type TurnInputs,
 } from '../ai/recommendNet';
+import { attentionGlobal, attentionModelReady, attentionScores, attentionTurnModel, explainAttention } from '../ai/recommendAttention';
 
 /** AI 에게 보여 주는 후보 코스 수 */
 const SHORTLIST_SIZE = 10;
@@ -401,6 +403,7 @@ export type Picker =
   | 'nvidia'
   | 'openai'
   | 'local'
+  | 'attention'
   | 'quota'
   | 'rule'
   | 'random';
@@ -414,7 +417,9 @@ export const PICKER_LABEL: Record<Picker, string> = {
   nvidia: 'NVIDIA',
   openai: 'OpenAI',
   // 설정 '다음판 추천 AI 설정' 의 로컬 신경망 기반 (ai/recommendNet.ts) — 서버 없이 브라우저 안에서 고른다
-  local: '로컬 신경망',
+  local: '로컬 신경망(MLP)',
+  // '로컬 신경망 어텐션' — 후보 판들을 함께 보는 어텐션 신경망 (ai/recommendAttention.ts)
+  attention: '로컬 신경망(어텐션)',
   quota: 'AI',
   rule: '우회전 규칙',
   random: '무작위 뽑기',
@@ -871,6 +876,21 @@ function ruleWhy(plan: Plan, e: LibraryEntry): string {
 
 // ── 3-1. 로컬 신경망이 고르기 (ai/recommendNet.ts) ─────────────────────────────
 
+/**
+ * 학습자 모델이 가장 옅어졌다고 보는 개념 (ai/knowledge.ts 의 weakSkills — 마스터 운행의 masterPick 과 같은 함수). 후보 2,000판마다
+ * 다시 세지 않게 계획(학습자 모델)마다 한 번만 센다.
+ */
+const weakestCache = new WeakMap<object, { at: number; code: ViolationCode | null }>();
+function weakestOf(plan: Plan): ViolationCode | null {
+  if (!plan.skills) return null;
+  const now = Date.now();
+  const hit = weakestCache.get(plan.skills);
+  if (hit && hit.at === now) return hit.code;
+  const code = weakSkills(plan.skills, now, 1)[0]?.code ?? null;
+  weakestCache.set(plan.skills, { at: now, code });
+  return code;
+}
+
 /** 후보 하나를 신경망의 입력으로 — 학습 스크립트(scripts/train-recommend.ts)도 이 함수로 센다 */
 export function courseInputs(
   plan: Plan,
@@ -880,6 +900,8 @@ export function courseInputs(
   verdict: (e: LibraryEntry) => CandidateVerdict | null,
   /** 최근 판의 차례 (아래 turnContext) — 없으면 목표 비율 그대로인 것으로 본다 */
   turns: TurnContext = NO_TURNS,
+  /** 최근 `RECENT_EXCLUDE` 판에 탄 판 번호 — 되풀이인가 (recommendNet.ts 의 replay) */
+  recent: ReadonlySet<number> = NO_RECENT,
 ): CourseInputs {
   const k = plan.skills ?? {};
   const mastery = {} as Record<ViolationCode, number>;
@@ -920,9 +942,15 @@ export function courseInputs(
     levelOpens: isCombinedLevel(plan.level) || levelGuide(plan.level).length > 0,
     master: !!plan.master,
     noSignalOpen: noSignalZoneOpen(plan.level),
+    replay: recent.has(e.spec.id),
+    weakest: weakestOf(plan) !== null && e.targets.includes(weakestOf(plan)!),
     ...turnFlags(e),
   };
 }
+
+const NO_RECENT: ReadonlySet<number> = new Set();
+/** 최근 `RECENT_EXCLUDE` 판의 번호 — courseInputs 의 되풀이 표시 */
+export const recentSet = (recentIds: readonly number[]): ReadonlySet<number> => new Set(recentIds.slice(-RECENT_EXCLUDE));
 
 /** 판의 차례 표시 — 보호구역인가 · 신호기 없는 보호구역인가 · 앞차가 있는가 · 보호구역 전용 도로인가 */
 function turnFlags(e: LibraryEntry): { zone: boolean; noSignalZone: boolean; lead: boolean; zoneCourse: boolean } {
@@ -1085,6 +1113,12 @@ export function turnContext(playedIds: readonly number[]): TurnContext {
  * 개념(난이도 4 · 5 는 한두 레벨 위까지 · 보호구역 전용 도로는 보호구역이 열린 뒤), 마스터 운행이면 L10, L1 에는 야간 없음,
  * 그리고 최근 20판에 탄 판은 빼기. 그 안에서 무엇을 고를지 — 습관 · 보호구역 · 앞차 · 신호기 차례, 연습 구분이 자동이면
  * 갈래까지 — 는 추천 신경망이 정한다.
+ *
+ * **고칠 습관이 있으면 테두리를 넓힌다** — 예전 프로그램이 고를 수 있던 판을 신경망도 고를 수 있게. 프로그램은 고른 판의 6% 를
+ * 이 테두리 밖에서 골랐고 그 98% 가 습관을 고치려는 판이었다: 습관을 시험하는 판을 최근에 탔어도 다시 주고(되풀이), 이 레벨까지
+ * 그 습관을 시험할 판이 없으면 위 레벨에서 가져온다 (아래 candidatesFor). 신경망은 그 판들을 고를 수 없어 진짜 익힌 개념이
+ * 프로그램보다 적었다 (2026-11-01, scripts/recommendSim.ts 의 가상 운전자). 신호기 없는 보호구역은 그 개념이 열리는 레벨까지
+ * 들인다 (바닥 차례에 프로그램이 그렇게 한다). 되풀이할지는 신경망이 '최근에 탄 판인가'(recommendNet.ts 의 replay)를 보고 정한다.
  */
 export function eligibleFor(plan: Plan, recentIds: readonly number[]): LibraryEntry[] {
   const setting = plan.trackSetting ?? plan.track ?? 'both';
@@ -1097,9 +1131,23 @@ export function eligibleFor(plan: Plan, recentIds: readonly number[]): LibraryEn
   const ok = plan.level === 1 ? all.filter((e) => !L1_EXCLUDES(e.tags)) : all;
   const upTo = plan.level + challengeRule(plan.challenge).reach;
   const recent = new Set(recentIds.slice(-RECENT_EXCLUDE));
-  const fits = ok.filter((e) => e.level <= upTo);
-  const fresh = fits.filter((e) => !recent.has(e.spec.id));
-  return fresh.length ? fresh : fits.length ? fits : ok;
+  const habits = plan.badHabits.map((h) => h.code);
+  const testsHabit = (e: LibraryEntry) => habits.some((c) => e.targets.includes(c));
+  const noSignalUpTo = Math.max(upTo, noSignalZoneLevel());
+  const fits = ok.filter((e) => e.level <= upTo || (isNoSignalZone(e.tags) && e.level <= noSignalUpTo));
+  // 이 레벨까지 시험할 판이 없는 습관 — 그 습관을 시험하는 가장 낮은 위 레벨의 판
+  const above: LibraryEntry[] = [];
+  for (const c of habits) {
+    if (fits.some((e) => e.targets.includes(c))) continue;
+    const higher = ok.filter((e) => e.level > upTo && e.targets.includes(c));
+    if (!higher.length) continue;
+    const lowest = Math.min(...higher.map((e) => e.level));
+    above.push(...higher.filter((e) => e.level === lowest));
+  }
+  const wide = above.length ? [...new Set([...fits, ...above])] : fits;
+  // 최근 판은 빼되, 고칠 습관을 시험하는 판은 되풀이할 수 있다
+  const fresh = wide.filter((e) => !recent.has(e.spec.id) || testsHabit(e));
+  return fresh.length ? fresh : wide.length ? wide : ok;
 }
 
 /**
@@ -1144,14 +1192,22 @@ export function aiCourses(
   seen: SeenShapes = seenShapes(recentIds),
   cover: Coverage = coverageOf(playedIds, plan.level),
   size = AI_SAMPLE,
+  /**
+   * **어텐션 신경망으로** (설정 '로컬 신경망 어텐션' — ai/recommendAttention.ts) — 판마다 읽은 뒤 갈래마다 위 판들이 서로를
+   * 보게 해 고른다. 어텐션 모델이 없으면(학습 전 · 특징이 바뀜) 지금 신경망으로 고른다.
+   */
+  attention = false,
 ): {
   eligible: number;
   scored: number;
   turn: TurnClass;
   courses: LibraryEntry[];
   pick: { entry: LibraryEntry; why: string };
+  /** 어텐션 신경망이 골랐는가 */
+  attention: boolean;
 } | null {
-  if (!recommendModelReady()) return null;
+  const attn = attention && attentionModelReady();
+  if (!attn && !recommendModelReady()) return null;
   const eligible = eligibleFor(plan, recentIds);
   if (!eligible.length) return null;
   const turns = turnContext(playedIds);
@@ -1160,14 +1216,33 @@ export function aiCourses(
     판이 몇 개인지는 보지 않는다 — 보면 보호구역 판이 많은 레벨에서 보호구역만 나온다.
   */
   const classOf = eligible.map(turnClassOf);
-  const turn = TURN_CLASSES[drawIndex(turnProbs(turnInputs(plan, turns, cover), new Set(classOf)), random)];
-  const inTurn = eligible.filter((_, i) => classOf[i] === turn);
+  /*
+    **어텐션 신경망 하나로 고를 때**(ai/recommendAttention.ts 의 global)는 갈래를 먼저 뽑지 않는다 — 모든 갈래의 판을 한 묶음으로
+    넘기고, 차례 신경망이 보던 입력(최근 판의 갈래 · 오래 없던 갈래 · 탈 수 있는 갈래)은 상황 토큰으로 함께 넘긴다. 판을 하나씩 보는
+    신경망은 '이 레벨에 보호구역 판이 많다' 를 몰라 갈래 비율이 판 구성을 따라갔지만, 어텐션은 묶음 전체를 본다.
+  */
+  const global = attn && attentionGlobal();
+  const available = new Set(classOf);
+  const turnIn = turnInputs(plan, turns, cover);
+  const drawn = global ? null : TURN_CLASSES[drawIndex(turnProbs(turnIn, available, attn ? attentionTurnModel() : undefined), random)];
+  const inTurn = drawn ? eligible.filter((_, i) => classOf[i] === drawn) : eligible;
   const pool = inTurn.length > size ? sampleOf(inTurn, size, random) : inTurn;
+  const scene = global
+    ? {
+        classes: pool.map((e) => TURN_CLASSES.indexOf(turnClassOf(e))),
+        ctx: [...turnFeatures(turnIn), ...TURN_CLASSES.map((c) => (available.has(c) ? 1 : 0))],
+      }
+    : undefined;
   const verdict = verdictsFor(plan, cover);
-  const inputs = pool.map((e) => courseInputs(plan, e, seen, cover, verdict, turns));
+  const recent = recentSet(recentIds);
+  const inputs = pool.map((e) => courseInputs(plan, e, seen, cover, verdict, turns, recent));
   const rows = inputs.map(recommendFeatures);
-  const scores = scoreCourses(rows);
-  const order = scores.map((_, i) => i).sort((a, b) => scores[b] - scores[a]);
+  // 어텐션이면 갈래마다 위 판만 마지막 점수가 있고(나머지 −∞) 최종 후보를 채울 때는 나머지를 판마다 본 점수 순으로 잇는다
+  const attnScores = attn ? attentionScores(rows, undefined, scene) : null;
+  const scores = attnScores ? attnScores.final : scoreCourses(rows);
+  const order = scores
+    .map((_, i) => i)
+    .sort((a, b) => scores[b] - scores[a] || (attnScores ? attnScores.base[b] - attnScores.base[a] : 0));
   /*
     **점수를 확률로 바꿔 한 판을 뽑는다** (소프트맥스 정책) — 신경망이 따라 배운 프로그램도 같은 상황에서 늘 같은 판을 고르지
     않았다(흔들림). 1등만 고르면 같은 판이 되풀이된다. 뽑힌 판이 최종 후보의 맨 앞이다.
@@ -1200,18 +1275,26 @@ export function aiCourses(
   }
   for (const i of order) if (picked.length < SHORTLIST_SIZE && !picked.includes(i)) picked.push(i);
   // 왜 이 판인가 — 최종 후보들 사이에서 가려 본다 (뽑힌 판이 picked[0] 이다). 바닥 차례(한동안 없던 갈래)를 뽑았으면 그것이 까닭이다
-  const reason = explainPick(
-    picked.map((i) => rows[i]),
-    0,
-  );
+  const reason = attn
+    ? explainAttention(
+        picked.map((i) => rows[i]),
+        0,
+        undefined,
+        scene && { classes: picked.map((i) => scene.classes[i]), ctx: scene.ctx },
+      )
+    : explainPick(
+        picked.map((i) => rows[i]),
+        0,
+      );
   const best = picked[0];
   const due = (turns.noSignalDue && inputs[best].noSignalZone) || (turns.roadDue && inputs[best].zoneCourse);
   return {
     eligible: eligible.length,
     scored: pool.length,
-    turn,
+    turn: drawn ?? turnClassOf(pool[best]),
     courses: picked.map((i) => pool[i]),
     pick: { entry: pool[best], why: localWhy(plan, inputs[best], due ? 'turn' : (reason?.group ?? null)) },
+    attention: attn,
   };
 }
 
@@ -1445,7 +1528,7 @@ export async function recommendScenario(
     **후보는 추천 신경망이 추린다** (위 aiCourses) — 탈 수 있는 판에서 2,000판을 채점해 10판. 습관 · 보호구역 · 앞차 · 신호기
     차례도 신경망이 본다. 모델이 없으면(학습 전 · 특징이 바뀜) 예전처럼 규칙이 습관마다 후보를 따로 추린다 (coursesByHabit).
   */
-  const ai = aiCourses(plan, recentIds, playedIds, Math.random, seen, cover);
+  const ai = aiCourses(plan, recentIds, playedIds, Math.random, seen, cover, AI_SAMPLE, mode === 'attention');
   const byHabit = ai ? null : coursesByHabit(plan, recentIds, Math.random, seen, cover);
   const courses = ai ? ai.courses : byHabit!.groups.flatMap((g) => g.courses);
   const habitOf = ai ? habitsOf(plan, courses) : new Map<number, ViolationCode>();
@@ -1516,7 +1599,7 @@ export async function recommendScenario(
   if (local) {
     const e = local.entry;
     const habit = habitOf.get(e.spec.id) ?? (plan.target as ViolationCode | null) ?? null;
-    const by: Picker = reply === 'quota' ? 'quota' : 'local';
+    const by: Picker = reply === 'quota' ? 'quota' : ai?.attention ? 'attention' : 'local';
     return {
       scenario: withVerdict(
         toScenario(
@@ -1545,7 +1628,7 @@ export async function recommendScenario(
     masterPick). 신경망 · 외부 LLM 이 고를 때만 위에서 이 후보들을 채점한다.
   */
   if (plan.master) {
-    const pick = masterPick(recentIds, Math.random, plan.skills);
+    const pick = masterPick(recentIds, Math.random, plan.skills, Date.now(), masterFrame(eligibleFor(plan, recentIds)));
     return why === 'quota' ? { ...pick, picker: why, scenario: { ...pick.scenario, picker: why } } : pick;
   }
   const entry = rulePick(plan, pool, Math.random, seen, cover);
@@ -1560,6 +1643,15 @@ export async function recommendScenario(
     habit: habitOf.get(entry.spec.id) ?? (plan.target as ViolationCode | null) ?? null,
     habitBy: 'rule',
   };
+}
+
+/**
+ * **마스터 운행의 테두리** — 설정의 갈래를 따른 탈 수 있는 판(eligibleFor) 가운데 L10 판. 보호구역 전용 갈래는 판이 모두 L1 이라
+ * 그 갈래의 판 그대로다.
+ */
+export function masterFrame(eligible: readonly LibraryEntry[]): LibraryEntry[] {
+  const top = eligible.filter((e) => e.level === MAX_LEVEL);
+  return top.length ? top : [...eligible];
 }
 
 /** 마스터 운행 카드의 👉 줄 */
@@ -1582,8 +1674,15 @@ export function masterPick(
   /** 학습자 모델 (ai/knowledge.ts) — 있으면 **기억이 가장 옅어진 개념**을 시험하는 코스에서 고른다 */
   skills?: Knowledge,
   now = Date.now(),
+  /**
+   * 고를 판 — 설정의 갈래를 따른 테두리(아래 masterFrame). 없으면 L10 코스 전부. **마스터도 설정을 따른다** (사용자가 정했다,
+   * 2026-11-01) — 예전에는 여기서만 갈래를 보지 않아, '우회전' · '어린이보호구역' 만 고른 사람에게도 마스터 운행에서 다른 갈래의
+   * L10 판을 주었다. 그 판들이 개념을 더 많이 물어 가상 운전자 견주기에서 프로그램이 신경망보다 익힌 개념 0.13 앞섰는데, 신경망은
+   * 설정을 지켜 그 판을 볼 수 없었다 (2026-11-02 — 프로그램이 마스터 운행에서 고른 판의 37% 가 설정 밖이었다).
+   */
+  frame?: readonly LibraryEntry[],
 ): RecommendOutcome {
-  const pool = scenarioLibrary().filter((e) => e.level === MAX_LEVEL);
+  const pool = frame?.length ? [...frame] : scenarioLibrary().filter((e) => e.level === MAX_LEVEL);
   const recent = new Set(recentIds.slice(-RECENT_EXCLUDE));
   const fresh = pool.filter((e) => !recent.has(e.spec.id));
   /*

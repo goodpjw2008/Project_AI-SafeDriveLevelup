@@ -41,7 +41,7 @@ import {
   type TurnNet,
 } from '../src/ai/recommendNet';
 import { isNoSignalZone, zoneKindOf, type LibraryEntry } from '../src/scenarios/library';
-import { NO_SIGNAL_ZONE_GAP, noSignalZoneOpen, turnClassOf, turnInputs } from '../src/scenarios/recommend';
+import { NO_SIGNAL_ZONE_GAP, noSignalZoneOpen, rulePick, turnClassOf, turnInputs } from '../src/scenarios/recommend';
 import type { Difficulty } from '../src/scenarios/curriculum';
 import { practiceTrack } from '../src/scenarios/trackPick';
 import {
@@ -61,6 +61,7 @@ import {
   seedGame,
   turnRow,
 } from './recommendSim';
+import { lookaheadPick, lookaheadValues, type LookaheadOptions, type ValueNet } from './recommendValue';
 
 const args = process.argv.slice(2);
 const arg = (name: string, def: number): number => {
@@ -83,9 +84,59 @@ const NEG = arg('neg', 31);
 const EXPLORE = arg('explore', 0.1);
 /** 한 레벨에 오래 머무는 운전자의 몫 (recommendSim.ts 의 pinEpisode) — 학습 자료에만 */
 const PLATEAU = arg('plateau', 0.3);
+/**
+ * 견주기에서 신경망을 **LLM 과 짝을 이루는 후보 신경망**으로 쓴다 — 후보 `--set` 판(10)을 점수에 비례해 뽑고, 마지막은 외부 LLM 을
+ * 대신하는 규칙(recommend.ts 의 rulePick)이 고른다 (scripts/ppo-rollout.ts 의 set 모드). 0 이면 신경망이 혼자 한 판을 고른다.
+ */
+const SET_K = arg('set', 0);
+/** 신경망이 한 갈래에서 채점하는 판의 수 (기본 recommendSim.ts 의 POOL) — 강화학습(scripts/ppo-rollout.ts 의 --pool)과 맞춰 견줄 때 */
+const NET_POOL = arg('pool', POOL);
+/** 추천 신경망이 갈래 안에서 판을 뽑는 온도 — 1 이면 배운 그대로, 작을수록 1등 쪽으로 (차례 신경망은 늘 1) */
+const CTEMP = arg('ctemp', 1);
+/** 진단 — 갈래는 예전 프로그램이 고른 판의 갈래로, 판만 추천 신경망이 (어디서 프로그램과 갈리는지 가를 때) */
+const HYBRID = arg('hybrid', 0);
+/**
+ * **앞을 내다보는 교사** (scripts/recommendValue.ts) — 가치 신경망 JSON 을 주면 정답을 예전 프로그램 대신 이 교사가 낸다: 프로그램이
+ * 추린 후보를 한 판씩 같은 운으로 `--rollouts` 번 달려 보고 (그 판의 보상 + 가치 신경망이 본 그 뒤의 값)이 가장 큰 판. 첫 차례의
+ * 운전자도 이 교사가 가르친다. `--lambda` 는 레벨 하나의 무게 (개념 하나를 1 로).
+ */
+const TEACHER_PATH = sarg('teacher');
+const TEACHER: LookaheadOptions | null = TEACHER_PATH
+  ? { value: JSON.parse(readFileSync(TEACHER_PATH, 'utf8')) as ValueNet, lambda: arg('lambda', 0.2), rollouts: arg('rollouts', 8) }
+  : null;
+/** 1 이면 전문가가 견주고도 고르지 않은 최종 후보(같은 갈래)를 오답 앞자리에 둔다 (recommendSim.ts 의 bcSet) */
+const HARD = arg('hard', 0);
+/**
+ * **최종 후보를 정답 묶음으로** (0 ~ 1, 0 이면 끔) — 전문가가 고른 판에 이만큼, 나머지를 같은 갈래의 다른 최종 후보에 고르게 나눠
+ * 정답으로 두고(부드러운 정답), 무작위 판에는 갈래 안 판 수만큼의 무게를 준다(표본 소프트맥스 보정). 예전처럼 전문가 한 판만 정답으로,
+ * 무작위 31판만 오답으로 두자 신경망은 31판 가운데서는 81% 맞혔지만 게임처럼 갈래 안 판 전부(평균 335판)를 채점하면 확률의
+ * 29% 가 프로그램이 후보로도 올리지 않을 판에 실렸고, 그 몫이 프로그램보다 익힌 개념 0.15 를 잃게 했다 — 최종 후보 안에서만
+ * 고르게 하면 같은 신경망이 프로그램과 같았다 (2026-11-02). 최종 후보를 오답으로 두면(`--hard`) 그 몫이 66% 로 더 줄었다.
+ */
+const SET_W = arg('setTarget', 0);
+/**
+ * **교사 값으로 나눈 최종 후보 정답** (`--teacher` 와 함께, 값은 소프트맥스 온도) — 갈래는 예전 프로그램이 고른 판의 갈래 그대로,
+ * 그 갈래의 최종 후보마다 앞을 내다보는 교사의 값(recommendValue.ts 의 lookaheadValues)을 매겨 소프트맥스로 정답 몫을 나눈다.
+ * 교사가 고른 한 판을 따라 하게 하면(가상 운전자의 속을 보고 고른 판이라) 신경망이 31% 밖에 못 맞히고 흐려져 프로그램보다
+ * 익힌 개념 0.26 · 레벨 0.91 낮았다 — 값을 나눠 주면 신경망은 '보이는 것으로 짐작한 교사 값' 이 큰 쪽을 배운다.
+ */
+const QSET = arg('qset', 0);
+/**
+ * **스스로 찾은 어려운 오답** (둘째 차례부터, 값은 개수) — 방금 배운 신경망이 전문가의 갈래에서 판 500개를 채점해 **최종 후보가
+ * 아닌데 높게 친 판** 을 오답 앞자리에 둔다. 신경망을 프로그램의 최종 후보 안에서만 고르게 하면 프로그램과 같았는데(+0.01 ± 0.02),
+ * 갈래 안 판 전부를 채점하면 확률의 29% 가 최종 후보 밖의 비슷해 보이는 판에 실려 익힌 개념 0.1 남짓을 잃었다 — 바로 그 판들을
+ * 오답으로 보여 준다 (검색 모델의 hard negative mining). 최종 후보의 다른 판은 오답으로 두지 않는다 (`--hard` 는 그래서 나빴다).
+ */
+const MINE = arg('mine', 0);
 const ROUNDS = arg('rounds', 3);
 const EVAL = arg('eval', 400);
 const EVAL_RUNS = arg('evalRuns', 60);
+/**
+ * 견주기 운전자의 씨앗 바탕 — 늘 같은 400명을 쓰면 그 사람들의 운(주사위)이 모든 견주기에 똑같이 묻어난다. 2026-11-01 에 처음 보는
+ * 운전자 400명의 프로그램 결과가 그 판들의 기댓값보다 0.21 높게 나와, 신경망이 매번 0.2 남짓 뒤지는 것처럼 보였다. 다른 사람들로
+ * 다시 잴 때 바꾼다 (기본 0 — 예전과 같은 사람들).
+ */
+const EVAL_SEED = arg('evalSeed', 0);
 const EPOCHS = arg('epochs', 20);
 const HIDDEN = arg('hidden', 32);
 /** 차례 신경망 — 은닉 · 학습 횟수 */
@@ -111,6 +162,12 @@ interface Labeled {
   turn: number[];
   cls: number;
   avail: number[];
+  /** `--set` 학습 — rows[1..short] 는 전문가의 최종 후보 가운데 같은 갈래의 다른 판 (정답 쪽), 그 뒤는 무작위 판 */
+  short?: number;
+  /** 무작위 판 하나가 대신하는 갈래 안 판 수의 로그 (표본 소프트맥스 보정 — 게임은 갈래 안 판 전부를 채점한다) */
+  negW?: number;
+  /** `--qset` 학습 — rows[0..short] (프로그램이 고른 판과 같은 갈래의 최종 후보)의 정답 몫: 교사 값의 소프트맥스 */
+  soft?: number[];
 }
 
 type Policy = 'random' | 'program' | 'net';
@@ -132,19 +189,32 @@ function choose(policy: Policy, d: ReturnType<typeof decide>, model: RecommendMo
   if (policy === 'random') return d.pool[Math.floor(r() * d.pool.length)];
   if (policy === 'net' && model) {
     const classOf = d.pool.map(turnClassOf);
-    const turn = TURN_CLASSES[draw(turnProbs(turnInputs(d.plan, d.turns, d.cover), new Set(classOf), model), r)];
+    const fromProgram = HYBRID ? turnClassOf(programPick(d)) : null;
+    const turn =
+      fromProgram && classOf.includes(fromProgram)
+        ? fromProgram
+        : TURN_CLASSES[draw(turnProbs(turnInputs(d.plan, d.turns, d.cover), new Set(classOf), model), r)];
     const inTurn = d.pool.filter((_, i) => classOf[i] === turn);
     const pool: LibraryEntry[] = [];
-    if (inTurn.length > POOL) {
+    if (inTurn.length > NET_POOL) {
       const taken = new Set<number>();
-      while (pool.length < POOL) {
+      while (pool.length < NET_POOL) {
         const i = Math.floor(r() * inTurn.length);
         if (taken.has(i)) continue;
         taken.add(i);
         pool.push(inTurn[i]);
       }
     } else pool.push(...inTurn);
-    const s = scoreCourses(featureRows(d, pool), model);
+    const s = scoreCourses(featureRows(d, pool), model).map((v) => v / CTEMP);
+    if (SET_K > 0) {
+      const g = s.map((v) => v - Math.log(-Math.log(Math.max(1e-12, r()))));
+      const shortlist = g
+        .map((_, k) => k)
+        .sort((x, y) => g[y] - g[x])
+        .slice(0, SET_K)
+        .map((k) => pool[k]);
+      return rulePick(d.plan, shortlist, r, d.seen, d.cover);
+    }
     const top = Math.max(...s);
     return pool[draw(s.map((v) => Math.exp(v - top)), r)];
   }
@@ -163,12 +233,45 @@ function collect(worker: number, round: number, model: RecommendModel | null): L
     for (let run = 0; run < MAX_RUNS; run++) {
       const d = decide(ep);
       if (!d.pool.length) break;
+      let taught: LibraryEntry | null = null;
       if (d.pool.length > 1 && r() < LABEL_P) {
         // 전문가가 이 상황에서 고를 판 — 주사위(차례 · 흔들림)도 함께 굴린다. 그 뒤 과정의 난수를 다시 세운다
         seedGame(seed * 1000 + run);
-        const expert = programPick(d);
-        const rows = featureRows(d, bcSet(d, expert, NEG, r));
+        const expert = TEACHER && !QSET ? lookaheadPick(ep, d, run, seed, TEACHER) : programPick(d);
+        taught = expert;
+        let mined: LibraryEntry[] = [];
+        if (MINE && model && !d.plan.master) {
+          const ec = turnClassOf(expert);
+          const shortIds0 = new Set(d.courses.map((e) => e.spec.id));
+          let inC = d.pool.filter((e) => turnClassOf(e) === ec && !shortIds0.has(e.spec.id) && e !== expert);
+          if (inC.length > 500) {
+            for (let k = inC.length - 1; k > 0; k--) {
+              const j = Math.floor(r() * (k + 1));
+              [inC[k], inC[j]] = [inC[j], inC[k]];
+            }
+            inC = inC.slice(0, 500);
+          }
+          const sc = scoreCourses(featureRows(d, inC), model);
+          mined = inC
+            .map((e, k) => ({ e, v: sc[k] }))
+            .sort((a, b) => b.v - a.v)
+            .slice(0, MINE)
+            .map((x) => x.e);
+        }
+        const set = bcSet(d, expert, NEG, r, MINE ? mined : HARD || SET_W || QSET ? d.courses : []);
+        const rows = featureRows(d, set);
         const cls = TURN_CLASSES.indexOf(turnClassOf(expert));
+        const shortIds = new Set(d.courses.map((e) => e.spec.id));
+        let short = 0;
+        while (short + 1 < set.length && shortIds.has(set[short + 1].spec.id)) short += 1;
+        const inClass = d.pool.filter((e) => turnClassOf(e) === TURN_CLASSES[cls] && !shortIds.has(e.spec.id)).length;
+        const nRand = set.length - 1 - short;
+        const negW = nRand > 0 ? Math.log(Math.max(1, inClass) / nRand) : 0;
+        let soft: number[] | undefined;
+        if (QSET && TEACHER && !d.plan.master) {
+          const q = lookaheadValues(ep, set.slice(0, short + 1), run, seed, TEACHER);
+          soft = softmax(q.map((v) => v / QSET)).map(round4);
+        }
         const have = new Set(d.pool.map(turnClassOf));
         // 전문가는 규칙이 추린 후보에서 고르므로 탈 수 있는 판 밖의 갈래일 수도 있다 — 그 갈래도 고를 수 있던 것으로 본다
         const avail = TURN_CLASSES.map((_, k) => k).filter((k) => k === cls || have.has(TURN_CLASSES[k]));
@@ -179,11 +282,21 @@ function collect(worker: number, round: number, model: RecommendModel | null): L
           turn: turnRow(d).map(round4),
           cls,
           avail,
+          short,
+          negW: round4(negW),
+          soft,
         });
         seedGame(seed * 1000 + run + 1);
       }
       const policy: Policy = r() < EXPLORE ? 'random' : model ? 'net' : 'program';
-      play(ep, choose(policy, d, model, r));
+      // 첫 차례(신경망이 없을 때)는 교사가 가르친다 — 교사가 만드는 상황에서 교사의 정답을 배우도록
+      if (policy === 'program' && TEACHER && !QSET) {
+        if (!taught) {
+          taught = lookaheadPick(ep, d, run, seed, TEACHER);
+          seedGame(seed * 1000 + run + 1);
+        }
+        play(ep, taught);
+      } else play(ep, choose(policy, d, model, r));
     }
   }
   return out;
@@ -212,13 +325,18 @@ interface EvalRow {
   /** 신호기 없는 보호구역 없이 지나간 가장 긴 판 수 · 그것이 NO_SIGNAL_ZONE_GAP 을 넘은 판 수 */
   maxGap: number;
   overdue: number;
+  /** 진단 — 고칠 습관이 있던 판 · 그 판이 그 습관을 시험한 판 · 판마다 새로 알게 될 개념 수의 기댓값(잊음 뺌)의 합 · 최근 20판 되풀이 */
+  targets: number;
+  hits: number;
+  expGain: number;
+  replays: number;
 }
 
 function evaluate(worker: number, model: RecommendModel): EvalRow[] {
   const out: EvalRow[] = [];
   for (const kind of ['train', 'shifted'] as const) {
     for (let i = worker; i < EVAL; i += JOBS) {
-      const seed = (kind === 'train' ? 1_000_000 : 2_000_000) + i;
+      const seed = (kind === 'train' ? 1_000_000 : 2_000_000) + EVAL_SEED + i;
       for (const policy of ['random', 'program', 'net'] as Policy[]) {
         const ep = makeEpisode(seed, kind === 'train' ? TRAIN_KIND : SHIFTED_KIND);
         const r = rng(seed * 17 + 3);
@@ -227,10 +345,17 @@ function evaluate(worker: number, model: RecommendModel): EvalRow[] {
         const known: number[] = [];
         const level: number[] = [];
         let [both, zone, noSig, lead, counted, gap, maxGap, overdue] = [false, 0, 0, 0, 0, 0, 0, 0];
+        let [targets, hits, expGain, replays] = [0, 0, 0, 0];
         for (let run = 0; run < EVAL_RUNS; run++) {
           const d = decide(ep);
           if (d.pool.length) {
             const e = choose(policy, d, model, r);
+            if (d.plan.target) {
+              targets += 1;
+              hits += e.targets.includes(d.plan.target as never) ? 1 : 0;
+            }
+            replays += d.ids.slice(-20).includes(e.spec.id) ? 1 : 0;
+            expGain -= ep.expKnown;
             if (practiceTrack(ep.save).track === 'both' && run >= 10) {
               // 처음 열 판은 보호구역이 열리기 전(L1)이거나 기록이 짧다 — 차례는 그 뒤부터 센다
               both = true;
@@ -245,6 +370,7 @@ function evaluate(worker: number, model: RecommendModel): EvalRow[] {
               if (gap > NO_SIGNAL_ZONE_GAP) overdue += 1;
             }
             play(ep, e);
+            expGain += ep.expKnown;
           }
           if (run === EVAL_RUNS / 2 - 1 || run === EVAL_RUNS - 1) {
             known.push(knownCount(ep.learner));
@@ -270,6 +396,10 @@ function evaluate(worker: number, model: RecommendModel): EvalRow[] {
           turnRuns: counted,
           maxGap,
           overdue,
+          targets,
+          hits,
+          expGain,
+          replays,
         });
       }
     }
@@ -340,8 +470,14 @@ function train(data: Labeled[]): RecommendModel {
   for (const x of all) for (let j = 0; j < d; j++) std[j] += (x[j] - mean[j]) ** 2 / all.length;
   for (let j = 0; j < d; j++) std[j] = Math.sqrt(std[j]) || 1;
   const Z = data.map((l) => l.rows.map((x) => x.map((v, j) => (v - mean[j]) / std[j])));
-  // 정답은 맨 앞 판 하나 (전문가가 고른 판)
-  const T = data.map((l) => l.rows.map((_, k) => (k === 0 ? 1 : 0)));
+  // 정답은 맨 앞 판 하나 (전문가가 고른 판) — `--setTarget` 이면 같은 갈래의 다른 최종 후보에도 나눠 준다 (위 SET_W)
+  const T = data.map((l) => {
+    if (l.soft) return l.rows.map((_, k) => l.soft![k] ?? 0);
+    const m = SET_W ? (l.short ?? 0) : 0;
+    return l.rows.map((_, k) => (k === 0 ? (m ? SET_W : 1) : k <= m ? (1 - SET_W) / m : 0));
+  });
+  // 무작위 판의 점수에 더하는 표본 보정 — 학습의 소프트맥스가 게임의 '갈래 안 판 전부' 를 닮도록
+  const B = data.map((l) => l.rows.map((_, k) => ((SET_W || l.soft) && k > (l.short ?? 0) ? (l.negW ?? 0) : 0)));
 
   const rand = rng(11);
   const W1 = Array.from({ length: HIDDEN }, () => Array.from({ length: d }, () => (rand() * 2 - 1) * Math.sqrt(3 / d)));
@@ -367,7 +503,7 @@ function train(data: Labeled[]): RecommendModel {
           return Math.tanh(s);
         }),
       );
-      const scores = hs.map((h) => h.reduce((s, v, q) => s + w2[q] * v, b2));
+      const scores = hs.map((h, k) => h.reduce((s, v, q) => s + w2[q] * v, b2) + B[i][k]);
       const p = softmax(scores);
       for (let k = 0; k < p.length; k++) loss -= T[i][k] * Math.log(Math.max(1e-12, p[k]));
       // 소프트맥스 교차 엔트로피의 기울기 — 후보마다 (p − t)
@@ -550,6 +686,9 @@ function turnStats(rs: EvalRow[]) {
     leadShare: round4(sum((r) => r.lead) / runs),
     maxGap: round4(b.reduce((m, r) => Math.max(m, r.maxGap), 0)),
     overdueShare: round4(sum((r) => r.overdue) / runs),
+    hitRate: round4(rs.reduce((a, r) => a + r.hits, 0) / (rs.reduce((a, r) => a + r.targets, 0) || 1)),
+    expGainPerRun: round4(rs.reduce((a, r) => a + r.expGain, 0) / (rs.reduce((a, r) => a + r.runs, 0) || 1)),
+    replayRate: round4(rs.reduce((a, r) => a + r.replays, 0) / (rs.reduce((a, r) => a + r.runs, 0) || 1)),
   };
 }
 
@@ -576,6 +715,7 @@ function summarize(rows: EvalRow[]) {
     }
     out[kind].netMinusProgramGain = paired(rows, kind, (r) => r.known[1] - r.known0);
     out[kind].netMinusProgramLevel = paired(rows, kind, (r) => r.level[1]);
+    out[kind].netMinusProgramExpGain = paired(rows, kind, (r) => r.expGain);
   }
   return out;
 }
@@ -636,10 +776,15 @@ async function main() {
         `         차례 — 보호구역 ${pct(t.zoneShare)} · 그중 무신호 ${pct(t.noSignalShare)} · 앞차 ${pct(t.leadShare)}` +
           ` · 무신호 공백 최장 ${t.maxGap}판 · ${NO_SIGNAL_ZONE_GAP}판 넘은 판 ${pct(t.overdueShare)}`,
       );
+      console.log(
+        `         진단 — 고칠 습관을 시험한 판 ${pct(t.hitRate)} · 판당 새로 알게 될 개념 기댓값 ${t.expGainPerRun.toFixed(4)} · 최근 20판 되풀이 ${pct(t.replayRate)}`,
+      );
     }
     const g = table[kind].netMinusProgramGain as { mean: number; se: number };
     const l = table[kind].netMinusProgramLevel as { mean: number; se: number };
     console.log(`  같은 사람끼리 신경망 − 프로그램: 익힌 개념 ${g.mean >= 0 ? '+' : ''}${g.mean.toFixed(2)} ± ${g.se.toFixed(2)} · 레벨 ${l.mean >= 0 ? '+' : ''}${l.mean.toFixed(2)} ± ${l.se.toFixed(2)}`);
+    const x = table[kind].netMinusProgramExpGain as { mean: number; se: number };
+    console.log(`  같은 사람끼리 신경망 − 프로그램: 익힌 개념의 기댓값(주사위 잡음 없이) ${x.mean >= 0 ? '+' : ''}${x.mean.toFixed(3)} ± ${x.se.toFixed(3)}`);
   }
 
   model!.meta = {
@@ -648,7 +793,9 @@ async function main() {
     learners: LEARNERS * ROUNDS,
     decisions: data.length,
     candidates: data.reduce((s, l) => s + l.rows.length, 0),
-    teacher: 'behavior cloning — 예전 규칙 · 프로그램 점수 (recommendSim.ts 의 programPick)',
+    teacher: TEACHER
+      ? `behavior cloning — 앞을 내다보는 교사 (scripts/recommendValue.ts — 가치 신경망 + 한 판 ${TEACHER.rollouts}번 미리 달려 보기 · 레벨 무게 ${TEACHER.lambda})`
+      : 'behavior cloning — 예전 규칙 · 프로그램 점수 (recommendSim.ts 의 programPick)',
     rounds,
     eval: { learners: EVAL, runs: EVAL_RUNS, ...table },
   };

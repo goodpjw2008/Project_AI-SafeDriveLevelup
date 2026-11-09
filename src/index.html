@@ -1259,6 +1259,10 @@
       .picker-chip.picker-local {
         background: linear-gradient(115deg, #0e7490, #14b8a6);
       }
+      /* 로컬 신경망 어텐션 — 후보를 함께 보는 신경망 (ai/recommendAttention.ts). 같은 집안에서 남색 쪽으로 */
+      .picker-chip.picker-attention {
+        background: linear-gradient(115deg, #3730a3, #0e7490);
+      }
       /* 모델 이름 — 알약 옆에 작게. 이름이 길어도(openai/gpt-oss-20b) 줄을 밀지 않게 */
       .picker-model {
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1803,6 +1807,14 @@
         font-size: 12px;
         color: var(--muted);
         margin-left: 2px;
+      }
+      /* 고르는 근거 한 줄 — 이름 아래에 붙는다 (Screens.ts 의 AI 사용 설정) */
+      .opt-line {
+        display: block;
+        margin-top: 2px;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.85;
       }
 
       /* 설정 항목 — 고른 것이 한눈에 보여야 한다 */

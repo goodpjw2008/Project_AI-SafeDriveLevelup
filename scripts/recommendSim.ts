@@ -33,7 +33,7 @@
  */
 
 import { difficultyOf, abilityPriorFor, levelMeanDifficulty } from '../src/ai/difficulty';
-import { HABIT_CLEARED_AFTER } from '../src/coach/badHabits';
+import { runsToClear } from '../src/coach/badHabits';
 import { SKILL_ORDER } from '../src/ai/knowledge';
 import { learnerVector, predictOutcome } from '../src/ai/outcome';
 import type { JudgeResult } from '../src/rules/lawRules';
@@ -50,7 +50,9 @@ import {
   coverageOf,
   coverKeys,
   eligibleFor,
+  masterFrame,
   masterPick,
+  recentSet,
   rulePick,
   seenShapes,
   turnClassOf,
@@ -157,7 +159,7 @@ const QUIET_LEARN = 0.15;
 const PER_PRACTICE = 0.6;
 
 /** 그 개념의 지금 반감기 (시간) — 두 달에서 멈춘다 */
-const halfLifeOf = (l: Learner, c: ViolationCode): number =>
+export const halfLifeOf = (l: Learner, c: ViolationCode): number =>
   Math.min(24 * 60, l.halfLife * 2 ** (PER_PRACTICE * Math.max(0, l.strength[c] - 1)));
 
 /**
@@ -213,7 +215,12 @@ const slip = (l: Learner, b: number): number => 0.02 + 0.1 / (1 + Math.exp(-(b -
  * **난수는 판과 상관없이 개념마다 둘씩 뽑는다** (어길지 · 익힐지). 판마다 시험하는 개념 수가 달라 쓰는 만큼만 뽑으면,
  * 교사가 후보끼리 같은 운으로 견주려 해도 난수의 줄이 후보마다 어긋난다 (공통 난수가 깨진다).
  */
-export function drive(l: Learner, e: LibraryEntry, r: () => number, nowHours: number): ViolationCode[] {
+/**
+ * `acc` 를 주면 **이 판에서 새로 알게 될 개념 수의 기댓값**을 더한다 — 모르는 개념마다 배울 확률(어겼으면 learn × load, 아니면
+ * learn × QUIET_LEARN). 실제로 알게 됐는지는 주사위라, 강화학습의 보상을 이 기댓값으로 세면 같은 목표를 훨씬 적은 잡음으로 잰다
+ * (scripts/ppo-rollout.ts · rewardWorth).
+ */
+export function drive(l: Learner, e: LibraryEntry, r: () => number, nowHours: number, acc?: { gain: number; learn?: number }): ViolationCode[] {
   const uViolate = SKILL_ORDER.map(() => r());
   const uLearn = SKILL_ORDER.map(() => r());
   const tested = [...habitsTestedBy(e.spec)].filter((c) => SKILL_ORDER.includes(c));
@@ -231,21 +238,36 @@ export function drive(l: Learner, e: LibraryEntry, r: () => number, nowHours: nu
       */
       l.strength[c] += Math.min(1, (nowHours - l.last[c]) / halfLifeOf(l, c));
       l.last[c] = nowHours;
-    } else if (uLearn[at(c)] < l.learn[c] * (violated.includes(c) ? load : QUIET_LEARN)) {
-      l.known[c] = true;
-      l.strength[c] = Math.max(1, l.strength[c]);
-      l.last[c] = nowHours;
+    } else {
+      const p = l.learn[c] * (violated.includes(c) ? load : QUIET_LEARN);
+      if (acc) {
+        acc.gain += p;
+        acc.learn = (acc.learn ?? 0) + p;
+      }
+      if (uLearn[at(c)] < p) {
+        l.known[c] = true;
+        l.strength[c] = Math.max(1, l.strength[c]);
+        l.last[c] = nowHours;
+      }
     }
   }
   return violated;
 }
 
 /** 시간이 흐른다 — 아는 개념이 반감기만큼 잊힌다 (난수는 개념마다 하나씩, 아는지와 상관없이) */
-export function forget(l: Learner, hours: number, r: () => number): void {
+/**
+ * `gap` 이 있으면 `acc` 에는 쉬는 시간의 **길이를 고르게 평균한** 잊을 확률을 뺀다 — 쉬는 시간이 4 + 68u 시간(u 는 0~1 고르게)이라
+ * 그 평균은 닫힌 꼴이다. 실제로 잊는지는 그대로 이번 길이로 정한다. 쉬는 길이는 고르기와 무관한 운이라, 보상에서 빼면 같은 목표를
+ * 잡음 없이 잰다.
+ */
+export function forget(l: Learner, hours: number, r: () => number, acc?: { gain: number }, gap?: { base: number; span: number }): void {
   for (const c of SKILL_ORDER) {
     const u = r();
     if (!l.known[c]) continue;
-    if (u < 1 - 2 ** (-hours / halfLifeOf(l, c))) l.known[c] = false;
+    const hl = halfLifeOf(l, c);
+    const p = 1 - 2 ** (-hours / hl);
+    if (acc) acc.gain -= gap ? 1 - (2 ** (-gap.base / hl) * hl * (1 - 2 ** (-gap.span / hl))) / (gap.span * Math.LN2) : p;
+    if (u < p) l.known[c] = false;
   }
 }
 
@@ -274,6 +296,13 @@ export interface Episode {
   violations: number;
   /** 이 레벨에 머문다 — 레벨이 올라도 되돌린다 (아래 pinEpisode) */
   pin?: Difficulty;
+  /**
+   * **아는 개념 수의 기댓값** — 처음 아는 수에서 판마다 배울 확률을 더하고 잊을 확률을 뺀다 (drive · forget 의 acc). 실제로 아는
+   * 수(knownCount)와 기댓값이 같지만 주사위 잡음이 없어, 강화학습의 보상(rewardWorth)이 이것을 쓴다.
+   */
+  expKnown: number;
+  /** **새로 배운 개념 수의 기댓값** — 위 expKnown 에서 잊음을 뺀 것 (배울 확률만 더한다). 강화학습의 보상(rewardWorth 의 learn) */
+  expLearned: number;
 }
 
 /**
@@ -326,6 +355,8 @@ export function makeEpisode(seed: number, kind: LearnerKind = TRAIN_KIND): Episo
     frustration: 0,
     runs: 0,
     violations: 0,
+    expKnown: knownCount(learner),
+    expLearned: 0,
   };
 }
 
@@ -352,6 +383,8 @@ export function cloneEpisode(ep: Episode, rand: () => number): Episode {
     frustration: ep.frustration,
     runs: ep.runs,
     violations: ep.violations,
+    expKnown: ep.expKnown,
+    expLearned: ep.expLearned,
   };
 }
 
@@ -383,7 +416,7 @@ export const POOL = 500;
  * 않으므로 교사의 점수는 남을 실력 · 습관 · 새 상황 · 연패로만 갈린다 (아래 value). 지금 모델은 이 변경 전에 배웠지만 마스터
  * 차례에서도 잘 고른다 (아래 교사의 무게 주석의 마지막 항).
  */
-export function decide(ep: Episode, fast = false): Decision {
+export function decide(ep: Episode, fast = false, program = true): Decision {
   clock.ms = ep.clockMs;
   const plan = nextPlan(ep.save);
   const ids = ep.save.history.map((h) => h.st);
@@ -396,9 +429,10 @@ export function decide(ep: Episode, fast = false): Decision {
     const courses = all.length > FAST_SAMPLE ? sample(all, FAST_SAMPLE) : all;
     return { plan, courses, seen, cover, ids, pool: courses, turns };
   }
-  const by = coursesByHabit(plan, ids, Math.random, seen, cover);
+  // 신경망만 고르면(강화학습 — scripts/finetune-recommend.ts) 예전 프로그램의 후보는 세지 않는다
+  const courses = program ? coursesByHabit(plan, ids, Math.random, seen, cover).groups.flatMap((g) => g.courses) : [];
   const pool = eligibleFor(plan, ids);
-  return { plan, courses: by.groups.flatMap((g) => g.courses), seen, cover, ids, pool, turns };
+  return { plan, courses, seen, cover, ids, pool, turns };
 }
 
 /**
@@ -406,10 +440,15 @@ export function decide(ep: Episode, fast = false): Decision {
  * 갈래**의 판에서 고르게 `k` 판을 뒤에 둔다. 추천 신경망은 맨 앞 판의 확률이 가장 높도록 배운다 (scripts/train-recommend.ts). 갈래는
  * 차례 신경망이 따로 배우므로(아래 turnRow), 추천 신경망은 갈래 안에서 고르는 것만 배운다 — 게임에서도 그렇게 쓴다.
  */
-export function bcSet(d: Decision, expert: LibraryEntry, k: number, r: () => number): LibraryEntry[] {
+export function bcSet(d: Decision, expert: LibraryEntry, k: number, r: () => number, hard: readonly LibraryEntry[] = []): LibraryEntry[] {
   const cls = turnClassOf(expert);
   const same = d.pool.filter((e) => e !== expert && turnClassOf(e) === cls);
   const out: LibraryEntry[] = [expert];
+  /*
+    **어려운 오답을 먼저** — 전문가가 견주고도 고르지 않은 최종 후보(같은 갈래)를 앞에 둔다. 무작위 판만 오답으로 두면 신경망은 '전문가가
+    고를 만한 판' 과 아무 판을 가르는 것만 배워(31판 가운데 1등 81%) 게임에서 2,000판을 채점할 때는 비슷하게 좋은 판들 사이에서 흐려졌다.
+  */
+  for (const e of hard) if (out.length < k + 1 && e !== expert && turnClassOf(e) === cls && !out.includes(e)) out.push(e);
   for (let tries = 0; out.length < k + 1 && same.length && tries < k * 4; tries++) {
     const e = same[Math.floor(r() * same.length)];
     if (!out.includes(e)) out.push(e);
@@ -426,7 +465,8 @@ export const turnRow = (d: Decision): number[] => turnFeatures(turnInputs(d.plan
  */
 export function programPick(d: Decision): LibraryEntry {
   if (d.plan.master) {
-    const id = masterPick(d.ids, Math.random, d.plan.skills).scenario.id;
+    // 설정의 갈래를 따른 L10 판에서 (recommend.ts 의 masterFrame — 게임과 같다). d.pool 은 그 테두리(eligibleFor)다
+    const id = masterPick(d.ids, Math.random, d.plan.skills, Date.now(), masterFrame(d.pool)).scenario.id;
     const e = libraryEntry(id);
     if (e) return e;
   }
@@ -458,7 +498,8 @@ export function play(ep: Episode, e: LibraryEntry): { violated: ViolationCode[] 
     before.outcomeBias ?? {},
   );
   for (const k of coverKeys(e)) ep.seenKeys.add(`${before.level}|${k}`);
-  const violated = drive(ep.learner, e, ep.rand, ep.clockMs / 3_600_000);
+  const acc: { gain: number; learn?: number } = { gain: 0 };
+  const violated = drive(ep.learner, e, ep.rand, ep.clockMs / 3_600_000, acc);
   const result = {
     violations: violated.map((code) => ({ code })),
     failReason: null,
@@ -481,11 +522,15 @@ export function play(ep: Episode, e: LibraryEntry): { violated: ViolationCode[] 
   let hours = 0.05;
   const [uGap, uLen] = [ep.rand(), ep.rand()];
   ep.sessionLeft -= 1;
+  let gap: { base: number; span: number } | undefined;
   if (ep.sessionLeft <= 0) {
     hours += 4 + uGap * 68;
+    gap = { base: 0.05 + 4, span: 68 };
     ep.sessionLeft = 4 + Math.floor(uLen * 11);
   }
-  forget(ep.learner, hours, ep.rand);
+  forget(ep.learner, hours, ep.rand, acc, gap);
+  ep.expKnown += acc.gain;
+  ep.expLearned += acc.learn ?? 0;
   ep.clockMs += hours * 3_600_000;
   return { violated };
 }
@@ -523,7 +568,7 @@ export const NOVEL_VALUE = 0.02;
 export const FRUSTRATION_COST = 0.15;
 /**
  * **습관 빚 한 칸** — 나쁜 습관이 풀리기까지 그 습관을 시험하는 판을 깨끗하게 더 지나야 하는 수(coach/badHabits.ts 의
- * HABIT_CLEARED_AFTER)의 한 칸. 습관이 남아 있으면 레벨이 오르지 않고, 이 게임은 습관 없는 무위반 한 판이 곧 레벨 하나라
+ * runsToClear — 학습자 모델이 내다본 남은 판)의 한 칸. 습관이 남아 있으면 레벨이 오르지 않고, 이 게임은 습관 없는 무위반 한 판이 곧 레벨 하나라
  * (curriculum.ts 의 XP_TO_NEXT 200 = 무위반 한 판) 빚 한 칸은 레벨 한 걸음이 미뤄지는 것에 가깝다. 이것이 없으면 한 판만
  * 보는 교사에게 '습관을 시험해 푸는 판' 의 값이 보이지 않아 신경망이 습관을 오래 끌었다(60판에 레벨 −0.6).
  */
@@ -558,13 +603,57 @@ export function value(ep: Episode): number {
   const c = ep.save.curriculum;
   const need = xpToNext(c.level, challengeRule(ep.save.settings.difficulty));
   const progress = c.level + Math.min(1, (c.xp ?? 0) / need) + (c.mastered ? 1 : 0);
-  const debt = c.badHabits.reduce((s, h) => s + Math.max(0, HABIT_CLEARED_AFTER - h.cleanRuns), 0);
+  // 습관 빚 — 풀리기까지 학습자 모델이 내다본 남은 판 (coach/badHabits.ts 의 runsToClear)
+  const debt = c.badHabits.reduce((s, h) => s + runsToClear(h, c.skills), 0);
   return (
     retained(ep.learner) +
     LEVEL_VALUE * progress -
     HABIT_DEBT_VALUE * debt +
     NOVEL_VALUE * ep.seenKeys.size -
     FRUSTRATION_COST * ep.frustration
+  );
+}
+
+/**
+ * **강화학습의 보상 잣대** (scripts/finetune-recommend.ts · scripts/ppo-rollout.ts) — 진짜로 아는 개념 수가 으뜸이고, 하루 뒤
+ * 남을 실력 · 레벨 · 습관 빚 · 새 상황 · 연패를 무게대로 곁들인다. 위 value 는 한 판만 보는 교사의 잣대라 레벨 · 연패가 무겁다 —
+ * 60판을 통째로 보는 강화학습에 그대로 쓰자 레벨만 오르고 진짜 실력은 프로그램보다 0.21 적었다 (2026-11-01).
+ */
+export interface RewardWeights {
+  /** 새로 배운 개념 수의 기댓값 (잊음 없이 — 세션 사이의 잊음은 고르기와 거의 무관한 운이라 잡음만 보탠다) */
+  learn: number;
+  know: number;
+  retain: number;
+  level: number;
+  debt: number;
+  novel: number;
+  frust: number;
+}
+/**
+ * 기본 무게 (2026-11-01 셋째 판) — **견주기의 잣대와 같은 것: 끝에 아는 개념 수**(의 기댓값 expKnown — 배울 확률 − 쉬는 길이를
+ * 평균한 잊을 확률)와 작은 레벨 몫뿐. 둘째 판(배운 횟수 learn 1 · retain 0.2 …)은 잊고 다시 배우는 것까지 쳐서(60판에 배움 15번,
+ * 끝에 늘어난 앎은 1.2개) 레벨만 −0.33 떨어졌고, 첫 판의 retain(하루 뒤 남을 실력)은 **이미 아는 개념을 되풀이해 기억을 굳히는**
+ * 쪽을 좋게 쳐 새 개념을 덜 가르쳤다.
+ *
+ * 그 전 기본 무게 (둘째 판) — **배움이 으뜸**. 첫 판(know 1 · retain 0.5 · level 0.05 · debt 0.015 · novel 0.01 · frust 0.03)으로
+ * 배운 PPO 정책은 가상 운전자 4,000명에게 레벨은 프로그램보다 +0.09 였지만 진짜 아는 개념이 −0.15 였다 — 습관 빚 · 레벨 몫이
+ * '쉬운 습관 판으로 깨끗한 판을 늘려 학습자 모델의 습관을 지우는' 쪽을 좋게 쳤다 (깨끗한 판에서는 거의 배우지 않는다).
+ */
+export const RL_REWARD: RewardWeights = { learn: 0, know: 1, retain: 0, level: 0.02, debt: 0, novel: 0, frust: 0 };
+
+export function rewardWorth(ep: Episode, w: RewardWeights = RL_REWARD): number {
+  const c = ep.save.curriculum;
+  const need = xpToNext(c.level, challengeRule(ep.save.settings.difficulty));
+  const progress = c.level + Math.min(1, (c.xp ?? 0) / need) + (c.mastered ? 1 : 0);
+  const debt = c.badHabits.reduce((s, h) => s + runsToClear(h, c.skills), 0);
+  return (
+    w.learn * ep.expLearned +
+    w.know * ep.expKnown +
+    w.retain * retained(ep.learner) +
+    w.level * progress -
+    w.debt * debt +
+    w.novel * ep.seenKeys.size -
+    w.frust * ep.frustration
   );
 }
 
@@ -602,7 +691,8 @@ export function teacherScores(ep: Episode, courses: readonly LibraryEntry[], see
 /** 후보들을 신경망의 입력으로 — 브라우저와 같은 함수 (recommend.ts 의 courseInputs) */
 export function featureRows(d: Decision, courses: readonly LibraryEntry[] = d.courses): number[][] {
   const verdict = verdictsFor(d.plan, d.cover);
-  return courses.map((e) => recommendFeatures(courseInputs(d.plan, e, d.seen, d.cover, verdict, d.turns)));
+  const recent = recentSet(d.ids);
+  return courses.map((e) => recommendFeatures(courseInputs(d.plan, e, d.seen, d.cover, verdict, d.turns, recent)));
 }
 
 export { knownCount };

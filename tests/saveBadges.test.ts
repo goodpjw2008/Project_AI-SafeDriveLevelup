@@ -56,15 +56,22 @@ describe('처음부터 다시 시작', () => {
 });
 
 /*
-  **AI 사용 설정** (save.ts 의 aiMode) — 기본은 로컬이다 (사용자가 정했다). 이 값이 없던 저장본도 로컬로 읽고, 모르는 값은
-  서버에 묻는 쪽으로 새지 않게 로컬로 돌린다. 1.0.6 의 '다음판 추천 AI 설정'(recommendAi)에서 고른 값은 이어받는다.
+  **AI 사용 설정** (save.ts 의 aiMode) — 기본은 로컬 신경망(어텐션)이다 (사용자가 정했다). 이 값이 없던 저장본도 그쪽으로 읽고, 모르는 값은
+  서버에 묻는 쪽으로 새지 않게 기본으로 돌린다. 1.0.6 의 '다음판 추천 AI 설정'(recommendAi)에서 고른 값은 이어받는다.
 */
 describe('AI 사용 설정', () => {
-  it('새 저장본과 이 값이 없던 저장본은 로컬이다', () => {
-    expect(defaultSave().settings.aiMode).toBe('local');
+  it('새 저장본과 이 값이 없던 저장본은 어텐션이다', () => {
+    expect(defaultSave().settings.aiMode).toBe('attention');
     const old = defaultSave() as unknown as { settings: Record<string, unknown> };
     delete old.settings.aiMode;
     store(JSON.stringify(old));
+    expect(load().settings.aiMode).toBe('attention');
+  });
+
+  it('이미 고른 로컬 신경망(MLP)은 그대로 둔다 — 기본이 바뀌어도 고른 값을 덮지 않는다', () => {
+    const saved = defaultSave();
+    saved.settings.aiMode = 'local';
+    store(JSON.stringify(saved));
     expect(load().settings.aiMode).toBe('local');
   });
 
@@ -74,7 +81,14 @@ describe('AI 사용 설정', () => {
     store(JSON.stringify(llm));
     expect(load().settings.aiMode).toBe('llm');
     store(JSON.stringify({ ...defaultSave(), settings: { ...defaultSave().settings, aiMode: 'gpt' } }));
-    expect(load().settings.aiMode).toBe('local');
+    expect(load().settings.aiMode).toBe('attention');
+  });
+
+  it('로컬 신경망 어텐션을 고른 값도 남는다 (세 가지 — 2026-11-02 사용자가 정함)', () => {
+    const attention = defaultSave();
+    attention.settings.aiMode = 'attention';
+    store(JSON.stringify(attention));
+    expect(load().settings.aiMode).toBe('attention');
   });
 
   it('1.0.6 의 다음판 추천 AI 설정에서 고른 외부 LLM 을 이어받는다', () => {

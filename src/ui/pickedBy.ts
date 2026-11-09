@@ -88,12 +88,23 @@ export function advisedBy(picker?: Picker, _model?: string): string {
 }
 
 /**
+ * 로컬 코치의 이름표 — 코치는 추천과 다른 신경망이라(ai/localCoach.ts) '로컬 신경망(MLP)' 도 '(어텐션)' 도 아니다. 설정이 어느 쪽이든
+ * 같은 코치가 쓰므로 괄호 없이 적는다. 기본이 어텐션이 되자 결과 화면이 'MLP 분석' 이라고 말할 뻔했다.
+ */
+const COACH_CHIP = '<span class="picker-chip picker-local">로컬 신경망</span>';
+
+/** 로컬 신경망이 쓴 코칭 · 진단 (설정이 MLP · 어텐션일 때) */
+export function advisedLocal(): string {
+  return `${COACH_CHIP}<span class="pick-long"> 분석 — 조언해 준 AI 의 코칭이에요</span>` + `<span class="pick-short"> AI 코칭</span>`;
+}
+
+/**
  * 외부 LLM 을 골랐는데 답이 없어 **로컬 신경망이 대신 쓴** 코칭 · 진단 — 그렇다고 밝힌다 (ai/localCoach.ts). 누가 쓴 글인지
  * 밝히는 줄이라, 외부 LLM 이 쓴 것처럼 보이면 안 된다.
  */
 export function advisedInstead(): string {
   return (
-    `${chip('local')}<span class="pick-long"> 분석 — 외부 LLM 이 답하지 않아 대신 쓴 코칭이에요</span>` +
+    `${COACH_CHIP}<span class="pick-long"> 분석 — 외부 LLM 이 답하지 않아 대신 쓴 코칭이에요</span>` +
     `<span class="pick-short"> AI 코칭</span>`
   );
 }

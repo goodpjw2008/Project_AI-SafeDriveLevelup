@@ -15,8 +15,12 @@ import { TRACK_CHOICES, type TrackChoice } from '../scenarios/tracks';
 import { habitsTestedBy, libraryEntry } from '../scenarios/library';
 import { badgesFromHistory, freshBadges, normalizeBadges, type BadgeState } from './badges';
 
-/** AI 기능을 무엇으로 돌리는가 (settings.aiMode) — 브라우저 안의 신경망 · 외부 LLM */
-export type AiMode = 'local' | 'llm';
+/**
+ * AI 기능을 무엇으로 돌리는가 (settings.aiMode) — 브라우저 안의 신경망(판마다 채점 · 후보를 함께 보는 어텐션) · 외부 LLM.
+ * 어텐션은 다음판 추천만 다르고(ai/recommendAttention.ts) 주행결과 분석 · 습관 진단은 로컬과 같다 (사용자가 정했다, 2026-11-02:
+ * *"로컬 신경망 현재꺼, 로컬 신경망 어텐션, 로컬신경망+외부 LLM"*).
+ */
+export type AiMode = 'local' | 'attention' | 'llm';
 
 const KEY = 'turn-right:save:v1';
 
@@ -209,7 +213,7 @@ export interface SaveData {
      * (`recommendAi`)이었는데, 사용자가 하나로 묶었다 (2026-11-01: *"주행분석등 모든것을 신경망으로 동작 하거나 llm으로
      * 동작하게 설정을 심플하게"*).
      *
-     * **기본은 로컬이다** (사용자가 정했다). LLM 은 키 · 한도 · 망이 있어야 돌고 — 기본을 바깥에 기대지 않게 한다. 외부 LLM 을
+     * **기본은 로컬 신경망(어텐션)이다** (사용자가 정했다, 2026-11-05 — 다양성이 가장 높고 정확도는 MLP 와 거의 같다). LLM 은 키 · 한도 · 망이 있어야 돌고 — 기본을 바깥에 기대지 않게 한다. 외부 LLM 을
      * 고르면 서버에 묻고, 답이 없으면 로컬 신경망이 한다.
      */
     aiMode: AiMode;
@@ -272,7 +276,7 @@ export function defaultSave(): SaveData {
       autoNextStage: true,
       difficulty: DEFAULT_CHALLENGE,
       track: 'auto',
-      aiMode: 'local',
+      aiMode: 'attention',
       graphics: defaultGraphics(),
       sounds: { ...DEFAULT_SOUNDS },
     },
@@ -344,10 +348,9 @@ export function load(): SaveData {
           모르는 값이면 기본(로컬)으로 — 손으로 고친 저장본이 서버에 묻는 쪽으로 새지 않게. 1.0.6 의 '다음판 추천 AI 설정'
           (`recommendAi`)에서 고른 값은 그대로 이어받는다.
         */
-        aiMode:
-          (parsed.settings?.aiMode ?? (parsed.settings as { recommendAi?: unknown } | undefined)?.recommendAi) === 'llm'
-            ? 'llm'
-            : 'local',
+        aiMode: ((v: unknown): AiMode => (v === 'llm' || v === 'local' || v === 'attention' ? v : 'attention'))(
+          parsed.settings?.aiMode ?? (parsed.settings as { recommendAi?: unknown } | undefined)?.recommendAi,
+        ),
       },
       stats: { ...base.stats, ...(parsed.stats ?? {}) },
       /*

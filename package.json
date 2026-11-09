@@ -24,6 +24,7 @@
     "train:lidar": "vite-node scripts/train-lidar.ts",
     "train:intent": "vite-node scripts/train-intent.ts",
     "train:recommend": "vite-node scripts/train-recommend.ts",
+    "train:recommend:rl": "vite-node scripts/finetune-recommend.ts",
     "train:signal": "vite-node scripts/train-signal.ts",
     "train:coach": "vite-node scripts/train-coach.ts",
     "train:drive": "vite-node scripts/train-drive.ts",

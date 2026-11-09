@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { advisedBy, analyzingBy, pickedByCard, pickedByHud } from '../src/ui/pickedBy';
+import { advisedBy, advisedInstead, advisedLocal, analyzingBy, pickedByCard, pickedByHud } from '../src/ui/pickedBy';
 import { recommendModelReady } from '../src/ai/recommendNet';
 
 describe('추천 카드의 한 줄', () => {
@@ -109,5 +109,15 @@ describe('조언한 AI', () => {
     // 코치 글은 AI 가 쓸 때만 뜨므로, 이름이 없으면 줄도 없다
     expect(advisedBy(undefined)).toBe('');
     for (const picker of ['quota', 'rule', 'random'] as const) expect(advisedBy(picker)).toBe('');
+  });
+});
+
+describe('로컬 코치의 이름표', () => {
+  it('추천 모드의 이름을 쓰지 않는다 — 코치는 MLP 도 어텐션도 아니다', () => {
+    for (const line of [advisedLocal(), advisedInstead()]) {
+      expect(line).toContain('로컬 신경망');
+      expect(line).not.toContain('MLP');
+      expect(line).not.toContain('어텐션');
+    }
   });
 });
