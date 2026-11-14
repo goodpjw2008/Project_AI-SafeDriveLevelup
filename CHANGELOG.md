@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.**
+
+### 추가
+
+- **공모전 제출 전 기능 점검 테스트를 더했습니다** (사용자가 정했습니다) — `tests/submission.test.ts` 한 파일이 제출본이 발표자료 · README 와 어긋나지 않는지 봅니다: 버전(package.json · 설정 창 · CHANGELOG 가 모두 1.1.0), 시나리오 수(라이브러리 22,818판 = 우회전 3,985 + 복합 18,833, 따로 보호구역 전용 도로 180판), AI 모델 열 개가 모두 학습된 값이고 앱이 그 모델을 쓰는지, AI 사용 설정 세 가지 이름과 기본값(로컬 신경망(어텐션)), 후원 페이지('후원(준비중)' 세 곳 · 준비 중 안내 · 도와주신 분 · 비어 있는 후원사), 사이트 주소와 검색 등록 파일, 그리고 배포되는 코드에 API 키 · 학습용 키 이름이 없는지.
+
+### 변경
+
+- **'AI 사용 설정' 의 세 번째 이름이 '로컬 신경망(MLP) + 외부 LLM' 입니다** (사용자가 정했습니다) — 외부 LLM 은 로컬 신경망(MLP)이 추린 10판에서 고르므로, 같은 신경망을 쓴다는 것이 이름에서 보이게 했습니다. 발표자료의 이름과 같습니다.
+- **후원 페이지의 '후원금은 이렇게 쓰입니다' 와 맨 아래 안내를 고쳤습니다** (사용자가 정했습니다) — 두 칸이 '서비스의 최소 운영비용으로'(이 사이트의 운영을 위한 최소 비용 — 도메인 비용 등 — 으로만 사용할 예정입니다)와 '교통안전을 지키는 비용으로 사용'(교통안전을 지키는 비용으로 사용할 예정입니다)이 됩니다. 맨 아래 안내는 "후원을 준비하고 있습니다. 현재 저는 고등학생입니다. 후원을 어떻게 받아야 하는지 부모님과 선생님께 의논 중입니다." 세 줄입니다.
+- **'후원' 버튼과 후원 창의 이름이 '후원(준비중)' 입니다** (사용자가 정했습니다) — 첫 화면의 버튼, 휴대폰 설정 창 아래의 버튼, 후원 창의 제목이 모두 같습니다. 기사 칸의 제목은 "우회전과 어린이보호구역에서 여전히 헷갈리는 규칙들이 있습니다." 입니다.
+
 ## [1.0.8] - 2026-11-15
 
 ### 추가
@@ -714,7 +728,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...v1.1.0
 [1.0.8]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.5...v1.0.6
