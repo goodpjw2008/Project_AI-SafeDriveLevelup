@@ -608,6 +608,425 @@
         }
       }
       /*
+        ── 후원 페이지 (Screens.ts 의 renderSupport · 값은 support.ts) ─────────────────
+        캠페인 페이지처럼 **밝은 종이 바탕**에 한 장을 내려 읽는다 (사용자가 정했다, 2026-11-14). 앱의 다른 창은 어둡지만 이 창만
+        밝다 — 후원 캠페인의 얼굴이고, 수채화 그림(기사 칸)이 어두운 바탕에서는 탁해진다. 머리(닫기)는 위에 붙어 따라 내려온다.
+      */
+      #screen-support .screen-inner {
+        max-width: 980px;
+        max-height: 94vh;
+        padding: 0;
+        background: #fffdf8;
+        color: #1d2129;
+        border-color: #e7e1d4;
+      }
+      #screen-support .screen-head {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        margin: 0;
+        padding: 12px 22px;
+        background: rgba(255, 253, 248, 0.94);
+        border-bottom: 1px solid #ece6d9;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+      }
+      #screen-support .screen-head h1 {
+        margin: 0;
+        font-size: 22px;
+        color: #1d2129;
+      }
+      #screen-support .screen-head .back {
+        background: #ffffff;
+        color: #1d2129;
+        border-color: #d9d2c3;
+      }
+      #screen-support .screen-head .back:hover {
+        background: #f3efe6;
+      }
+      .sp {
+        padding: 0 0 34px;
+      }
+      .sp-hero-art {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .sp-hero-copy {
+        padding: 22px 34px 8px;
+      }
+      .sp-kicker,
+      .sp-eyebrow {
+        margin: 0 0 6px;
+        font-size: 13.5px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #c2410c;
+      }
+      /* 한 줄 제목 — 화면 폭을 따라 글자가 줄어 PC 에서는 한 줄에 선다 (아래 721px 이상에서 줄바꿈 금지) */
+      .sp-title {
+        margin: 0 0 12px;
+        font-size: clamp(22px, 3.2vw, 38px);
+        line-height: 1.3;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+        color: #14171c;
+        word-break: keep-all;
+      }
+      .sp-lead {
+        max-width: 720px;
+        margin: 0 0 18px;
+        font-size: 17px;
+        line-height: 1.75;
+        color: #3b414c;
+        word-break: keep-all;
+      }
+      @media (min-width: 721px) {
+        .sp-title {
+          white-space: nowrap;
+        }
+      }
+      #screen-support button.sp-cta {
+        min-height: 54px;
+        padding: 0 30px;
+        border: 0;
+        border-radius: 999px;
+        background: #1f8f4a;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 900;
+        box-shadow: 0 6px 18px rgba(31, 143, 74, 0.28);
+      }
+      #screen-support button.sp-cta:hover:not(:disabled) {
+        background: #187a3e;
+      }
+      #screen-support button.sp-cta:disabled {
+        opacity: 1;
+        background: #b8bfc8;
+        box-shadow: none;
+      }
+      .sp-sec {
+        margin: 0 34px;
+        padding: 34px 0 6px;
+        border-top: 1px solid #efe9dc;
+        margin-top: 26px;
+      }
+      .sp-h {
+        margin: 0 0 14px;
+        font-size: clamp(21px, 2.8vw, 27px);
+        line-height: 1.4;
+        font-weight: 900;
+        color: #14171c;
+        word-break: keep-all;
+      }
+      .sp-text {
+        margin: 0 0 14px;
+        font-size: 16px;
+        line-height: 1.75;
+        color: #3b414c;
+        word-break: keep-all;
+      }
+      .sp-text b {
+        color: #c2410c;
+      }
+      /* 기사 칸의 통계 그림 — 누르면 원래 크기 (글씨가 작다) */
+      .sp-stats {
+        display: block;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e7e1d4;
+        box-shadow: 0 4px 14px rgba(40, 32, 20, 0.08);
+        cursor: zoom-in;
+      }
+      .sp-stats img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      /* 휴대폰 속 주행 화면 — 세로로 길어 폭을 줄여 가운데에 세운다 */
+      .sp-art.sp-phone {
+        width: min(290px, 72%);
+        margin: 0 auto;
+        border-radius: 0;
+      }
+      .sp-news-card {
+        margin: 16px 0 0;
+        padding: 18px 22px;
+        background: #ffffff;
+        border: 1px solid #ebe4d6;
+        border-left: 6px solid #d9302a;
+        border-radius: 12px;
+      }
+      .sp-news-meta {
+        margin: 0 0 4px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #7a8190;
+      }
+      .sp-news-card h4 {
+        margin: 0 0 8px;
+        font-size: 19px;
+        line-height: 1.45;
+        font-weight: 900;
+        color: #14171c;
+        word-break: keep-all;
+      }
+      .sp-news-card p {
+        margin: 0 0 8px;
+        font-size: 15.5px;
+        line-height: 1.7;
+        color: #3b414c;
+        word-break: keep-all;
+      }
+      .sp-news-card .sp-news-links {
+        margin: 0;
+        font-size: 14.5px;
+      }
+      .sp-news-links a {
+        color: #1d4ed8;
+        font-weight: 700;
+      }
+      /* 약속 문장과 그 오른쪽 옆의 초록 버튼 — 둘을 오른쪽에 붙여 세운다 (두 번째 버튼은 오른쪽 정렬) */
+      .sp-promise-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px 20px;
+        margin-top: 20px;
+      }
+      .sp-promise {
+        margin: 0;
+        text-align: right;
+        font-size: 19px;
+        font-weight: 800;
+        color: #14171c;
+        word-break: keep-all;
+      }
+      /* 세 번째 — 연습장 소개 목록 아래 (왼쪽 정렬) */
+      .sp-points + .sp-cta {
+        margin-top: 16px;
+      }
+      .sp-promise b {
+        color: #d9302a;
+      }
+      .sp-split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 28px;
+        align-items: center;
+      }
+      .sp-flip .sp-art {
+        order: 2;
+      }
+      /*
+        연습장 소개 — 휴대폰 그림은 좁으니 칸을 좁게 두고 글 칸을 넓힌다. 반반이면 '…앞차를 조합한 판' 의 '판' 만 다음 줄로
+        떨어졌다 (사용자가 사진으로 짚었다, 2026-11-14: 한 줄로).
+      */
+      .sp-split.sp-flip {
+        grid-template-columns: minmax(0, 1fr) clamp(220px, 24vw, 270px);
+      }
+      .sp-flip .sp-art.sp-phone {
+        width: 100%;
+      }
+      .sp-art {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 14px;
+      }
+      .sp-law,
+      .sp-points {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sp-law li,
+      .sp-points li {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 12px 14px;
+        background: #ffffff;
+        border: 1px solid #ebe4d6;
+        border-radius: 12px;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #3b414c;
+        word-break: keep-all;
+      }
+      .sp-law b {
+        font-size: 14px;
+        color: #c2410c;
+      }
+      .sp-points b {
+        font-size: 16.5px;
+        color: #14171c;
+      }
+      .sp-use {
+        list-style: none;
+        counter-reset: su;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin: 0;
+        padding: 0;
+      }
+      .sp-use li {
+        counter-increment: su;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px;
+        background: #ffffff;
+        border: 1px solid #ebe4d6;
+        border-radius: 14px;
+      }
+      .sp-use img {
+        flex: none;
+        width: 120px;
+        height: auto;
+      }
+      .sp-use b {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 17px;
+        color: #14171c;
+      }
+      .sp-use b::before {
+        content: counter(su) '. ';
+        color: #1f8f4a;
+      }
+      .sp-use span {
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: #3b414c;
+        word-break: keep-all;
+      }
+      .sp-people {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 0;
+      }
+      .sp-people > div {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #ffffff;
+        border: 1px solid #ebe4d6;
+        border-radius: 12px;
+      }
+      .sp-people dt {
+        font-size: 14.5px;
+        font-weight: 800;
+        color: #6b7280;
+      }
+      .sp-people dd {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0;
+      }
+      .sp-chip {
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: #eef6f0;
+        color: #14532d;
+        font-size: 15.5px;
+        font-weight: 800;
+      }
+      .sp-empty {
+        font-size: 15px;
+        color: #9aa1ad;
+      }
+      .sp-give {
+        text-align: center;
+      }
+      /* 후원 창구가 정해지기 전의 안내 한 줄 */
+      .sp-give-note {
+        display: inline-block;
+        margin: 0;
+        padding: 12px 22px;
+        border-radius: 18px;
+        background: #eef6f0;
+        color: #14532d;
+        font-size: 16px;
+        font-weight: 800;
+        word-break: keep-all;
+      }
+      .sp-contact {
+        margin: 14px 0 0;
+        font-size: 14px;
+        color: #6b7280;
+      }
+      .sp-contact a {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      @media (max-width: 720px) {
+        .sp-split,
+        .sp-split.sp-flip,
+        .sp-use {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .sp-flip .sp-art {
+          order: 0;
+        }
+        /* 한 칸으로 접히면 휴대폰 그림은 다시 폭을 줄여 가운데에 */
+        .sp-flip .sp-art.sp-phone {
+          width: min(290px, 72%);
+        }
+        .sp-sec {
+          margin-left: 18px;
+          margin-right: 18px;
+        }
+        .sp-hero-copy {
+          padding: 18px 18px 4px;
+        }
+        .sp-people > div {
+          grid-template-columns: 92px minmax(0, 1fr);
+        }
+        /* 그림을 줄여 글 칸을 넓힌다 — 120px 이면 '나머지는 교통안전 단체로' 의 '로' 만 다음 줄로 떨어졌다 */
+        .sp-use img {
+          width: 84px;
+        }
+      }
+      /* 휴대폰 — 아래에서 올라오는 짧은 시트가 아니라 화면을 다 쓰는 페이지 */
+      @media (max-width: 620px) {
+        #screen-support .screen-inner {
+          height: 100dvh;
+          max-height: 100dvh;
+          border-radius: 0;
+        }
+      }
+      /*
+        설정 창의 후원 줄 — **휴대폰에서만** 보인다. 첫 화면의 메뉴 줄에서 후원이 감춰지는 바로 그 화면(아래 두 조건)이다.
+        PC 는 첫 화면 줄에 후원이 있어 감춘다 — 설정 창이 한 화면에 들어오는 것을 지킨다.
+      */
+      .settings-cols > .settings-support {
+        grid-column: 1 / -1;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-top: 6px;
+      }
+      /* (pointer: coarse) 를 앞에 둔다 — 세로 · 가로 휴대폰 규칙 덩어리의 첫머리와 같은 글이면 테스트(mobileHome · mobileLandscape)가 이 줄을 그 덩어리로 읽는다 */
+      @media (pointer: coarse) and (orientation: portrait) and (max-width: 720px),
+        (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+        .settings-cols > .settings-support {
+          display: flex;
+        }
+      }
+      /*
         ── 첫 화면 맨 아래의 저작권 줄 (Screens.ts 의 siteFooter) ───────────────
         사이트에서 흔한 꼴 — 가운데 · 작은 글자. 3D 배경 위에 곧바로 놓이므로 다른 카드 밖 글자처럼
         어두운 그림자를 깐다(밝은 장면이 지나가도 읽히게).
@@ -6685,6 +7104,7 @@
         #screen-menu #btn-shop,
         #screen-menu #btn-about,
         #screen-menu #btn-credits,
+        #screen-menu #btn-support,
         #screen-menu #btn-trial {
           display: none;
         }
@@ -7390,6 +7810,7 @@
         .menu-links #btn-shop,
         .menu-links #btn-about,
         .menu-links #btn-credits,
+        .menu-links #btn-support,
         .menu-links #btn-trial {
           display: none;
         }
@@ -8059,6 +8480,8 @@
       <div class="screen" id="screen-help"><div class="screen-inner" id="help-body"></div></div>
       <div class="screen sheet" id="screen-credits"><div class="screen-inner" id="credits-body"></div></div>
       <div class="screen sheet" id="screen-about"><div class="screen-inner" id="about-body"></div></div>
+      <!-- 후원 — About 과 같은 시트 (Screens 의 renderSupport · 값은 support.ts) -->
+      <div class="screen sheet" id="screen-support"><div class="screen-inner" id="support-body"></div></div>
       <!-- 맵 체험하기 — 시험용이라 첫 화면 본문이 아니라 따로 여는 시트다 (Screens 의 renderTrial) -->
       <div class="screen sheet" id="screen-trial"><div class="screen-inner" id="trial-body"></div></div>
       <div class="screen sheet" id="screen-settings"><div class="screen-inner" id="settings-body"></div></div>

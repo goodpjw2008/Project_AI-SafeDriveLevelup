@@ -20,6 +20,18 @@ import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
 import robotTurn from '../assets/airobot/turnlight.webp';
 import qrSite from '../assets/qr-site.png';
+import { SUPPORT_DONATE, SUPPORT_HELPERS, SUPPORT_NEWS, SUPPORT_SPONSORS } from '../support';
+/*
+  후원 페이지 그림 — 후원금 쓰임은 직접 그린 SVG. 첫 장면(photo/donate01.png — 어린이보호구역), 사각지대(photo/donate03.png),
+  휴대폰 속 주행 화면(photo/mobile99.jpeg 에 휴대폰 테두리를 그려 씌움)은 사용자가 고른 그림이다 (2026-11-14). 기사 칸의 통계 그림은
+  발표자료 2장(필요성)과 같은 그림이다 — 처음 받은 photo/donate01.png 가 새 그림으로 바뀌어, 2장을 2배로 그려 같은 자리를 잘라 되살렸다.
+*/
+import artHero from '../assets/support/hero.webp';
+import artStats from '../assets/support/stats.webp';
+import artBlind from '../assets/support/blindspot.webp';
+import artPhone from '../assets/support/mobile-play.webp';
+import artUseOps from '../assets/support/use-ops.svg';
+import artUseOrgs from '../assets/support/use-orgs.svg';
 import { fetchCoaching, fetchHabitReport, toCoachRequest } from '../coach/client';
 import { MIN_RUNS, summarize, weakestPoint, type HabitSummary } from '../coach/habits';
 import { CARS_BY_LEVEL, getCar, isCarUnlocked, type CarSpec } from '../economy/cars';
@@ -97,6 +109,7 @@ export type ScreenId =
   | 'help'
   | 'credits'
   | 'about'
+  | 'support'
   | 'settings'
   | 'report'
   | 'trial'
@@ -225,10 +238,10 @@ export function fallbackCoach(result: JudgeResult): string {
   return lines.map((l) => `- ${l}`).join('\n');
 }
 
-const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'settings', 'report', 'trial', 'badges'] as const;
+const SCREEN_IDS = ['menu', 'shop', 'debrief', 'help', 'credits', 'about', 'support', 'settings', 'report', 'trial', 'badges'] as const;
 
 /** 뒤에 있던 화면 위에 뜨는 화면 — 바깥을 누르면 닫힌다 (index.html 의 `.sheet`) */
-const SHEET_IDS: ReadonlySet<ScreenId> = new Set<ScreenId>(['settings', 'credits', 'about']);
+const SHEET_IDS: ReadonlySet<ScreenId> = new Set<ScreenId>(['settings', 'credits', 'about', 'support']);
 
 /**
  * **주의사항 상자** — 프로토타입이고 교육용 도구라는 것. About 창과 설정 창 맨 아래(PC · 휴대폰)에 같은 말이 선다
@@ -473,6 +486,12 @@ export class Screens {
       돌아왔는지를 다시 알아봐야 한다.
     */
     if (SHEET_IDS.has(id)) {
+      /*
+        **시트 위에 시트를 열면 앞의 시트는 내린다.** 휴대폰은 설정 창에서 후원 창을 연다 (renderSettings 의 .settings-support) —
+        둘 다 켜 두면 DOM 에서 뒤에 오는 설정 창이 후원 창을 덮고, 후원 창을 닫아 설정으로 돌아와도 후원 창이 켜진 채 남는다.
+        시트끼리만 끈다 — 그 아래의 화면(첫 화면)은 그대로다.
+      */
+      for (const other of SHEET_IDS) if (other !== id) $(`screen-${other}`).classList.remove('active');
       const sheet = $(`screen-${id}`);
       sheet.classList.add('active');
       sheet.scrollTop = 0;
@@ -753,6 +772,8 @@ export class Screens {
       onCredits(): void;
       /** 이 작품을 만든 이유 — 만든 사람의 글 (renderAbout) */
       onAbout(): void;
+      /** 후원 · 도와주신 분 (renderSupport · support.ts) */
+      onSupport(): void;
       onSettings(): void;
       /** 전체 화면 ↔ 주소창 (휴대폰) — main.ts 의 toggleFullscreen */
       onFullscreen(): void;
@@ -857,6 +878,12 @@ export class Screens {
         <button class="ghost" id="btn-about">${icon('about')}About</button>
         <button class="ghost" id="btn-credits">${icon('info')}오픈소스 · 저작권</button>
         <!--
+          **후원은 조용한 줄의 맨 끝에 하나** (사용자가 정했다, 2026-11-14: "사용자에게 불편함이 없는 후원아이콘 정도").
+          팝업도 반복 안내도 없다 — 기능은 모두에게 똑같고, 누르는 사람만 후원 창을 본다. 휴대폰은 이 줄이 한 줄로
+          접혀 About · 저작권처럼 감추고, 설정 창 아래에 같은 버튼을 둔다 (renderSettings 의 .settings-support).
+        -->
+        <button class="ghost" id="btn-support">${icon('support')}후원</button>
+        <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
           (AI 안전운전 연습 · 안전운전 AI 자율주행 · 처음부터)만 두고, 고친 판을 골라 보는 문은 About · 설정과 같은 조용한 줄에 선다.
@@ -898,6 +925,7 @@ export class Screens {
     $('btn-zone-help').addEventListener('click', handlers.onZoneHelp);
     $('btn-credits').addEventListener('click', handlers.onCredits);
     $('btn-about').addEventListener('click', handlers.onAbout);
+    $('btn-support').addEventListener('click', handlers.onSupport);
     $('btn-settings').addEventListener('click', handlers.onSettings);
     $('btn-fullscreen').addEventListener('click', handlers.onFullscreen);
     // 판이 모자라면 버튼 자체가 없다 — getElementById 로 찾아 있을 때만 묶는다
@@ -1466,6 +1494,8 @@ export class Screens {
       onSound(kind: 'engine' | 'horn' | 'blinker', id: string): void;
       /** 설정 전체 초기화 — 이 창의 값만 처음 값으로 (레벨 · 기록은 그대로) */
       onResetSettings(): void;
+      /** 후원 창 — 휴대폰에서만 보이는 버튼 (첫 화면 줄에서는 감춰진다) */
+      onSupport(): void;
       onBack(): void;
     },
   ): void {
@@ -1487,7 +1517,29 @@ export class Screens {
       <div class="settings-cols">
         <section class="settings-col">
           <h3 class="settings-h">연습</h3>
-          <!-- 난이도가 맨 위다 — 설정을 여는 가장 흔한 이유가 "너무 쉽다 · 어렵다" 다 -->
+          <!--
+            **AI 사용 설정** (save.ts 의 aiMode · 사용자가 정한 이름과 기본값, 2026-11-01: *"주행분석등 모든것을 신경망으로 동작
+            하거나 llm으로 동작하게 설정을 심플하게"*). 로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이
+            없으면 로컬 신경망이 한다. 세 가지로 나눈 것도 사용자가 정했다 (2026-11-02, 이름은 11-05 — 로컬 신경망(MLP) · 로컬 신경망(어텐션) ·
+            로컬 신경망 + 외부 LLM. 어텐션은 공모전에 뜻이 있어 함께 둔다). 2026-11-09 사용자가 정했다: 이 줄을 '연습' 맨 위에,
+            기본(어텐션)을 고르기의 맨 앞에 두고, 위의 설명 문단은 뺀다 — 고르기마다 붙은 한 줄이 그 몫을 한다.
+          -->
+          ${this.optionRow(
+            'ai',
+            'AI 사용 설정',
+            [
+              /*
+                한 줄 장단점 — 사용자가 정한 꼴 (2026-11-05). 가상 운전자로 잰 값이다: 정확도는 학습자에게 도움이 되는 판을 고른 비율(새로 배움 · 더 연습 ·
+                복습 · 교육 약속 · 더 나은 판이 없는 자리), 다양성은 60판에서 만난 서로 다른 상황 수. MLP · 어텐션은 1,008명(다양성 500명), LLM 은 Gemini 24명.
+                LLM 의 비용은 추정이다 — 한 게임 입력 5,600 · 출력 230 토큰을 Gemini 유료 가격으로 치면 약 3원 (지금은 무료 키라 실제로는 0원).
+              */
+              ['attention', '로컬 신경망(어텐션) ·기본', '정확도 96.5%, 다양성 37.3가지, 1게임 비용 0원'],
+              ['local', '로컬 신경망(MLP)', '정확도 96.9%, 다양성 36.4가지, 1게임 비용 0원'],
+              ['llm', '로컬 신경망 + 외부 LLM', '정확도 96.7%, 다양성 36.7가지, 1게임 비용 약 3원'],
+            ],
+            save.settings.aiMode,
+          )}
+          <!-- 그다음 난이도 — 설정을 여는 가장 흔한 이유가 "너무 쉽다 · 어렵다" 다 -->
           <div class="opt-row">
             <div class="opt-label">
               난이도
@@ -1518,31 +1570,6 @@ export class Screens {
             TRACK_CHOICES.map((t) => [t, CHOICE_LABEL[t] + (t === 'auto' ? ' ·기본' : '')]),
             save.settings.track,
             { note: '자동은 고칠 습관과 기록을 보고 AI 가 우회전, 어린이보호구역, 우회전+어린이보호구역 을 선택' },
-          )}
-          <!--
-            **AI 사용 설정** (save.ts 의 aiMode · 사용자가 정한 이름과 기본값, 2026-11-01: *"주행분석등 모든것을 신경망으로 동작
-            하거나 llm으로 동작하게 설정을 심플하게"*). 로컬은 서버 · 키 · 한도 없이 브라우저 안에서 끝난다. 외부 LLM 은 답이
-            없으면 로컬 신경망이 한다. 세 가지로 나눈 것도 사용자가 정했다 (2026-11-02, 이름은 11-05 — 로컬 신경망(MLP) · 로컬 신경망(어텐션) ·
-            로컬 신경망 + 외부 LLM. 어텐션은 공모전에 뜻이 있어 함께 둔다).
-          -->
-          ${this.optionRow(
-            'ai',
-            'AI 사용 설정',
-            [
-              /*
-                한 줄 장단점 — 사용자가 정한 꼴 (2026-11-05). 가상 운전자로 잰 값이다: 정확도는 학습자에게 도움이 되는 판을 고른 비율(새로 배움 · 더 연습 ·
-                복습 · 교육 약속 · 더 나은 판이 없는 자리), 다양성은 60판에서 만난 서로 다른 상황 수. MLP · 어텐션은 1,008명(다양성 500명), LLM 은 Gemini 24명.
-                LLM 의 비용은 추정이다 — 한 게임 입력 5,600 · 출력 230 토큰을 Gemini 유료 가격으로 치면 약 3원 (지금은 무료 키라 실제로는 0원).
-              */
-              ['local', '로컬 신경망(MLP)', '정확도 96.9%, 다양성 36.4가지, 1게임 비용 0원'],
-              ['attention', '로컬 신경망(어텐션) ·기본', '정확도 96.5%, 다양성 37.3가지, 1게임 비용 0원'],
-              ['llm', '로컬 신경망 + 외부 LLM', '정확도 96.7%, 다양성 36.7가지, 1게임 비용 약 3원'],
-            ],
-            save.settings.aiMode,
-            {
-              note:
-                '다음판 추천, 주행결과 분석, 습관 진단을 무엇으로 할지 정합니다 — MLP 는 판마다 점수를 매겨, 어텐션은 후보 판들을 함께 견주어(트랜스포머의 셀프 어텐션) 고릅니다. 외부 LLM 은 로컬 신경망이 추린 후보에서 고릅니다 (외부 LLM 이 답하지 않으면 로컬 신경망). 정확도는 학습자에게 도움이 되는 판을 고른 비율, 다양성은 60판에서 만난 서로 다른 상황 수입니다 (가상 운전자로 측정)',
-            },
           )}
           ${
             /*
@@ -1664,6 +1691,14 @@ export class Screens {
           <button class="ghost" id="btn-reset-settings">${icon('retry')}설정 전체 초기화</button>
           <span class="opt-hint">이 창의 값을 처음 값으로 되돌립니다 · 레벨과 기록은 그대로입니다</span>
         </div>
+        <!--
+          **후원 — 휴대폰에서만** (index.html 의 .settings-support). 휴대폰 첫 화면은 메뉴 줄이 한 줄로 접혀 후원 버튼이
+          감춰지므로 여기서 연다. PC 는 첫 화면 줄에 있어 이 줄을 감춘다 — 한 창이 넘치지 않게.
+        -->
+        <div class="settings-support">
+          <button class="ghost" id="btn-support-settings">${icon('support')}후원</button>
+          <span class="opt-hint">기본은 무료입니다 · 후원은 선택입니다</span>
+        </div>
         <!-- 주의사항 — 설정 창 맨 아래, PC · 휴대폰 모두 (사용자 요청). 문구는 brand.ts 의 APP_NOTICE_* -->
         ${noticeHtml()}
         <!-- 버전 — 설정 창 맨 아래 (사용자가 정했다). 값은 brand.ts 의 APP_VERSION 하나 -->
@@ -1673,6 +1708,7 @@ export class Screens {
 
     this.bindBack('settings', handlers.onBack);
     $('btn-reset-settings').addEventListener('click', () => handlers.onResetSettings());
+    $('btn-support-settings').addEventListener('click', () => handlers.onSupport());
     for (const [kind, prefix, list] of [
       ['engine', 'eng', ENGINE_SOUNDS],
       ['blinker', 'blk', BLINKER_SOUNDS],
@@ -2891,6 +2927,133 @@ export class Screens {
       </div>
     `;
     this.bindBack('about', onBack);
+  }
+
+  // ── 후원 ────────────────────────────────────────────────────────────────
+
+  /**
+   * **후원 페이지 — 캠페인 페이지처럼 한 장을 내려 읽는다** (사용자가 정했다, 2026-11-14: 국경없는의사회 후원 캠페인 같은
+   * 페이지, 그림은 직접 그리고, 우회전 사고 기사로 경각심을). 값은 support.ts 한 곳.
+   *
+   * 차례: 첫 장면(그림 · 한 줄 · 후원 버튼) → 기사 한 건(통계 그림 · 누르면 원래 크기) → 왜 우회전인가(사각지대 ·
+   * 바뀐 법 — 앱의 '우회전' · '어린이보호구역' 안내와 같은 말) → 그래서 만든 연습장 → 후원금이 쓰이는 곳(두 걸음) →
+   * 함께하는 분(도와주신 분이 첫 줄, 후원사가 다음 줄) → 후원.
+   * 사용자가 뺀 것: 받은 돈 · 쓴 곳 표, '모두 공개' 걸음, 개인 후원 안내 문장 (2026-11-14).
+   * 후원사는 비어 있다 — 지어낸 후원사를 채우지 않는다. 후원 창구가 정해지기 전에는 버튼이 '준비 중' 으로 잠긴다.
+   */
+  renderSupport(onBack: () => void): void {
+    const n = SUPPORT_NEWS;
+    /*
+      후원 창구가 정해지면 버튼(새 창으로 단체의 후원 페이지), 그 전에는 **안내 한 줄** — '후원 창구 준비 중' 잠긴 버튼은 사용자가 뺐다
+      (2026-11-14 — 버튼은 삭제, 문장은 사용자가 '현재는 후원을 준비 중입니다.' 로 정했다). 버튼 모양은 <button> 에만 입혀 있다.
+    */
+    const give = SUPPORT_DONATE.url
+      ? `<button class="sp-cta" type="button" id="btn-support-go">${icon('support')}${esc(SUPPORT_DONATE.org)} 후원 페이지로</button>`
+      : '<p class="sp-give-note">현재는 후원을 준비 중입니다.</p>';
+    /*
+      **초록 버튼('후원 준비 중')은 페이지 중간중간에 다시 선다** (사용자가 정했다, 2026-11-14) — 첫 장면(왼쪽 정렬) → 기사 칸의 약속 문장
+      오른쪽 옆(오른쪽 정렬) → 연습장 소개의 '누구나 무료' 아래(왼쪽 정렬). 모두 맨 아래 후원 칸으로 내려간다 (.sp-jump).
+    */
+    // 글자는 '후원 준비 중' (사용자가 정했다, 2026-11-14 — 예전 '후원으로 함께하기'). 후원 창구가 열리면 다시 고친다
+    const jump = `<button class="sp-cta sp-jump" type="button">${icon('support')}후원 준비 중</button>`;
+    $('support-body').innerHTML = `
+      ${this.head({ id: 'support', title: '후원', backLabel: '닫기' })}
+      <div class="sp">
+        <section class="sp-hero">
+          <img class="sp-hero-art" src="${artHero}" alt="어린이보호구역 — 초록불에 횡단보도를 건너는 아이와, 빨간 보호구역 길의 정지선 뒤에 멈춘 차" />
+          <div class="sp-hero-copy">
+            <p class="sp-kicker">AI 안전운전 레벨업 · 후원</p>
+            <!-- 한 줄 (사용자가 정했다, 2026-11-14) — PC 에서는 줄을 바꾸지 않고, 좁은 휴대폰에서만 저절로 접힌다 -->
+            <h2 class="sp-title">우회전 앞에서 한 번 멈추면 아이의 길이 안전해집니다</h2>
+            <p class="sp-lead">누구나 무료로 우회전과 어린이보호구역 일시정지를 연습하는 곳입니다. 작은 후원이 이 연습장을 계속 무료로 지키고, 교통안전 현장으로 돌아갑니다.</p>
+            ${jump}
+          </div>
+        </section>
+
+        <section class="sp-sec sp-news">
+          <!-- 사용자가 고친 말 (2026-11-14) — 예전: '지금도 횡단보도 위에서' / '초록불은 아이에게 '건너도 된다'는 약속입니다' -->
+          <p class="sp-eyebrow">지금도 도로 위에서</p>
+          <h3 class="sp-h">우회전과 어린이보호구역에서 여전히 지키기 어려운 규칙들이 있습니다.</h3>
+          <!-- 글씨가 작은 통계 그림이라 누르면 원래 크기로 새 창에서 연다 -->
+          <a class="sp-stats" href="${artStats}" target="_blank" rel="noopener" title="크게 보기"><img src="${artStats}" alt="우회전 차량과 보행자 사이의 교통사고(2021~2025, 경찰청 · 한국도로교통공단 자료)와 어린이보호구역 신호 없는 횡단보도의 일시정지 실태(안전생활실천시민연합 · 삼성화재 교통안전문화연구소 · 한국도로교통공단 현장조사)를 정리한 그림" /></a>
+          <article class="sp-news-card">
+            <p class="sp-news-meta">${esc(n.outlet)} · ${esc(n.date)}</p>
+            <h4>${esc(n.headline)}</h4>
+            <p>${esc(n.summary)}</p>
+            <p class="sp-news-links"><a href="${esc(n.url)}" target="_blank" rel="noopener">기사 원문 (${esc(n.outlet)})</a>${n.also
+              .map((a) => ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">같은 소식 (${esc(a.outlet)})</a>`)
+              .join('')}</p>
+          </article>
+          <div class="sp-promise-row">
+            <p class="sp-promise">그 약속은 <b>우회전하는 차가 멈출 때</b> 지켜집니다.</p>
+            ${jump}
+          </div>
+        </section>
+
+        <section class="sp-sec sp-split">
+          <img class="sp-art" src="${artBlind}" alt="위에서 본 교차로 — 오른쪽으로 도는 차의 오른쪽 앞(빨간 곳)은 운전석에서 잘 보이지 않는다" />
+          <div>
+            <p class="sp-eyebrow">왜 우회전인가</p>
+            <h3 class="sp-h">도는 차의 오른쪽 앞은 잘 보이지 않습니다</h3>
+            <p class="sp-text">운전석은 왼쪽에 있습니다. 오른쪽으로 돌 때, 특히 버스 · 트럭 같은 큰 차는 오른쪽 앞이 잘 보이지 않습니다. 그래서 법은 <b>멈추라고</b> 말합니다.</p>
+            <ul class="sp-law">
+              <li><b>2022년 7월 12일부터</b>횡단보도를 건너거나 건너려는 사람이 있으면 일시정지</li>
+              <li><b>2023년 1월 22일부터</b>앞 신호가 빨간불이면 정지선 앞에서 멈춘 뒤 우회전</li>
+              <li><b>어린이보호구역</b>신호기가 없는 횡단보도 앞에서는 사람이 있든 없든 먼저 멈춤</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="sp-sec sp-split sp-flip">
+          <img class="sp-art sp-phone" src="${artPhone}" alt="휴대폰에서 연습하는 실제 화면 — 로컬 신경망이 고른 판에서 AI 주행 중인 내 차가 어린이보호구역 횡단보도 앞에서 일시정지하고, 오른쪽 아래 LiDAR 화면이 사람 · 자전거 · 차를 찾는다" />
+          <div>
+            <p class="sp-eyebrow">그래서 만들었습니다</p>
+            <h3 class="sp-h">멈추는 습관을 미리 연습하는 곳</h3>
+            <ul class="sp-points">
+              <li><b>22,818가지 상황</b>우회전과 어린이보호구역에서 만나는 신호 · 보행자 · 앞차를 조합한 판</li>
+              <li><b>AI 가 내 습관에 맞춰</b>자주 놓치는 상황을 골라 다시 연습하게 합니다</li>
+              <li><b>누구나 무료</b>설치 · 계정 없이 휴대폰과 PC 에서</li>
+            </ul>
+            ${jump}
+          </div>
+        </section>
+
+        <section class="sp-sec">
+          <p class="sp-eyebrow">후원금은 이렇게 쓰입니다</p>
+          <h3 class="sp-h">운영비는 최소로, 나머지는 교통안전 현장으로</h3>
+          <ol class="sp-use">
+            <li><img src="${artUseOps}" alt="" /><div><b>최소 운영비만</b><span>이 사이트는 서버 · 도메인 비용만 받습니다</span></div></li>
+            <li><img src="${artUseOrgs}" alt="" /><div><b>나머지는 교통안전 단체로</b><span>후원사가 국내 안전운전 · 교통안전 단체에 직접 전달합니다</span></div></li>
+          </ol>
+        </section>
+
+        <section class="sp-sec">
+          <p class="sp-eyebrow">함께하는 분</p>
+          <dl class="sp-people">
+            <div><dt>도와주신 분</dt><dd>${SUPPORT_HELPERS.map((h) => `<span class="sp-chip">${esc(h)}</span>`).join('')}</dd></div>
+            <div><dt>후원사</dt><dd>${
+              SUPPORT_SPONSORS.length
+                ? SUPPORT_SPONSORS.map((x) => `<span class="sp-chip" title="${esc(x.what)}">${esc(x.name)}</span>`).join('')
+                : '<span class="sp-empty">아직 없습니다</span>'
+            }</dd></div>
+          </dl>
+        </section>
+
+        <section class="sp-sec sp-give" id="sp-give">
+          <h3 class="sp-h">작은 후원으로 함께해 주세요</h3>
+          ${give}
+          <!-- 문의 줄 — 예전 '기업 · 기관 후원 문의' 를 사용자가 '관련 문의' 로 바꿨다 (2026-11-14) -->
+          <p class="sp-contact">관련 문의 : <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a></p>
+        </section>
+      </div>
+    `;
+    this.bindBack('support', onBack);
+    // 초록 버튼 세 개 — 모두 맨 아래 후원 칸('현재는 후원을 준비 중입니다.')으로 내려간다
+    for (const btn of document.querySelectorAll('#support-body .sp-jump'))
+      btn.addEventListener('click', () => document.getElementById('sp-give')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    document
+      .getElementById('btn-support-go')
+      ?.addEventListener('click', () => window.open(SUPPORT_DONATE.url, '_blank', 'noopener'));
   }
 
   // ── 오픈소스 · 저작권 ─────────────────────────────────────────────────────

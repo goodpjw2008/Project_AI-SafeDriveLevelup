@@ -348,7 +348,14 @@ async function makeAiScenario(): Promise<void> {
           최근에 안 탄 판) 가운데 차례 신경망이 이번 판의 갈래를 뽑고, 그 갈래의 판(많으면 2,000개)을 추천 신경망이 채점한다.
         */
         () =>
-          aiNarrows
+          /*
+            **어텐션은 차례 신경망을 쓰지 않는다** (recommend.ts 의 aiCourses — global) — 탈 수 있는 판에서 2,000개를 뽑아 모든 갈래를
+            함께 본다. 한때 이 줄이 어텐션에서도 "차례 신경망이 '…' 를 골라" 라고 말해 사용자가 짚었다 (2026-11-09). 그 갈래는 어텐션이
+            고른 판의 갈래일 뿐이었다.
+          */
+          attention
+            ? `예측 모델로 후보 읽기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${master ? `마스터 운행 ${levelLabel(c.level)} 코스` : '탈 수 있는'} ${(counts.eligible ?? counts.candidates).toLocaleString()}개에서 ${counts.candidates.toLocaleString()}개를 뽑아 판마다 어길 확률 · 예상 성공률을 붙임`
+            : aiNarrows
             ? `신경망으로 후보 채점 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${master ? `마스터 운행 ${levelLabel(c.level)} 코스` : '탈 수 있는'} ${(counts.eligible ?? counts.candidates).toLocaleString()}개에서 차례 신경망이 '${counts.turn ? TURN_LABEL[counts.turn] : '갈래'}' 를 골라 ${counts.candidates.toLocaleString()}개 (습관 · 약한 개념 · 난이도를 봄)`
             : many
               ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 습관 ${priorityHabits(plan).length}가지를 고칠 ${counts.candidates.toLocaleString()}개`
@@ -356,12 +363,17 @@ async function makeAiScenario(): Promise<void> {
                 ? `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 마스터 운행 ${levelLabel(c.level)} 코스 ${counts.candidates.toLocaleString()}개`
                 : `규칙으로 후보 추리기 — 시나리오 ${scenarioLibrary().length.toLocaleString()}개 중 ${levelLabel(c.level)}에 맞는 ${counts.candidates.toLocaleString()}개`,
         // 결과 예측 모델(ai/outcome.ts) — 후보마다 어길 확률과 표를 붙인다. 학습자 모델이 시험된 개념이 없는 첫 판에도 돈다
-        () =>
-          aiNarrows
-            ? `신경망 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 · 난이도 모델의 값도 입력으로 봄)`
-            : OUTCOME_MODEL
-              ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
-              : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
+        // 어텐션은 최종 후보 10개를 어텐션 점수로 정하므로 이 줄을 두지 않는다 — 2차 줄이 함께 말한다
+        ...(attention
+          ? []
+          : [
+              () =>
+                aiNarrows
+                  ? `신경망 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 · 난이도 모델의 값도 입력으로 봄)`
+                  : OUTCOME_MODEL
+                    ? `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (결과 예측 모델이 판마다 어길 확률과 표를 붙임)`
+                    : `모델 점수로 최종 후보 고르기 — ${counts.candidates.toLocaleString()}개 중 ${counts.courses}개 (난이도 모델이 판마다 예상 성공률을 셈)`,
+            ]),
         /*
           **2차는 설정을 따른다** (save.ts 의 aiMode) — 로컬이면 서버에 묻지 않으니 LLM 이라고 말하지 않는다.
           로컬은 추천 신경망이 최종 후보를 채점해 고른다 (ai/recommendNet.ts). 모델이 없으면(학습 전) 1차의 모델 점수가
@@ -383,15 +395,20 @@ async function makeAiScenario(): Promise<void> {
                 */
                 { tag: '2차', heading: '로컬 신경망(어텐션)으로 최종 맵 선택 중' },
                 () =>
-                  `어텐션 신경망이 후보 ${counts.candidates.toLocaleString()}개 중 위 ${Math.min(attentionTopK(), counts.candidates)}개를 서로 견주며 가장 많이 배울 코스를 고르는 중`,
+                  `어텐션 신경망이 후보 ${counts.candidates.toLocaleString()}개를 모두 읽고 갈래마다 위 판 ${Math.min(attentionTopK(), counts.candidates)}개를 서로 견주며, 가장 많이 배울 코스와 최종 후보 ${counts.courses}개를 고르는 중`,
               ]
           : recommendModelReady()
             ? [
                 { tag: '2차', heading: '로컬 신경망(MLP)으로 최종 맵 선택 중' },
+                /*
+                  **MLP 는 최종 후보 10개 가운데서 다시 고르지 않는다** (recommend.ts 의 aiCourses) — 채점한 판 전부의 점수를 확률로 바꿔
+                  한 판을 뽑고, 그 판을 맨 앞에 둔 채 나머지 9개를 점수 순으로 채운다. 예전 줄("최종 후보 10개 중 … 고르고")은 두 번
+                  고르는 것처럼 읽혔다 (2026-11-09 사용자 검토). 10개 중에서 고르는 것은 외부 LLM 뿐이다.
+                */
                 () =>
                   many
-                    ? `신경망이 최종 후보 ${counts.courses}개 중 먼저 고칠 습관과 코스를 고르는 중`
-                    : `신경망이 최종 후보 ${counts.courses}개 중 가장 많이 배울 코스를 고르고 까닭을 찾는 중`,
+                    ? `신경망이 점수를 확률로 바꿔 ${counts.candidates.toLocaleString()}개 중 한 판을 뽑고, 그 판이 고치는 습관을 먼저 고칠 습관으로 정하는 중`
+                    : `신경망이 점수를 확률로 바꿔 ${counts.candidates.toLocaleString()}개 중 가장 많이 배울 한 판을 뽑고 까닭을 찾는 중`,
               ]
             : [
                 { tag: '2차', heading: '브라우저 안의 모델로 최종 맵 선택 중' },
@@ -876,6 +893,7 @@ function renderMenu(): void {
     onZoneHelp: () => nav.go({ name: 'zone-help', enter: renderZoneHelp }),
     onCredits: () => nav.go({ name: 'credits', enter: renderCredits }),
     onAbout: () => nav.go({ name: 'about', enter: renderAbout }),
+    onSupport: () => nav.go({ name: 'support', enter: renderSupport }),
     onSettings: () => nav.go({ name: 'settings', enter: renderSettings }),
     onFullscreen: toggleFullscreen,
     onReport: () => nav.go({ name: 'report', enter: renderReport }),
@@ -1059,6 +1077,15 @@ function renderAbout(): void {
   screens.renderAbout(() => nav.back());
 }
 
+/** 후원 — 기본은 무료, 후원은 선택 (support.ts · About 창과 같은 시트) */
+function renderSupport(): void {
+  stopAutoNext();
+  disposeSeatPreview();
+  ensureMenuScene();
+  screens.show('support');
+  screens.renderSupport(() => nav.back());
+}
+
 /**
  * 설정 화면.
  *
@@ -1153,6 +1180,7 @@ function renderSettings(): void {
       void audio.resume().then(() => audio.preview(kind, id));
       renderSettings();
     },
+    onSupport: () => nav.go({ name: 'support', enter: renderSupport }),
     onBack: () => nav.back(),
   });
 }
