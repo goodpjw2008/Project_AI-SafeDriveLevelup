@@ -882,7 +882,8 @@ export class Screens {
           팝업도 반복 안내도 없다 — 기능은 모두에게 똑같고, 누르는 사람만 후원 창을 본다. 휴대폰은 이 줄이 한 줄로
           접혀 About · 저작권처럼 감추고, 설정 창 아래에 같은 버튼을 둔다 (renderSettings 의 .settings-support).
         -->
-        <button class="ghost" id="btn-support">${icon('support')}후원</button>
+        <!-- 이름은 '후원(준비중)' (사용자가 정했다, 2026-11-15) — 후원 창구가 열리기 전이라는 것을 버튼에서부터 밝힌다 -->
+        <button class="ghost" id="btn-support">${icon('support')}후원(준비중)</button>
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
@@ -1535,7 +1536,11 @@ export class Screens {
               */
               ['attention', '로컬 신경망(어텐션) ·기본', '정확도 96.5%, 다양성 37.3가지, 1게임 비용 0원'],
               ['local', '로컬 신경망(MLP)', '정확도 96.9%, 다양성 36.4가지, 1게임 비용 0원'],
-              ['llm', '로컬 신경망 + 외부 LLM', '정확도 96.7%, 다양성 36.7가지, 1게임 비용 약 3원'],
+              /*
+                ③ 의 이름에 '(MLP)' 를 붙인다 (사용자가 정했다, 2026-11-15: 발표자료와 맞춰 "앱에도 맞춰줘") — ③ 이 쓰는 신경망은 ② 의 MLP 그대로라
+                (scenarios/recommend.ts 의 aiCourses — 외부 LLM 은 MLP 가 추린 10판에서 고른다) 이름에서 그것이 보여야 헷갈리지 않는다.
+              */
+              ['llm', '로컬 신경망(MLP) + 외부 LLM', '정확도 96.7%, 다양성 36.7가지, 1게임 비용 약 3원'],
             ],
             save.settings.aiMode,
           )}
@@ -1696,7 +1701,7 @@ export class Screens {
           감춰지므로 여기서 연다. PC 는 첫 화면 줄에 있어 이 줄을 감춘다 — 한 창이 넘치지 않게.
         -->
         <div class="settings-support">
-          <button class="ghost" id="btn-support-settings">${icon('support')}후원</button>
+          <button class="ghost" id="btn-support-settings">${icon('support')}후원(준비중)</button>
           <span class="opt-hint">기본은 무료입니다 · 후원은 선택입니다</span>
         </div>
         <!-- 주의사항 — 설정 창 맨 아래, PC · 휴대폰 모두 (사용자 요청). 문구는 brand.ts 의 APP_NOTICE_* -->
@@ -2946,10 +2951,12 @@ export class Screens {
     /*
       후원 창구가 정해지면 버튼(새 창으로 단체의 후원 페이지), 그 전에는 **안내 한 줄** — '후원 창구 준비 중' 잠긴 버튼은 사용자가 뺐다
       (2026-11-14 — 버튼은 삭제, 문장은 사용자가 '현재는 후원을 준비 중입니다.' 로 정했다). 버튼 모양은 <button> 에만 입혀 있다.
+      2026-11-15 사용자가 세 줄로 바꿨다 — 만든 사람이 고등학생이라 후원을 어떻게 받을지 부모님 · 선생님과 의논 중이라는 것을 그대로 밝힌다.
     */
     const give = SUPPORT_DONATE.url
       ? `<button class="sp-cta" type="button" id="btn-support-go">${icon('support')}${esc(SUPPORT_DONATE.org)} 후원 페이지로</button>`
-      : '<p class="sp-give-note">현재는 후원을 준비 중입니다.</p>';
+      : '<p class="sp-give-note"><b>후원을 준비하고 있습니다.</b><span>현재 저는 고등학생입니다.</span>' +
+        '<span>후원을 어떻게 받아야 하는지 부모님과 선생님께 의논 중입니다.</span></p>';
     /*
       **초록 버튼('후원 준비 중')은 페이지 중간중간에 다시 선다** (사용자가 정했다, 2026-11-14) — 첫 장면(왼쪽 정렬) → 기사 칸의 약속 문장
       오른쪽 옆(오른쪽 정렬) → 연습장 소개의 '누구나 무료' 아래(왼쪽 정렬). 모두 맨 아래 후원 칸으로 내려간다 (.sp-jump).
@@ -2957,7 +2964,7 @@ export class Screens {
     // 글자는 '후원 준비 중' (사용자가 정했다, 2026-11-14 — 예전 '후원으로 함께하기'). 후원 창구가 열리면 다시 고친다
     const jump = `<button class="sp-cta sp-jump" type="button">${icon('support')}후원 준비 중</button>`;
     $('support-body').innerHTML = `
-      ${this.head({ id: 'support', title: '후원', backLabel: '닫기' })}
+      ${this.head({ id: 'support', title: '후원(준비중)', backLabel: '닫기' })}
       <div class="sp">
         <section class="sp-hero">
           <img class="sp-hero-art" src="${artHero}" alt="어린이보호구역 — 초록불에 횡단보도를 건너는 아이와, 빨간 보호구역 길의 정지선 뒤에 멈춘 차" />
@@ -2973,7 +2980,7 @@ export class Screens {
         <section class="sp-sec sp-news">
           <!-- 사용자가 고친 말 (2026-11-14) — 예전: '지금도 횡단보도 위에서' / '초록불은 아이에게 '건너도 된다'는 약속입니다' -->
           <p class="sp-eyebrow">지금도 도로 위에서</p>
-          <h3 class="sp-h">우회전과 어린이보호구역에서 여전히 지키기 어려운 규칙들이 있습니다.</h3>
+          <h3 class="sp-h">우회전과 어린이보호구역에서 여전히 헷갈리는 규칙들이 있습니다.</h3>
           <!-- 글씨가 작은 통계 그림이라 누르면 원래 크기로 새 창에서 연다 -->
           <a class="sp-stats" href="${artStats}" target="_blank" rel="noopener" title="크게 보기"><img src="${artStats}" alt="우회전 차량과 보행자 사이의 교통사고(2021~2025, 경찰청 · 한국도로교통공단 자료)와 어린이보호구역 신호 없는 횡단보도의 일시정지 실태(안전생활실천시민연합 · 삼성화재 교통안전문화연구소 · 한국도로교통공단 현장조사)를 정리한 그림" /></a>
           <article class="sp-news-card">
@@ -3022,8 +3029,9 @@ export class Screens {
           <p class="sp-eyebrow">후원금은 이렇게 쓰입니다</p>
           <h3 class="sp-h">운영비는 최소로, 나머지는 교통안전 현장으로</h3>
           <ol class="sp-use">
-            <li><img src="${artUseOps}" alt="" /><div><b>최소 운영비만</b><span>이 사이트는 서버 · 도메인 비용만 받습니다</span></div></li>
-            <li><img src="${artUseOrgs}" alt="" /><div><b>나머지는 교통안전 단체로</b><span>후원사가 국내 안전운전 · 교통안전 단체에 직접 전달합니다</span></div></li>
+            <!-- 두 칸의 글은 사용자가 정했다 (2026-11-15) — 예전 '최소 운영비만 · 서버 · 도메인 비용만' / '나머지는 교통안전 단체로 · 후원사가 … 직접 전달' -->
+            <li><img src="${artUseOps}" alt="" /><div><b>서비스의 최소 운영비용으로</b><span>이 사이트의 운영을 위한 최소 비용(도메인&nbsp;비용&nbsp;등)으로만 사용할 예정입니다</span></div></li>
+            <li><img src="${artUseOrgs}" alt="" /><div><b>교통안전을 지키는 비용으로 사용</b><span>교통안전을 지키는 비용으로 사용할 예정입니다</span></div></li>
           </ol>
         </section>
 
@@ -3048,7 +3056,7 @@ export class Screens {
       </div>
     `;
     this.bindBack('support', onBack);
-    // 초록 버튼 세 개 — 모두 맨 아래 후원 칸('현재는 후원을 준비 중입니다.')으로 내려간다
+    // 초록 버튼 세 개 — 모두 맨 아래 후원 칸('후원을 준비하고 있습니다.')으로 내려간다
     for (const btn of document.querySelectorAll('#support-body .sp-jump'))
       btn.addEventListener('click', () => document.getElementById('sp-give')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     document

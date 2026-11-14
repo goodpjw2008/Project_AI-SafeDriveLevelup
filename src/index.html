@@ -895,6 +895,8 @@
         margin-bottom: 4px;
         font-size: 17px;
         color: #14171c;
+        /* 낱말 단위로 접는다 — 휴대폰에서 '교통안전을 지키는 비용으로 사용' 의 '용' 한 글자만 다음 줄로 떨어졌다 (2026-11-15) */
+        word-break: keep-all;
       }
       .sp-use b::before {
         content: counter(su) '. ';
@@ -959,6 +961,17 @@
         font-size: 16px;
         font-weight: 800;
         word-break: keep-all;
+      }
+      /* 세 줄 — 첫 줄(준비 중)만 굵게, 아래 두 줄은 사정 (2026-11-15 사용자 문장) */
+      .sp-give-note b,
+      .sp-give-note span {
+        display: block;
+      }
+      .sp-give-note span {
+        margin-top: 4px;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.6;
       }
       .sp-contact {
         margin: 14px 0 0;
