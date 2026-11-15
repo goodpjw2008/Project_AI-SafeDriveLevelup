@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.0 뒤에 고친 것을 담아 다시 최종으로 정했습니다)
+
 ### 변경
 
 - **'후원' 이 '도움을 주신 분' 이 되었습니다** (사용자가 정했습니다) — 후원이라기보다 도움을 주신 분으로 부릅니다. 첫 화면의 버튼, 휴대폰 설정 창 아래의 버튼, 창의 제목, 창 안의 초록 버튼이 모두 '도움을 주신 분' 입니다. 창 맨 아래 칸은 발표자료 15장과 같은 말입니다: "도로 위 안전을 지키기 위한 선순환 구조" — 현재 경찰서에서 자문을 도와주시고 있고 아래의 관련 주체들로 확대 예정입니다. '현재 자문' 줄에는 안산단원경찰서와 한국디지털미디어고등학교가 섭니다. 이어서 '도움을 주신 분(확대 예정)' 으로 교통 관련 정부 · 경찰서 · 공공기관, 보험사, 운전면허학원, 일반 기업 안전교육이 한 줄씩 섭니다. 예전 '후원사 · 아직 없습니다' 와 고등학생 안내 세 줄은 이 칸으로 바뀌었습니다. 공모전 제출 전 기능 점검 테스트도 새 이름을 봅니다.
@@ -734,7 +738,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...v1.1.0
 [1.0.8]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.6...v1.0.7
