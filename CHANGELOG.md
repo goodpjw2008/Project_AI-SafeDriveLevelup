@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.1 뒤에 공개 포트폴리오를 발표자료로 바꾸고 다시 최종으로 정했습니다)
+
 ### 변경
 
 - **공개 포트폴리오가 지금 발표자료 17장이 되었습니다** (사용자가 정했습니다) — safedrive.ai.kr/AI_safelevelup_portfolio.html 과 저장소 맨 위의 같은 파일이 예전 기획서 판 10장에서 공모전 발표자료 17장(필요성 · 개요 · 기획 · 설계 · 프로그램 동작 흐름 · AI 운전연습 시나리오 맵 구성 · AI Gamification · 핵심 AI 분석기법 · 어텐션 · MLP · 성능 비교 · AI 자율주행 · 검증 · 테스트 · 오픈소스 · 저작권 · 활용 · 기대효과)으로 바뀝니다. 공개본에는 사람이 찍힌 사진을 싣지 않습니다 — 경찰서 방문 · 1차 강의는 예전 공개본과 같은 수채화 삽화로, 2차 강의는 사람이 없게 노트북 · 스크린만 잘라 화면 속 영상통화 얼굴을 흐리게 했습니다. README 의 저절로 넘어가는 장표 그림도 17장으로 다시 만들었습니다.
@@ -743,7 +747,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...v1.1.0
 [1.0.8]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.7...v1.0.8
