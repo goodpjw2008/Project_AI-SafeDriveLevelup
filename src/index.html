@@ -5699,6 +5699,46 @@
         bottom: auto;
       }
       /*
+        ── 소리 끄기 · 켜기 (휴대폰만) ─────────────────────────────────────────
+        **오른쪽 위 모서리의 동그란 단추** — 왼쪽 위 전체 화면 알약과 마주 본다. 처음엔 알약 바로 오른쪽에 두었는데 세로 휴대폰에서는
+        과제 상자가 알약 옆(x 70)부터 시작해 겹쳤다 — 오른쪽 위는 세로 · 가로 모두 비어 있다. 크기 · 높이는 main.ts 의 placeSoundButton 이
+        알약과 같게 맞춘다(알약이 없는 아이폰은 아래 40px). 선택자를 하나 더 붙이는 까닭은 위의 전체 화면 알약과 같다(bottom 을 비운다).
+        꺼져 있을 때는 빨간 ×로 또렷하게 — 소리가 왜 안 나는지 바로 보이게.
+      */
+      .hud-sound {
+        display: none;
+      }
+      body.touch .hud-home.hud-sound {
+        display: inline-grid;
+        place-items: center;
+        left: auto;
+        right: max(12px, env(safe-area-inset-right));
+        top: max(12px, env(safe-area-inset-top));
+        bottom: auto;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 50%;
+        color: var(--text);
+        opacity: 0.85;
+      }
+      .hud-sound svg {
+        width: 22px;
+        height: 22px;
+      }
+      .hud-sound .snd-off,
+      body.sound-muted .hud-sound .snd-on {
+        display: none;
+      }
+      body.sound-muted .hud-sound .snd-off {
+        display: block;
+      }
+      body.touch.sound-muted .hud-home.hud-sound {
+        color: #ff8080;
+        border-color: rgba(255, 92, 92, 0.55);
+        opacity: 1;
+      }
+      /*
         전체 화면으로 들어갈 때 **우리 말로 한 번 알린다** (main.ts 의 showFullscreenNotice). 크롬은 전체 화면마다
         제 말("상단에서 드래그한 후 뒤로 버튼을 터치하세요")을 흰 상자로 띄우는데, 그 상자와 글은 브라우저의
         것이라 페이지가 바꾸거나 없앨 수 없다 — 그래서 사용자가 정한 글을 우리 상자로 한 번 더 띄운다.
@@ -8421,6 +8461,18 @@
         </div>
         <!-- 전체 화면 ↔ 주소창 (휴대폰만 — .fs-toggle). 첫 화면의 토글과 같은 일을 한다 (main.ts 의 toggleFullscreen) -->
         <button class="hud-home hud-fullscreen fs-toggle" id="btn-hud-fullscreen">전체 화면</button>
+        <!--
+          **소리 끄기 · 켜기** — 휴대폰 주행 화면의 단추 하나 (사용자가 정했다, 2026-11-15: "모바일 화면에서 소리를 끄고 키는 기능을
+          만들어줘. 버튼하나로 음소거가 되게"). 엔진 · 경적 · 깜빡이 · 충돌 · 결과 소리가 모두 한 출구(Audio.ts 의 master)로 나가므로
+          그 볼륨만 0 으로 내린다. 끈 값은 저장본(settings.muted)에 남아 다음 판 · 다음 방문에도 그대로다 (main.ts 의 syncSoundButton).
+          자리는 **오른쪽 위 모서리** — 왼쪽 위 전체 화면 알약과 마주 본다. 위 가운데는 과제 상자가 쓰고(세로 휴대폰에서 알약 바로 옆까지 온다),
+          오른쪽 위는 세로 · 가로 모두 비어 있다. 높이는 알약과 같게 main.ts 의 placeSoundButton 이 맞춘다.
+          그림은 지금 상태 — 소리가 나면 스피커와 음파, 꺼져 있으면 스피커와 ×(빨갛게).
+        -->
+        <button class="hud-home hud-sound" id="btn-hud-sound" type="button" aria-pressed="false" aria-label="소리 끄기" title="소리 끄기">
+          <svg class="snd-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.8l5-4.4v14.4l-5-4.4H3.5z" fill="currentColor" /><path d="M15.6 8.8a4.4 4.4 0 0 1 0 6.4M18.3 6.1a8.2 8.2 0 0 1 0 11.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          <svg class="snd-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.8l5-4.4v14.4l-5-4.4H3.5z" fill="currentColor" /><path d="M15.8 9.4l5.2 5.2M21 9.4l-5.2 5.2" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" /></svg>
+        </button>
 
         <!--
           fps 표시. 설정에서 켰을 때만 뜬다 — 화질 손잡이를 내렸을 때 숫자가 실제로

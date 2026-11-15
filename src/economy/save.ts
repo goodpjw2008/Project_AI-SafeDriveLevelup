@@ -228,6 +228,12 @@ export interface SaveData {
      * 모르는 id 가 들어와도 engineById 등이 기본값으로 되돌리므로 검증하지 않는다.
      */
     sounds: { engine: string; horn: string; blinker: string };
+    /**
+     * **소리를 껐는가** — 휴대폰 주행 화면의 소리 단추가 정한다 (사용자가 정했다, 2026-11-15: "모바일 화면에서 소리를 끄고 키는
+     * 기능을 만들어줘. 버튼하나로 음소거가 되게"). 기본은 켜짐. 끈 사람은 다음 판 · 다음 방문에도 꺼진 채로 시작한다 —
+     * 끈 까닭(교실 · 대중교통)은 대개 다음에도 그대로라서. 설정에서 소리를 미리 들으면 다시 켜진다 (main.ts).
+     */
+    muted: boolean;
   };
   /** 통계 */
   stats: {
@@ -279,6 +285,7 @@ export function defaultSave(): SaveData {
       aiMode: 'attention',
       graphics: defaultGraphics(),
       sounds: { ...DEFAULT_SOUNDS },
+      muted: false,
     },
     stats: { attempts: 0, perfects: 0, violations: 0, fails: 0, streak: 0, bestStreak: 0 },
     history: [],
@@ -335,6 +342,8 @@ export function load(): SaveData {
         graphics: graphicsFromSaved(parsed.settings?.graphics, from < 11),
         // 소리도 **항목별로** 합친다 — 통째로 덮으면 새로 생긴 항목이 undefined 로 들어온다
         sounds: { ...base.settings.sounds, ...(parsed.settings?.sounds ?? {}) },
+        // 참 · 거짓만 받는다 — 손으로 고친 저장본의 다른 값은 기본(켜짐)으로
+        muted: parsed.settings?.muted === true,
         /*
           연습 갈래는 **아는 값인지 확인하고 받는다** — 손으로 고친 저장본이나 예전 이름이 들어오면
           추천이 후보를 하나도 못 찾는다. 모르면 '자동'(기본값)으로 돌린다.

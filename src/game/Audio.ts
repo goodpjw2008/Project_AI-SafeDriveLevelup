@@ -253,8 +253,17 @@ export class GameAudio {
   }
 
   toggleMute(): boolean {
-    this.muted = !this.muted;
+    this.setMuted(!this.muted);
+    return this.muted;
+  }
+
+  /** 소리 끄기 · 켜기 — 휴대폰 주행 화면의 단추와 저장본(settings.muted)이 정한다 (main.ts 의 syncSoundButton) */
+  setMuted(on: boolean): void {
+    this.muted = on;
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+  }
+
+  get isMuted(): boolean {
     return this.muted;
   }
 

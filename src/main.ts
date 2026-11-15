@@ -722,6 +722,8 @@ function syncFullscreenButtons(): void {
     }
     else b.innerHTML = icon(on ? 'fullscreenExit' : 'fullscreen');
   }
+  // 알약의 글('전체 화면' ↔ '주소창 보기')이 바뀌면 높이도 바뀐다(세로 화면은 두 줄) — 소리 단추를 다시 같은 높이로
+  requestAnimationFrame(() => placeSoundButton());
 }
 if (!fullscreenSupported() && !DEMO_PHONE) document.body.classList.add('no-fullscreen-api');
 document.addEventListener('fullscreenchange', syncFullscreenButtons);
@@ -1195,11 +1197,18 @@ function renderSettings(): void {
       if (!ok) return;
       saveData.settings = defaultSave().settings;
       commit();
+      // 소리도 처음 값(켜짐)으로 — 주행 화면의 소리 단추를 함께 맞춘다
+      syncSoundButton();
       hud.setShowFps(saveData.settings.graphics.showFps);
       renderSettings();
     },
     onSound: (kind, id) => {
       saveData.settings.sounds = { ...saveData.settings.sounds, [kind]: id };
+      // 미리 듣기는 들으려고 누른 것이다 — 주행 화면에서 소리를 꺼 두었으면 다시 켠다 (꺼진 채로는 아무것도 안 들려 고장처럼 보인다)
+      if (saveData.settings.muted) {
+        saveData.settings.muted = false;
+        syncSoundButton();
+      }
       commit();
       void audio.resume().then(() => audio.preview(kind, id));
       renderSettings();
@@ -1778,12 +1787,54 @@ function syncPauseButton(): void {
  * 재어 그 오른쪽 8px 에 둔다. 아래쪽 높이는 같은 알약(.hud-home)이라 CSS 가 같은 값으로 맞춘다.
  */
 function placePauseButton(): void {
+  // 같은 때(HUD 가 그려진 뒤 · 화면 크기가 바뀔 때) 오른쪽 위 소리 단추도 맞춘다
+  placeSoundButton();
   const home = document.getElementById('btn-hud-home');
   const pause = document.getElementById('btn-hud-pause');
   if (!home || !pause || home.offsetWidth === 0) return;
   pause.style.left = `${home.offsetLeft + home.offsetWidth + 8}px`;
 }
 window.addEventListener('resize', () => placePauseButton());
+
+/**
+ * **소리 끄기 · 켜기** (휴대폰 주행 화면 — 사용자가 정했다, 2026-11-15: "모바일 화면에서 소리를 끄고 키는 기능을 만들어줘. 버튼하나로
+ * 음소거가 되게"). 소리는 모두 Audio.ts 의 한 출구로 나가 그 볼륨만 0 으로 내린다. 끈 값은 저장본(settings.muted)에 남는다.
+ */
+function syncSoundButton(): void {
+  const muted = saveData.settings.muted;
+  audio.setMuted(muted);
+  document.body.classList.toggle('sound-muted', muted);
+  const b = document.getElementById('btn-hud-sound');
+  if (!b) return;
+  const label = muted ? '소리 켜기' : '소리 끄기';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.setAttribute('aria-pressed', String(muted));
+}
+/**
+ * 소리 단추는 **오른쪽 위 모서리, 전체 화면 알약과 같은 높이의 동그라미** — 알약의 높이는 화면(세로 두 줄 · 가로 한 줄)마다 달라
+ * 그려진 알약을 잰다. 알약이 없으면(아이폰 사파리 — 전체 화면 API 가 없다) CSS 의 40px 그대로.
+ */
+function placeSoundButton(): void {
+  const b = document.getElementById('btn-hud-sound');
+  const fs = document.getElementById('btn-hud-fullscreen');
+  if (!b) return;
+  if (!fs || fs.offsetWidth === 0) {
+    b.style.top = b.style.width = b.style.height = '';
+    return;
+  }
+  const size = Math.max(40, fs.offsetHeight);
+  b.style.top = `${fs.offsetTop}px`;
+  b.style.width = b.style.height = `${size}px`;
+}
+document.getElementById('btn-hud-sound')?.addEventListener('click', (e) => {
+  // 포커스를 뗀다 — 남아 있으면 키보드의 Space 가 이 단추를 다시 누른다 (멈춤 단추와 같다)
+  (e.currentTarget as HTMLElement).blur();
+  saveData.settings.muted = !saveData.settings.muted;
+  commit();
+  syncSoundButton();
+});
+syncSoundButton();
 document.getElementById('btn-hud-pause')?.addEventListener('click', (e) => {
   // 포커스를 뗀다 — 남아 있으면 Space(정지 별칭)가 이 단추를 다시 눌러 곧바로 풀린다 (모드 카드의 스위치와 같다)
   (e.currentTarget as HTMLElement).blur();
