@@ -34,6 +34,7 @@ import { ensureCarPhotos, hasCarPhoto, loadCarPhotos, uploadCarPhoto } from './e
 import { settle } from './economy/reward';
 import { defaultSave, load, save as persist, pushHistory, reset as resetSave, type SaveData } from './economy/save';
 import { demoMaster } from './economy/demo';
+import { forcePhoneLayout } from './demoPhone';
 import { updateBadges } from './economy/badges';
 import type { JudgeResult } from './rules/lawRules';
 import {
@@ -89,6 +90,17 @@ import { beginRun, cachedSiteStats, endRun, loadSiteStats, outcomeOf } from './s
 // 단일 파일 빌드는 file:// 로 열려도 정상 동작하므로 안내가 뜨면 안 된다.
 (window as unknown as { __TURN_RIGHT_BOOTED__?: boolean }).__TURN_RIGHT_BOOTED__ = true;
 
+/*
+  **시연용 주소 `?demo=…`** (사용자가 정했다, 2026-11-15 — 발표자료 '시연 포함' 판의 휴대폰 틀). 쉼표로 여럿을 받는다:
+   - `master` — 이 화면의 저장본을 마스터 상태로 (economy/demo.ts, 아래 load 뒤)
+   - `phone`  — 마우스 화면에서도 휴대폰(손가락 화면)처럼 그린다 (demoPhone.ts). 다른 코드가 matchMedia 를 부르기 전, 맨 먼저
+  주소창에는 남기지 않는다 — 새로 고침 · 공유로 다시 덮이지 않게. 휴대폰 틀이 새로 고침하면 주소를 다시 받는다.
+*/
+const DEMO = new Set((new URLSearchParams(location.search).get('demo') ?? '').split(',').filter(Boolean));
+const DEMO_PHONE = DEMO.has('phone');
+if (DEMO_PHONE) forcePhoneLayout();
+if (DEMO.size) history.replaceState(history.state, '', location.pathname + location.hash);
+
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 // 시트 바깥을 누르면 한 칸 되돌아간다 — 어디로 돌아가는지는 히스토리가 안다
 const screens = new Screens({ onDismiss: () => nav.back() });
@@ -101,12 +113,11 @@ let saveData: SaveData = load();
 /*
   **시연용 주소 `?demo=master`** (사용자가 정했다, 2026-11-15 — 발표자료 '시연 포함' 판의 휴대폰 틀). 다른 페이지 안(iframe)에서 열린 이 사이트는
   브라우저가 저장 공간을 따로 두어 평소의 마스터 기록이 없다 — 이 주소로 열면 이 화면의 저장본을 마스터 상태로 채워 '마스터 운행' 으로 바로
-  시연할 수 있다 (economy/demo.ts). 저장본은 이 기기에만 있다. 주소창에는 남기지 않는다 — 새로 고침 · 공유로 다시 덮이지 않게.
+  시연할 수 있다 (economy/demo.ts). 저장본은 이 기기에만 있다. 주소 읽기는 맨 위의 DEMO.
 */
-if (new URLSearchParams(location.search).get('demo') === 'master') {
+if (DEMO.has('master')) {
   saveData = demoMaster(saveData);
   persist(saveData);
-  history.replaceState(history.state, '', location.pathname + location.hash);
 }
 let game: Game | null = null;
 /**
@@ -635,6 +646,7 @@ function fullscreenSupported(): boolean {
   return typeof document.documentElement.requestFullscreen === 'function' && document.fullscreenEnabled !== false;
 }
 function toggleFullscreen(): void {
+  if (DEMO_PHONE) return; // 시연 휴대폰은 늘 전체 화면으로 보인다 — 단추는 모양만
   if (document.fullscreenElement) {
     void document.exitFullscreen().catch(() => undefined);
   } else {
@@ -697,8 +709,9 @@ function showFullscreenNotice(on: boolean): void {
   fsNoticeTimer = window.setTimeout(() => el.classList.remove('show'), 5000);
 }
 function syncFullscreenButtons(): void {
-  const on = !!document.fullscreenElement;
-  showFullscreenNotice(on);
+  showFullscreenNotice(!!document.fullscreenElement);
+  // 시연 휴대폰은 발표 화면 안에서 주소창 없이 돈다 — 실제 휴대폰의 전체 화면처럼 '주소창 보기' 로 세운다
+  const on = !!document.fullscreenElement || DEMO_PHONE;
   const label = on ? '주소창 보기' : '전체 화면';
   for (const b of document.querySelectorAll<HTMLButtonElement>('.fs-toggle')) {
     b.title = label;
@@ -710,7 +723,7 @@ function syncFullscreenButtons(): void {
     else b.innerHTML = icon(on ? 'fullscreenExit' : 'fullscreen');
   }
 }
-if (!fullscreenSupported()) document.body.classList.add('no-fullscreen-api');
+if (!fullscreenSupported() && !DEMO_PHONE) document.body.classList.add('no-fullscreen-api');
 document.addEventListener('fullscreenchange', syncFullscreenButtons);
 /**
  * **주행을 누르면 저절로 전체 화면** (휴대폰만 — 사용자가 정했다). 전체 화면 요청은 **손가락이 닿은 그 처리 안에서**만
