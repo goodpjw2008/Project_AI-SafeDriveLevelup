@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.4 뒤에 발표용 뉴스 쇼츠 페이지를 더하고 다시 최종으로 정했습니다)
+
+### 추가
+
+- **발표용 뉴스 쇼츠 페이지를 더했습니다** (사용자가 정했습니다) — 발표자료 '시연 포함' 판은 1 ~ 2장(필요성)을 말하는 동안 오른쪽 휴대폰 칸에 JTBC 뉴스 쇼츠 "초록불에 건너는데…우회전 차량에 스쿨존서 초등생 참변" 을 보여 주고, 3장부터는 시연 사이트로 바뀝니다. 유튜브는 영상을 넣은 페이지의 주소를 알 수 없으면 '오류 153' 으로 재생을 막는데, 발표자료는 파일로 열어 그 주소를 보내지 못합니다. 그래서 safedrive.ai.kr/news-shorts.html 이 그 쇼츠 하나만 넣어 대신 띄웁니다. 검색에는 싣지 않습니다 (`public/news-shorts.html`).
+
 ## [1.1.4] - 2026-11-15
 
 **공모전 제출 전 최종 버전입니다.** (1.1.3 뒤에 시연 휴대폰을 실제 휴대폰 화면과 같게 하고 다시 최종으로 정했습니다)
@@ -763,7 +771,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...v1.1.2
