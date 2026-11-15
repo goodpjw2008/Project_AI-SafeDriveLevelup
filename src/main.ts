@@ -33,6 +33,7 @@ import { carForLevel, getCar } from './economy/cars';
 import { ensureCarPhotos, hasCarPhoto, loadCarPhotos, uploadCarPhoto } from './economy/carPhotos';
 import { settle } from './economy/reward';
 import { defaultSave, load, save as persist, pushHistory, reset as resetSave, type SaveData } from './economy/save';
+import { demoMaster } from './economy/demo';
 import { updateBadges } from './economy/badges';
 import type { JudgeResult } from './rules/lawRules';
 import {
@@ -97,6 +98,16 @@ const hud = new Hud();
 const audio = new GameAudio();
 
 let saveData: SaveData = load();
+/*
+  **시연용 주소 `?demo=master`** (사용자가 정했다, 2026-11-15 — 발표자료 '시연 포함' 판의 휴대폰 틀). 다른 페이지 안(iframe)에서 열린 이 사이트는
+  브라우저가 저장 공간을 따로 두어 평소의 마스터 기록이 없다 — 이 주소로 열면 이 화면의 저장본을 마스터 상태로 채워 '마스터 운행' 으로 바로
+  시연할 수 있다 (economy/demo.ts). 저장본은 이 기기에만 있다. 주소창에는 남기지 않는다 — 새로 고침 · 공유로 다시 덮이지 않게.
+*/
+if (new URLSearchParams(location.search).get('demo') === 'master') {
+  saveData = demoMaster(saveData);
+  persist(saveData);
+  history.replaceState(history.state, '', location.pathname + location.hash);
+}
 let game: Game | null = null;
 /**
  * 첫 화면 뒤에서 도는 배경 장면.
