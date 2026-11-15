@@ -1,0 +1,28 @@
+<!doctype html>
+<!--
+  발표자료 '시연 포함' 판의 휴대폰 칸이 1 ~ 2장에서 여는 뉴스 쇼츠 (사용자가 정했다, 2026-11-15:
+  "1페이지~2페이지에는 휴대폰부분에 나오게 해줘 … 1~2페이지는 뉴스를 보여줄꺼고 3페이지부터는 시연하며 발표").
+  유튜브는 영상을 넣은 페이지의 주소(Referer)가 없으면 '오류 153' 으로 재생을 막는다. 발표자료는 파일(file://)로 열어
+  주소를 보내지 못하므로, 이 https 페이지가 영상을 대신 넣는다 — 영상 하나(JTBC 뉴스)만 띄우고, 검색에는 싣지 않는다.
+-->
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>뉴스 쇼츠 — AI 안전운전 레벨업 발표</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; }
+    iframe { display: block; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe
+    src="https://www.youtube.com/embed/CQTDFGm2gnk?playsinline=1&amp;rel=0"
+    title="JTBC 뉴스 — 초록불에 건너는데…우회전 차량에 스쿨존서 초등생 참변"
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+    referrerpolicy="strict-origin-when-cross-origin"
+    allowfullscreen></iframe>
+</body>
+</html>
