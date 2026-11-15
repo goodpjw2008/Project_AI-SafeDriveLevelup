@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.2 뒤에 발표 · 시연용 주소를 더하고 다시 최종으로 정했습니다)
+
+### 추가
+
+- **시연용 주소 `?demo=master` 를 더했습니다** (사용자가 정했습니다) — 발표자료 '시연 포함' 판은 오른쪽 휴대폰 틀 안에서 이 사이트를 띄우고 발표하면서 '마스터 운행' 을 누릅니다. 그런데 다른 페이지 안에서 열린 사이트에는 브라우저가 저장 공간을 따로 두어 평소의 기록이 보이지 않고 Level 1 로 열립니다. 이 주소로 열면 그 화면의 저장본이 마스터 상태(레벨 10 · 마스터 · 맨 위 차 · 뱃지)가 되어 처음 화면에 '마스터 운행' 이 바로 섭니다. 저장본은 그 기기에만 있고 서버로 가지 않으며, 주소창에는 남기지 않습니다 (`src/economy/demo.ts`).
+
 ## [1.1.2] - 2026-11-15
 
 **공모전 제출 전 최종 버전입니다.** (1.1.1 뒤에 공개 포트폴리오를 발표자료로 바꾸고 다시 최종으로 정했습니다)
@@ -747,7 +755,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...v1.1.0
