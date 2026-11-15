@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.3 뒤에 시연 휴대폰을 실제 휴대폰 화면과 같게 하고 다시 최종으로 정했습니다)
+
+### 변경
+
+- **시연용 주소가 휴대폰 화면도 그대로 보여 줍니다** (사용자가 짚었습니다) — 발표자료 '시연 포함' 판의 휴대폰 틀 안 화면이 실제 휴대폰과 달랐습니다: PC 의 발표 화면 안에서는 크기가 휴대폰이어도 마우스라서, 위쪽 판 설명이 길고 LiDAR 설명 상자가 크고 'AI 자율주행' 카드 위에 레벨 카드가 겹치는 PC 쪽 화면이 섰습니다. 이제 `?demo=…,phone` 으로 열면 휴대폰과 PC 를 가르는 '손가락 화면' 조건을 그 화면에서만 참으로 읽어, 첫 화면 · 주행 화면이 휴대폰과 같습니다(짧은 판 설명 · 'AI주행' 카드 · 'LiDAR(광선추적기법)'). 주소창이 없으니 전체 화면 단추도 휴대폰의 전체 화면처럼 '주소창 보기' 로 섭니다. 시연 판의 휴대폰은 `?demo=master,phone` 을 엽니다 (`src/demoPhone.ts`).
+
 ## [1.1.3] - 2026-11-15
 
 **공모전 제출 전 최종 버전입니다.** (1.1.2 뒤에 발표 · 시연용 주소를 더하고 다시 최종으로 정했습니다)
@@ -755,7 +763,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.0...v1.1.1
