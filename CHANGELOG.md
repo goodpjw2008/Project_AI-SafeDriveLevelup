@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-11-15
+
+**공모전 제출 전 최종 버전입니다.** (1.1.5 뒤에 휴대폰 주행 화면의 소리 끄기 · 켜기 단추를 더하고 다시 최종으로 정했습니다)
+
 ### 추가
 
 - **휴대폰 주행 화면에 소리 끄기 · 켜기 단추를 더했습니다** (사용자가 정했습니다) — 오른쪽 위 모서리의 동그란 단추 하나로 엔진 · 경적 · 깜빡이 · 충돌 · 결과 소리를 모두 끄고 켭니다. 왼쪽 위 '전체 화면' 알약과 마주 보는 자리이고 높이도 같습니다(위 가운데는 과제 상자 자리). 켜져 있으면 스피커와 음파, 꺼져 있으면 빨간 ×로 보입니다. 끈 값은 저장되어 다음 판 · 다음 방문에도 꺼진 채로 시작하고, 설정에서 소리를 미리 들으면 다시 켜집니다. PC 화면에는 서지 않습니다.
@@ -775,7 +779,8 @@ AI 자율주행 판. 자율 주행이 가상 LiDAR 로 주변을 보고(학습�
 - **Vercel 배포** — GitHub에 올리면 자동으로 배포됩니다. AI 기능에는 호출 제한과 응답 시간 제한을 둡니다.
 - **라이선스** — 코드는 MIT, 로봇 그림 · README는 CC BY 4.0, 제3자 자산은 원작자 라이선스 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.6...HEAD
+[1.1.6]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.2...v1.1.3

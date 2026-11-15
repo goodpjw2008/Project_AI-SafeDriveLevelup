@@ -2,7 +2,7 @@
  * **공모전 제출 전 기능 점검** — 사용자가 정했다 (2026-11-15: *"1.1.0으로 버전을 올려주고 공모전 제출전 최종 버전으로 해줘.
  * 공모전 제출전 기능 테스트를 추가해줘"*).
  *
- * 제출본(1.1.5 — 2026-11-15 다시 최종으로 정함)이 발표자료 · README 가 말하는 것과 어긋나지 않는지 **한 곳에서** 본다 — 버전, 시나리오 수, AI 모델 열 개가 모두
+ * 제출본(1.1.6 — 2026-11-15 다시 최종으로 정함)이 발표자료 · README 가 말하는 것과 어긋나지 않는지 **한 곳에서** 본다 — 버전, 시나리오 수, AI 모델 열 개가 모두
  * 학습된 값인지, AI 사용 설정 세 가지와 기본값, 도움을 주신 분 페이지(현재 자문 · 확대 예정), 사이트 주소와 검색 등록 파일, 공개 저장소의
  * 규칙(API 키 · 학습용 키). 기능마다의 자세한 동작은 그 기능의 테스트가 맡고, 여기서는 '제출할 때 빠지거나
  * 바뀐 것이 없는가' 만 본다. 숫자를 바꿀 일이 생기면 발표자료와 README 도 함께 고친다.
@@ -26,16 +26,16 @@ import { SUPPORT_DONATE, SUPPORT_EXPAND, SUPPORT_HELPERS, SUPPORT_NEWS } from '.
 const ROOT = join(__dirname, '..');
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
 
-describe('공모전 제출 전 기능 점검 — 1.1.5', () => {
-  it('버전 — package.json · 설정 창의 버전 · CHANGELOG 맨 위가 모두 1.1.5 이고, 제출 전 최종 버전이라고 적혀 있다', () => {
-    expect(JSON.parse(read('package.json')).version).toBe('1.1.5');
-    expect(APP_VERSION).toBe('1.1.5');
+describe('공모전 제출 전 기능 점검 — 1.1.6', () => {
+  it('버전 — package.json · 설정 창의 버전 · CHANGELOG 맨 위가 모두 1.1.6 이고, 제출 전 최종 버전이라고 적혀 있다', () => {
+    expect(JSON.parse(read('package.json')).version).toBe('1.1.6');
+    expect(APP_VERSION).toBe('1.1.6');
     const log = read('CHANGELOG.md');
     // 맨 위의 [Unreleased](아직 배포 전 변경)는 건너뛰고 첫 배포 버전을 본다
     const first = log.split('\n').find((l) => l.startsWith('## [') && !l.startsWith('## [Unreleased]'));
-    expect(first).toMatch(/^## \[1\.1\.5\] - \d{4}-\d{2}-\d{2}$/);
+    expect(first).toMatch(/^## \[1\.1\.6\] - \d{4}-\d{2}-\d{2}$/);
     expect(log.slice(log.indexOf(first!), log.indexOf('## [', log.indexOf(first!) + 4))).toContain('공모전 제출 전 최종 버전');
-    expect(log).toContain('[1.1.5]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.4...v1.1.5');
+    expect(log).toContain('[1.1.6]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.1.5...v1.1.6');
   });
 
   it(
