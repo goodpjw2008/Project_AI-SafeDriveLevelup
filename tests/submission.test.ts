@@ -3,7 +3,7 @@
  * 공모전 제출전 기능 테스트를 추가해줘"*).
  *
  * 제출본(1.1.0)이 발표자료 · README 가 말하는 것과 어긋나지 않는지 **한 곳에서** 본다 — 버전, 시나리오 수, AI 모델 열 개가 모두
- * 학습된 값인지, AI 사용 설정 세 가지와 기본값, 후원 페이지(준비중 · 도와주신 분), 사이트 주소와 검색 등록 파일, 공개 저장소의
+ * 학습된 값인지, AI 사용 설정 세 가지와 기본값, 도움을 주신 분 페이지(현재 자문 · 확대 예정), 사이트 주소와 검색 등록 파일, 공개 저장소의
  * 규칙(API 키 · 학습용 키). 기능마다의 자세한 동작은 그 기능의 테스트가 맡고, 여기서는 '제출할 때 빠지거나
  * 바뀐 것이 없는가' 만 본다. 숫자를 바꿀 일이 생기면 발표자료와 README 도 함께 고친다.
  */
@@ -21,7 +21,7 @@ import { coachModelReady } from '../src/ai/localCoach';
 import { driveModelReady } from '../src/ai/drivePolicy';
 import { signalModelReady } from '../src/ai/signalPolicy';
 import { intentModelReady } from '../src/ai/intent';
-import { SUPPORT_DONATE, SUPPORT_HELPERS, SUPPORT_NEWS, SUPPORT_SPONSORS } from '../src/support';
+import { SUPPORT_DONATE, SUPPORT_EXPAND, SUPPORT_HELPERS, SUPPORT_NEWS } from '../src/support';
 
 const ROOT = join(__dirname, '..');
 const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
@@ -31,7 +31,8 @@ describe('공모전 제출 전 기능 점검 — 1.1.0', () => {
     expect(JSON.parse(read('package.json')).version).toBe('1.1.0');
     expect(APP_VERSION).toBe('1.1.0');
     const log = read('CHANGELOG.md');
-    const first = log.split('\n').find((l) => l.startsWith('## ['));
+    // 맨 위의 [Unreleased](아직 배포 전 변경)는 건너뛰고 첫 배포 버전을 본다
+    const first = log.split('\n').find((l) => l.startsWith('## [') && !l.startsWith('## [Unreleased]'));
     expect(first).toMatch(/^## \[1\.1\.0\] - \d{4}-\d{2}-\d{2}$/);
     expect(log.slice(log.indexOf(first!), log.indexOf('## [', log.indexOf(first!) + 4))).toContain('공모전 제출 전 최종 버전');
     expect(log).toContain('[1.1.0]: https://github.com/goodpjw2008/Project_AI-SafeDriveLevelup/compare/v1.0.8...v1.1.0');
@@ -69,16 +70,17 @@ describe('공모전 제출 전 기능 점검 — 1.1.0', () => {
     expect(screens).not.toContain("'로컬 신경망 + 외부 LLM'");
   });
 
-  it("후원 — '후원(준비중)' 세 곳, 준비 중 안내, 도와주신 분 안산단원경찰서, 후원사 · 후원 창구는 아직 비어 있다", () => {
-    expect(SUPPORT_HELPERS).toEqual(['안산단원경찰서']);
-    expect(SUPPORT_SPONSORS).toHaveLength(0);
+  it("도움을 주신 분 — 이름 네 곳, 현재 자문 안산단원경찰서 · 한국디지털미디어고등학교, 확대 예정 주체 넷(발표자료 15장과 같은 말), 창구는 아직 비어 있다", () => {
+    expect(SUPPORT_HELPERS).toEqual(['안산단원경찰서', '한국디지털미디어고등학교']);
+    expect(SUPPORT_EXPAND.map((x) => x.name)).toEqual(['교통 관련 정부 · 경찰서 · 공공기관', '보험사', '운전면허학원', '일반 기업 안전교육']);
     expect(SUPPORT_DONATE.url).toBe('');
     expect(SUPPORT_NEWS.url.startsWith('https://www.hani.co.kr/')).toBe(true);
     const screens = read('src/ui/Screens.ts');
-    // 첫 화면 버튼 · 휴대폰 설정 창의 버튼 · 후원 창의 제목
-    expect(screens.match(/후원\(준비중\)<\/button>|title: '후원\(준비중\)'/g)?.length).toBe(3);
-    expect(screens).toContain('후원을 준비하고 있습니다.');
-    expect(screens).toContain('현재 저는 고등학생입니다.');
+    // 첫 화면 버튼 · 휴대폰 설정 창의 버튼 · 창 안의 초록 버튼 · 창의 제목 — 예전 '후원(준비중)' 은 남지 않는다 (사용자, 2026-11-15)
+    expect(screens.match(/도움을 주신 분<\/button>|title: '도움을 주신 분'/g)?.length).toBe(4);
+    expect(screens.match(/후원\(준비중\)<\/button>|title: '후원\(준비중\)'/g)).toBeNull();
+    expect(screens).toContain('현재 경찰서에서 자문을 도와주시고 있고 아래의 관련 주체들로 확대 예정');
+    expect(screens).toContain('도움을 주신 분(확대 예정)');
     expect(screens).toContain('서비스의 최소 운영비용으로');
     expect(screens).toContain('교통안전을 지키는 비용으로 사용');
   });

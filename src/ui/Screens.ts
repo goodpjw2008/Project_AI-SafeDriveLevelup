@@ -20,7 +20,7 @@ import robotNormal from '../assets/airobot/normal.webp';
 import robotStop from '../assets/airobot/stop.webp';
 import robotTurn from '../assets/airobot/turnlight.webp';
 import qrSite from '../assets/qr-site.png';
-import { SUPPORT_DONATE, SUPPORT_HELPERS, SUPPORT_NEWS, SUPPORT_SPONSORS } from '../support';
+import { SUPPORT_DONATE, SUPPORT_EXPAND, SUPPORT_HELPERS, SUPPORT_NEWS } from '../support';
 /*
   후원 페이지 그림 — 후원금 쓰임은 직접 그린 SVG. 첫 장면(photo/donate01.png — 어린이보호구역), 사각지대(photo/donate03.png),
   휴대폰 속 주행 화면(photo/mobile99.jpeg 에 휴대폰 테두리를 그려 씌움)은 사용자가 고른 그림이다 (2026-11-14). 기사 칸의 통계 그림은
@@ -882,8 +882,8 @@ export class Screens {
           팝업도 반복 안내도 없다 — 기능은 모두에게 똑같고, 누르는 사람만 후원 창을 본다. 휴대폰은 이 줄이 한 줄로
           접혀 About · 저작권처럼 감추고, 설정 창 아래에 같은 버튼을 둔다 (renderSettings 의 .settings-support).
         -->
-        <!-- 이름은 '후원(준비중)' (사용자가 정했다, 2026-11-15) — 후원 창구가 열리기 전이라는 것을 버튼에서부터 밝힌다 -->
-        <button class="ghost" id="btn-support">${icon('support')}후원(준비중)</button>
+        <!-- 이름은 '도움을 주신 분' (사용자가 정했다, 2026-11-15 — 예전 '후원(준비중)'. 후원이라기보다 도움을 주신 분으로, 발표자료 15장과 같은 말) -->
+        <button class="ghost" id="btn-support">${icon('support')}도움을 주신 분</button>
         <!--
           **맵 체험하기는 여기, 설정 옆이다** — 시험용이라 첫 화면 본문에 두지 않는다. 사용자가 짚었다:
           "테스트용이기 때문에 메인 페이지에는 넣지 말고 별도 메뉴로 만들어 줘." 본문은 학습자가 누를 것
@@ -1701,8 +1701,8 @@ export class Screens {
           감춰지므로 여기서 연다. PC 는 첫 화면 줄에 있어 이 줄을 감춘다 — 한 창이 넘치지 않게.
         -->
         <div class="settings-support">
-          <button class="ghost" id="btn-support-settings">${icon('support')}후원(준비중)</button>
-          <span class="opt-hint">기본은 무료입니다 · 후원은 선택입니다</span>
+          <button class="ghost" id="btn-support-settings">${icon('support')}도움을 주신 분</button>
+          <span class="opt-hint">기본은 무료입니다 · 경찰서 자문과 함께 만들고 있습니다</span>
         </div>
         <!-- 주의사항 — 설정 창 맨 아래, PC · 휴대폰 모두 (사용자 요청). 문구는 brand.ts 의 APP_NOTICE_* -->
         ${noticeHtml()}
@@ -2937,42 +2937,38 @@ export class Screens {
   // ── 후원 ────────────────────────────────────────────────────────────────
 
   /**
-   * **후원 페이지 — 캠페인 페이지처럼 한 장을 내려 읽는다** (사용자가 정했다, 2026-11-14: 국경없는의사회 후원 캠페인 같은
+   * **도움을 주신 분 — 캠페인 페이지처럼 한 장을 내려 읽는다** (사용자가 정했다, 2026-11-14: 국경없는의사회 후원 캠페인 같은
    * 페이지, 그림은 직접 그리고, 우회전 사고 기사로 경각심을). 값은 support.ts 한 곳.
+   * 2026-11-15 사용자가 '후원' 을 **도움을 주신 분** 으로 바꿨다 — 발표자료 15장과 같은 말 (머리말 한 마디는 앱에 넣지 않기로 사용자가 정했다).
    *
-   * 차례: 첫 장면(그림 · 한 줄 · 후원 버튼) → 기사 한 건(통계 그림 · 누르면 원래 크기) → 왜 우회전인가(사각지대 ·
-   * 바뀐 법 — 앱의 '우회전' · '어린이보호구역' 안내와 같은 말) → 그래서 만든 연습장 → 후원금이 쓰이는 곳(두 걸음) →
-   * 함께하는 분(도와주신 분이 첫 줄, 후원사가 다음 줄) → 후원.
-   * 사용자가 뺀 것: 받은 돈 · 쓴 곳 표, '모두 공개' 걸음, 개인 후원 안내 문장 (2026-11-14).
-   * 후원사는 비어 있다 — 지어낸 후원사를 채우지 않는다. 후원 창구가 정해지기 전에는 버튼이 '준비 중' 으로 잠긴다.
+   * 차례: 첫 장면(그림 · 한 줄 · 버튼) → 기사 한 건(통계 그림 · 누르면 원래 크기) → 왜 우회전인가(사각지대 ·
+   * 바뀐 법 — 앱의 '우회전' · '어린이보호구역' 안내와 같은 말) → 그래서 만든 연습장 → 도움이 쓰이는 곳(두 걸음) →
+   * 도움을 주신 분(지금 자문하는 경찰서 → 확대 예정인 주체 넷) → 문의.
+   * 사용자가 뺀 것: 받은 돈 · 쓴 곳 표, '모두 공개' 걸음, 개인 후원 안내 문장 (2026-11-14), 고등학생 안내 세 줄 (2026-11-15).
+   * 확대 예정인 주체는 갈래만 적는다 — 지어낸 이름을 채우지 않는다.
    */
   renderSupport(onBack: () => void): void {
     const n = SUPPORT_NEWS;
-    /*
-      후원 창구가 정해지면 버튼(새 창으로 단체의 후원 페이지), 그 전에는 **안내 한 줄** — '후원 창구 준비 중' 잠긴 버튼은 사용자가 뺐다
-      (2026-11-14 — 버튼은 삭제, 문장은 사용자가 '현재는 후원을 준비 중입니다.' 로 정했다). 버튼 모양은 <button> 에만 입혀 있다.
-      2026-11-15 사용자가 세 줄로 바꿨다 — 만든 사람이 고등학생이라 후원을 어떻게 받을지 부모님 · 선생님과 의논 중이라는 것을 그대로 밝힌다.
-    */
+    // 도움 창구(단체 페이지)가 정해졌을 때만 버튼 — 그 전에는 아무것도 그리지 않는다
     const give = SUPPORT_DONATE.url
-      ? `<button class="sp-cta" type="button" id="btn-support-go">${icon('support')}${esc(SUPPORT_DONATE.org)} 후원 페이지로</button>`
-      : '<p class="sp-give-note"><b>후원을 준비하고 있습니다.</b><span>현재 저는 고등학생입니다.</span>' +
-        '<span>후원을 어떻게 받아야 하는지 부모님과 선생님께 의논 중입니다.</span></p>';
+      ? `<button class="sp-cta" type="button" id="btn-support-go">${icon('support')}${esc(SUPPORT_DONATE.org)} 페이지로</button>`
+      : '';
     /*
-      **초록 버튼('후원 준비 중')은 페이지 중간중간에 다시 선다** (사용자가 정했다, 2026-11-14) — 첫 장면(왼쪽 정렬) → 기사 칸의 약속 문장
-      오른쪽 옆(오른쪽 정렬) → 연습장 소개의 '누구나 무료' 아래(왼쪽 정렬). 모두 맨 아래 후원 칸으로 내려간다 (.sp-jump).
+      **초록 버튼은 페이지 중간중간에 다시 선다** (사용자가 정했다, 2026-11-14) — 첫 장면(왼쪽 정렬) → 기사 칸의 약속 문장
+      오른쪽 옆(오른쪽 정렬) → 연습장 소개의 '누구나 무료' 아래(왼쪽 정렬). 모두 맨 아래 '도움을 주신 분' 칸으로 내려간다 (.sp-jump).
     */
-    // 글자는 '후원 준비 중' (사용자가 정했다, 2026-11-14 — 예전 '후원으로 함께하기'). 후원 창구가 열리면 다시 고친다
-    const jump = `<button class="sp-cta sp-jump" type="button">${icon('support')}후원 준비 중</button>`;
+    // 글자는 '도움을 주신 분' (2026-11-15 — 예전 '후원 준비 중')
+    const jump = `<button class="sp-cta sp-jump" type="button">${icon('support')}도움을 주신 분</button>`;
     $('support-body').innerHTML = `
-      ${this.head({ id: 'support', title: '후원(준비중)', backLabel: '닫기' })}
+      ${this.head({ id: 'support', title: '도움을 주신 분', backLabel: '닫기' })}
       <div class="sp">
         <section class="sp-hero">
           <img class="sp-hero-art" src="${artHero}" alt="어린이보호구역 — 초록불에 횡단보도를 건너는 아이와, 빨간 보호구역 길의 정지선 뒤에 멈춘 차" />
           <div class="sp-hero-copy">
-            <p class="sp-kicker">AI 안전운전 레벨업 · 후원</p>
+            <p class="sp-kicker">AI 안전운전 레벨업 · 도움을 주신 분</p>
             <!-- 한 줄 (사용자가 정했다, 2026-11-14) — PC 에서는 줄을 바꾸지 않고, 좁은 휴대폰에서만 저절로 접힌다 -->
             <h2 class="sp-title">우회전 앞에서 한 번 멈추면 아이의 길이 안전해집니다</h2>
-            <p class="sp-lead">누구나 무료로 우회전과 어린이보호구역 일시정지를 연습하는 곳입니다. 작은 후원이 이 연습장을 계속 무료로 지키고, 교통안전 현장으로 돌아갑니다.</p>
+            <p class="sp-lead">누구나 무료로 우회전과 어린이보호구역 일시정지를 연습하는 곳입니다. 작은 도움이 이 연습장을 계속 무료로 지키고, 교통안전 현장으로 돌아갑니다.</p>
             ${jump}
           </div>
         </section>
@@ -3026,7 +3022,7 @@ export class Screens {
         </section>
 
         <section class="sp-sec">
-          <p class="sp-eyebrow">후원금은 이렇게 쓰입니다</p>
+          <p class="sp-eyebrow">도움은 이렇게 쓰입니다</p>
           <h3 class="sp-h">운영비는 최소로, 나머지는 교통안전 현장으로</h3>
           <ol class="sp-use">
             <!-- 두 칸의 글은 사용자가 정했다 (2026-11-15) — 예전 '최소 운영비만 · 서버 · 도메인 비용만' / '나머지는 교통안전 단체로 · 후원사가 … 직접 전달' -->
@@ -3035,20 +3031,22 @@ export class Screens {
           </ol>
         </section>
 
-        <section class="sp-sec">
-          <p class="sp-eyebrow">함께하는 분</p>
+        <!--
+          **도움을 주신 분** (사용자가 정했다, 2026-11-15 — 발표자료 15장과 같은 말). 예전 '함께하는 분(도와주신 분 · 후원사 아직 없음)' 과
+          '작은 후원으로 함께해 주세요(고등학생 안내 세 줄)' 를 한 칸으로.
+        -->
+        <section class="sp-sec" id="sp-give">
+          <p class="sp-eyebrow">도움을 주신 분</p>
+          <h3 class="sp-h">도로 위 안전을 지키기 위한 선순환 구조</h3>
+          <p class="sp-text">현재 경찰서에서 자문을 도와주시고 있고 아래의 관련 주체들로 확대 예정입니다.</p>
           <dl class="sp-people">
-            <div><dt>도와주신 분</dt><dd>${SUPPORT_HELPERS.map((h) => `<span class="sp-chip">${esc(h)}</span>`).join('')}</dd></div>
-            <div><dt>후원사</dt><dd>${
-              SUPPORT_SPONSORS.length
-                ? SUPPORT_SPONSORS.map((x) => `<span class="sp-chip" title="${esc(x.what)}">${esc(x.name)}</span>`).join('')
-                : '<span class="sp-empty">아직 없습니다</span>'
-            }</dd></div>
+            <div><dt>현재 자문</dt><dd>${SUPPORT_HELPERS.map((h) => `<span class="sp-chip">${esc(h)}</span>`).join('')}</dd></div>
           </dl>
-        </section>
-
-        <section class="sp-sec sp-give" id="sp-give">
-          <h3 class="sp-h">작은 후원으로 함께해 주세요</h3>
+          <h4 class="sp-expand-h">도움을 주신 분(확대 예정)</h4>
+          <p class="sp-text">도로 위 안전운전을 위한 주체들로 안전문화를 함께 만듭니다.</p>
+          <ul class="sp-points sp-expand">
+            ${SUPPORT_EXPAND.map((x) => `<li><b>${esc(x.name)}</b>${esc(x.why)}</li>`).join('')}
+          </ul>
           ${give}
           <!-- 문의 줄 — 예전 '기업 · 기관 후원 문의' 를 사용자가 '관련 문의' 로 바꿨다 (2026-11-14) -->
           <p class="sp-contact">관련 문의 : <a href="mailto:${esc(APP_CONTACT)}">${esc(APP_CONTACT)}</a></p>
@@ -3056,7 +3054,7 @@ export class Screens {
       </div>
     `;
     this.bindBack('support', onBack);
-    // 초록 버튼 세 개 — 모두 맨 아래 후원 칸('후원을 준비하고 있습니다.')으로 내려간다
+    // 초록 버튼 세 개 — 모두 맨 아래 '도움을 주신 분' 칸으로 내려간다
     for (const btn of document.querySelectorAll('#support-body .sp-jump'))
       btn.addEventListener('click', () => document.getElementById('sp-give')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     document

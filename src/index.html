@@ -943,35 +943,23 @@
         font-size: 15.5px;
         font-weight: 800;
       }
-      .sp-empty {
-        font-size: 15px;
-        color: #9aa1ad;
-      }
-      .sp-give {
-        text-align: center;
-      }
-      /* 후원 창구가 정해지기 전의 안내 한 줄 */
-      .sp-give-note {
-        display: inline-block;
-        margin: 0;
-        padding: 12px 22px;
-        border-radius: 18px;
-        background: #eef6f0;
+      /*
+        도움을 주신 분(확대 예정) — 갈래 넷을 PC 는 두 칸씩, 휴대폰은 한 칸으로 (사용자, 2026-11-15 — 발표자료 15장과 같은 말).
+        예전 '후원사 · 아직 없습니다' 와 고등학생 안내 세 줄(.sp-give-note)은 이 칸으로 바뀌어 뺐다.
+      */
+      .sp-expand-h {
+        margin: 26px 0 6px;
+        font-size: 18px;
+        font-weight: 900;
         color: #14532d;
-        font-size: 16px;
-        font-weight: 800;
         word-break: keep-all;
       }
-      /* 세 줄 — 첫 줄(준비 중)만 굵게, 아래 두 줄은 사정 (2026-11-15 사용자 문장) */
-      .sp-give-note b,
-      .sp-give-note span {
-        display: block;
+      .sp-points.sp-expand {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .sp-give-note span {
-        margin-top: 4px;
-        font-size: 15px;
-        font-weight: 600;
-        line-height: 1.6;
+      .sp-people + .sp-expand-h {
+        margin-top: 26px;
       }
       .sp-contact {
         margin: 14px 0 0;
@@ -986,7 +974,8 @@
       @media (max-width: 720px) {
         .sp-split,
         .sp-split.sp-flip,
-        .sp-use {
+        .sp-use,
+        .sp-points.sp-expand {
           grid-template-columns: minmax(0, 1fr);
         }
         .sp-flip .sp-art {
